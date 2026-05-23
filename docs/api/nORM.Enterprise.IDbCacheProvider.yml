@@ -22,13 +22,20 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IDbCacheProvider
     path: src/nORM/Enterprise/IDbCacheProvider.cs
-    startLine: 7
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: >-
+    Defines a caching mechanism that can be used by the framework to store and
+
+    retrieve results of database operations.
+  example: []
   syntax:
     content: public interface IDbCacheProvider
     content.vb: Public Interface IDbCacheProvider
+  derivedClasses:
+  - nORM.Core.NormMemoryCacheProvider
   extensionMethods:
   - nORM.Enterprise.IDbCacheProvider.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
   - nORM.Enterprise.IDbCacheProvider.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.IDbCacheProvider,{TProperty}}})
@@ -52,21 +59,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TryGet
     path: src/nORM/Enterprise/IDbCacheProvider.cs
-    startLine: 9
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Attempts to retrieve a cached value for the specified <code class="paramref">key</code>.
+  example: []
   syntax:
     content: bool TryGet<T>(string key, out T? value)
     parameters:
     - id: key
       type: System.String
+      description: The unique identifier of the cache entry.
     - id: value
       type: '{T}'
+      description: When this method returns, contains the cached value if it was found.
     typeParameters:
     - id: T
+      description: Type of the cached value.
     return:
       type: System.Boolean
+      description: <code>true</code> if the value exists in the cache; otherwise, <code>false</code>.
     content.vb: Function TryGet(Of T)(key As String, value As T) As Boolean
   overload: nORM.Enterprise.IDbCacheProvider.TryGet*
   nameWithType.vb: IDbCacheProvider.TryGet(Of T)(String, T)
@@ -90,23 +103,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Set
     path: src/nORM/Enterprise/IDbCacheProvider.cs
-    startLine: 10
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Stores a value in the cache with the specified expiration policy and tags.
+  example: []
   syntax:
     content: void Set<T>(string key, T value, TimeSpan expiration, IEnumerable<string> tags)
     parameters:
     - id: key
       type: System.String
+      description: The unique identifier for the cache entry.
     - id: value
       type: '{T}'
+      description: The value to cache.
     - id: expiration
       type: System.TimeSpan
+      description: How long the entry should remain in the cache.
     - id: tags
       type: System.Collections.Generic.IEnumerable{System.String}
+      description: A collection of tags used to later invalidate related entries.
     typeParameters:
     - id: T
+      description: Type of the value being cached.
     content.vb: Sub [Set](Of T)(key As String, value As T, expiration As TimeSpan, tags As IEnumerable(Of String))
   overload: nORM.Enterprise.IDbCacheProvider.Set*
   nameWithType.vb: IDbCacheProvider.Set(Of T)(String, T, TimeSpan, IEnumerable(Of String))
@@ -130,15 +150,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InvalidateTag
     path: src/nORM/Enterprise/IDbCacheProvider.cs
-    startLine: 11
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Invalidates all cache entries associated with the specified <code class="paramref">tag</code>.
+  example: []
   syntax:
     content: void InvalidateTag(string tag)
     parameters:
     - id: tag
       type: System.String
+      description: The tag identifying which cache entries to remove.
     content.vb: Sub InvalidateTag(tag As String)
   overload: nORM.Enterprise.IDbCacheProvider.InvalidateTag*
   nameWithType.vb: IDbCacheProvider.InvalidateTag(String)

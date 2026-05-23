@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ITenantProvider
     path: src/nORM/Enterprise/ITenantProvider.cs
-    startLine: 4
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Provides access to the current tenant identifier in multi-tenant applications.
+  example: []
   syntax:
     content: public interface ITenantProvider
     content.vb: Public Interface ITenantProvider
@@ -50,14 +52,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCurrentTenantId
     path: src/nORM/Enterprise/ITenantProvider.cs
-    startLine: 6
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Enterprise
+  summary: Retrieves the identifier of the tenant associated with the current execution context.
+  example: []
   syntax:
     content: object GetCurrentTenantId()
     return:
       type: System.Object
+      description: A value representing the current tenant.
     content.vb: Function GetCurrentTenantId() As Object
   overload: nORM.Enterprise.ITenantProvider.GetCurrentTenantId*
 references:

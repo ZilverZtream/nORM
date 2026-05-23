@@ -40,7 +40,7 @@ items:
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
 - uid: nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
-  commentId: F:nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
+  commentId: P:nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
   id: SuppressExecutionContextFlow
   parent: nORM.Core.NormAsyncPolicy
   langs:
@@ -49,7 +49,7 @@ items:
   name: SuppressExecutionContextFlow
   nameWithType: NormAsyncPolicy.SuppressExecutionContextFlow
   fullName: nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
-  type: Field
+  type: Property
   source:
     remote:
       path: src/nORM/Core/NormAsyncPolicy.cs
@@ -67,10 +67,12 @@ items:
     Set environment variable NORM_PRESERVE_CONTEXT to "true" to preserve context.
   example: []
   syntax:
-    content: public static readonly bool SuppressExecutionContextFlow
+    content: public static bool SuppressExecutionContextFlow { get; }
+    parameters: []
     return:
       type: System.Boolean
-    content.vb: Public Shared ReadOnly SuppressExecutionContextFlow As Boolean
+    content.vb: Public Shared ReadOnly Property SuppressExecutionContextFlow As Boolean
+  overload: nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow*
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -331,6 +333,12 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow*
+  commentId: Overload:nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
+  href: nORM.Core.NormAsyncPolicy.html#nORM_Core_NormAsyncPolicy_SuppressExecutionContextFlow
+  name: SuppressExecutionContextFlow
+  nameWithType: NormAsyncPolicy.SuppressExecutionContextFlow
+  fullName: nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow
 - uid: System.Boolean
   commentId: T:System.Boolean
   parent: System

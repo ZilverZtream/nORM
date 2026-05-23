@@ -38,6 +38,7 @@ items:
   - nORM.Core.NormUsageException
   - nORM.Core.NormValidator
   - nORM.Core.OutputParameter
+  - nORM.Core.PreparedOperation`1
   - nORM.Core.QueryTrackingBehavior
   - nORM.Core.SetPropertyCalls`1
   - nORM.Core.StoredProcedureResult`1
@@ -151,32 +152,26 @@ references:
   name: DbContext
   nameWithType: DbContext
   fullName: nORM.Core.DbContext
-- uid: nORM.Core.OutputParameter
-  commentId: T:nORM.Core.OutputParameter
-  href: nORM.Core.OutputParameter.html
-  name: OutputParameter
-  nameWithType: OutputParameter
-  fullName: nORM.Core.OutputParameter
-- uid: nORM.Core.StoredProcedureResult`1
-  commentId: T:nORM.Core.StoredProcedureResult`1
-  href: nORM.Core.StoredProcedureResult-1.html
-  name: StoredProcedureResult<T>
-  nameWithType: StoredProcedureResult<T>
-  fullName: nORM.Core.StoredProcedureResult<T>
-  nameWithType.vb: StoredProcedureResult(Of T)
-  fullName.vb: nORM.Core.StoredProcedureResult(Of T)
-  name.vb: StoredProcedureResult(Of T)
+- uid: nORM.Core.PreparedOperation`1
+  commentId: T:nORM.Core.PreparedOperation`1
+  href: nORM.Core.PreparedOperation-1.html
+  name: PreparedOperation<T>
+  nameWithType: PreparedOperation<T>
+  fullName: nORM.Core.PreparedOperation<T>
+  nameWithType.vb: PreparedOperation(Of T)
+  fullName.vb: nORM.Core.PreparedOperation(Of T)
+  name.vb: PreparedOperation(Of T)
   spec.csharp:
-  - uid: nORM.Core.StoredProcedureResult`1
-    name: StoredProcedureResult
-    href: nORM.Core.StoredProcedureResult-1.html
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
   - name: <
   - name: T
   - name: '>'
   spec.vb:
-  - uid: nORM.Core.StoredProcedureResult`1
-    name: StoredProcedureResult
-    href: nORM.Core.StoredProcedureResult-1.html
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
   - name: (
   - name: Of
   - name: " "
@@ -398,6 +393,37 @@ references:
   - uid: nORM.Core.SetPropertyCalls`1
     name: SetPropertyCalls
     href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.OutputParameter
+  commentId: T:nORM.Core.OutputParameter
+  href: nORM.Core.OutputParameter.html
+  name: OutputParameter
+  nameWithType: OutputParameter
+  fullName: nORM.Core.OutputParameter
+- uid: nORM.Core.StoredProcedureResult`1
+  commentId: T:nORM.Core.StoredProcedureResult`1
+  href: nORM.Core.StoredProcedureResult-1.html
+  name: StoredProcedureResult<T>
+  nameWithType: StoredProcedureResult<T>
+  fullName: nORM.Core.StoredProcedureResult<T>
+  nameWithType.vb: StoredProcedureResult(Of T)
+  fullName.vb: nORM.Core.StoredProcedureResult(Of T)
+  name.vb: StoredProcedureResult(Of T)
+  spec.csharp:
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
   - name: (
   - name: Of
   - name: " "

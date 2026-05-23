@@ -21,10 +21,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalExtensions
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 7
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Provides helper methods for querying temporal tables at specific points in time.
+  example: []
   syntax:
     content: public static class TemporalExtensions
     content.vb: Public Module TemporalExtensions
@@ -57,21 +59,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsOf
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 9
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Creates a query that returns entity states as of the specified timestamp.
+  example: []
   syntax:
     content: public static IQueryable<T> AsOf<T>(this IQueryable<T> source, DateTime timestamp)
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
+      description: Queryable source representing a temporal table.
     - id: timestamp
       type: System.DateTime
+      description: Point in time to query.
     typeParameters:
     - id: T
+      description: Type of the entity.
     return:
       type: System.Linq.IQueryable{{T}}
+      description: A queryable that yields entity values at the given timestamp.
     content.vb: Public Shared Function AsOf(Of T)(source As IQueryable(Of T), timestamp As Date) As IQueryable(Of T)
   overload: nORM.Core.TemporalExtensions.AsOf*
   nameWithType.vb: TemporalExtensions.AsOf(Of T)(IQueryable(Of T), Date)
@@ -96,21 +104,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsOf
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 16
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Creates a query that uses a temporal history table tag to filter results.
+  example: []
   syntax:
     content: public static IQueryable<T> AsOf<T>(this IQueryable<T> source, string tagName)
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
+      description: Queryable source representing a temporal table.
     - id: tagName
       type: System.String
+      description: Name of the history tag to apply.
     typeParameters:
     - id: T
+      description: Type of the entity.
     return:
       type: System.Linq.IQueryable{{T}}
+      description: A queryable filtered by the specified temporal tag.
     content.vb: Public Shared Function AsOf(Of T)(source As IQueryable(Of T), tagName As String) As IQueryable(Of T)
   overload: nORM.Core.TemporalExtensions.AsOf*
   nameWithType.vb: TemporalExtensions.AsOf(Of T)(IQueryable(Of T), String)

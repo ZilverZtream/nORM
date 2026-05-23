@@ -26,10 +26,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseNode
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 11
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Describes a single database node participating in the topology.
+  example: []
   syntax:
     content: public class DatabaseTopology.DatabaseNode
     content.vb: Public Class DatabaseTopology.DatabaseNode
@@ -66,10 +68,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConnectionString
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 13
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Connection string used to reach the node.
+  example: []
   syntax:
     content: public string ConnectionString { get; set; }
     parameters: []
@@ -95,10 +99,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Role
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 14
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The role the node plays within the topology.
+  example: []
   syntax:
     content: public DatabaseTopology.DatabaseRole Role { get; set; }
     parameters: []
@@ -124,10 +130,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Priority
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 16
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Relative priority used when selecting nodes.
+  example: []
   syntax:
     content: public int Priority { get; set; }
     parameters: []
@@ -153,10 +161,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsHealthy
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 19
+    startLine: 37
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Indicates whether the node is considered healthy and eligible for use.
+  example: []
   syntax:
     content: public bool IsHealthy { get; set; }
     parameters: []
@@ -182,10 +192,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LastHealthCheck
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 26
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Timestamp of the last health check performed against the node.
+  example: []
   syntax:
     content: public DateTime LastHealthCheck { get; set; }
     parameters: []
@@ -211,10 +223,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageLatency
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 33
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Gets or sets the moving average latency observed when communicating with the node.
+  example: []
   syntax:
     content: public TimeSpan AverageLatency { get; set; }
     parameters: []
@@ -240,10 +254,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Region
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 38
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Geographic region where the node is located.
+  example: []
   syntax:
     content: public string Region { get; set; }
     parameters: []

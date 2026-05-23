@@ -6,7 +6,10 @@ items:
   parent: nORM.Configuration
   children:
   - nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  - nORM.Configuration.IEntityTypeConfiguration.Converters
   - nORM.Configuration.IEntityTypeConfiguration.KeyProperties
+  - nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+  - nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
   - nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
   - nORM.Configuration.IEntityTypeConfiguration.Relationships
   - nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
@@ -26,10 +29,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IEntityTypeConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 8
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Defines mapping metadata for a single entity type including table, key,
+
+    property and relationship configuration.
+  example: []
   syntax:
     content: public interface IEntityTypeConfiguration
     content.vb: Public Interface IEntityTypeConfiguration
@@ -56,10 +64,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 10
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets the unqualified table name that the entity maps to.
+  example: []
   syntax:
     content: string? TableName { get; }
     parameters: []
@@ -85,16 +95,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: KeyProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 11
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets the collection of properties that compose the primary key.
+  example: []
   syntax:
-    content: List<PropertyInfo> KeyProperties { get; }
+    content: IReadOnlyList<PropertyInfo> KeyProperties { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.List{System.Reflection.PropertyInfo}
-    content.vb: ReadOnly Property KeyProperties As List(Of PropertyInfo)
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    content.vb: ReadOnly Property KeyProperties As IReadOnlyList(Of PropertyInfo)
   overload: nORM.Configuration.IEntityTypeConfiguration.KeyProperties*
 - uid: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames
@@ -114,16 +126,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnNames
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 12
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets a mapping of property infos to explicit column names.
+  example: []
   syntax:
-    content: Dictionary<PropertyInfo, string> ColumnNames { get; }
+    content: IReadOnlyDictionary<PropertyInfo, string> ColumnNames { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
-    content.vb: ReadOnly Property ColumnNames As Dictionary(Of PropertyInfo, String)
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+    content.vb: ReadOnly Property ColumnNames As IReadOnlyDictionary(Of PropertyInfo, String)
   overload: nORM.Configuration.IEntityTypeConfiguration.ColumnNames*
 - uid: nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
@@ -143,10 +157,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 13
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets the CLR type that this entity shares its table with, if any.
+  example: []
   syntax:
     content: Type? TableSplitWith { get; }
     parameters: []
@@ -172,16 +188,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 14
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets owned navigation properties configured for this entity.
+  example: []
   syntax:
-    content: Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
+    content: IReadOnlyDictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
-    content.vb: ReadOnly Property OwnedNavigations As Dictionary(Of PropertyInfo, OwnedNavigation)
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+    content.vb: ReadOnly Property OwnedNavigations As IReadOnlyDictionary(Of PropertyInfo, OwnedNavigation)
   overload: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations*
 - uid: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
@@ -201,16 +219,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 15
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets the shadow properties defined for the entity type.
+  example: []
   syntax:
-    content: Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
+    content: IReadOnlyDictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
-    content.vb: ReadOnly Property ShadowProperties As Dictionary(Of String, ShadowPropertyConfiguration)
+      type: System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+    content.vb: ReadOnly Property ShadowProperties As IReadOnlyDictionary(Of String, ShadowPropertyConfiguration)
   overload: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties*
 - uid: nORM.Configuration.IEntityTypeConfiguration.Relationships
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.Relationships
@@ -230,17 +250,115 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 16
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Gets the relationship configurations defined for the entity type.
+  example: []
   syntax:
-    content: List<RelationshipConfiguration> Relationships { get; }
+    content: IReadOnlyList<RelationshipConfiguration> Relationships { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
-    content.vb: ReadOnly Property Relationships As List(Of RelationshipConfiguration)
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.RelationshipConfiguration}
+    content.vb: ReadOnly Property Relationships As IReadOnlyList(Of RelationshipConfiguration)
   overload: nORM.Configuration.IEntityTypeConfiguration.Relationships*
+- uid: nORM.Configuration.IEntityTypeConfiguration.Converters
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.Converters
+  id: Converters
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: Converters
+  nameWithType: IEntityTypeConfiguration.Converters
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Converters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Converters
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 51
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets value converter configurations for this entity type.
+  example: []
+  syntax:
+    content: IReadOnlyList<ConverterConfiguration> Converters { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
+    content.vb: ReadOnly Property Converters As IReadOnlyList(Of ConverterConfiguration)
+  overload: nORM.Configuration.IEntityTypeConfiguration.Converters*
+- uid: nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
+  id: OwnedCollectionNavigations
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: OwnedCollectionNavigations
+  nameWithType: IEntityTypeConfiguration.OwnedCollectionNavigations
+  fullName: nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OwnedCollectionNavigations
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 57
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets owned collection navigation properties configured for this entity.
+
+    Key is the collection navigation property; value describes the owned element type and configuration.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, OwnedCollectionNavigation> OwnedCollectionNavigations { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedCollectionNavigation}
+    content.vb: ReadOnly Property OwnedCollectionNavigations As IReadOnlyDictionary(Of PropertyInfo, OwnedCollectionNavigation)
+  overload: nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations*
+- uid: nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+  id: ManyToManyRelationships
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ManyToManyRelationships
+  nameWithType: IEntityTypeConfiguration.ManyToManyRelationships
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ManyToManyRelationships
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets the many-to-many relationship configurations defined for this entity type.
+  example: []
+  syntax:
+    content: IReadOnlyList<ManyToManyConfiguration> ManyToManyRelationships { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ManyToManyConfiguration}
+    content.vb: ReadOnly Property ManyToManyRelationships As IReadOnlyList(Of ManyToManyConfiguration)
+  overload: nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships*
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -998,22 +1116,22 @@ references:
   name: KeyProperties
   nameWithType: IEntityTypeConfiguration.KeyProperties
   fullName: nORM.Configuration.IEntityTypeConfiguration.KeyProperties
-- uid: System.Collections.Generic.List{System.Reflection.PropertyInfo}
-  commentId: T:System.Collections.Generic.List{System.Reflection.PropertyInfo}
+- uid: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.List`1
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  name: List<PropertyInfo>
-  nameWithType: List<PropertyInfo>
-  fullName: System.Collections.Generic.List<System.Reflection.PropertyInfo>
-  nameWithType.vb: List(Of PropertyInfo)
-  fullName.vb: System.Collections.Generic.List(Of System.Reflection.PropertyInfo)
-  name.vb: List(Of PropertyInfo)
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<PropertyInfo>
+  nameWithType: IReadOnlyList<PropertyInfo>
+  fullName: System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>
+  nameWithType.vb: IReadOnlyList(Of PropertyInfo)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo)
+  name.vb: IReadOnlyList(Of PropertyInfo)
   spec.csharp:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: <
   - uid: System.Reflection.PropertyInfo
     name: PropertyInfo
@@ -1021,10 +1139,10 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: (
   - name: Of
   - name: " "
@@ -1033,29 +1151,29 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
   - name: )
-- uid: System.Collections.Generic.List`1
-  commentId: T:System.Collections.Generic.List`1
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
   isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  name: List<T>
-  nameWithType: List<T>
-  fullName: System.Collections.Generic.List<T>
-  nameWithType.vb: List(Of T)
-  fullName.vb: System.Collections.Generic.List(Of T)
-  name.vb: List(Of T)
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
   spec.csharp:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: <
   - name: T
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: (
   - name: Of
   - name: " "
@@ -1104,22 +1222,22 @@ references:
   name: ColumnNames
   nameWithType: IEntityTypeConfiguration.ColumnNames
   fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
-- uid: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
-  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,System.String}
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.Dictionary`2
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
-  name: Dictionary<PropertyInfo, string>
-  nameWithType: Dictionary<PropertyInfo, string>
-  fullName: System.Collections.Generic.Dictionary<System.Reflection.PropertyInfo, string>
-  nameWithType.vb: Dictionary(Of PropertyInfo, String)
-  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.PropertyInfo, String)
-  name.vb: Dictionary(Of PropertyInfo, String)
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<PropertyInfo, string>
+  nameWithType: IReadOnlyDictionary<PropertyInfo, string>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Reflection.PropertyInfo, string>
+  nameWithType.vb: IReadOnlyDictionary(Of PropertyInfo, String)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Reflection.PropertyInfo, String)
+  name.vb: IReadOnlyDictionary(Of PropertyInfo, String)
   spec.csharp:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - uid: System.Reflection.PropertyInfo
     name: PropertyInfo
@@ -1133,10 +1251,10 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "
@@ -1151,21 +1269,21 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: )
-- uid: System.Collections.Generic.Dictionary`2
-  commentId: T:System.Collections.Generic.Dictionary`2
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
   isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
-  name: Dictionary<TKey, TValue>
-  nameWithType: Dictionary<TKey, TValue>
-  fullName: System.Collections.Generic.Dictionary<TKey, TValue>
-  nameWithType.vb: Dictionary(Of TKey, TValue)
-  fullName.vb: System.Collections.Generic.Dictionary(Of TKey, TValue)
-  name.vb: Dictionary(Of TKey, TValue)
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
   spec.csharp:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - name: TKey
   - name: ','
@@ -1173,10 +1291,10 @@ references:
   - name: TValue
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "
@@ -1205,22 +1323,22 @@ references:
   name: OwnedNavigations
   nameWithType: IEntityTypeConfiguration.OwnedNavigations
   fullName: nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
-- uid: System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
-  commentId: T:System.Collections.Generic.Dictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.Dictionary`2
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
-  name: Dictionary<PropertyInfo, OwnedNavigation>
-  nameWithType: Dictionary<PropertyInfo, OwnedNavigation>
-  fullName: System.Collections.Generic.Dictionary<System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation>
-  nameWithType.vb: Dictionary(Of PropertyInfo, OwnedNavigation)
-  fullName.vb: System.Collections.Generic.Dictionary(Of System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation)
-  name.vb: Dictionary(Of PropertyInfo, OwnedNavigation)
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<PropertyInfo, OwnedNavigation>
+  nameWithType: IReadOnlyDictionary<PropertyInfo, OwnedNavigation>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation>
+  nameWithType.vb: IReadOnlyDictionary(Of PropertyInfo, OwnedNavigation)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Reflection.PropertyInfo, nORM.Configuration.OwnedNavigation)
+  name.vb: IReadOnlyDictionary(Of PropertyInfo, OwnedNavigation)
   spec.csharp:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - uid: System.Reflection.PropertyInfo
     name: PropertyInfo
@@ -1233,10 +1351,10 @@ references:
     href: nORM.Configuration.OwnedNavigation.html
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "
@@ -1256,22 +1374,22 @@ references:
   name: ShadowProperties
   nameWithType: IEntityTypeConfiguration.ShadowProperties
   fullName: nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
-- uid: System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
-  commentId: T:System.Collections.Generic.Dictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.Dictionary`2
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
-  name: Dictionary<string, ShadowPropertyConfiguration>
-  nameWithType: Dictionary<string, ShadowPropertyConfiguration>
-  fullName: System.Collections.Generic.Dictionary<string, nORM.Configuration.ShadowPropertyConfiguration>
-  nameWithType.vb: Dictionary(Of String, ShadowPropertyConfiguration)
-  fullName.vb: System.Collections.Generic.Dictionary(Of String, nORM.Configuration.ShadowPropertyConfiguration)
-  name.vb: Dictionary(Of String, ShadowPropertyConfiguration)
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<string, ShadowPropertyConfiguration>
+  nameWithType: IReadOnlyDictionary<string, ShadowPropertyConfiguration>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<string, nORM.Configuration.ShadowPropertyConfiguration>
+  nameWithType.vb: IReadOnlyDictionary(Of String, ShadowPropertyConfiguration)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of String, nORM.Configuration.ShadowPropertyConfiguration)
+  name.vb: IReadOnlyDictionary(Of String, ShadowPropertyConfiguration)
   spec.csharp:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - uid: System.String
     name: string
@@ -1284,10 +1402,10 @@ references:
     href: nORM.Configuration.ShadowPropertyConfiguration.html
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.Dictionary`2
-    name: Dictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "
@@ -1307,36 +1425,165 @@ references:
   name: Relationships
   nameWithType: IEntityTypeConfiguration.Relationships
   fullName: nORM.Configuration.IEntityTypeConfiguration.Relationships
-- uid: System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
-  commentId: T:System.Collections.Generic.List{nORM.Configuration.RelationshipConfiguration}
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.RelationshipConfiguration}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.RelationshipConfiguration}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.List`1
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  name: List<RelationshipConfiguration>
-  nameWithType: List<RelationshipConfiguration>
-  fullName: System.Collections.Generic.List<nORM.Configuration.RelationshipConfiguration>
-  nameWithType.vb: List(Of RelationshipConfiguration)
-  fullName.vb: System.Collections.Generic.List(Of nORM.Configuration.RelationshipConfiguration)
-  name.vb: List(Of RelationshipConfiguration)
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<RelationshipConfiguration>
+  nameWithType: IReadOnlyList<RelationshipConfiguration>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Configuration.RelationshipConfiguration>
+  nameWithType.vb: IReadOnlyList(Of RelationshipConfiguration)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Configuration.RelationshipConfiguration)
+  name.vb: IReadOnlyList(Of RelationshipConfiguration)
   spec.csharp:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: <
   - uid: nORM.Configuration.RelationshipConfiguration
     name: RelationshipConfiguration
     href: nORM.Configuration.RelationshipConfiguration.html
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: (
   - name: Of
   - name: " "
   - uid: nORM.Configuration.RelationshipConfiguration
     name: RelationshipConfiguration
     href: nORM.Configuration.RelationshipConfiguration.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.Converters*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.Converters
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_Converters
+  name: Converters
+  nameWithType: IEntityTypeConfiguration.Converters
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Converters
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<ConverterConfiguration>
+  nameWithType: IReadOnlyList<ConverterConfiguration>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Configuration.ConverterConfiguration>
+  nameWithType.vb: IReadOnlyList(Of ConverterConfiguration)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Configuration.ConverterConfiguration)
+  name.vb: IReadOnlyList(Of ConverterConfiguration)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Configuration.ConverterConfiguration
+    name: ConverterConfiguration
+    href: nORM.Configuration.ConverterConfiguration.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.ConverterConfiguration
+    name: ConverterConfiguration
+    href: nORM.Configuration.ConverterConfiguration.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_OwnedCollectionNavigations
+  name: OwnedCollectionNavigations
+  nameWithType: IEntityTypeConfiguration.OwnedCollectionNavigations
+  fullName: nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedCollectionNavigation}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedCollectionNavigation}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<PropertyInfo, OwnedCollectionNavigation>
+  nameWithType: IReadOnlyDictionary<PropertyInfo, OwnedCollectionNavigation>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Reflection.PropertyInfo, nORM.Configuration.OwnedCollectionNavigation>
+  nameWithType.vb: IReadOnlyDictionary(Of PropertyInfo, OwnedCollectionNavigation)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Reflection.PropertyInfo, nORM.Configuration.OwnedCollectionNavigation)
+  name.vb: IReadOnlyDictionary(Of PropertyInfo, OwnedCollectionNavigation)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.OwnedCollectionNavigation
+    name: OwnedCollectionNavigation
+    href: nORM.Configuration.OwnedCollectionNavigation.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: nORM.Configuration.OwnedCollectionNavigation
+    name: OwnedCollectionNavigation
+    href: nORM.Configuration.OwnedCollectionNavigation.html
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ManyToManyRelationships
+  name: ManyToManyRelationships
+  nameWithType: IEntityTypeConfiguration.ManyToManyRelationships
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ManyToManyConfiguration}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ManyToManyConfiguration}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<ManyToManyConfiguration>
+  nameWithType: IReadOnlyList<ManyToManyConfiguration>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Configuration.ManyToManyConfiguration>
+  nameWithType.vb: IReadOnlyList(Of ManyToManyConfiguration)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Configuration.ManyToManyConfiguration)
+  name.vb: IReadOnlyList(Of ManyToManyConfiguration)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Configuration.ManyToManyConfiguration
+    name: ManyToManyConfiguration
+    href: nORM.Configuration.ManyToManyConfiguration.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.ManyToManyConfiguration
+    name: ManyToManyConfiguration
+    href: nORM.Configuration.ManyToManyConfiguration.html
   - name: )

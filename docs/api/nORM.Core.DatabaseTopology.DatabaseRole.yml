@@ -22,10 +22,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseRole
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 41
+    startLine: 70
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Enumerates the roles that a database node can fulfill.
+  example: []
   syntax:
     content: public enum DatabaseTopology.DatabaseRole
     content.vb: Public Enum DatabaseTopology.DatabaseRole
@@ -47,10 +49,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Primary
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 43
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The primary writable node.
+  example: []
   syntax:
     content: Primary = 0
     return:
@@ -73,10 +77,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReadReplica
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 44
+    startLine: 75
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: A read-only replica used for load balancing.
+  example: []
   syntax:
     content: ReadReplica = 1
     return:
@@ -99,10 +105,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SecondaryMaster
     path: src/nORM/Core/DatabaseTopology.cs
-    startLine: 45
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: A secondary writable node that can assume the primary role during failover.
+  example: []
   syntax:
     content: SecondaryMaster = 2
     return:

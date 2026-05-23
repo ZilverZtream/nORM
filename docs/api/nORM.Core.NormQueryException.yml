@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormQueryException
     path: src/nORM/Core/NormQueryException.cs
-    startLine: 5
+    startLine: 8
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Exception thrown when a query fails to execute or produces an error result.
+  example: []
   syntax:
     content: 'public class NormQueryException : NormException, ISerializable'
     content.vb: Public Class NormQueryException Inherits NormException Implements ISerializable
@@ -84,21 +86,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormQueryException.cs
-    startLine: 7
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new <xref href="nORM.Core.NormQueryException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormQueryException(string message, string? sql = null, IReadOnlyDictionary<string, object>? parameters = null, Exception? inner = null)
     parameters:
     - id: message
       type: System.String
+      description: Human-readable error message.
     - id: sql
       type: System.String
+      description: Offending SQL statement, if available.
     - id: parameters
       type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+      description: Parameters used in the statement.
     - id: inner
       type: System.Exception
+      description: Underlying exception that triggered this error.
     content.vb: Public Sub New(message As String, sql As String = Nothing, parameters As IReadOnlyDictionary(Of String, Object) = Nothing, inner As Exception = Nothing)
   overload: nORM.Core.NormQueryException.#ctor*
   nameWithType.vb: NormQueryException.New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
@@ -1370,6 +1378,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormQueryException
+  commentId: T:nORM.Core.NormQueryException
+  href: nORM.Core.NormQueryException.html
+  name: NormQueryException
+  nameWithType: NormQueryException
+  fullName: nORM.Core.NormQueryException
 - uid: nORM.Core.NormQueryException.#ctor*
   commentId: Overload:nORM.Core.NormQueryException.#ctor
   href: nORM.Core.NormQueryException.html#nORM_Core_NormQueryException__ctor_System_String_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_Exception_

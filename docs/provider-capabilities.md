@@ -7,10 +7,15 @@ server can be reached.
 
 | Provider | Minimum Version | Notes | JSON | Temporal | Native Bulk Insert | Savepoints | Driver |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SQL Server | 13.0 / SQL Server 2016 | JSON support requires 2016 | Yes | Yes | Yes | Yes | `Microsoft.Data.SqlClient` |
-| PostgreSQL | 12+ | | Yes | Yes | Yes | Yes | `Npgsql` |
-| MySQL | 8.0+ | RENAME COLUMN requires 8.0 | Yes | Yes | Yes | Yes | `MySqlConnector` or `MySql.Data` |
-| SQLite | 3.25+ | RENAME COLUMN requires 3.25 | JSON1-dependent | Yes | No | Yes | `Microsoft.Data.Sqlite` |
+| SQL Server | 13.0 (SQL Server 2016) | JSON support requires 2016 | Yes | Yes | Yes | Yes | `Microsoft.Data.SqlClient` |
+| PostgreSQL | 12.0 | Generated identity (10) + JSON path operators (12) | Yes | Yes | Yes | Yes | `Npgsql` |
+| MySQL | 8.0 | RENAME COLUMN requires 8.0 | Yes | Yes | Yes | Yes | `MySqlConnector` or `MySql.Data` |
+| SQLite | 3.25 | RENAME COLUMN, window functions, and UPSERT require 3.25 | JSON1-dependent | Yes | No | Yes | `Microsoft.Data.Sqlite` |
+
+Versions in the Minimum Version column are floors enforced at runtime: connections to older
+servers fail startup validation with a `NormConfigurationException` that names the actual
+and minimum versions. `ProviderCapabilityContractTests` enforces that this table and the
+runtime `Capabilities.MinimumServerVersion` for each provider stay in sync.
 
 ## Startup Validation
 

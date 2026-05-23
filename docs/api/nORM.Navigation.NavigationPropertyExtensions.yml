@@ -29,9 +29,9 @@ items:
   - nORM
   namespace: nORM.Navigation
   summary: >-
-    Advanced navigation property system with lazy loading, change tracking, and performance optimization
+    Provides extension methods for lazy loading and explicit loading of navigation properties.
 
-    Provides EF Core-like experience without sacrificing nORM's performance characteristics
+    Delivers an EF Core-like experience without sacrificing nORM's performance characteristics.
   example: []
   syntax:
     content: public static class NavigationPropertyExtensions
@@ -65,11 +65,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableLazyLoading
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 43
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Enables lazy loading for an entity instance
+  summary: >-
+    Enables lazy loading for an entity instance by attaching lazy-loading proxies to
+
+    all eligible navigation properties.
   example: []
   syntax:
     content: 'public static T EnableLazyLoading<T>(this T entity, DbContext context) where T : class'
@@ -84,6 +87,10 @@ items:
       type: '{T}'
     content.vb: Public Shared Function EnableLazyLoading(Of T As Class)(entity As T, context As DbContext) As T
   overload: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">entity</code> or <code class="paramref">context</code> is <code>null</code>.
   nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
   fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
   name.vb: EnableLazyLoading(Of T)(T, DbContext)
@@ -105,7 +112,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CleanupNavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 58
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -142,11 +149,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 79
+    startLine: 86
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Loads a navigation property explicitly
+  summary: Explicitly loads a reference navigation property from the database.
   example: []
   syntax:
     content: 'public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, TProperty?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class'
@@ -186,11 +193,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 97
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Loads a collection navigation property explicitly
+  summary: Explicitly loads a collection navigation property from the database.
   example: []
   syntax:
     content: 'public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, ICollection<TProperty>?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class'
@@ -230,11 +237,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 115
+    startLine: 124
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Checks if a navigation property is loaded
+  summary: Checks whether a navigation property has already been loaded for the given entity.
   example: []
   syntax:
     content: 'public static bool IsLoaded<T, TProperty>(this T entity, Expression<Func<T, TProperty?>> navigationProperty) where T : class'
@@ -513,6 +520,13 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading*
   commentId: Overload:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading
   href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_

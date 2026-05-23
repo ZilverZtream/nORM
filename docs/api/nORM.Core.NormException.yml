@@ -22,10 +22,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormException
     path: src/nORM/Core/NormException.cs
-    startLine: 8
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Base exception type for nORM that enriches <xref href="System.Data.Common.DbException" data-throw-if-not-resolved="false"></xref> with SQL and parameter information.
+  example: []
   syntax:
     content: 'public class NormException : DbException, ISerializable'
     content.vb: Public Class NormException Inherits DbException Implements ISerializable
@@ -91,10 +93,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlStatement
     path: src/nORM/Core/NormException.cs
-    startLine: 10
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Gets the SQL statement that caused the exception, if available.
+  example: []
   syntax:
     content: public string? SqlStatement { get; }
     parameters: []
@@ -120,10 +124,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Parameters
     path: src/nORM/Core/NormException.cs
-    startLine: 11
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Gets the parameters used with the SQL statement, if any.
+  example: []
   syntax:
     content: public IReadOnlyDictionary<string, object>? Parameters { get; }
     parameters: []
@@ -149,27 +155,41 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormException.cs
-    startLine: 13
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner = null)
     parameters:
     - id: message
       type: System.String
+      description: Human-readable error message.
     - id: sql
       type: System.String
+      description: SQL statement associated with the error.
     - id: parameters
       type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+      description: Parameters supplied with the SQL statement.
     - id: inner
       type: System.Exception
+      description: The original exception that triggered this error.
     content.vb: Public Sub New(message As String, sql As String, parameters As IReadOnlyDictionary(Of String, Object), inner As Exception = Nothing)
   overload: nORM.Core.NormException.#ctor*
   nameWithType.vb: NormException.New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
   fullName.vb: nORM.Core.NormException.New(String, String, System.Collections.Generic.IReadOnlyDictionary(Of String, Object), System.Exception)
   name.vb: New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
 references:
+- uid: System.Data.Common.DbException
+  commentId: T:System.Data.Common.DbException
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception
+  name: DbException
+  nameWithType: DbException
+  fullName: System.Data.Common.DbException
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -227,14 +247,6 @@ references:
   name: ExternalException
   nameWithType: ExternalException
   fullName: System.Runtime.InteropServices.ExternalException
-- uid: System.Data.Common.DbException
-  commentId: T:System.Data.Common.DbException
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbexception
-  name: DbException
-  nameWithType: DbException
-  fullName: System.Data.Common.DbException
 - uid: System.Runtime.Serialization.ISerializable
   commentId: T:System.Runtime.Serialization.ISerializable
   parent: System.Runtime.Serialization
@@ -954,6 +966,43 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
 - uid: System
   commentId: N:System
   isExternal: true
@@ -998,43 +1047,6 @@ references:
     name: InteropServices
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.runtime.interopservices
-- uid: System.Data.Common
-  commentId: N:System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Data.Common
-  nameWithType: System.Data.Common
-  fullName: System.Data.Common
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
 - uid: System.Runtime.Serialization
   commentId: N:System.Runtime.Serialization
   isExternal: true
@@ -1555,6 +1567,13 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.NormException
+  commentId: T:nORM.Core.NormException
+  parent: nORM.Core
+  href: nORM.Core.NormException.html
+  name: NormException
+  nameWithType: NormException
+  fullName: nORM.Core.NormException
 - uid: nORM.Core.NormException.#ctor*
   commentId: Overload:nORM.Core.NormException.#ctor
   href: nORM.Core.NormException.html#nORM_Core_NormException__ctor_System_String_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_Exception_

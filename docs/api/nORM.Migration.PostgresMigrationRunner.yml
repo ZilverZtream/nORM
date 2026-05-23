@@ -5,8 +5,11 @@ items:
   id: PostgresMigrationRunner
   parent: nORM.Migration
   children:
-  - nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
+  - nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  - nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   - nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
+  - nORM.Migration.PostgresMigrationRunner.Dispose
+  - nORM.Migration.PostgresMigrationRunner.DisposeAsync
   - nORM.Migration.PostgresMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
   - nORM.Migration.PostgresMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken)
   langs:
@@ -23,17 +26,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PostgresMigrationRunner
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 17
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Executes migrations against a PostgreSQL database using a supplied connection and migrations assembly.
+  example: []
   syntax:
-    content: 'public class PostgresMigrationRunner : IMigrationRunner'
-    content.vb: Public Class PostgresMigrationRunner Implements IMigrationRunner
+    content: 'public class PostgresMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
+    content.vb: Public Class PostgresMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
   - nORM.Migration.IMigrationRunner
+  - System.IAsyncDisposable
+  - System.IDisposable
   inheritedMembers:
   - System.Object.Equals(System.Object)
   - System.Object.Equals(System.Object,System.Object)
@@ -47,16 +54,16 @@ items:
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,{TProperty}}})
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,{TProperty}}},System.Threading.CancellationToken)
-- uid: nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
-  commentId: M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
-  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)'
+- uid: nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  commentId: M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
   parent: nORM.Migration.PostgresMigrationRunner
   langs:
   - csharp
   - vb
-  name: PostgresMigrationRunner(DbConnection, Assembly, DbContextOptions?)
-  nameWithType: PostgresMigrationRunner.PostgresMigrationRunner(DbConnection, Assembly, DbContextOptions?)
-  fullName: nORM.Migration.PostgresMigrationRunner.PostgresMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions?)
+  name: PostgresMigrationRunner(DbConnection, Assembly, DbContextOptions?, ILogger?)
+  nameWithType: PostgresMigrationRunner.PostgresMigrationRunner(DbConnection, Assembly, DbContextOptions?, ILogger?)
+  fullName: nORM.Migration.PostgresMigrationRunner.PostgresMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions?, Microsoft.Extensions.Logging.ILogger?)
   type: Constructor
   source:
     remote:
@@ -65,24 +72,79 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 24
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.PostgresMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
-    content: public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
+    content: public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
+      description: Open connection to the target PostgreSQL database.
     - id: migrationsAssembly
       type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
     - id: options
       type: nORM.Configuration.DbContextOptions
-    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, options As DbContextOptions = Nothing)
+      description: Optional DbContext configuration for interceptors.
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+      description: Optional logger for drift warnings and diagnostics.
+    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, options As DbContextOptions = Nothing, logger As ILogger = Nothing)
   overload: nORM.Migration.PostgresMigrationRunner.#ctor*
-  nameWithType.vb: PostgresMigrationRunner.New(DbConnection, Assembly, DbContextOptions)
-  fullName.vb: nORM.Migration.PostgresMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions)
-  name.vb: New(DbConnection, Assembly, DbContextOptions)
+  nameWithType.vb: PostgresMigrationRunner.New(DbConnection, Assembly, DbContextOptions, ILogger)
+  fullName.vb: nORM.Migration.PostgresMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions, Microsoft.Extensions.Logging.ILogger)
+  name.vb: New(DbConnection, Assembly, DbContextOptions, ILogger)
+- uid: nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  commentId: M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
+  parent: nORM.Migration.PostgresMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: PostgresMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?, ILogger?)
+  nameWithType: PostgresMigrationRunner.PostgresMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?, ILogger?)
+  fullName: nORM.Migration.PostgresMigrationRunner.PostgresMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions?, Microsoft.Extensions.Logging.ILogger?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Migration/PostgresMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Migration/PostgresMigrationRunner.cs
+    startLine: 61
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.PostgresMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
+  syntax:
+    content: public PostgresMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null, ILogger? logger = null)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open connection to the target PostgreSQL database.
+    - id: migrationsAssembly
+      type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
+    - id: migrationOptions
+      type: nORM.Migration.MigrationOptions
+      description: Migration runner options.
+    - id: options
+      type: nORM.Configuration.DbContextOptions
+      description: Optional DbContext configuration for interceptors.
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+      description: Optional logger for drift warnings and diagnostics.
+    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, migrationOptions As MigrationOptions, options As DbContextOptions = Nothing, logger As ILogger = Nothing)
+  overload: nORM.Migration.PostgresMigrationRunner.#ctor*
+  nameWithType.vb: PostgresMigrationRunner.New(DbConnection, Assembly, MigrationOptions, DbContextOptions, ILogger)
+  fullName.vb: nORM.Migration.PostgresMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions, Microsoft.Extensions.Logging.ILogger)
+  name.vb: New(DbConnection, Assembly, MigrationOptions, DbContextOptions, ILogger)
 - uid: nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   id: ApplyMigrationsAsync(System.Threading.CancellationToken)
@@ -101,11 +163,16 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 38
+    startLine: 81
   assemblies:
   - nORM
   namespace: nORM.Migration
-  summary: Applies all pending migrations to the PostgreSQL database.
+  summary: >-
+    Applies all pending migrations to the PostgreSQL database.
+
+    Acquires a session-level advisory lock (<code>pg_try_advisory_lock</code>) before reading the
+
+    pending list, preventing concurrent deployers from running the same DDL simultaneously.
   example: []
   syntax:
     content: public Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -137,7 +204,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 58
+    startLine: 182
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -174,7 +241,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 70
+    startLine: 197
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -193,6 +260,68 @@ items:
   overload: nORM.Migration.PostgresMigrationRunner.GetPendingMigrationsAsync*
   implements:
   - nORM.Migration.IMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
+- uid: nORM.Migration.PostgresMigrationRunner.DisposeAsync
+  commentId: M:nORM.Migration.PostgresMigrationRunner.DisposeAsync
+  id: DisposeAsync
+  parent: nORM.Migration.PostgresMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: DisposeAsync()
+  nameWithType: PostgresMigrationRunner.DisposeAsync()
+  fullName: nORM.Migration.PostgresMigrationRunner.DisposeAsync()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/PostgresMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DisposeAsync
+    path: src/nORM/Migration/PostgresMigrationRunner.cs
+    startLine: 347
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Asynchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public ValueTask DisposeAsync()
+    return:
+      type: System.Threading.Tasks.ValueTask
+    content.vb: Public Function DisposeAsync() As ValueTask
+  overload: nORM.Migration.PostgresMigrationRunner.DisposeAsync*
+  implements:
+  - System.IAsyncDisposable.DisposeAsync
+- uid: nORM.Migration.PostgresMigrationRunner.Dispose
+  commentId: M:nORM.Migration.PostgresMigrationRunner.Dispose
+  id: Dispose
+  parent: nORM.Migration.PostgresMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: Dispose()
+  nameWithType: PostgresMigrationRunner.Dispose()
+  fullName: nORM.Migration.PostgresMigrationRunner.Dispose()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/PostgresMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Dispose
+    path: src/nORM/Migration/PostgresMigrationRunner.cs
+    startLine: 362
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Synchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public void Dispose()
+    content.vb: Public Sub Dispose()
+  overload: nORM.Migration.PostgresMigrationRunner.Dispose*
+  implements:
+  - System.IDisposable.Dispose
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -234,6 +363,22 @@ references:
   name: IMigrationRunner
   nameWithType: IMigrationRunner
   fullName: nORM.Migration.IMigrationRunner
+- uid: System.IAsyncDisposable
+  commentId: T:System.IAsyncDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable
+  name: IAsyncDisposable
+  nameWithType: IAsyncDisposable
+  fullName: System.IAsyncDisposable
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
 - uid: System.Object.Equals(System.Object)
   commentId: M:System.Object.Equals(System.Object)
   parent: System.Object
@@ -1164,9 +1309,15 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Migration.PostgresMigrationRunner
+  commentId: T:nORM.Migration.PostgresMigrationRunner
+  href: nORM.Migration.PostgresMigrationRunner.html
+  name: PostgresMigrationRunner
+  nameWithType: PostgresMigrationRunner
+  fullName: nORM.Migration.PostgresMigrationRunner
 - uid: nORM.Migration.PostgresMigrationRunner.#ctor*
   commentId: Overload:nORM.Migration.PostgresMigrationRunner.#ctor
-  href: nORM.Migration.PostgresMigrationRunner.html#nORM_Migration_PostgresMigrationRunner__ctor_System_Data_Common_DbConnection_System_Reflection_Assembly_nORM_Configuration_DbContextOptions_
+  href: nORM.Migration.PostgresMigrationRunner.html#nORM_Migration_PostgresMigrationRunner__ctor_System_Data_Common_DbConnection_System_Reflection_Assembly_nORM_Configuration_DbContextOptions_Microsoft_Extensions_Logging_ILogger_
   name: PostgresMigrationRunner
   nameWithType: PostgresMigrationRunner.PostgresMigrationRunner
   fullName: nORM.Migration.PostgresMigrationRunner.PostgresMigrationRunner
@@ -1196,6 +1347,14 @@ references:
   name: DbContextOptions
   nameWithType: DbContextOptions
   fullName: nORM.Configuration.DbContextOptions
+- uid: Microsoft.Extensions.Logging.ILogger
+  commentId: T:Microsoft.Extensions.Logging.ILogger
+  parent: Microsoft.Extensions.Logging
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger
+  name: ILogger
+  nameWithType: ILogger
+  fullName: Microsoft.Extensions.Logging.ILogger
 - uid: System.Data.Common
   commentId: N:System.Data.Common
   isExternal: true
@@ -1282,6 +1441,43 @@ references:
   - uid: nORM.Configuration
     name: Configuration
     href: nORM.Configuration.html
+- uid: Microsoft.Extensions.Logging
+  commentId: N:Microsoft.Extensions.Logging
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Logging
+  nameWithType: Microsoft.Extensions.Logging
+  fullName: Microsoft.Extensions.Logging
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+- uid: nORM.Migration.MigrationOptions
+  commentId: T:nORM.Migration.MigrationOptions
+  parent: nORM.Migration
+  href: nORM.Migration.MigrationOptions.html
+  name: MigrationOptions
+  nameWithType: MigrationOptions
+  fullName: nORM.Migration.MigrationOptions
 - uid: nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync*
   commentId: Overload:nORM.Migration.PostgresMigrationRunner.ApplyMigrationsAsync
   href: nORM.Migration.PostgresMigrationRunner.html#nORM_Migration_PostgresMigrationRunner_ApplyMigrationsAsync_System_Threading_CancellationToken_
@@ -1565,4 +1761,97 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: (
   - name: )
+  - name: )
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Migration.PostgresMigrationRunner.DisposeAsync*
+  commentId: Overload:nORM.Migration.PostgresMigrationRunner.DisposeAsync
+  href: nORM.Migration.PostgresMigrationRunner.html#nORM_Migration_PostgresMigrationRunner_DisposeAsync
+  name: DisposeAsync
+  nameWithType: PostgresMigrationRunner.DisposeAsync
+  fullName: nORM.Migration.PostgresMigrationRunner.DisposeAsync
+- uid: System.IAsyncDisposable.DisposeAsync
+  commentId: M:System.IAsyncDisposable.DisposeAsync
+  parent: System.IAsyncDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  name: DisposeAsync()
+  nameWithType: IAsyncDisposable.DisposeAsync()
+  fullName: System.IAsyncDisposable.DisposeAsync()
+  spec.csharp:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.ValueTask
+  commentId: T:System.Threading.Tasks.ValueTask
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask
+  name: ValueTask
+  nameWithType: ValueTask
+  fullName: System.Threading.Tasks.ValueTask
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Migration.PostgresMigrationRunner.Dispose*
+  commentId: Overload:nORM.Migration.PostgresMigrationRunner.Dispose
+  href: nORM.Migration.PostgresMigrationRunner.html#nORM_Migration_PostgresMigrationRunner_Dispose
+  name: Dispose
+  nameWithType: PostgresMigrationRunner.Dispose
+  fullName: nORM.Migration.PostgresMigrationRunner.Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
   - name: )

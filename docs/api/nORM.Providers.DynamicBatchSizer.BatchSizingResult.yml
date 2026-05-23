@@ -23,10 +23,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BatchSizingResult
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 16
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: >-
+    Represents the outcome of a batch size calculation including various
+
+    estimates that influenced the decision.
+  example: []
   syntax:
     content: public class DynamicBatchSizer.BatchSizingResult
     content.vb: Public Class DynamicBatchSizer.BatchSizingResult
@@ -63,10 +68,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OptimalBatchSize
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 18
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Chosen number of records to include in each batch.
+  example: []
   syntax:
     content: public int OptimalBatchSize { get; set; }
     parameters: []
@@ -92,16 +99,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EstimatedMemoryUsage
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 19
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Estimated memory consumption for a batch of the chosen size.
+  example: []
   syntax:
-    content: public int EstimatedMemoryUsage { get; set; }
+    content: public long EstimatedMemoryUsage { get; set; }
     parameters: []
     return:
-      type: System.Int32
-    content.vb: Public Property EstimatedMemoryUsage As Integer
+      type: System.Int64
+    content.vb: Public Property EstimatedMemoryUsage As Long
   overload: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage*
 - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
   commentId: P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
@@ -121,10 +130,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EstimatedBatchTime
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 20
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Estimated time required to process a batch of the chosen size.
+  example: []
   syntax:
     content: public TimeSpan EstimatedBatchTime { get; set; }
     parameters: []
@@ -150,10 +161,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Strategy
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 21
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Description of the strategy and factors used to derive the batch size.
+  example: []
   syntax:
     content: public string Strategy { get; set; }
     parameters: []
@@ -1148,6 +1161,17 @@ references:
   name: EstimatedMemoryUsage
   nameWithType: DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
   fullName: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage
+- uid: System.Int64
+  commentId: T:System.Int64
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int64
+  name: long
+  nameWithType: long
+  fullName: long
+  nameWithType.vb: Long
+  fullName.vb: Long
+  name.vb: Long
 - uid: nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime*
   commentId: Overload:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime
   href: nORM.Providers.DynamicBatchSizer.BatchSizingResult.html#nORM_Providers_DynamicBatchSizer_BatchSizingResult_EstimatedBatchTime

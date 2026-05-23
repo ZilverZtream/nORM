@@ -23,11 +23,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationReference
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 587
+    startLine: 694
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Lazy loading reference that loads data on first access
+  summary: Lazy loading reference that defers database access until the value is first requested.
   example: []
   syntax:
     content: 'public sealed class LazyNavigationReference<T> where T : class'
@@ -69,21 +69,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 596
+    startLine: 710
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: Initializes a new lazy reference wrapper for the specified navigation property.
+  example: []
   syntax:
     content: public LazyNavigationReference(object parent, PropertyInfo property, NavigationContext context)
     parameters:
     - id: parent
       type: System.Object
+      description: Entity that owns the navigation property.
     - id: property
       type: System.Reflection.PropertyInfo
+      description: Reflection metadata describing the navigation.
     - id: context
       type: nORM.Navigation.NavigationContext
+      description: Navigation loading context.
     content.vb: Public Sub New(parent As Object, [property] As PropertyInfo, context As NavigationContext)
   overload: nORM.Navigation.LazyNavigationReference`1.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Any argument is <code>null</code>.
   nameWithType.vb: LazyNavigationReference(Of T).New(Object, PropertyInfo, NavigationContext)
   fullName.vb: nORM.Navigation.LazyNavigationReference(Of T).New(Object, System.Reflection.PropertyInfo, nORM.Navigation.NavigationContext)
   name.vb: New(Object, PropertyInfo, NavigationContext)
@@ -105,7 +114,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetValueAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 609
+    startLine: 723
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -142,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetValue
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 621
+    startLine: 735
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -177,7 +186,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: op_Implicit
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 634
+    startLine: 749
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -192,6 +201,10 @@ items:
       type: System.Threading.Tasks.Task{{T}}
     content.vb: Public Shared Widening Operator CType(reference As LazyNavigationReference(Of T)) As Task(Of T)
   overload: nORM.Navigation.LazyNavigationReference`1.op_Implicit*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">reference</code> is <code>null</code>.
   nameWithType.vb: LazyNavigationReference(Of T).CType(LazyNavigationReference(Of T))
   fullName.vb: nORM.Navigation.LazyNavigationReference(Of T).CType(nORM.Navigation.LazyNavigationReference(Of T))
   name.vb: CType(LazyNavigationReference(Of T))
@@ -1201,6 +1214,13 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Navigation.LazyNavigationReference`1.#ctor*
   commentId: Overload:nORM.Navigation.LazyNavigationReference`1.#ctor
   href: nORM.Navigation.LazyNavigationReference-1.html#nORM_Navigation_LazyNavigationReference_1__ctor_System_Object_System_Reflection_PropertyInfo_nORM_Navigation_NavigationContext_

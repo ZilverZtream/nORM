@@ -6,6 +6,7 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+  - nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
   langs:
   - csharp
   - vb
@@ -20,10 +21,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshotBuilder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 27
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: >-
+    Helper responsible for creating <xref href="nORM.Migration.SchemaSnapshot" data-throw-if-not-resolved="false"></xref> instances by
+
+    scanning assemblies for entity types and their mapping attributes.
+  example: []
   syntax:
     content: public static class SchemaSnapshotBuilder
     content.vb: Public Module SchemaSnapshotBuilder
@@ -55,11 +61,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 34
+    startLine: 134
   assemblies:
   - nORM
   namespace: nORM.Migration
-  summary: Builds a snapshot of the entity schema by inspecting the types in the provided assembly.
+  summary: >-
+    Builds a snapshot of the entity schema by inspecting the types in the provided assembly.
+
+    Reflects only attributes and conventions; fluent configuration is not visible.
+
+    Use <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref> to include fluent model overrides.
+  remarks: >-
+    <p>
+
+    <b>Differences from <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>:</b>
+
+    </p>
+
+    <ul><li>Uses reflection, <code>[Table]</code>/<code>[Column]</code>/<code>[Key]</code>/<code>[DatabaseGenerated]</code>
+            attributes, and Id/TypeNameId conventions to discover entities and their columns.
+            Fluent API overrides (e.g. <code>ToTable()</code>, <code>HasColumnName()</code>, <code>HasKey()</code>)
+            are <b>not</b> visible here.</li><li>Scans all non-abstract classes in the assembly that carry <code>[Table]</code> or a
+            <code>[Key]</code>-annotated property. The context-based overload only includes types
+            explicitly registered with the fluent model builder.</li><li>Does not include foreign key constraints (no fluent Relation metadata available).</li><li>May produce duplicate <code>TableSchema</code> entries if two entity types share the
+            same <code>[Table]</code> name — see the duplicate-name guard for details.</li></ul>
   example: []
   syntax:
     content: public static SchemaSnapshot Build(Assembly assembly)
@@ -72,7 +97,75 @@ items:
       description: A snapshot describing the tables and columns inferred from the assembly.
     content.vb: Public Shared Function Build(assembly As Assembly) As SchemaSnapshot
   overload: nORM.Migration.SchemaSnapshotBuilder.Build*
+- uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  commentId: M:nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  id: Build(nORM.Core.DbContext)
+  parent: nORM.Migration.SchemaSnapshotBuilder
+  langs:
+  - csharp
+  - vb
+  name: Build(DbContext)
+  nameWithType: SchemaSnapshotBuilder.Build(DbContext)
+  fullName: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Build
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 281
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    Builds a snapshot using only the fluent-registered entity types from the provided
+
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>. Unlike <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)" data-throw-if-not-resolved="false"></xref>, this method does NOT
+
+    scan the context's assembly; it operates exclusively on types that have been
+
+    explicitly configured via the fluent API (e.g. <code>modelBuilder.Entity&lt;T&gt;()</code>).
+
+    Fluent overrides such as <code>ToTable()</code>, <code>HasColumnName()</code>, and <code>HasKey()</code>
+
+    are reflected in the returned snapshot.
+  remarks: >-
+    <p>
+
+    <b>Differences from <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)" data-throw-if-not-resolved="false"></xref>:</b>
+
+    </p>
+
+    <ul><li>Uses the resolved <xref href="nORM.Mapping.TableMapping" data-throw-if-not-resolved="false"></xref> objects produced by the fluent model
+            builder. Fluent overrides (<code>ToTable()</code>, <code>HasColumnName()</code>, <code>HasKey()</code>,
+            <code>HasForeignKey()</code>, etc.) are fully reflected.</li><li>Only includes entity types explicitly registered via
+            <code>modelBuilder.Entity&lt;T&gt;()</code>. Types present in the assembly but not
+            registered are silently excluded, preventing StackOverflowExceptions from
+            circular navigation properties in test assemblies.</li><li>Includes foreign key constraints derived from fluent <code>HasForeignKey()</code>
+            / <code>HasOne()</code> / <code>HasMany()</code> configuration.</li><li>Owned collection tables and many-to-many join tables are not included — see
+            <xref href="nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable%7bnORM.Mapping.TableMapping%7d)" data-throw-if-not-resolved="false"></xref> remarks for details.</li></ul>
+  example: []
+  syntax:
+    content: public static SchemaSnapshot Build(DbContext ctx)
+    parameters:
+    - id: ctx
+      type: nORM.Core.DbContext
+      description: The context whose fluent model is used to build the snapshot.
+    return:
+      type: nORM.Migration.SchemaSnapshot
+      description: A snapshot reflecting the fluent runtime model of the context.
+    content.vb: Public Shared Function Build(ctx As DbContext) As SchemaSnapshot
+  overload: nORM.Migration.SchemaSnapshotBuilder.Build*
 references:
+- uid: nORM.Migration.SchemaSnapshot
+  commentId: T:nORM.Migration.SchemaSnapshot
+  parent: nORM.Migration
+  href: nORM.Migration.SchemaSnapshot.html
+  name: SchemaSnapshot
+  nameWithType: SchemaSnapshot
+  fullName: nORM.Migration.SchemaSnapshot
 - uid: nORM.Migration
   commentId: N:nORM.Migration
   href: nORM.html
@@ -332,6 +425,30 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  commentId: M:nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  name: Build(DbContext)
+  nameWithType: SchemaSnapshotBuilder.Build(DbContext)
+  fullName: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  spec.csharp:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
 - uid: nORM.Migration.SchemaSnapshotBuilder.Build*
   commentId: Overload:nORM.Migration.SchemaSnapshotBuilder.Build
   href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_System_Reflection_Assembly_
@@ -346,13 +463,6 @@ references:
   name: Assembly
   nameWithType: Assembly
   fullName: System.Reflection.Assembly
-- uid: nORM.Migration.SchemaSnapshot
-  commentId: T:nORM.Migration.SchemaSnapshot
-  parent: nORM.Migration
-  href: nORM.Migration.SchemaSnapshot.html
-  name: SchemaSnapshot
-  nameWithType: SchemaSnapshot
-  fullName: nORM.Migration.SchemaSnapshot
 - uid: System.Reflection
   commentId: N:System.Reflection
   isExternal: true
@@ -380,3 +490,128 @@ references:
     name: Reflection
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.reflection
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+  commentId: M:nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+  isExternal: true
+  href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_System_Reflection_Assembly_
+  name: Build(Assembly)
+  nameWithType: SchemaSnapshotBuilder.Build(Assembly)
+  fullName: nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+  spec.csharp:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_System_Reflection_Assembly_
+  - name: (
+  - uid: System.Reflection.Assembly
+    name: Assembly
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.assembly
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_System_Reflection_Assembly_
+  - name: (
+  - uid: System.Reflection.Assembly
+    name: Assembly
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.assembly
+  - name: )
+- uid: nORM.Mapping.TableMapping
+  commentId: T:nORM.Mapping.TableMapping
+  parent: nORM.Mapping
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping
+  nameWithType: TableMapping
+  fullName: nORM.Mapping.TableMapping
+- uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
+  commentId: M:nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  name: BuildFromMappings(IEnumerable<TableMapping>)
+  nameWithType: SchemaSnapshotBuilder.BuildFromMappings(IEnumerable<TableMapping>)
+  fullName: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable<nORM.Mapping.TableMapping>)
+  nameWithType.vb: SchemaSnapshotBuilder.BuildFromMappings(IEnumerable(Of TableMapping))
+  fullName.vb: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable(Of nORM.Mapping.TableMapping))
+  name.vb: BuildFromMappings(IEnumerable(Of TableMapping))
+  spec.csharp:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
+    name: BuildFromMappings
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
+    name: BuildFromMappings
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.TableMapping
+    name: TableMapping
+    href: nORM.Mapping.TableMapping.html
+  - name: )
+  - name: )
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html

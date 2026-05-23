@@ -24,10 +24,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormValidator
     path: src/nORM/Core/NormValidator.cs
-    startLine: 15
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Provides runtime validation helpers for entities, bulk operations and raw SQL statements
+
+    to guard against misuse and excessively large payloads.
+  example: []
   syntax:
     content: public static class NormValidator
     content.vb: Public Module NormValidator
@@ -59,19 +64,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateEntity
     path: src/nORM/Core/NormValidator.cs
-    startLine: 27
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Validates a single entity instance to ensure it does not contain excessively deep
+
+    or cyclic graphs that could lead to stack overflows or performance issues.
+  example: []
   syntax:
     content: 'public static void ValidateEntity<T>(T entity, string parameterName = "entity") where T : class'
     parameters:
     - id: entity
       type: '{T}'
+      description: Entity instance to validate.
     - id: parameterName
       type: System.String
+      description: Name of the parameter for exception messages.
     typeParameters:
     - id: T
+      description: Type of the entity being validated.
     content.vb: Public Shared Sub ValidateEntity(Of T As Class)(entity As T, parameterName As String = "entity")
   overload: nORM.Core.NormValidator.ValidateEntity*
   nameWithType.vb: NormValidator.ValidateEntity(Of T)(T, String)
@@ -95,19 +108,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateBulkOperation
     path: src/nORM/Core/NormValidator.cs
-    startLine: 148
+    startLine: 225
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Validates that a bulk operation contains a reasonable number of entities and none are null.
+  example: []
   syntax:
     content: 'public static void ValidateBulkOperation<T>(IEnumerable<T> entities, string operation) where T : class'
     parameters:
     - id: entities
       type: System.Collections.Generic.IEnumerable{{T}}
+      description: Collection of entities to validate.
     - id: operation
       type: System.String
+      description: Name of the bulk operation (for error messages).
     typeParameters:
     - id: T
+      description: Type of the entities involved in the operation.
     content.vb: Public Shared Sub ValidateBulkOperation(Of T As Class)(entities As IEnumerable(Of T), operation As String)
   overload: nORM.Core.NormValidator.ValidateBulkOperation*
   nameWithType.vb: NormValidator.ValidateBulkOperation(Of T)(IEnumerable(Of T), String)
@@ -131,7 +149,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateRawSql
     path: src/nORM/Core/NormValidator.cs
-    startLine: 174
+    startLine: 251
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -176,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateLikeEscapeChar
     path: src/nORM/Core/NormValidator.cs
-    startLine: 255
+    startLine: 980
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -218,7 +236,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateConnectionString
     path: src/nORM/Core/NormValidator.cs
-    startLine: 269
+    startLine: 1003
   assemblies:
   - nORM
   namespace: nORM.Core

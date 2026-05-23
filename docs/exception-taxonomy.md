@@ -30,6 +30,27 @@ classes without parsing provider messages.
   includes and async streaming with Include/GroupJoin, also throw
   `NormUnsupportedFeatureException`.
 
+## Cancellation Cleanup Contract
+
+Every async public API that accepts a `CancellationToken` honors it. When a cancellation token
+fires mid-operation, nORM's contract per resource type is:
+
+| Resource | Behavior on cancellation |
+| --- | --- |
+| Owned transactions (`BeginTransactionAsync` -> work -> `CommitAsync`/`RollbackAsync`) | If cancellation fires before commit, nORM rolls back automatically and disposes the transaction. If cancellation fires *during* commit, the operation completes (commit is not interruptible at the protocol level) and nORM returns successfully - cancellation does NOT throw `OperationCanceledException` for already-committed transactions. |
+| Ambient transactions (`TransactionScope`) | nORM never owns the transaction; cancellation propagates to the underlying command but the scope ownership remains with the caller. |
+| Temp tables (bulk operations) | Dropped during cancellation cleanup; verified by `BulkTempTableLeakTests` and `BulkOperationCancellationTests`. |
+| Command pools and prepared commands | Returned to the pool / disposed before `OperationCanceledException` propagates. |
+| Open data readers | Disposed before `OperationCanceledException` propagates. |
+| Migrations | Cancellation between steps leaves the migration history in a consistent state; cancellation during a single step rolls back that step's transaction. See `MigrationCommitCancellationTests`. |
+| Temporal bootstrap (`EnableTemporalVersioning`) | The bootstrap task is idempotent; partial bootstrap is detected on the next run and resumed. See `TemporalBootstrapCancellationTests`. |
+| Interceptors | Receive the same `CancellationToken`; interceptor exceptions surface as the operation's exception. |
+
+Caller cancellation (an `OperationCanceledException` raised by the caller's token) is never
+re-wrapped as a nORM exception. Timeouts originating from `DbContextOptions` / `AdaptiveTimeoutManager`
+surface as `NormTimeoutException`. Retry policies treat caller cancellations as terminal and
+never retry them.
+
 ## Guidance
 
 Catch `DbConcurrencyException` for retry or merge workflows. Catch

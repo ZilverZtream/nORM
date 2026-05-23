@@ -26,11 +26,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 430
+    startLine: 507
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Holds navigation context for an entity instance
+  summary: >-
+    Tracks which navigation properties have been loaded for a particular entity instance,
+
+    along with the owning <xref href="nORM.Navigation.NavigationContext.DbContext" data-throw-if-not-resolved="false"></xref> and entity type.
   example: []
   syntax:
     content: 'public sealed class NavigationContext : IDisposable'
@@ -69,10 +72,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 434
+    startLine: 514
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: Gets the owning <xref href="nORM.Navigation.NavigationContext.DbContext" data-throw-if-not-resolved="false"></xref> used to load navigation properties.
+  example: []
   syntax:
     content: public DbContext DbContext { get; }
     parameters: []
@@ -98,10 +103,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityType
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 435
+    startLine: 519
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: Gets the <xref href="System.Type" data-throw-if-not-resolved="false"></xref> of the entity associated with this context.
+  example: []
   syntax:
     content: public Type EntityType { get; }
     parameters: []
@@ -127,19 +134,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 437
+    startLine: 527
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: Initializes a new instance of the <xref href="nORM.Navigation.NavigationContext" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
     content: public NavigationContext(DbContext dbContext, Type entityType)
     parameters:
     - id: dbContext
       type: nORM.Core.DbContext
+      description: The associated context.
     - id: entityType
       type: System.Type
+      description: The entity type this context relates to.
     content.vb: Public Sub New(dbContext As DbContext, entityType As Type)
   overload: nORM.Navigation.NavigationContext.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">dbContext</code> or <code class="paramref">entityType</code> is <code>null</code>.
   nameWithType.vb: NavigationContext.New(DbContext, Type)
   fullName.vb: nORM.Navigation.NavigationContext.New(nORM.Core.DbContext, System.Type)
   name.vb: New(DbContext, Type)
@@ -161,7 +176,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 448
+    startLine: 538
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -199,7 +214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MarkAsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 454
+    startLine: 544
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -234,7 +249,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MarkAsUnloaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 460
+    startLine: 550
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -269,11 +284,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 465
+    startLine: 555
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Clears the loaded-property cache.
+  summary: Clears the loaded-property tracking state. Safe to call multiple times.
   example: []
   syntax:
     content: public void Dispose()
@@ -282,6 +297,12 @@ items:
   implements:
   - System.IDisposable.Dispose
 references:
+- uid: nORM.Navigation.NavigationContext.DbContext
+  commentId: P:nORM.Navigation.NavigationContext.DbContext
+  href: nORM.Navigation.NavigationContext.html#nORM_Navigation_NavigationContext_DbContext
+  name: DbContext
+  nameWithType: NavigationContext.DbContext
+  fullName: nORM.Navigation.NavigationContext.DbContext
 - uid: nORM.Navigation
   commentId: N:nORM.Navigation
   href: nORM.html
@@ -1242,12 +1263,6 @@ references:
   - uid: nORM.Core
     name: Core
     href: nORM.Core.html
-- uid: nORM.Navigation.NavigationContext.EntityType*
-  commentId: Overload:nORM.Navigation.NavigationContext.EntityType
-  href: nORM.Navigation.NavigationContext.html#nORM_Navigation_NavigationContext_EntityType
-  name: EntityType
-  nameWithType: NavigationContext.EntityType
-  fullName: nORM.Navigation.NavigationContext.EntityType
 - uid: System.Type
   commentId: T:System.Type
   parent: System
@@ -1256,6 +1271,26 @@ references:
   name: Type
   nameWithType: Type
   fullName: System.Type
+- uid: nORM.Navigation.NavigationContext.EntityType*
+  commentId: Overload:nORM.Navigation.NavigationContext.EntityType
+  href: nORM.Navigation.NavigationContext.html#nORM_Navigation_NavigationContext_EntityType
+  name: EntityType
+  nameWithType: NavigationContext.EntityType
+  fullName: nORM.Navigation.NavigationContext.EntityType
+- uid: nORM.Navigation.NavigationContext
+  commentId: T:nORM.Navigation.NavigationContext
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationContext.html
+  name: NavigationContext
+  nameWithType: NavigationContext
+  fullName: nORM.Navigation.NavigationContext
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Navigation.NavigationContext.#ctor*
   commentId: Overload:nORM.Navigation.NavigationContext.#ctor
   href: nORM.Navigation.NavigationContext.html#nORM_Navigation_NavigationContext__ctor_nORM_Core_DbContext_System_Type_

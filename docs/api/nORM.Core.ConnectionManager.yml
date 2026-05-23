@@ -23,11 +23,31 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConnectionManager
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 16
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Provides connection management with support for read replicas and failover.
+  remarks: >-
+    IMPORTANT: This class no longer uses custom connection pooling. Instead, it relies on
+
+    the database provider's native connection pooling (configured via connection string).
+
+    This eliminates redundant "double pooling" and reduces resource overhead.
+
+
+    ConnectionManager provides:
+
+    - Round-robin load balancing across read replicas
+
+    - Automatic failover when a node becomes unhealthy
+
+    - Health monitoring of database nodes
+
+
+    All connections are created fresh and should be disposed by the caller, which returns
+
+    them to the ADO.NET provider's connection pool.
   example: []
   syntax:
     content: 'public class ConnectionManager : IDisposable'
@@ -67,21 +87,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 41
+    startLine: 70
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new <xref href="nORM.Core.ConnectionManager" data-throw-if-not-resolved="false"></xref> that manages database connections
+
+    across a topology of nodes. Starts an optional background health check loop.
+  example: []
   syntax:
     content: public ConnectionManager(DatabaseTopology topology, DatabaseProvider provider, ILogger logger, TimeSpan? healthCheckInterval = null)
     parameters:
     - id: topology
       type: nORM.Core.DatabaseTopology
+      description: Topology describing available database nodes.
     - id: provider
       type: nORM.Providers.DatabaseProvider
+      description: Database provider responsible for creating connections.
     - id: logger
       type: Microsoft.Extensions.Logging.ILogger
+      description: Logger used for diagnostic output.
     - id: healthCheckInterval
       type: System.Nullable{System.TimeSpan}
+      description: Optional interval between health check executions.
     content.vb: Public Sub New(topology As DatabaseTopology, provider As DatabaseProvider, logger As ILogger, healthCheckInterval As TimeSpan? = Nothing)
   overload: nORM.Core.ConnectionManager.#ctor*
   nameWithType.vb: ConnectionManager.New(DatabaseTopology, DatabaseProvider, ILogger, TimeSpan?)
@@ -105,7 +134,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetWriteConnectionAsync
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 120
+    startLine: 146
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -113,6 +142,8 @@ items:
     Retrieves an open connection to the primary node for write operations.
 
     Implements a simple circuit breaker and failover mechanism.
+
+    The caller must dispose the returned connection.
   example: []
   syntax:
     content: public Task<DbConnection> GetWriteConnectionAsync(CancellationToken ct = default)
@@ -126,6 +157,9 @@ items:
     content.vb: Public Function GetWriteConnectionAsync(ct As CancellationToken = Nothing) As Task(Of DbConnection)
   overload: nORM.Core.ConnectionManager.GetWriteConnectionAsync*
   exceptions:
+  - type: System.ObjectDisposedException
+    commentId: T:System.ObjectDisposedException
+    description: Thrown when this instance has been disposed.
   - type: System.InvalidOperationException
     commentId: T:System.InvalidOperationException
     description: Thrown when no primary node is available.
@@ -147,7 +181,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetReadConnectionAsync
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 162
+    startLine: 222
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -155,6 +189,8 @@ items:
     Retrieves an open connection optimized for read operations, using available read replicas
 
     and falling back to the primary node when necessary.
+
+    The caller must dispose the returned connection.
   example: []
   syntax:
     content: public Task<DbConnection> GetReadConnectionAsync(CancellationToken ct = default)
@@ -167,6 +203,10 @@ items:
       description: An open <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref> suitable for read operations.
     content.vb: Public Function GetReadConnectionAsync(ct As CancellationToken = Nothing) As Task(Of DbConnection)
   overload: nORM.Core.ConnectionManager.GetReadConnectionAsync*
+  exceptions:
+  - type: System.ObjectDisposedException
+    commentId: T:System.ObjectDisposedException
+    description: Thrown when this instance has been disposed.
 - uid: nORM.Core.ConnectionManager.Dispose
   commentId: M:nORM.Core.ConnectionManager.Dispose
   id: Dispose
@@ -185,14 +225,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 339
+    startLine: 536
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: >-
-    Disposes the manager and all pooled connections, terminating background tasks
-
-    and releasing unmanaged resources.
+  summary: Disposes the manager, terminating background tasks and releasing unmanaged resources.
   example: []
   syntax:
     content: public void Dispose()
@@ -1172,6 +1209,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.ConnectionManager
+  commentId: T:nORM.Core.ConnectionManager
+  href: nORM.Core.ConnectionManager.html
+  name: ConnectionManager
+  nameWithType: ConnectionManager
+  fullName: nORM.Core.ConnectionManager
 - uid: nORM.Core.ConnectionManager.#ctor*
   commentId: Overload:nORM.Core.ConnectionManager.#ctor
   href: nORM.Core.ConnectionManager.html#nORM_Core_ConnectionManager__ctor_nORM_Core_DatabaseTopology_nORM_Providers_DatabaseProvider_Microsoft_Extensions_Logging_ILogger_System_Nullable_System_TimeSpan__
@@ -1311,6 +1354,13 @@ references:
   name: DbConnection
   nameWithType: DbConnection
   fullName: System.Data.Common.DbConnection
+- uid: System.ObjectDisposedException
+  commentId: T:System.ObjectDisposedException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.objectdisposedexception
+  name: ObjectDisposedException
+  nameWithType: ObjectDisposedException
+  fullName: System.ObjectDisposedException
 - uid: System.InvalidOperationException
   commentId: T:System.InvalidOperationException
   isExternal: true

@@ -1,0 +1,1820 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Mapping.JoinTableMapping
+  commentId: T:nORM.Mapping.JoinTableMapping
+  id: JoinTableMapping
+  parent: nORM.Mapping
+  children:
+  - nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  - nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  - nORM.Mapping.JoinTableMapping.EscTableName
+  - nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+  - nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+  - nORM.Mapping.JoinTableMapping.LeftFkColumn
+  - nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  - nORM.Mapping.JoinTableMapping.LeftPkGetter
+  - nORM.Mapping.JoinTableMapping.LeftType
+  - nORM.Mapping.JoinTableMapping.RightCollectionGetter
+  - nORM.Mapping.JoinTableMapping.RightCollectionSetter
+  - nORM.Mapping.JoinTableMapping.RightFkColumn
+  - nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  - nORM.Mapping.JoinTableMapping.RightPkGetter
+  - nORM.Mapping.JoinTableMapping.RightType
+  - nORM.Mapping.JoinTableMapping.TableName
+  langs:
+  - csharp
+  - vb
+  name: JoinTableMapping
+  nameWithType: JoinTableMapping
+  fullName: nORM.Mapping.JoinTableMapping
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: JoinTableMapping
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Describes the join (bridge) table that links two entity types in a many-to-many relationship.
+  example: []
+  syntax:
+    content: public sealed class JoinTableMapping
+    content.vb: Public NotInheritable Class JoinTableMapping
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,{TProperty}}})
+  - nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Mapping.JoinTableMapping.TableName
+  commentId: P:nORM.Mapping.JoinTableMapping.TableName
+  id: TableName
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: TableName
+  nameWithType: JoinTableMapping.TableName
+  fullName: nORM.Mapping.JoinTableMapping.TableName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TableName
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 17
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain join table name.
+  example: []
+  syntax:
+    content: public string TableName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property TableName As String
+  overload: nORM.Mapping.JoinTableMapping.TableName*
+- uid: nORM.Mapping.JoinTableMapping.EscTableName
+  commentId: P:nORM.Mapping.JoinTableMapping.EscTableName
+  id: EscTableName
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: EscTableName
+  nameWithType: JoinTableMapping.EscTableName
+  fullName: nORM.Mapping.JoinTableMapping.EscTableName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EscTableName
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Escaped join table name for use in SQL statements.
+  example: []
+  syntax:
+    content: public string EscTableName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property EscTableName As String
+  overload: nORM.Mapping.JoinTableMapping.EscTableName*
+- uid: nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  commentId: P:nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  id: EscLeftFkColumn
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: EscLeftFkColumn
+  nameWithType: JoinTableMapping.EscLeftFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EscLeftFkColumn
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Escaped column in the join table that holds the FK to the left (owner) entity's PK.
+  example: []
+  syntax:
+    content: public string EscLeftFkColumn { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property EscLeftFkColumn As String
+  overload: nORM.Mapping.JoinTableMapping.EscLeftFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  commentId: P:nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  id: EscRightFkColumn
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: EscRightFkColumn
+  nameWithType: JoinTableMapping.EscRightFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EscRightFkColumn
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 26
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Escaped column in the join table that holds the FK to the right (related) entity's PK.
+  example: []
+  syntax:
+    content: public string EscRightFkColumn { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property EscRightFkColumn As String
+  overload: nORM.Mapping.JoinTableMapping.EscRightFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.LeftFkColumn
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftFkColumn
+  id: LeftFkColumn
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftFkColumn
+  nameWithType: JoinTableMapping.LeftFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.LeftFkColumn
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftFkColumn
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 29
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain left FK column name.
+  example: []
+  syntax:
+    content: public string LeftFkColumn { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property LeftFkColumn As String
+  overload: nORM.Mapping.JoinTableMapping.LeftFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.RightFkColumn
+  commentId: P:nORM.Mapping.JoinTableMapping.RightFkColumn
+  id: RightFkColumn
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightFkColumn
+  nameWithType: JoinTableMapping.RightFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.RightFkColumn
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightFkColumn
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain right FK column name.
+  example: []
+  syntax:
+    content: public string RightFkColumn { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property RightFkColumn As String
+  overload: nORM.Mapping.JoinTableMapping.RightFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.LeftType
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftType
+  id: LeftType
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftType
+  nameWithType: JoinTableMapping.LeftType
+  fullName: nORM.Mapping.JoinTableMapping.LeftType
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftType
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 35
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: CLR type of the left (owner) entity.
+  example: []
+  syntax:
+    content: public Type LeftType { get; }
+    parameters: []
+    return:
+      type: System.Type
+    content.vb: Public ReadOnly Property LeftType As Type
+  overload: nORM.Mapping.JoinTableMapping.LeftType*
+- uid: nORM.Mapping.JoinTableMapping.RightType
+  commentId: P:nORM.Mapping.JoinTableMapping.RightType
+  id: RightType
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightType
+  nameWithType: JoinTableMapping.RightType
+  fullName: nORM.Mapping.JoinTableMapping.RightType
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightType
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 38
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: CLR type of the right (related) entity.
+  example: []
+  syntax:
+    content: public Type RightType { get; }
+    parameters: []
+    return:
+      type: System.Type
+    content.vb: Public ReadOnly Property RightType As Type
+  overload: nORM.Mapping.JoinTableMapping.RightType*
+- uid: nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  id: LeftNavPropertyName
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftNavPropertyName
+  nameWithType: JoinTableMapping.LeftNavPropertyName
+  fullName: nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftNavPropertyName
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Name of the navigation property on the left entity.
+  example: []
+  syntax:
+    content: public string LeftNavPropertyName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property LeftNavPropertyName As String
+  overload: nORM.Mapping.JoinTableMapping.LeftNavPropertyName*
+- uid: nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  commentId: P:nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  id: RightNavPropertyName
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightNavPropertyName
+  nameWithType: JoinTableMapping.RightNavPropertyName
+  fullName: nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightNavPropertyName
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 44
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Name of the navigation property on the right entity (inverse side), if any.
+  example: []
+  syntax:
+    content: public string? RightNavPropertyName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property RightNavPropertyName As String
+  overload: nORM.Mapping.JoinTableMapping.RightNavPropertyName*
+- uid: nORM.Mapping.JoinTableMapping.LeftPkGetter
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftPkGetter
+  id: LeftPkGetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftPkGetter
+  nameWithType: JoinTableMapping.LeftPkGetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftPkGetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftPkGetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 47
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the FK value (left entity PK) from a left entity instance.
+  example: []
+  syntax:
+    content: public Func<object, object?> LeftPkGetter { get; }
+    parameters: []
+    return:
+      type: System.Func{System.Object,System.Object}
+    content.vb: Public ReadOnly Property LeftPkGetter As Func(Of Object, Object)
+  overload: nORM.Mapping.JoinTableMapping.LeftPkGetter*
+- uid: nORM.Mapping.JoinTableMapping.RightPkGetter
+  commentId: P:nORM.Mapping.JoinTableMapping.RightPkGetter
+  id: RightPkGetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightPkGetter
+  nameWithType: JoinTableMapping.RightPkGetter
+  fullName: nORM.Mapping.JoinTableMapping.RightPkGetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightPkGetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 50
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the FK value (right entity PK) from a right entity instance.
+  example: []
+  syntax:
+    content: public Func<object, object?> RightPkGetter { get; }
+    parameters: []
+    return:
+      type: System.Func{System.Object,System.Object}
+    content.vb: Public ReadOnly Property RightPkGetter As Func(Of Object, Object)
+  overload: nORM.Mapping.JoinTableMapping.RightPkGetter*
+- uid: nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+  id: LeftCollectionGetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftCollectionGetter
+  nameWithType: JoinTableMapping.LeftCollectionGetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftCollectionGetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 53
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the collection of related (right) entities from a left entity instance.
+  example: []
+  syntax:
+    content: public Func<object, IList?> LeftCollectionGetter { get; }
+    parameters: []
+    return:
+      type: System.Func{System.Object,System.Collections.IList}
+    content.vb: Public ReadOnly Property LeftCollectionGetter As Func(Of Object, IList)
+  overload: nORM.Mapping.JoinTableMapping.LeftCollectionGetter*
+- uid: nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+  id: LeftCollectionSetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftCollectionSetter
+  nameWithType: JoinTableMapping.LeftCollectionSetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftCollectionSetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 56
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Sets the collection of related (right) entities on a left entity instance.
+  example: []
+  syntax:
+    content: public Action<object, IList?> LeftCollectionSetter { get; }
+    parameters: []
+    return:
+      type: System.Action{System.Object,System.Collections.IList}
+    content.vb: Public ReadOnly Property LeftCollectionSetter As Action(Of Object, IList)
+  overload: nORM.Mapping.JoinTableMapping.LeftCollectionSetter*
+- uid: nORM.Mapping.JoinTableMapping.RightCollectionGetter
+  commentId: P:nORM.Mapping.JoinTableMapping.RightCollectionGetter
+  id: RightCollectionGetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightCollectionGetter
+  nameWithType: JoinTableMapping.RightCollectionGetter
+  fullName: nORM.Mapping.JoinTableMapping.RightCollectionGetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightCollectionGetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 59
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the collection of related (left) entities from a right entity instance (inverse), if configured.
+  example: []
+  syntax:
+    content: public Func<object, IList?>? RightCollectionGetter { get; }
+    parameters: []
+    return:
+      type: System.Func{System.Object,System.Collections.IList}
+    content.vb: Public ReadOnly Property RightCollectionGetter As Func(Of Object, IList)
+  overload: nORM.Mapping.JoinTableMapping.RightCollectionGetter*
+- uid: nORM.Mapping.JoinTableMapping.RightCollectionSetter
+  commentId: P:nORM.Mapping.JoinTableMapping.RightCollectionSetter
+  id: RightCollectionSetter
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightCollectionSetter
+  nameWithType: JoinTableMapping.RightCollectionSetter
+  fullName: nORM.Mapping.JoinTableMapping.RightCollectionSetter
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightCollectionSetter
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Sets the collection of related (left) entities on a right entity instance (inverse), if configured.
+  example: []
+  syntax:
+    content: public Action<object, IList?>? RightCollectionSetter { get; }
+    parameters: []
+    return:
+      type: System.Action{System.Object,System.Collections.IList}
+    content.vb: Public ReadOnly Property RightCollectionSetter As Action(Of Object, IList)
+  overload: nORM.Mapping.JoinTableMapping.RightCollectionSetter*
+references:
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<JoinTableMapping>(JoinTableMapping, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<JoinTableMapping>(JoinTableMapping, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Mapping.JoinTableMapping>(nORM.Mapping.JoinTableMapping, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of JoinTableMapping)(JoinTableMapping, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Mapping.JoinTableMapping)(nORM.Mapping.JoinTableMapping, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of JoinTableMapping)(JoinTableMapping, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Mapping.JoinTableMapping,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: '>'
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Mapping.JoinTableMapping,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: )
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Mapping.JoinTableMapping, TProperty>(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression<System.Func<nORM.Mapping.JoinTableMapping, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Mapping.JoinTableMapping, TProperty)(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Mapping.JoinTableMapping, TProperty)))
+  name.vb: IsLoaded(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Mapping.JoinTableMapping, TProperty>(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression<System.Func<nORM.Mapping.JoinTableMapping, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Mapping.JoinTableMapping, TProperty)(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Mapping.JoinTableMapping, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<JoinTableMapping, TProperty>(JoinTableMapping, Expression<Func<JoinTableMapping, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Mapping.JoinTableMapping, TProperty>(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression<System.Func<nORM.Mapping.JoinTableMapping, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Mapping.JoinTableMapping, TProperty)(nORM.Mapping.JoinTableMapping, System.Linq.Expressions.Expression(Of System.Func(Of nORM.Mapping.JoinTableMapping, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of JoinTableMapping, TProperty)(JoinTableMapping, Expression(Of Func(Of JoinTableMapping, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Mapping.JoinTableMapping,System.Linq.Expressions.Expression{System.Func{nORM.Mapping.JoinTableMapping,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    href: nORM.Mapping.JoinTableMapping.html
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Mapping.JoinTableMapping.TableName*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.TableName
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_TableName
+  name: TableName
+  nameWithType: JoinTableMapping.TableName
+  fullName: nORM.Mapping.JoinTableMapping.TableName
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Mapping.JoinTableMapping.EscTableName*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.EscTableName
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscTableName
+  name: EscTableName
+  nameWithType: JoinTableMapping.EscTableName
+  fullName: nORM.Mapping.JoinTableMapping.EscTableName
+- uid: nORM.Mapping.JoinTableMapping.EscLeftFkColumn*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscLeftFkColumn
+  name: EscLeftFkColumn
+  nameWithType: JoinTableMapping.EscLeftFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+- uid: nORM.Mapping.JoinTableMapping.EscRightFkColumn*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscRightFkColumn
+  name: EscRightFkColumn
+  nameWithType: JoinTableMapping.EscRightFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.EscRightFkColumn
+- uid: nORM.Mapping.JoinTableMapping.LeftFkColumn*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftFkColumn
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftFkColumn
+  name: LeftFkColumn
+  nameWithType: JoinTableMapping.LeftFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.LeftFkColumn
+- uid: nORM.Mapping.JoinTableMapping.RightFkColumn*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightFkColumn
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightFkColumn
+  name: RightFkColumn
+  nameWithType: JoinTableMapping.RightFkColumn
+  fullName: nORM.Mapping.JoinTableMapping.RightFkColumn
+- uid: nORM.Mapping.JoinTableMapping.LeftType*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftType
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftType
+  name: LeftType
+  nameWithType: JoinTableMapping.LeftType
+  fullName: nORM.Mapping.JoinTableMapping.LeftType
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: nORM.Mapping.JoinTableMapping.RightType*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightType
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightType
+  name: RightType
+  nameWithType: JoinTableMapping.RightType
+  fullName: nORM.Mapping.JoinTableMapping.RightType
+- uid: nORM.Mapping.JoinTableMapping.LeftNavPropertyName*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftNavPropertyName
+  name: LeftNavPropertyName
+  nameWithType: JoinTableMapping.LeftNavPropertyName
+  fullName: nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+- uid: nORM.Mapping.JoinTableMapping.RightNavPropertyName*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightNavPropertyName
+  name: RightNavPropertyName
+  nameWithType: JoinTableMapping.RightNavPropertyName
+  fullName: nORM.Mapping.JoinTableMapping.RightNavPropertyName
+- uid: nORM.Mapping.JoinTableMapping.LeftPkGetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftPkGetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftPkGetter
+  name: LeftPkGetter
+  nameWithType: JoinTableMapping.LeftPkGetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftPkGetter
+- uid: System.Func{System.Object,System.Object}
+  commentId: T:System.Func{System.Object,System.Object}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<object, object>
+  nameWithType: Func<object, object>
+  fullName: System.Func<object, object>
+  nameWithType.vb: Func(Of Object, Object)
+  fullName.vb: System.Func(Of Object, Object)
+  name.vb: Func(Of Object, Object)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.RightPkGetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightPkGetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightPkGetter
+  name: RightPkGetter
+  nameWithType: JoinTableMapping.RightPkGetter
+  fullName: nORM.Mapping.JoinTableMapping.RightPkGetter
+- uid: nORM.Mapping.JoinTableMapping.LeftCollectionGetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftCollectionGetter
+  name: LeftCollectionGetter
+  nameWithType: JoinTableMapping.LeftCollectionGetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftCollectionGetter
+- uid: System.Func{System.Object,System.Collections.IList}
+  commentId: T:System.Func{System.Object,System.Collections.IList}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<object, IList>
+  nameWithType: Func<object, IList>
+  fullName: System.Func<object, System.Collections.IList>
+  nameWithType.vb: Func(Of Object, IList)
+  fullName.vb: System.Func(Of Object, System.Collections.IList)
+  name.vb: Func(Of Object, IList)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Collections.IList
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.ilist
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Collections.IList
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.ilist
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.LeftCollectionSetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftCollectionSetter
+  name: LeftCollectionSetter
+  nameWithType: JoinTableMapping.LeftCollectionSetter
+  fullName: nORM.Mapping.JoinTableMapping.LeftCollectionSetter
+- uid: System.Action{System.Object,System.Collections.IList}
+  commentId: T:System.Action{System.Object,System.Collections.IList}
+  parent: System
+  definition: System.Action`2
+  href: https://learn.microsoft.com/dotnet/api/system.action-2
+  name: Action<object, IList>
+  nameWithType: Action<object, IList>
+  fullName: System.Action<object, System.Collections.IList>
+  nameWithType.vb: Action(Of Object, IList)
+  fullName.vb: System.Action(Of Object, System.Collections.IList)
+  name.vb: Action(Of Object, IList)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-2
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Collections.IList
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.ilist
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Collections.IList
+    name: IList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.ilist
+  - name: )
+- uid: System.Action`2
+  commentId: T:System.Action`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.action-2
+  name: Action<T1, T2>
+  nameWithType: Action<T1, T2>
+  fullName: System.Action<T1, T2>
+  nameWithType.vb: Action(Of T1, T2)
+  fullName.vb: System.Action(Of T1, T2)
+  name.vb: Action(Of T1, T2)
+  spec.csharp:
+  - uid: System.Action`2
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-2
+  - name: <
+  - name: T1
+  - name: ','
+  - name: " "
+  - name: T2
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`2
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T1
+  - name: ','
+  - name: " "
+  - name: T2
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.RightCollectionGetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightCollectionGetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightCollectionGetter
+  name: RightCollectionGetter
+  nameWithType: JoinTableMapping.RightCollectionGetter
+  fullName: nORM.Mapping.JoinTableMapping.RightCollectionGetter
+- uid: nORM.Mapping.JoinTableMapping.RightCollectionSetter*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightCollectionSetter
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightCollectionSetter
+  name: RightCollectionSetter
+  nameWithType: JoinTableMapping.RightCollectionSetter
+  fullName: nORM.Mapping.JoinTableMapping.RightCollectionSetter

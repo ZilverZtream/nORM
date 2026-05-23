@@ -6,6 +6,7 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.TableSchema.Columns
+  - nORM.Migration.TableSchema.ForeignKeys
   - nORM.Migration.TableSchema.Name
   langs:
   - csharp
@@ -21,10 +22,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 14
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Describes the schema of a single table including its columns and foreign keys.
+  example: []
   syntax:
     content: public class TableSchema
     content.vb: Public Class TableSchema
@@ -61,10 +64,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 16
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Name of the table.
+  example: []
   syntax:
     content: public string Name { get; set; }
     parameters: []
@@ -90,17 +95,50 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 17
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Columns defined on the table.
+  example: []
   syntax:
-    content: public List<ColumnSchema> Columns { get; set; }
+    content: public List<ColumnSchema> Columns { get; init; }
     parameters: []
     return:
       type: System.Collections.Generic.List{nORM.Migration.ColumnSchema}
     content.vb: Public Property Columns As List(Of ColumnSchema)
   overload: nORM.Migration.TableSchema.Columns*
+- uid: nORM.Migration.TableSchema.ForeignKeys
+  commentId: P:nORM.Migration.TableSchema.ForeignKeys
+  id: ForeignKeys
+  parent: nORM.Migration.TableSchema
+  langs:
+  - csharp
+  - vb
+  name: ForeignKeys
+  nameWithType: TableSchema.ForeignKeys
+  fullName: nORM.Migration.TableSchema.ForeignKeys
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ForeignKeys
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 36
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Foreign key constraints defined on this table.
+  example: []
+  syntax:
+    content: public List<ForeignKeySchema> ForeignKeys { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
+    content.vb: Public Property ForeignKeys As List(Of ForeignKeySchema)
+  overload: nORM.Migration.TableSchema.ForeignKeys*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1186,3 +1224,42 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Migration.TableSchema.ForeignKeys*
+  commentId: Overload:nORM.Migration.TableSchema.ForeignKeys
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_ForeignKeys
+  name: ForeignKeys
+  nameWithType: TableSchema.ForeignKeys
+  fullName: nORM.Migration.TableSchema.ForeignKeys
+- uid: System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
+  commentId: T:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<ForeignKeySchema>
+  nameWithType: List<ForeignKeySchema>
+  fullName: System.Collections.Generic.List<nORM.Migration.ForeignKeySchema>
+  nameWithType.vb: List(Of ForeignKeySchema)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Migration.ForeignKeySchema)
+  name.vb: List(Of ForeignKeySchema)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Migration.ForeignKeySchema
+    name: ForeignKeySchema
+    href: nORM.Migration.ForeignKeySchema.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Migration.ForeignKeySchema
+    name: ForeignKeySchema
+    href: nORM.Migration.ForeignKeySchema.html
+  - name: )

@@ -20,10 +20,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReferenceCollectionBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 239
+    startLine: 602
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Enables configuration of relationship details between the principal
+
+    and dependent types for a collection navigation.
+  example: []
   syntax:
     content: public class EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
     content.vb: Public Class EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
@@ -63,27 +68,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasForeignKey
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 259
+    startLine: 623
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  summary: Configures the foreign key property used by the dependent entity in the relationship.
+  summary: Defines the foreign key used by the dependent entity in this relationship.
   example: []
   syntax:
     content: public EntityTypeBuilder<TEntity> HasForeignKey(Expression<Func<TDependent, object>> foreignKeyExpression, Expression<Func<TEntity, object>>? principalKeyExpression = null)
     parameters:
     - id: foreignKeyExpression
       type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
-      description: Expression selecting the foreign key property on the dependent type.
+      description: Expression selecting the foreign key property on the dependent.
     - id: principalKeyExpression
       type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
-      description: Optional expression selecting the principal key; required when the principal has composite keys.
+      description: Optional expression selecting the referenced principal key property.
     return:
       type: nORM.Configuration.EntityTypeBuilder`1
       description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for further configuration.
     content.vb: Public Function HasForeignKey(foreignKeyExpression As Expression(Of Func(Of TDependent, Object)), principalKeyExpression As Expression(Of Func(Of TEntity, Object)) = Nothing) As EntityTypeBuilder(Of TEntity)
   overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey*
   exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">foreignKeyExpression</code> is null.
   - type: nORM.Core.NormConfigurationException
     commentId: T:nORM.Core.NormConfigurationException
     description: Thrown when the principal key cannot be inferred.
@@ -1080,6 +1088,13 @@ references:
   - name: " "
   - name: TEntity
   - name: )
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Core.NormConfigurationException
   commentId: T:nORM.Core.NormConfigurationException
   href: nORM.Core.NormConfigurationException.html

@@ -5,7 +5,11 @@ items:
   id: EntityTypeBuilder`1.PropertyBuilder
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
   langs:
   - csharp
   - vb
@@ -20,15 +24,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 169
+    startLine: 413
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Provides configuration options for a specific property on the entity type.
+  example: []
   syntax:
     content: public class EntityTypeBuilder<TEntity>.PropertyBuilder
     content.vb: Public Class EntityTypeBuilder(Of TEntity).PropertyBuilder
   inheritance:
   - System.Object
+  derivedClasses:
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
   inheritedMembers:
   - System.Object.Equals(System.Object)
   - System.Object.Equals(System.Object,System.Object)
@@ -45,6 +53,68 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder
   name.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
+  commentId: F:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
+  id: _parent
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: _parent
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder._parent
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder._parent
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: _parent
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 416
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: The parent entity type builder that owns this property builder.
+  example: []
+  syntax:
+    content: protected readonly EntityTypeBuilder<TEntity> _parent
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Protected ReadOnly _parent As EntityTypeBuilder(Of TEntity)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder._parent
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder._parent
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
+  commentId: F:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
+  id: _property
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: _property
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder._property
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder._property
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: _property
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 418
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Reflection metadata for the property being configured.
+  example: []
+  syntax:
+    content: protected readonly PropertyInfo _property
+    return:
+      type: System.Reflection.PropertyInfo
+    content.vb: Protected ReadOnly _property As PropertyInfo
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder._property
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder._property
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
   id: HasColumnName(System.String)
@@ -63,26 +133,104 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 185
+    startLine: 432
   assemblies:
   - nORM
   namespace: nORM.Configuration
   summary: Sets the database column name for the configured property.
   example: []
   syntax:
-    content: public EntityTypeBuilder<TEntity> HasColumnName(string name)
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasColumnName(string name)
     parameters:
     - id: name
       type: System.String
       description: The column name to map the property to.
     return:
-      type: nORM.Configuration.EntityTypeBuilder`1
-      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
-    content.vb: Public Function HasColumnName(name As String) As EntityTypeBuilder(Of TEntity)
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasColumnName(name As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
   overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">name</code> is null or whitespace.
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnName(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnName(String)
   name.vb: HasColumnName(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  id: HasConversion(nORM.Mapping.IValueConverter)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasConversion(IValueConverter)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasConversion(IValueConverter)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasConversion
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 445
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures a value converter for this property using the untyped interface.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasConversion(IValueConverter converter)
+    parameters:
+    - id: converter
+      type: nORM.Mapping.IValueConverter
+      description: The value converter to apply.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function HasConversion(converter As IValueConverter) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">converter</code> is null.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasConversion(IValueConverter)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
+  commentId: P:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
+  id: Builder
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: Builder
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.Builder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.Builder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Builder
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 455
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Returns the parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> to resume entity-level chaining.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> Builder { get; }
+    parameters: []
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Public ReadOnly Property Builder As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.Builder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.Builder
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1073,6 +1221,82 @@ references:
   - name: " "
   - name: TEntity
   - name: )
+- uid: System.Reflection.PropertyInfo
+  commentId: T:System.Reflection.PropertyInfo
+  parent: System.Reflection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  name: PropertyInfo
+  nameWithType: PropertyInfo
+  fullName: System.Reflection.PropertyInfo
+- uid: System.Reflection
+  commentId: N:System.Reflection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Reflection
+  nameWithType: System.Reflection
+  fullName: System.Reflection
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Reflection
+    name: Reflection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Reflection
+    name: Reflection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.PropertyBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    name: PropertyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasColumnName_System_String_
@@ -1092,3 +1316,55 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasConversion_nORM_Mapping_IValueConverter_
+  name: HasConversion
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasConversion
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasConversion
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasConversion
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasConversion
+- uid: nORM.Mapping.IValueConverter
+  commentId: T:nORM.Mapping.IValueConverter
+  parent: nORM.Mapping
+  href: nORM.Mapping.IValueConverter.html
+  name: IValueConverter
+  nameWithType: IValueConverter
+  fullName: nORM.Mapping.IValueConverter
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_Builder
+  name: Builder
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.Builder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.Builder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.Builder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.Builder

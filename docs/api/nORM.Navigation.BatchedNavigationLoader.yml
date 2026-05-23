@@ -22,10 +22,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BatchedNavigationLoader
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 14
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: >-
+    Coordinates deferred loading of navigation properties by batching multiple
+
+    requests into a single query. This reduces database round trips when many
+
+    entities require the same navigation data.
+  example: []
   syntax:
     content: 'public sealed class BatchedNavigationLoader : IDisposable'
     content.vb: Public NotInheritable Class BatchedNavigationLoader Implements IDisposable
@@ -63,17 +70,33 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 22
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Navigation.BatchedNavigationLoader" data-throw-if-not-resolved="false"></xref>
+
+    for the specified <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  remarks: >-
+    PERFORMANCE OPTIMIZATION: Uses reactive scheduling instead of polling.
+
+    Async delay continuations own scheduled batch windows, avoiding a shared scheduler
+
+    bottleneck or a retained thread per loader.
+  example: []
   syntax:
     content: public BatchedNavigationLoader(DbContext context)
     parameters:
     - id: context
       type: nORM.Core.DbContext
+      description: The owning context used to execute navigation queries.
     content.vb: Public Sub New(context As DbContext)
   overload: nORM.Navigation.BatchedNavigationLoader.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">context</code> is <code>null</code>.
   nameWithType.vb: BatchedNavigationLoader.New(DbContext)
   fullName.vb: nORM.Navigation.BatchedNavigationLoader.New(nORM.Core.DbContext)
   name.vb: New(DbContext)
@@ -95,7 +118,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadNavigationAsync
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 39
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -123,6 +146,13 @@ items:
       description: A list of related entities once the batch has been processed.
     content.vb: Public Function LoadNavigationAsync(entity As Object, propertyName As String, ct As CancellationToken = Nothing) As Task(Of List(Of Object))
   overload: nORM.Navigation.BatchedNavigationLoader.LoadNavigationAsync*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">entity</code> or <code class="paramref">propertyName</code> is <code>null</code>.
+  - type: System.ObjectDisposedException
+    commentId: T:System.ObjectDisposedException
+    description: The loader has been disposed.
   nameWithType.vb: BatchedNavigationLoader.LoadNavigationAsync(Object, String, CancellationToken)
   fullName.vb: nORM.Navigation.BatchedNavigationLoader.LoadNavigationAsync(Object, String, System.Threading.CancellationToken)
   name.vb: LoadNavigationAsync(Object, String, CancellationToken)
@@ -144,11 +174,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 203
+    startLine: 574
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Releases resources used by the loader and unregisters it from the navigation system.
+  summary: >-
+    Releases resources used by the loader, cancels any pending navigation requests, and
+
+    unregisters it from the navigation system. Safe to call multiple times.
   example: []
   syntax:
     content: public void Dispose()
@@ -1082,6 +1115,26 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: nORM.Navigation.BatchedNavigationLoader
+  commentId: T:nORM.Navigation.BatchedNavigationLoader
+  href: nORM.Navigation.BatchedNavigationLoader.html
+  name: BatchedNavigationLoader
+  nameWithType: BatchedNavigationLoader
+  fullName: nORM.Navigation.BatchedNavigationLoader
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Navigation.BatchedNavigationLoader.#ctor*
   commentId: Overload:nORM.Navigation.BatchedNavigationLoader.#ctor
   href: nORM.Navigation.BatchedNavigationLoader.html#nORM_Navigation_BatchedNavigationLoader__ctor_nORM_Core_DbContext_
@@ -1091,13 +1144,6 @@ references:
   nameWithType.vb: BatchedNavigationLoader.New
   fullName.vb: nORM.Navigation.BatchedNavigationLoader.New
   name.vb: New
-- uid: nORM.Core.DbContext
-  commentId: T:nORM.Core.DbContext
-  parent: nORM.Core
-  href: nORM.Core.DbContext.html
-  name: DbContext
-  nameWithType: DbContext
-  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -1120,6 +1166,13 @@ references:
   - uid: nORM.Core
     name: Core
     href: nORM.Core.html
+- uid: System.ObjectDisposedException
+  commentId: T:System.ObjectDisposedException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.objectdisposedexception
+  name: ObjectDisposedException
+  nameWithType: ObjectDisposedException
+  fullName: System.ObjectDisposedException
 - uid: nORM.Navigation.BatchedNavigationLoader.LoadNavigationAsync*
   commentId: Overload:nORM.Navigation.BatchedNavigationLoader.LoadNavigationAsync
   href: nORM.Navigation.BatchedNavigationLoader.html#nORM_Navigation_BatchedNavigationLoader_LoadNavigationAsync_System_Object_System_String_System_Threading_CancellationToken_

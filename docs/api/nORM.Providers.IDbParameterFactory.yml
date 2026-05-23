@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IDbParameterFactory
     path: src/nORM/Providers/IDbParameterFactory.cs
-    startLine: 6
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Abstraction for creating provider-specific <xref href="System.Data.Common.DbParameter" data-throw-if-not-resolved="false"></xref> instances.
+  example: []
   syntax:
     content: public interface IDbParameterFactory
     content.vb: Public Interface IDbParameterFactory
@@ -50,25 +52,38 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateParameter
     path: src/nORM/Providers/IDbParameterFactory.cs
-    startLine: 8
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Creates a database parameter with the provided name and value.
+  example: []
   syntax:
     content: DbParameter CreateParameter(string name, object? value)
     parameters:
     - id: name
       type: System.String
+      description: Parameter name including provider prefix.
     - id: value
       type: System.Object
+      description: Parameter value or <code>null</code>.
     return:
       type: System.Data.Common.DbParameter
+      description: A configured <xref href="System.Data.Common.DbParameter" data-throw-if-not-resolved="false"></xref>.
     content.vb: Function CreateParameter(name As String, value As Object) As DbParameter
   overload: nORM.Providers.IDbParameterFactory.CreateParameter*
   nameWithType.vb: IDbParameterFactory.CreateParameter(String, Object)
   fullName.vb: nORM.Providers.IDbParameterFactory.CreateParameter(String, Object)
   name.vb: CreateParameter(String, Object)
 references:
+- uid: System.Data.Common.DbParameter
+  commentId: T:System.Data.Common.DbParameter
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbparameter
+  name: DbParameter
+  nameWithType: DbParameter
+  fullName: System.Data.Common.DbParameter
 - uid: nORM.Providers
   commentId: N:nORM.Providers
   href: nORM.html
@@ -453,6 +468,43 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
 - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
   commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
   href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
@@ -823,14 +875,6 @@ references:
   nameWithType.vb: Object
   fullName.vb: Object
   name.vb: Object
-- uid: System.Data.Common.DbParameter
-  commentId: T:System.Data.Common.DbParameter
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbparameter
-  name: DbParameter
-  nameWithType: DbParameter
-  fullName: System.Data.Common.DbParameter
 - uid: System
   commentId: N:System
   isExternal: true
@@ -838,40 +882,3 @@ references:
   name: System
   nameWithType: System
   fullName: System
-- uid: System.Data.Common
-  commentId: N:System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Data.Common
-  nameWithType: System.Data.Common
-  fullName: System.Data.Common
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common

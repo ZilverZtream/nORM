@@ -1,11 +1,11 @@
-# Scaffolding Preview Contract
+# Scaffolding Contract
 
-> **Preview**: Scaffolding is preview in v1.0. The public API and generated code
-> format may change in minor versions. See the [public API policy](public-api-policy.md).
-
-Database scaffolding is a preview feature for v1. It is useful for generating a
-starting point from an existing schema, but generated code must be reviewed
-before it is treated as the application's model contract.
+Scaffolding ships as a documented v1 feature with the scope below. The "Supported" section is
+the v1 contract; everything in "Not Yet Stable" is explicitly out of scope for v1.0 and tracked
+for v1.x. Generated code is still meant to be reviewed and edited (it is a starting point, not a
+hand-off), but the public surface (`nORM.Scaffolding.DatabaseScaffolder`,
+`nORM.Scaffolding.DynamicEntityTypeGenerator`, and the `dotnet-norm scaffold` command) is
+stable v1.
 
 ## Supported
 
@@ -31,5 +31,6 @@ Use scaffolding to bootstrap a model, then edit the generated files into the
 model you want to own. For production applications, commit the generated code
 and review diffs like handwritten model code.
 
-The `dotnet-norm scaffold` command is also preview. It uses the same
-`DatabaseScaffolder` implementation as the runtime API.
+The `dotnet-norm scaffold` command shares the v1 contract above. It uses the same
+`DatabaseScaffolder` implementation as the runtime API; both surfaces support the same
+"Supported" scope and have the same out-of-scope items.

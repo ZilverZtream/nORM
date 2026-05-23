@@ -21,10 +21,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlFunctionAttribute
     path: src/nORM/Query/SqlFunctionAttribute.cs
-    startLine: 4
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: >-
+    Attribute used to associate a .NET method with a specific SQL fragment.
+
+    When applied, the LINQ query translator substitutes calls to the method
+
+    with the provided SQL format string.
+  example: []
   syntax:
     content: >-
       [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
@@ -112,15 +119,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Query/SqlFunctionAttribute.cs
-    startLine: 7
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Query.SqlFunctionAttribute" data-throw-if-not-resolved="false"></xref> class
+
+    with the SQL format string used to translate the decorated method call.
+  example: []
   syntax:
     content: public SqlFunctionAttribute(string format)
     parameters:
     - id: format
       type: System.String
+      description: >-
+        A composite format string representing the SQL fragment to emit. Parameters
+
+        specified in the method invocation will be substituted into this format.
     content.vb: Public Sub New(format As String)
   overload: nORM.Query.SqlFunctionAttribute.#ctor*
   nameWithType.vb: SqlFunctionAttribute.New(String)
@@ -144,10 +160,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Format
     path: src/nORM/Query/SqlFunctionAttribute.cs
-    startLine: 12
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Query
+  summary: >-
+    Gets the SQL format string that describes how the attributed method should be
+
+    represented in the generated SQL statement.
+  example: []
   syntax:
     content: public string Format { get; }
     parameters: []
@@ -2652,6 +2673,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Query.SqlFunctionAttribute
+  commentId: T:nORM.Query.SqlFunctionAttribute
+  href: nORM.Query.SqlFunctionAttribute.html
+  name: SqlFunctionAttribute
+  nameWithType: SqlFunctionAttribute
+  fullName: nORM.Query.SqlFunctionAttribute
 - uid: nORM.Query.SqlFunctionAttribute.#ctor*
   commentId: Overload:nORM.Query.SqlFunctionAttribute.#ctor
   href: nORM.Query.SqlFunctionAttribute.html#nORM_Query_SqlFunctionAttribute__ctor_System_String_

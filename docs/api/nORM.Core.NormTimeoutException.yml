@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormTimeoutException
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 94
+    startLine: 185
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Thrown when a database operation exceeds the configured timeout.
+  example: []
   syntax:
     content: 'public class NormTimeoutException : NormException, ISerializable'
     content.vb: Public Class NormTimeoutException Inherits NormException Implements ISerializable
@@ -84,21 +86,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 96
+    startLine: 194
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of <xref href="nORM.Core.NormTimeoutException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormTimeoutException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner)
     parameters:
     - id: message
       type: System.String
+      description: Human-readable error message.
     - id: sql
       type: System.String
+      description: SQL statement being executed, if known.
     - id: parameters
       type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+      description: Parameters supplied to the statement.
     - id: inner
       type: System.Exception
+      description: The original timeout exception.
     content.vb: Public Sub New(message As String, sql As String, parameters As IReadOnlyDictionary(Of String, Object), inner As Exception)
   overload: nORM.Core.NormTimeoutException.#ctor*
   nameWithType.vb: NormTimeoutException.New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
@@ -1370,6 +1378,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormTimeoutException
+  commentId: T:nORM.Core.NormTimeoutException
+  href: nORM.Core.NormTimeoutException.html
+  name: NormTimeoutException
+  nameWithType: NormTimeoutException
+  fullName: nORM.Core.NormTimeoutException
 - uid: nORM.Core.NormTimeoutException.#ctor*
   commentId: Overload:nORM.Core.NormTimeoutException.#ctor
   href: nORM.Core.NormTimeoutException.html#nORM_Core_NormTimeoutException__ctor_System_String_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_Exception_

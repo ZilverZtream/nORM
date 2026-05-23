@@ -5,6 +5,7 @@ items:
   id: nORM.Internal
   children:
   - nORM.Internal.ConcurrentLruCache`2
+  - nORM.Internal.ParameterOptimizer
   langs:
   - csharp
   - vb
@@ -46,3 +47,9 @@ references:
   - name: " "
   - name: TValue
   - name: )
+- uid: nORM.Internal.ParameterOptimizer
+  commentId: T:nORM.Internal.ParameterOptimizer
+  href: nORM.Internal.ParameterOptimizer.html
+  name: ParameterOptimizer
+  nameWithType: ParameterOptimizer
+  fullName: nORM.Internal.ParameterOptimizer

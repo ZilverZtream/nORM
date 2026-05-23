@@ -33,11 +33,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationCollection
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 476
+    startLine: 567
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Lazy loading collection that loads data on first enumeration
+  summary: Lazy loading collection that defers database access until first enumeration or mutation.
   example: []
   syntax:
     content: 'public sealed class LazyNavigationCollection<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IAsyncEnumerable<T> where T : class'
@@ -85,21 +85,30 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 482
+    startLine: 580
   assemblies:
   - nORM
   namespace: nORM.Navigation
+  summary: Initializes a new lazy collection wrapper for the specified navigation property.
+  example: []
   syntax:
     content: public LazyNavigationCollection(object parent, PropertyInfo property, NavigationContext context)
     parameters:
     - id: parent
       type: System.Object
+      description: Entity that owns the navigation property.
     - id: property
       type: System.Reflection.PropertyInfo
+      description: Reflection metadata describing the navigation.
     - id: context
       type: nORM.Navigation.NavigationContext
+      description: Navigation loading context.
     content.vb: Public Sub New(parent As Object, [property] As PropertyInfo, context As NavigationContext)
   overload: nORM.Navigation.LazyNavigationCollection`1.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Any argument is <code>null</code>.
   nameWithType.vb: LazyNavigationCollection(Of T).New(Object, PropertyInfo, NavigationContext)
   fullName.vb: nORM.Navigation.LazyNavigationCollection(Of T).New(Object, System.Reflection.PropertyInfo, nORM.Navigation.NavigationContext)
   name.vb: New(Object, PropertyInfo, NavigationContext)
@@ -121,7 +130,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 508
+    startLine: 606
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -155,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetAsyncEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 520
+    startLine: 618
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -194,7 +203,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Add
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 533
+    startLine: 631
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -229,7 +238,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 538
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -261,7 +270,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Contains
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 543
+    startLine: 641
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -298,7 +307,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CopyTo
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 548
+    startLine: 646
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -336,7 +345,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 553
+    startLine: 651
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -373,7 +382,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Count
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 558
+    startLine: 656
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -408,18 +417,22 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsReadOnly
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 560
+    startLine: 663
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Gets a value indicating whether the <xref href="System.Collections.Generic.ICollection%601" data-throw-if-not-resolved="false"></xref> is read-only.
+  summary: >-
+    Gets a value indicating whether the underlying collection is read-only.
+
+    Accessing this property triggers lazy loading if the collection has not yet
+
+    been loaded.
   example: []
   syntax:
     content: public bool IsReadOnly { get; }
     parameters: []
     return:
       type: System.Boolean
-      description: <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> if the <xref href="System.Collections.Generic.ICollection%601" data-throw-if-not-resolved="false"></xref> is read-only; otherwise, <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a>.
     content.vb: Public ReadOnly Property IsReadOnly As Boolean
   overload: nORM.Navigation.LazyNavigationCollection`1.IsReadOnly*
   implements:
@@ -444,7 +457,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOf
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 565
+    startLine: 668
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -481,7 +494,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Insert
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 570
+    startLine: 673
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -519,7 +532,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveAt
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 575
+    startLine: 678
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -555,30 +568,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: this[]
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 577
+    startLine: 684
   assemblies:
   - nORM
   namespace: nORM.Navigation
-  summary: Gets or sets the element at the specified index.
+  summary: >-
+    Gets or sets the element at the specified index, loading the collection if
+
+    necessary.
   example: []
   syntax:
     content: public T this[int index] { get; set; }
     parameters:
     - id: index
       type: System.Int32
-      description: The zero-based index of the element to get or set.
     return:
       type: '{T}'
-      description: The element at the specified index.
     content.vb: Public Default Property this[](index As Integer) As T
   overload: nORM.Navigation.LazyNavigationCollection`1.Item*
-  exceptions:
-  - type: System.ArgumentOutOfRangeException
-    commentId: T:System.ArgumentOutOfRangeException
-    description: <code class="paramref">index</code> is not a valid index in the <xref href="System.Collections.Generic.IList%601" data-throw-if-not-resolved="false"></xref>.
-  - type: System.NotSupportedException
-    commentId: T:System.NotSupportedException
-    description: The property is set and the <xref href="System.Collections.Generic.IList%601" data-throw-if-not-resolved="false"></xref> is read-only.
   implements:
   - System.Collections.Generic.IList{{T}}.Item(System.Int32)
   nameWithType.vb: LazyNavigationCollection(Of T).this[](Integer)
@@ -1890,6 +1897,13 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Navigation.LazyNavigationCollection`1.#ctor*
   commentId: Overload:nORM.Navigation.LazyNavigationCollection`1.#ctor
   href: nORM.Navigation.LazyNavigationCollection-1.html#nORM_Navigation_LazyNavigationCollection_1__ctor_System_Object_System_Reflection_PropertyInfo_nORM_Navigation_NavigationContext_
@@ -2860,20 +2874,6 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.int32
   - name: )
-- uid: System.ArgumentOutOfRangeException
-  commentId: T:System.ArgumentOutOfRangeException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception
-  name: ArgumentOutOfRangeException
-  nameWithType: ArgumentOutOfRangeException
-  fullName: System.ArgumentOutOfRangeException
-- uid: System.NotSupportedException
-  commentId: T:System.NotSupportedException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.notsupportedexception
-  name: NotSupportedException
-  nameWithType: NotSupportedException
-  fullName: System.NotSupportedException
 - uid: nORM.Navigation.LazyNavigationCollection`1.Item*
   commentId: Overload:nORM.Navigation.LazyNavigationCollection`1.Item
   href: nORM.Navigation.LazyNavigationCollection-1.html#nORM_Navigation_LazyNavigationCollection_1_Item_System_Int32_

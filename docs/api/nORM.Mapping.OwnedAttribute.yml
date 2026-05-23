@@ -19,10 +19,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedAttribute
     path: src/nORM/Mapping/OwnedAttribute.cs
-    startLine: 4
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Marks a type as being owned by another entity, indicating its lifecycle is dependent on the owner.
+  example: []
   syntax:
     content: >-
       [AttributeUsage(AttributeTargets.Class)]

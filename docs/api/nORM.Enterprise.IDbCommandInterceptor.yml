@@ -5,12 +5,19 @@ items:
   id: IDbCommandInterceptor
   parent: nORM.Enterprise
   children:
+  - nORM.Enterprise.IDbCommandInterceptor.CommandFailed(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Exception)
   - nORM.Enterprise.IDbCommandInterceptor.CommandFailedAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Exception,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Int32,System.TimeSpan)
   - nORM.Enterprise.IDbCommandInterceptor.NonQueryExecutedAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Int32,System.TimeSpan,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
   - nORM.Enterprise.IDbCommandInterceptor.NonQueryExecutingAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Data.Common.DbDataReader,System.TimeSpan)
   - nORM.Enterprise.IDbCommandInterceptor.ReaderExecutedAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Data.Common.DbDataReader,System.TimeSpan,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
   - nORM.Enterprise.IDbCommandInterceptor.ReaderExecutingAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Object,System.TimeSpan)
   - nORM.Enterprise.IDbCommandInterceptor.ScalarExecutedAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Object,System.TimeSpan,System.Threading.CancellationToken)
+  - nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
   - nORM.Enterprise.IDbCommandInterceptor.ScalarExecutingAsync(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Threading.CancellationToken)
   langs:
   - csharp
@@ -26,7 +33,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IDbCommandInterceptor
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 15
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -34,10 +41,22 @@ items:
     Defines hooks that are invoked before and after execution of <xref href="System.Data.Common.DbCommand" data-throw-if-not-resolved="false"></xref> instances.
 
     Implementations may inspect or modify the command, short-circuit execution, or react to failures.
+  remarks: >-
+    Two contract tiers are provided:
+
+
+    <ul><li><span class="term">Async (…Async methods)</span>Invoked from all async execution paths.
+        Implementations may freely use <code>await</code>.</li><li><span class="term">Sync (non-Async methods)</span>Invoked from synchronous execution
+        paths (e.g. <code>ToList()</code>). Default implementations are no-ops. Override these when
+        synchronous interception is needed; do <em>not</em> block on async work from these
+        implementations as doing so can deadlock single-threaded
+        <xref href="System.Threading.SynchronizationContext" data-throw-if-not-resolved="false"></xref> environments.</li></ul>
   example: []
   syntax:
     content: public interface IDbCommandInterceptor
     content.vb: Public Interface IDbCommandInterceptor
+  derivedClasses:
+  - nORM.Enterprise.BaseDbCommandInterceptor
   extensionMethods:
   - nORM.Enterprise.IDbCommandInterceptor.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
   - nORM.Enterprise.IDbCommandInterceptor.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Enterprise.IDbCommandInterceptor,{TProperty}}})
@@ -61,7 +80,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 21
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -101,7 +120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 26
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -145,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 32
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -185,7 +204,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 37
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -229,7 +248,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 43
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -269,7 +288,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 48
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -310,7 +329,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandFailedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 53
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -331,6 +350,290 @@ items:
       type: System.Threading.Tasks.Task
     content.vb: Function CommandFailedAsync(command As DbCommand, context As DbContext, exception As Exception, cancellationToken As CancellationToken) As Task
   overload: nORM.Enterprise.IDbCommandInterceptor.CommandFailedAsync*
+- uid: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  id: NonQueryExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: NonQueryExecuting(DbCommand, DbContext)
+  nameWithType: IDbCommandInterceptor.NonQueryExecuting(DbCommand, DbContext)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting(System.Data.Common.DbCommand, nORM.Core.DbContext)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NonQueryExecuting
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 79
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously before a command that does not return rows is executed.
+
+    Return <xref href="nORM.Enterprise.InterceptionResult%601.SuppressWithResult(%600)" data-throw-if-not-resolved="false"></xref> to short-circuit execution.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: InterceptionResult<int> NonQueryExecuting(DbCommand command, DbContext context)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    return:
+      type: nORM.Enterprise.InterceptionResult{System.Int32}
+    content.vb: Function NonQueryExecuting(command As DbCommand, context As DbContext) As InterceptionResult(Of Integer)
+  overload: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting*
+- uid: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Int32,System.TimeSpan)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Int32,System.TimeSpan)
+  id: NonQueryExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Int32,System.TimeSpan)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: NonQueryExecuted(DbCommand, DbContext, int, TimeSpan)
+  nameWithType: IDbCommandInterceptor.NonQueryExecuted(DbCommand, DbContext, int, TimeSpan)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted(System.Data.Common.DbCommand, nORM.Core.DbContext, int, System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NonQueryExecuted
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 86
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously after a command that does not return rows has executed.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: void NonQueryExecuted(DbCommand command, DbContext context, int result, TimeSpan duration)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    - id: result
+      type: System.Int32
+    - id: duration
+      type: System.TimeSpan
+    content.vb: Sub NonQueryExecuted(command As DbCommand, context As DbContext, result As Integer, duration As TimeSpan)
+  overload: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted*
+  nameWithType.vb: IDbCommandInterceptor.NonQueryExecuted(DbCommand, DbContext, Integer, TimeSpan)
+  fullName.vb: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted(System.Data.Common.DbCommand, nORM.Core.DbContext, Integer, System.TimeSpan)
+  name.vb: NonQueryExecuted(DbCommand, DbContext, Integer, TimeSpan)
+- uid: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  id: ScalarExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: ScalarExecuting(DbCommand, DbContext)
+  nameWithType: IDbCommandInterceptor.ScalarExecuting(DbCommand, DbContext)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting(System.Data.Common.DbCommand, nORM.Core.DbContext)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ScalarExecuting
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 93
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously before a command that returns a scalar value is executed.
+
+    Return <xref href="nORM.Enterprise.InterceptionResult%601.SuppressWithResult(%600)" data-throw-if-not-resolved="false"></xref> to short-circuit execution.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: InterceptionResult<object?> ScalarExecuting(DbCommand command, DbContext context)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    return:
+      type: nORM.Enterprise.InterceptionResult{System.Object}
+    content.vb: Function ScalarExecuting(command As DbCommand, context As DbContext) As InterceptionResult(Of Object)
+  overload: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting*
+- uid: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Object,System.TimeSpan)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Object,System.TimeSpan)
+  id: ScalarExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Object,System.TimeSpan)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: ScalarExecuted(DbCommand, DbContext, object?, TimeSpan)
+  nameWithType: IDbCommandInterceptor.ScalarExecuted(DbCommand, DbContext, object?, TimeSpan)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted(System.Data.Common.DbCommand, nORM.Core.DbContext, object?, System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ScalarExecuted
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 100
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously after a command that returns a scalar value has executed.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: void ScalarExecuted(DbCommand command, DbContext context, object? result, TimeSpan duration)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    - id: result
+      type: System.Object
+    - id: duration
+      type: System.TimeSpan
+    content.vb: Sub ScalarExecuted(command As DbCommand, context As DbContext, result As Object, duration As TimeSpan)
+  overload: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted*
+  nameWithType.vb: IDbCommandInterceptor.ScalarExecuted(DbCommand, DbContext, Object, TimeSpan)
+  fullName.vb: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted(System.Data.Common.DbCommand, nORM.Core.DbContext, Object, System.TimeSpan)
+  name.vb: ScalarExecuted(DbCommand, DbContext, Object, TimeSpan)
+- uid: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  id: ReaderExecuting(System.Data.Common.DbCommand,nORM.Core.DbContext)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: ReaderExecuting(DbCommand, DbContext)
+  nameWithType: IDbCommandInterceptor.ReaderExecuting(DbCommand, DbContext)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting(System.Data.Common.DbCommand, nORM.Core.DbContext)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReaderExecuting
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 107
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously before a command that returns a reader is executed.
+
+    Return <xref href="nORM.Enterprise.InterceptionResult%601.SuppressWithResult(%600)" data-throw-if-not-resolved="false"></xref> to short-circuit execution.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, DbContext context)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    return:
+      type: nORM.Enterprise.InterceptionResult{System.Data.Common.DbDataReader}
+    content.vb: Function ReaderExecuting(command As DbCommand, context As DbContext) As InterceptionResult(Of DbDataReader)
+  overload: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting*
+- uid: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Data.Common.DbDataReader,System.TimeSpan)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Data.Common.DbDataReader,System.TimeSpan)
+  id: ReaderExecuted(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Data.Common.DbDataReader,System.TimeSpan)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: ReaderExecuted(DbCommand, DbContext, DbDataReader, TimeSpan)
+  nameWithType: IDbCommandInterceptor.ReaderExecuted(DbCommand, DbContext, DbDataReader, TimeSpan)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted(System.Data.Common.DbCommand, nORM.Core.DbContext, System.Data.Common.DbDataReader, System.TimeSpan)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReaderExecuted
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 114
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously after a command that returns a reader has executed.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: void ReaderExecuted(DbCommand command, DbContext context, DbDataReader reader, TimeSpan duration)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    - id: reader
+      type: System.Data.Common.DbDataReader
+    - id: duration
+      type: System.TimeSpan
+    content.vb: Sub ReaderExecuted(command As DbCommand, context As DbContext, reader As DbDataReader, duration As TimeSpan)
+  overload: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted*
+- uid: nORM.Enterprise.IDbCommandInterceptor.CommandFailed(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Exception)
+  commentId: M:nORM.Enterprise.IDbCommandInterceptor.CommandFailed(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Exception)
+  id: CommandFailed(System.Data.Common.DbCommand,nORM.Core.DbContext,System.Exception)
+  parent: nORM.Enterprise.IDbCommandInterceptor
+  langs:
+  - csharp
+  - vb
+  name: CommandFailed(DbCommand, DbContext, Exception)
+  nameWithType: IDbCommandInterceptor.CommandFailed(DbCommand, DbContext, Exception)
+  fullName: nORM.Enterprise.IDbCommandInterceptor.CommandFailed(System.Data.Common.DbCommand, nORM.Core.DbContext, System.Exception)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CommandFailed
+    path: src/nORM/Enterprise/IDbCommandInterceptor.cs
+    startLine: 120
+  assemblies:
+  - nORM
+  namespace: nORM.Enterprise
+  summary: >-
+    Called synchronously when execution of a command results in an exception.
+
+    The default implementation is a no-op.
+  example: []
+  syntax:
+    content: void CommandFailed(DbCommand command, DbContext context, Exception exception)
+    parameters:
+    - id: command
+      type: System.Data.Common.DbCommand
+    - id: context
+      type: nORM.Core.DbContext
+    - id: exception
+      type: System.Exception
+    content.vb: Sub CommandFailed(command As DbCommand, context As DbContext, exception As Exception)
+  overload: nORM.Enterprise.IDbCommandInterceptor.CommandFailed*
 references:
 - uid: System.Data.Common.DbCommand
   commentId: T:System.Data.Common.DbCommand
@@ -340,6 +643,13 @@ references:
   name: DbCommand
   nameWithType: DbCommand
   fullName: System.Data.Common.DbCommand
+- uid: System.Threading.SynchronizationContext
+  commentId: T:System.Threading.SynchronizationContext
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.synchronizationcontext
+  name: SynchronizationContext
+  nameWithType: SynchronizationContext
+  fullName: System.Threading.SynchronizationContext
 - uid: nORM.Enterprise
   commentId: N:nORM.Enterprise
   href: nORM.html
@@ -1476,3 +1786,192 @@ references:
   name: Exception
   nameWithType: Exception
   fullName: System.Exception
+- uid: nORM.Enterprise.InterceptionResult`1.SuppressWithResult(`0)
+  commentId: M:nORM.Enterprise.InterceptionResult`1.SuppressWithResult(`0)
+  href: nORM.Enterprise.InterceptionResult-1.html#nORM_Enterprise_InterceptionResult_1_SuppressWithResult__0_
+  name: SuppressWithResult(T)
+  nameWithType: InterceptionResult<T>.SuppressWithResult(T)
+  fullName: nORM.Enterprise.InterceptionResult<T>.SuppressWithResult(T)
+  nameWithType.vb: InterceptionResult(Of T).SuppressWithResult(T)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of T).SuppressWithResult(T)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1.SuppressWithResult(`0)
+    name: SuppressWithResult
+    href: nORM.Enterprise.InterceptionResult-1.html#nORM_Enterprise_InterceptionResult_1_SuppressWithResult__0_
+  - name: (
+  - name: T
+  - name: )
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1.SuppressWithResult(`0)
+    name: SuppressWithResult
+    href: nORM.Enterprise.InterceptionResult-1.html#nORM_Enterprise_InterceptionResult_1_SuppressWithResult__0_
+  - name: (
+  - name: T
+  - name: )
+- uid: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_NonQueryExecuting_System_Data_Common_DbCommand_nORM_Core_DbContext_
+  name: NonQueryExecuting
+  nameWithType: IDbCommandInterceptor.NonQueryExecuting
+  fullName: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuting
+- uid: nORM.Enterprise.InterceptionResult{System.Int32}
+  commentId: T:nORM.Enterprise.InterceptionResult{System.Int32}
+  parent: nORM.Enterprise
+  definition: nORM.Enterprise.InterceptionResult`1
+  href: nORM.Enterprise.InterceptionResult-1.html
+  name: InterceptionResult<int>
+  nameWithType: InterceptionResult<int>
+  fullName: nORM.Enterprise.InterceptionResult<int>
+  nameWithType.vb: InterceptionResult(Of Integer)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of Integer)
+  name.vb: InterceptionResult(Of Integer)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Enterprise.InterceptionResult`1
+  commentId: T:nORM.Enterprise.InterceptionResult`1
+  parent: nORM.Enterprise
+  href: nORM.Enterprise.InterceptionResult-1.html
+  name: InterceptionResult<T>
+  nameWithType: InterceptionResult<T>
+  fullName: nORM.Enterprise.InterceptionResult<T>
+  nameWithType.vb: InterceptionResult(Of T)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of T)
+  name.vb: InterceptionResult(Of T)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_NonQueryExecuted_System_Data_Common_DbCommand_nORM_Core_DbContext_System_Int32_System_TimeSpan_
+  name: NonQueryExecuted
+  nameWithType: IDbCommandInterceptor.NonQueryExecuted
+  fullName: nORM.Enterprise.IDbCommandInterceptor.NonQueryExecuted
+- uid: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_ScalarExecuting_System_Data_Common_DbCommand_nORM_Core_DbContext_
+  name: ScalarExecuting
+  nameWithType: IDbCommandInterceptor.ScalarExecuting
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuting
+- uid: nORM.Enterprise.InterceptionResult{System.Object}
+  commentId: T:nORM.Enterprise.InterceptionResult{System.Object}
+  parent: nORM.Enterprise
+  definition: nORM.Enterprise.InterceptionResult`1
+  href: nORM.Enterprise.InterceptionResult-1.html
+  name: InterceptionResult<object>
+  nameWithType: InterceptionResult<object>
+  fullName: nORM.Enterprise.InterceptionResult<object>
+  nameWithType.vb: InterceptionResult(Of Object)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of Object)
+  name.vb: InterceptionResult(Of Object)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_ScalarExecuted_System_Data_Common_DbCommand_nORM_Core_DbContext_System_Object_System_TimeSpan_
+  name: ScalarExecuted
+  nameWithType: IDbCommandInterceptor.ScalarExecuted
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ScalarExecuted
+- uid: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_ReaderExecuting_System_Data_Common_DbCommand_nORM_Core_DbContext_
+  name: ReaderExecuting
+  nameWithType: IDbCommandInterceptor.ReaderExecuting
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuting
+- uid: nORM.Enterprise.InterceptionResult{System.Data.Common.DbDataReader}
+  commentId: T:nORM.Enterprise.InterceptionResult{System.Data.Common.DbDataReader}
+  parent: nORM.Enterprise
+  definition: nORM.Enterprise.InterceptionResult`1
+  href: nORM.Enterprise.InterceptionResult-1.html
+  name: InterceptionResult<DbDataReader>
+  nameWithType: InterceptionResult<DbDataReader>
+  fullName: nORM.Enterprise.InterceptionResult<System.Data.Common.DbDataReader>
+  nameWithType.vb: InterceptionResult(Of DbDataReader)
+  fullName.vb: nORM.Enterprise.InterceptionResult(Of System.Data.Common.DbDataReader)
+  name.vb: InterceptionResult(Of DbDataReader)
+  spec.csharp:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: <
+  - uid: System.Data.Common.DbDataReader
+    name: DbDataReader
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbdatareader
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Enterprise.InterceptionResult`1
+    name: InterceptionResult
+    href: nORM.Enterprise.InterceptionResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Data.Common.DbDataReader
+    name: DbDataReader
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbdatareader
+  - name: )
+- uid: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_ReaderExecuted_System_Data_Common_DbCommand_nORM_Core_DbContext_System_Data_Common_DbDataReader_System_TimeSpan_
+  name: ReaderExecuted
+  nameWithType: IDbCommandInterceptor.ReaderExecuted
+  fullName: nORM.Enterprise.IDbCommandInterceptor.ReaderExecuted
+- uid: nORM.Enterprise.IDbCommandInterceptor.CommandFailed*
+  commentId: Overload:nORM.Enterprise.IDbCommandInterceptor.CommandFailed
+  href: nORM.Enterprise.IDbCommandInterceptor.html#nORM_Enterprise_IDbCommandInterceptor_CommandFailed_System_Data_Common_DbCommand_nORM_Core_DbContext_System_Exception_
+  name: CommandFailed
+  nameWithType: IDbCommandInterceptor.CommandFailed
+  fullName: nORM.Enterprise.IDbCommandInterceptor.CommandFailed

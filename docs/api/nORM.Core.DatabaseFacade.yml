@@ -21,10 +21,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseFacade
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 7
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Provides access to database-specific functionality for a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>,
+
+    such as transaction management.
+  example: []
   syntax:
     content: public class DatabaseFacade
     content.vb: Public Class DatabaseFacade
@@ -61,10 +66,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CurrentTransaction
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 16
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Gets the active <xref href="System.Data.Common.DbTransaction" data-throw-if-not-resolved="false"></xref> for the context, if one exists.
+  example: []
   syntax:
     content: public DbTransaction? CurrentTransaction { get; }
     parameters: []
@@ -90,7 +97,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BeginTransactionAsync
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 24
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -112,6 +119,13 @@ items:
     commentId: T:System.InvalidOperationException
     description: Thrown when a transaction is already active.
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -1075,12 +1089,6 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
-- uid: nORM.Core.DatabaseFacade.CurrentTransaction*
-  commentId: Overload:nORM.Core.DatabaseFacade.CurrentTransaction
-  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentTransaction
-  name: CurrentTransaction
-  nameWithType: DatabaseFacade.CurrentTransaction
-  fullName: nORM.Core.DatabaseFacade.CurrentTransaction
 - uid: System.Data.Common.DbTransaction
   commentId: T:System.Data.Common.DbTransaction
   parent: System.Data.Common
@@ -1089,6 +1097,12 @@ references:
   name: DbTransaction
   nameWithType: DbTransaction
   fullName: System.Data.Common.DbTransaction
+- uid: nORM.Core.DatabaseFacade.CurrentTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.CurrentTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentTransaction
+  name: CurrentTransaction
+  nameWithType: DatabaseFacade.CurrentTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentTransaction
 - uid: System.Data.Common
   commentId: N:System.Data.Common
   isExternal: true

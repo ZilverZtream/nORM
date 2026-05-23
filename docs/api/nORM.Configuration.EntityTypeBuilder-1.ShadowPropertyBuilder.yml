@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowPropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 192
+    startLine: 480
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Configures a shadow property that exists only in the model and database.
+  example: []
   syntax:
     content: public class EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
     content.vb: Public Class EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder
@@ -63,7 +65,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 208
+    startLine: 497
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -80,6 +82,10 @@ items:
       description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
     content.vb: Public Function HasColumnName(columnName As String) As EntityTypeBuilder(Of TEntity)
   overload: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder.HasColumnName*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">columnName</code> is null or whitespace.
   nameWithType.vb: EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder.HasColumnName(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ShadowPropertyBuilder.HasColumnName(String)
   name.vb: HasColumnName(String)
@@ -1073,6 +1079,13 @@ references:
   - name: " "
   - name: TEntity
   - name: )
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
 - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder.HasColumnName*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder.HasColumnName
   href: nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_ShadowPropertyBuilder_HasColumnName_System_String_

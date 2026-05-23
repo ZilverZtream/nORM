@@ -5,8 +5,11 @@ items:
   id: SqliteMigrationRunner
   parent: nORM.Migration
   children:
-  - nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
+  - nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  - nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   - nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
+  - nORM.Migration.SqliteMigrationRunner.Dispose
+  - nORM.Migration.SqliteMigrationRunner.DisposeAsync
   - nORM.Migration.SqliteMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
   - nORM.Migration.SqliteMigrationRunner.HasPendingMigrationsAsync(System.Threading.CancellationToken)
   langs:
@@ -23,17 +26,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqliteMigrationRunner
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 17
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Executes migrations against a SQLite database using a supplied connection and migrations assembly.
+  example: []
   syntax:
-    content: 'public class SqliteMigrationRunner : IMigrationRunner'
-    content.vb: Public Class SqliteMigrationRunner Implements IMigrationRunner
+    content: 'public class SqliteMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
+    content.vb: Public Class SqliteMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
   - nORM.Migration.IMigrationRunner
+  - System.IAsyncDisposable
+  - System.IDisposable
   inheritedMembers:
   - System.Object.Equals(System.Object)
   - System.Object.Equals(System.Object,System.Object)
@@ -47,16 +54,16 @@ items:
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,{TProperty}}})
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,{TProperty}}},System.Threading.CancellationToken)
-- uid: nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
-  commentId: M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
-  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)'
+- uid: nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  commentId: M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
   parent: nORM.Migration.SqliteMigrationRunner
   langs:
   - csharp
   - vb
-  name: SqliteMigrationRunner(DbConnection, Assembly, DbContextOptions?)
-  nameWithType: SqliteMigrationRunner.SqliteMigrationRunner(DbConnection, Assembly, DbContextOptions?)
-  fullName: nORM.Migration.SqliteMigrationRunner.SqliteMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions?)
+  name: SqliteMigrationRunner(DbConnection, Assembly, DbContextOptions?, ILogger?)
+  nameWithType: SqliteMigrationRunner.SqliteMigrationRunner(DbConnection, Assembly, DbContextOptions?, ILogger?)
+  fullName: nORM.Migration.SqliteMigrationRunner.SqliteMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions?, Microsoft.Extensions.Logging.ILogger?)
   type: Constructor
   source:
     remote:
@@ -65,24 +72,79 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 24
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.SqliteMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
   syntax:
-    content: public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null)
+    content: public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, DbContextOptions? options = null, ILogger? logger = null)
     parameters:
     - id: connection
       type: System.Data.Common.DbConnection
+      description: Open connection to the target SQLite database.
     - id: migrationsAssembly
       type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
     - id: options
       type: nORM.Configuration.DbContextOptions
-    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, options As DbContextOptions = Nothing)
+      description: Optional DbContext configuration for interceptors.
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+      description: Optional logger for drift warnings and diagnostics.
+    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, options As DbContextOptions = Nothing, logger As ILogger = Nothing)
   overload: nORM.Migration.SqliteMigrationRunner.#ctor*
-  nameWithType.vb: SqliteMigrationRunner.New(DbConnection, Assembly, DbContextOptions)
-  fullName.vb: nORM.Migration.SqliteMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions)
-  name.vb: New(DbConnection, Assembly, DbContextOptions)
+  nameWithType.vb: SqliteMigrationRunner.New(DbConnection, Assembly, DbContextOptions, ILogger)
+  fullName.vb: nORM.Migration.SqliteMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Configuration.DbContextOptions, Microsoft.Extensions.Logging.ILogger)
+  name.vb: New(DbConnection, Assembly, DbContextOptions, ILogger)
+- uid: nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  commentId: M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
+  id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Migration.MigrationOptions,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
+  parent: nORM.Migration.SqliteMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: SqliteMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?, ILogger?)
+  nameWithType: SqliteMigrationRunner.SqliteMigrationRunner(DbConnection, Assembly, MigrationOptions, DbContextOptions?, ILogger?)
+  fullName: nORM.Migration.SqliteMigrationRunner.SqliteMigrationRunner(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions?, Microsoft.Extensions.Logging.ILogger?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Migration/SqliteMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Migration/SqliteMigrationRunner.cs
+    startLine: 55
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Initializes a new instance of the <xref href="nORM.Migration.SqliteMigrationRunner" data-throw-if-not-resolved="false"></xref> class.
+  example: []
+  syntax:
+    content: public SqliteMigrationRunner(DbConnection connection, Assembly migrationsAssembly, MigrationOptions migrationOptions, DbContextOptions? options = null, ILogger? logger = null)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open connection to the target SQLite database.
+    - id: migrationsAssembly
+      type: System.Reflection.Assembly
+      description: Assembly containing migration classes.
+    - id: migrationOptions
+      type: nORM.Migration.MigrationOptions
+      description: Migration runner options.
+    - id: options
+      type: nORM.Configuration.DbContextOptions
+      description: Optional DbContext configuration for interceptors.
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger
+      description: Optional logger for drift warnings and diagnostics.
+    content.vb: Public Sub New(connection As DbConnection, migrationsAssembly As Assembly, migrationOptions As MigrationOptions, options As DbContextOptions = Nothing, logger As ILogger = Nothing)
+  overload: nORM.Migration.SqliteMigrationRunner.#ctor*
+  nameWithType.vb: SqliteMigrationRunner.New(DbConnection, Assembly, MigrationOptions, DbContextOptions, ILogger)
+  fullName.vb: nORM.Migration.SqliteMigrationRunner.New(System.Data.Common.DbConnection, System.Reflection.Assembly, nORM.Migration.MigrationOptions, nORM.Configuration.DbContextOptions, Microsoft.Extensions.Logging.ILogger)
+  name.vb: New(DbConnection, Assembly, MigrationOptions, DbContextOptions, ILogger)
 - uid: nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync(System.Threading.CancellationToken)
   id: ApplyMigrationsAsync(System.Threading.CancellationToken)
@@ -101,16 +163,22 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 40
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Migration
   summary: >-
     Applies all pending migrations to the connected SQLite database. The method
 
-    wraps migration execution in a transaction ensuring that either all migrations
+    wraps migration execution in an EXCLUSIVE transaction, which prevents any
 
-    succeed or none are applied.
+    other connection from acquiring ANY transaction (read or write) until this
+
+    runner commits. A second concurrent runner will block at the exclusive-lock
+
+    acquisition, then re-read applied migrations after commit and find nothing
+
+    pending — achieving correct serialization without explicit advisory locks.
   example: []
   syntax:
     content: public Task ApplyMigrationsAsync(CancellationToken ct = default)
@@ -142,7 +210,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 61
+    startLine: 121
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -182,7 +250,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 74
+    startLine: 137
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -204,6 +272,68 @@ items:
   overload: nORM.Migration.SqliteMigrationRunner.GetPendingMigrationsAsync*
   implements:
   - nORM.Migration.IMigrationRunner.GetPendingMigrationsAsync(System.Threading.CancellationToken)
+- uid: nORM.Migration.SqliteMigrationRunner.DisposeAsync
+  commentId: M:nORM.Migration.SqliteMigrationRunner.DisposeAsync
+  id: DisposeAsync
+  parent: nORM.Migration.SqliteMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: DisposeAsync()
+  nameWithType: SqliteMigrationRunner.DisposeAsync()
+  fullName: nORM.Migration.SqliteMigrationRunner.DisposeAsync()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/SqliteMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DisposeAsync
+    path: src/nORM/Migration/SqliteMigrationRunner.cs
+    startLine: 296
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Asynchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public ValueTask DisposeAsync()
+    return:
+      type: System.Threading.Tasks.ValueTask
+    content.vb: Public Function DisposeAsync() As ValueTask
+  overload: nORM.Migration.SqliteMigrationRunner.DisposeAsync*
+  implements:
+  - System.IAsyncDisposable.DisposeAsync
+- uid: nORM.Migration.SqliteMigrationRunner.Dispose
+  commentId: M:nORM.Migration.SqliteMigrationRunner.Dispose
+  id: Dispose
+  parent: nORM.Migration.SqliteMigrationRunner
+  langs:
+  - csharp
+  - vb
+  name: Dispose()
+  nameWithType: SqliteMigrationRunner.Dispose()
+  fullName: nORM.Migration.SqliteMigrationRunner.Dispose()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Migration/SqliteMigrationRunner.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Dispose
+    path: src/nORM/Migration/SqliteMigrationRunner.cs
+    startLine: 313
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Synchronously disposes the internal <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> created for interceptors.
+  example: []
+  syntax:
+    content: public void Dispose()
+    content.vb: Public Sub Dispose()
+  overload: nORM.Migration.SqliteMigrationRunner.Dispose*
+  implements:
+  - System.IDisposable.Dispose
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -245,6 +375,22 @@ references:
   name: IMigrationRunner
   nameWithType: IMigrationRunner
   fullName: nORM.Migration.IMigrationRunner
+- uid: System.IAsyncDisposable
+  commentId: T:System.IAsyncDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable
+  name: IAsyncDisposable
+  nameWithType: IAsyncDisposable
+  fullName: System.IAsyncDisposable
+- uid: System.IDisposable
+  commentId: T:System.IDisposable
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable
+  name: IDisposable
+  nameWithType: IDisposable
+  fullName: System.IDisposable
 - uid: System.Object.Equals(System.Object)
   commentId: M:System.Object.Equals(System.Object)
   parent: System.Object
@@ -1175,9 +1321,15 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Migration.SqliteMigrationRunner
+  commentId: T:nORM.Migration.SqliteMigrationRunner
+  href: nORM.Migration.SqliteMigrationRunner.html
+  name: SqliteMigrationRunner
+  nameWithType: SqliteMigrationRunner
+  fullName: nORM.Migration.SqliteMigrationRunner
 - uid: nORM.Migration.SqliteMigrationRunner.#ctor*
   commentId: Overload:nORM.Migration.SqliteMigrationRunner.#ctor
-  href: nORM.Migration.SqliteMigrationRunner.html#nORM_Migration_SqliteMigrationRunner__ctor_System_Data_Common_DbConnection_System_Reflection_Assembly_nORM_Configuration_DbContextOptions_
+  href: nORM.Migration.SqliteMigrationRunner.html#nORM_Migration_SqliteMigrationRunner__ctor_System_Data_Common_DbConnection_System_Reflection_Assembly_nORM_Configuration_DbContextOptions_Microsoft_Extensions_Logging_ILogger_
   name: SqliteMigrationRunner
   nameWithType: SqliteMigrationRunner.SqliteMigrationRunner
   fullName: nORM.Migration.SqliteMigrationRunner.SqliteMigrationRunner
@@ -1207,6 +1359,14 @@ references:
   name: DbContextOptions
   nameWithType: DbContextOptions
   fullName: nORM.Configuration.DbContextOptions
+- uid: Microsoft.Extensions.Logging.ILogger
+  commentId: T:Microsoft.Extensions.Logging.ILogger
+  parent: Microsoft.Extensions.Logging
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger
+  name: ILogger
+  nameWithType: ILogger
+  fullName: Microsoft.Extensions.Logging.ILogger
 - uid: System.Data.Common
   commentId: N:System.Data.Common
   isExternal: true
@@ -1293,6 +1453,43 @@ references:
   - uid: nORM.Configuration
     name: Configuration
     href: nORM.Configuration.html
+- uid: Microsoft.Extensions.Logging
+  commentId: N:Microsoft.Extensions.Logging
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Logging
+  nameWithType: Microsoft.Extensions.Logging
+  fullName: Microsoft.Extensions.Logging
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+- uid: nORM.Migration.MigrationOptions
+  commentId: T:nORM.Migration.MigrationOptions
+  parent: nORM.Migration
+  href: nORM.Migration.MigrationOptions.html
+  name: MigrationOptions
+  nameWithType: MigrationOptions
+  fullName: nORM.Migration.MigrationOptions
 - uid: nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync*
   commentId: Overload:nORM.Migration.SqliteMigrationRunner.ApplyMigrationsAsync
   href: nORM.Migration.SqliteMigrationRunner.html#nORM_Migration_SqliteMigrationRunner_ApplyMigrationsAsync_System_Threading_CancellationToken_
@@ -1576,4 +1773,97 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: (
   - name: )
+  - name: )
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Migration.SqliteMigrationRunner.DisposeAsync*
+  commentId: Overload:nORM.Migration.SqliteMigrationRunner.DisposeAsync
+  href: nORM.Migration.SqliteMigrationRunner.html#nORM_Migration_SqliteMigrationRunner_DisposeAsync
+  name: DisposeAsync
+  nameWithType: SqliteMigrationRunner.DisposeAsync
+  fullName: nORM.Migration.SqliteMigrationRunner.DisposeAsync
+- uid: System.IAsyncDisposable.DisposeAsync
+  commentId: M:System.IAsyncDisposable.DisposeAsync
+  parent: System.IAsyncDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  name: DisposeAsync()
+  nameWithType: IAsyncDisposable.DisposeAsync()
+  fullName: System.IAsyncDisposable.DisposeAsync()
+  spec.csharp:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.ValueTask
+  commentId: T:System.Threading.Tasks.ValueTask
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask
+  name: ValueTask
+  nameWithType: ValueTask
+  fullName: System.Threading.Tasks.ValueTask
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: nORM.Migration.SqliteMigrationRunner.Dispose*
+  commentId: Overload:nORM.Migration.SqliteMigrationRunner.Dispose
+  href: nORM.Migration.SqliteMigrationRunner.html#nORM_Migration_SqliteMigrationRunner_Dispose
+  name: Dispose
+  nameWithType: SqliteMigrationRunner.Dispose
+  fullName: nORM.Migration.SqliteMigrationRunner.Dispose
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
   - name: )

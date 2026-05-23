@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormDatabaseException
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 86
+    startLine: 167
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Represents database-specific failures such as constraint violations or other provider errors.
+  example: []
   syntax:
     content: 'public class NormDatabaseException : NormException, ISerializable'
     content.vb: Public Class NormDatabaseException Inherits NormException Implements ISerializable
@@ -84,21 +86,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 88
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Initializes a new instance of <xref href="nORM.Core.NormDatabaseException" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public NormDatabaseException(string message, string? sql, IReadOnlyDictionary<string, object>? parameters, Exception? inner)
     parameters:
     - id: message
       type: System.String
+      description: Human-readable error message.
     - id: sql
       type: System.String
+      description: SQL statement that caused the failure, if available.
     - id: parameters
       type: System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
+      description: Parameters supplied with the SQL statement.
     - id: inner
       type: System.Exception
+      description: The original provider exception.
     content.vb: Public Sub New(message As String, sql As String, parameters As IReadOnlyDictionary(Of String, Object), inner As Exception)
   overload: nORM.Core.NormDatabaseException.#ctor*
   nameWithType.vb: NormDatabaseException.New(String, String, IReadOnlyDictionary(Of String, Object), Exception)
@@ -1370,6 +1378,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormDatabaseException
+  commentId: T:nORM.Core.NormDatabaseException
+  href: nORM.Core.NormDatabaseException.html
+  name: NormDatabaseException
+  nameWithType: NormDatabaseException
+  fullName: nORM.Core.NormDatabaseException
 - uid: nORM.Core.NormDatabaseException.#ctor*
   commentId: Overload:nORM.Core.NormDatabaseException.#ctor
   href: nORM.Core.NormDatabaseException.html#nORM_Core_NormDatabaseException__ctor_System_String_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__System_Exception_

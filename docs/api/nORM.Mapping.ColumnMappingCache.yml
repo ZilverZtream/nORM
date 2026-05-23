@@ -20,10 +20,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnMappingCache
     path: src/nORM/Mapping/ColumnMappingCache.cs
-    startLine: 17
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Provides cached reflection-based metadata describing how entity properties map to database columns.
+  example: []
   syntax:
     content: public static class ColumnMappingCache
     content.vb: Public Module ColumnMappingCache
@@ -55,7 +57,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCachedColumns
     path: src/nORM/Mapping/ColumnMappingCache.cs
-    startLine: 30
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Mapping

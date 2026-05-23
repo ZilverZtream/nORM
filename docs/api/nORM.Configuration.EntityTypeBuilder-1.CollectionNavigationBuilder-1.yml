@@ -5,6 +5,7 @@ items:
   id: EntityTypeBuilder`1.CollectionNavigationBuilder`1
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}})
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithOne(System.Linq.Expressions.Expression{System.Func{`1,`0}})
   langs:
   - csharp
@@ -20,14 +21,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionNavigationBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 215
+    startLine: 509
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Supports configuration of collection navigations to dependent entity types.
+  example: []
   syntax:
     content: 'public class EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent> where TDependent : class'
     typeParameters:
     - id: TDependent
+      description: The CLR type of the dependent entity.
     content.vb: Public Class EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent As Class)
   inheritance:
   - System.Object
@@ -65,18 +69,21 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithOne
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 231
+    startLine: 526
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  summary: Configures the relationship to have a single optional reference back to the principal entity.
+  summary: >-
+    Configures the relationship to include an optional reference navigation
+
+    from the dependent entity back to the principal.
   example: []
   syntax:
     content: public EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder WithOne(Expression<Func<TDependent, TEntity?>>? navigation = null)
     parameters:
     - id: navigation
       type: System.Linq.Expressions.Expression{System.Func{{TDependent},{TEntity}}}
-      description: Optional expression specifying the navigation property on the dependent type.
+      description: Expression selecting the dependent's navigation property, if any.
     return:
       type: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
       description: A builder for configuring the relationship further.
@@ -85,6 +92,44 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithOne(Expression(Of Func(Of TDependent, TEntity)))
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithOne(System.Linq.Expressions.Expression(Of System.Func(Of TDependent, TEntity)))
   name.vb: WithOne(Expression(Of Func(Of TDependent, TEntity)))
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}})
+  id: WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}})
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: WithMany(Expression<Func<TDependent, IEnumerable<TEntity>>>?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.WithMany(Expression<Func<TDependent, IEnumerable<TEntity>>>?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.WithMany(System.Linq.Expressions.Expression<System.Func<TDependent, System.Collections.Generic.IEnumerable<TEntity>>>?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WithMany
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 539
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Begins configuration of a many-to-many relationship with an optional inverse navigation.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder WithMany(Expression<Func<TDependent, IEnumerable<TEntity>>>? inverseNavigation = null)
+    parameters:
+    - id: inverseNavigation
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Collections.Generic.IEnumerable{{TEntity}}}}
+      description: Expression selecting the inverse collection property on <code class="typeparamref">TDependent</code>, if any.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+      description: A builder for specifying the join table details.
+    content.vb: Public Function WithMany(inverseNavigation As Expression(Of Func(Of TDependent, IEnumerable(Of TEntity))) = Nothing) As EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithMany(Expression(Of Func(Of TDependent, IEnumerable(Of TEntity))))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithMany(System.Linq.Expressions.Expression(Of System.Func(Of TDependent, System.Collections.Generic.IEnumerable(Of TEntity))))
+  name.vb: WithMany(Expression(Of Func(Of TDependent, IEnumerable(Of TEntity))))
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1309,3 +1354,124 @@ references:
     name: Expressions
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.WithMany
+  href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_CollectionNavigationBuilder_1_WithMany_System_Linq_Expressions_Expression_System_Func__1_System_Collections_Generic_IEnumerable__0____
+  name: WithMany
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.WithMany
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.WithMany
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithMany
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).WithMany
+- uid: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Collections.Generic.IEnumerable{{TEntity}}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TDependent, IEnumerable<TEntity>>>
+  nameWithType: Expression<Func<TDependent, IEnumerable<TEntity>>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TDependent, System.Collections.Generic.IEnumerable<TEntity>>>
+  nameWithType.vb: Expression(Of Func(Of TDependent, IEnumerable(Of TEntity)))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TDependent, System.Collections.Generic.IEnumerable(Of TEntity)))
+  name.vb: Expression(Of Func(Of TDependent, IEnumerable(Of TEntity)))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TDependent
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+    name: ManyToManyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ManyToManyBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
+    name: CollectionNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+    name: ManyToManyBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ManyToManyBuilder.html

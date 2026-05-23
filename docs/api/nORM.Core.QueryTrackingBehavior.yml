@@ -21,10 +21,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: QueryTrackingBehavior
     path: src/nORM/Core/QueryTrackingBehavior.cs
-    startLine: 2
+    startLine: 5
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Specifies how entities returned from queries are tracked by the <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public enum QueryTrackingBehavior
     content.vb: Public Enum QueryTrackingBehavior
@@ -46,10 +48,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TrackAll
     path: src/nORM/Core/QueryTrackingBehavior.cs
-    startLine: 4
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Track all entities so that changes can be detected and persisted.
+  example: []
   syntax:
     content: TrackAll = 0
     return:
@@ -72,15 +76,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NoTracking
     path: src/nORM/Core/QueryTrackingBehavior.cs
-    startLine: 5
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Do not track entities; queries return detached objects.
+  example: []
   syntax:
     content: NoTracking = 1
     return:
       type: nORM.Core.QueryTrackingBehavior
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html

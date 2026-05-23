@@ -14,6 +14,7 @@ items:
   - nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
   - nORM.Core.DbContext.ChangeTracker
   - nORM.Core.DbContext.Connection
+  - nORM.Core.DbContext.CreateCompiledQueryCommandAsync(System.Threading.CancellationToken)
   - nORM.Core.DbContext.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContext.CreateTagAsync(System.String)
   - nORM.Core.DbContext.Database
@@ -23,21 +24,27 @@ items:
   - nORM.Core.DbContext.Dispose(System.Boolean)
   - nORM.Core.DbContext.DisposeAsync
   - nORM.Core.DbContext.Entry(System.Object)
+  - nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)
   - nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
   - nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
   - nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
+  - nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
   - nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  - nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String)
   - nORM.Core.DbContext.GetShadowProperty(System.Object,System.String)
   - nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   - nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
   - nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)
   - nORM.Core.DbContext.Options
+  - nORM.Core.DbContext.PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean)
   - nORM.Core.DbContext.Provider
   - nORM.Core.DbContext.Query(System.String)
   - nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  - nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
   - nORM.Core.DbContext.RegisterForDisposal(System.IDisposable)
   - nORM.Core.DbContext.Remove``1(``0)
   - nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.SaveChangesAsync(System.Boolean,System.Threading.CancellationToken)
   - nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
   - nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)
   - nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
@@ -53,15 +60,26 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/DbContext.WriteOperations.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContext
-    path: src/nORM/Core/DbContext.cs
-    startLine: 28
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Represents the primary entry point for interacting with a database using nORM.
+
+    The <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> manages the underlying <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref>,
+
+    maintains metadata such as <xref href="nORM.Mapping.TableMapping" data-throw-if-not-resolved="false"></xref> instances and coordinates
+
+    change tracking, transactions and provider specific behavior. Instances are
+
+    intended to be short lived and not thread safe.
+  example: []
   syntax:
     content: 'public class DbContext : IDisposable, IAsyncDisposable'
     content.vb: Public Class DbContext Implements IDisposable, IAsyncDisposable
@@ -84,6 +102,393 @@ items:
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TProperty}}})
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Core.DbContext.Add``1(``0)
+  commentId: M:nORM.Core.DbContext.Add``1(``0)
+  id: Add``1(``0)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: Add<T>(T)
+  nameWithType: DbContext.Add<T>(T)
+  fullName: nORM.Core.DbContext.Add<T>(T)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Add
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Begins tracking the given entity in the <xref href="nORM.Core.DbContext.ChangeTracker" data-throw-if-not-resolved="false"></xref> in the
+
+    <xref href="nORM.Core.EntityState.Added" data-throw-if-not-resolved="false"></xref> state. The entity will be inserted into the
+
+    database when <code>SaveChanges</code> is called.
+  example: []
+  syntax:
+    content: 'public EntityEntry Add<T>(T entity) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity instance to add.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: nORM.Core.EntityEntry
+      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> representing the tracked entity.
+    content.vb: Public Function Add(Of T As Class)(entity As T) As EntityEntry
+  overload: nORM.Core.DbContext.Add*
+  nameWithType.vb: DbContext.Add(Of T)(T)
+  fullName.vb: nORM.Core.DbContext.Add(Of T)(T)
+  name.vb: Add(Of T)(T)
+- uid: nORM.Core.DbContext.Attach``1(``0)
+  commentId: M:nORM.Core.DbContext.Attach``1(``0)
+  id: Attach``1(``0)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: Attach<T>(T)
+  nameWithType: DbContext.Attach<T>(T)
+  fullName: nORM.Core.DbContext.Attach<T>(T)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Attach
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Starts tracking the entity without modifying its state. Existing values are
+
+    assumed to match those in the database and no update will be sent unless
+
+    changes are detected.
+  example: []
+  syntax:
+    content: 'public EntityEntry Attach<T>(T entity) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to attach.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: nORM.Core.EntityEntry
+      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> for the attached entity.
+    content.vb: Public Function Attach(Of T As Class)(entity As T) As EntityEntry
+  overload: nORM.Core.DbContext.Attach*
+  nameWithType.vb: DbContext.Attach(Of T)(T)
+  fullName.vb: nORM.Core.DbContext.Attach(Of T)(T)
+  name.vb: Attach(Of T)(T)
+- uid: nORM.Core.DbContext.Update``1(``0)
+  commentId: M:nORM.Core.DbContext.Update``1(``0)
+  id: Update``1(``0)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: Update<T>(T)
+  nameWithType: DbContext.Update<T>(T)
+  fullName: nORM.Core.DbContext.Update<T>(T)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Update
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 64
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Marks the entity as <xref href="nORM.Core.EntityState.Modified" data-throw-if-not-resolved="false"></xref> so that all of its
+
+    properties are treated as modified and will be persisted during
+
+    <code>SaveChanges</code>.
+  example: []
+  syntax:
+    content: 'public EntityEntry Update<T>(T entity) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to update.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: nORM.Core.EntityEntry
+      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> for the updated entity.
+    content.vb: Public Function Update(Of T As Class)(entity As T) As EntityEntry
+  overload: nORM.Core.DbContext.Update*
+  nameWithType.vb: DbContext.Update(Of T)(T)
+  fullName.vb: nORM.Core.DbContext.Update(Of T)(T)
+  name.vb: Update(Of T)(T)
+- uid: nORM.Core.DbContext.Remove``1(``0)
+  commentId: M:nORM.Core.DbContext.Remove``1(``0)
+  id: Remove``1(``0)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: Remove<T>(T)
+  nameWithType: DbContext.Remove<T>(T)
+  fullName: nORM.Core.DbContext.Remove<T>(T)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Remove
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 78
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Marks the specified entity for deletion. The entity will be removed from the
+
+    database when <code>SaveChanges</code> is executed.
+  example: []
+  syntax:
+    content: 'public EntityEntry Remove<T>(T entity) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity instance to remove.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: nORM.Core.EntityEntry
+      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> for the removed entity.
+    content.vb: Public Function Remove(Of T As Class)(entity As T) As EntityEntry
+  overload: nORM.Core.DbContext.Remove*
+  nameWithType.vb: DbContext.Remove(Of T)(T)
+  fullName.vb: nORM.Core.DbContext.Remove(Of T)(T)
+  name.vb: Remove(Of T)(T)
+- uid: nORM.Core.DbContext.Entry(System.Object)
+  commentId: M:nORM.Core.DbContext.Entry(System.Object)
+  id: Entry(System.Object)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: Entry(object)
+  nameWithType: DbContext.Entry(object)
+  fullName: nORM.Core.DbContext.Entry(object)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Entry
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 94
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> for the supplied entity if it is already being tracked.
+
+    If the entity is not tracked, an exception is thrown instructing the caller to use
+
+    <xref href="nORM.Core.DbContext.Attach%60%601(%60%600)" data-throw-if-not-resolved="false"></xref> explicitly. Auto-attaching is deliberately not supported because
+
+    it is a dangerous side-effect that can silently modify tracking state.
+  example: []
+  syntax:
+    content: public EntityEntry Entry(object entity)
+    parameters:
+    - id: entity
+      type: System.Object
+      description: The entity whose tracking entry is requested.
+    return:
+      type: nORM.Core.EntityEntry
+      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> representing the entity's tracking information.
+    content.vb: Public Function Entry(entity As Object) As EntityEntry
+  overload: nORM.Core.DbContext.Entry*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">entity</code> is null or invalid.
+  - type: System.InvalidOperationException
+    commentId: T:System.InvalidOperationException
+    description: Thrown when the entity is not currently tracked.
+  nameWithType.vb: DbContext.Entry(Object)
+  fullName.vb: nORM.Core.DbContext.Entry(Object)
+  name.vb: Entry(Object)
+- uid: nORM.Core.DbContext.UseDeadlockResilientSaveChanges
+  commentId: M:nORM.Core.DbContext.UseDeadlockResilientSaveChanges
+  id: UseDeadlockResilientSaveChanges
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: UseDeadlockResilientSaveChanges()
+  nameWithType: DbContext.UseDeadlockResilientSaveChanges()
+  fullName: nORM.Core.DbContext.UseDeadlockResilientSaveChanges()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseDeadlockResilientSaveChanges
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 129
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Configures the context to automatically retry failed <code>SaveChanges</code>
+
+    operations when the database reports a deadlock (SQL Server error 1205).
+
+    A default retry policy with exponential backoff is applied.
+  example: []
+  syntax:
+    content: public DbContextOptions UseDeadlockResilientSaveChanges()
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for fluent configuration.
+    content.vb: Public Function UseDeadlockResilientSaveChanges() As DbContextOptions
+  overload: nORM.Core.DbContext.UseDeadlockResilientSaveChanges*
+- uid: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  id: SaveChangesAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: SaveChangesAsync(CancellationToken)
+  nameWithType: DbContext.SaveChangesAsync(CancellationToken)
+  fullName: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SaveChangesAsync
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 169
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Persists all tracked changes to the database. The operation is executed
+
+    using the configured retry policy which transparently retries transient
+
+    failures such as deadlocks.
+  remarks: >-
+    <p>
+
+    Automatically calls DetectChanges() which performs snapshot-based comparison of ALL
+
+    tracked entities. Avoid calling SaveChanges() in tight loops with many tracked entities.
+
+    For bulk operations, use InsertBulkAsync() or UpdateBulkAsync() instead. For read-only
+
+    queries, use AsNoTracking() to avoid change tracking overhead entirely.
+
+    </p>
+
+    <p>
+
+    <b>Async-first:</b> nORM does not provide a synchronous <code>SaveChanges()</code> method.
+
+    Always use <code>await ctx.SaveChangesAsync()</code>. Blocking with
+
+    <code>.GetAwaiter().GetResult()</code> can cause deadlocks in synchronization contexts
+
+    such as ASP.NET classic or WPF.
+
+    </p>
+  example: []
+  syntax:
+    content: public Task<int> SaveChangesAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The total number of state entries written to the database.
+    content.vb: Public Function SaveChangesAsync(ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.SaveChangesAsync*
+- uid: nORM.Core.DbContext.SaveChangesAsync(System.Boolean,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.SaveChangesAsync(System.Boolean,System.Threading.CancellationToken)
+  id: SaveChangesAsync(System.Boolean,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: SaveChangesAsync(bool, CancellationToken)
+  nameWithType: DbContext.SaveChangesAsync(bool, CancellationToken)
+  fullName: nORM.Core.DbContext.SaveChangesAsync(bool, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.ChangeTracking.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SaveChangesAsync
+    path: src/nORM/Core/DbContext.ChangeTracking.cs
+    startLine: 188
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Persists all tracked changes to the database. The operation is executed
+
+    using the configured retry policy which transparently retries transient
+
+    failures such as deadlocks.
+  example: []
+  syntax:
+    content: public Task<int> SaveChangesAsync(bool detectChanges, CancellationToken ct = default)
+    parameters:
+    - id: detectChanges
+      type: System.Boolean
+      description: >-
+        If true, automatically calls <xref href="nORM.Core.ChangeTracker.DetectChanges" data-throw-if-not-resolved="false"></xref> before saving.
+
+        If false, assumes changes have been manually tracked or detected.
+
+        Set to false for performance in scenarios with many tracked entities where you've
+
+        manually set entity states using <code>context.Entry(entity).State = EntityState.Modified</code>.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The total number of state entries written to the database.
+    content.vb: Public Function SaveChangesAsync(detectChanges As Boolean, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.SaveChangesAsync*
+  nameWithType.vb: DbContext.SaveChangesAsync(Boolean, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.SaveChangesAsync(Boolean, System.Threading.CancellationToken)
+  name.vb: SaveChangesAsync(Boolean, CancellationToken)
 - uid: nORM.Core.DbContext.Options
   commentId: P:nORM.Core.DbContext.Options
   id: Options
@@ -102,10 +507,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Options
     path: src/nORM/Core/DbContext.cs
-    startLine: 45
+    startLine: 128
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets the configuration options that control the behavior of this context
+
+    instance including logging, retry policies and mapping conventions.
+  example: []
   syntax:
     content: public DbContextOptions Options { get; }
     parameters: []
@@ -131,10 +541,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ChangeTracker
     path: src/nORM/Core/DbContext.cs
-    startLine: 46
+    startLine: 134
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Provides access to the tracking graph responsible for detecting changes
+
+    on entities and orchestrating persistence operations.
+  example: []
   syntax:
     content: public ChangeTracker ChangeTracker { get; }
     parameters: []
@@ -160,10 +575,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Database
     path: src/nORM/Core/DbContext.cs
-    startLine: 47
+    startLine: 140
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Exposes database specific operations such as transaction management and
+
+    command execution helpers.
+  example: []
   syntax:
     content: public DatabaseFacade Database { get; }
     parameters: []
@@ -189,19 +609,29 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbContext.cs
-    startLine: 48
+    startLine: 150
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> class using an
+
+    existing <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref>. The context takes ownership of the
+
+    connection and will not dispose it until the context itself is disposed.
+  example: []
   syntax:
     content: public DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options = null)
     parameters:
     - id: cn
       type: System.Data.Common.DbConnection
+      description: The open or closed database connection.
     - id: p
       type: nORM.Providers.DatabaseProvider
+      description: The <xref href="nORM.Providers.DatabaseProvider" data-throw-if-not-resolved="false"></xref> responsible for generating provider specific SQL.
     - id: options
       type: nORM.Configuration.DbContextOptions
+      description: Optional configuration controlling context behavior.
     content.vb: Public Sub New(cn As DbConnection, p As DatabaseProvider, options As DbContextOptions = Nothing)
   overload: nORM.Core.DbContext.#ctor*
   nameWithType.vb: DbContext.New(DbConnection, DatabaseProvider, DbContextOptions)
@@ -225,19 +655,31 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbContext.cs
-    startLine: 77
+    startLine: 205
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> by creating and owning a
+
+    <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref> using the supplied connection string and
+
+    provider. This overload is convenient for scenarios where a connection
+
+    has not yet been instantiated.
+  example: []
   syntax:
     content: public DbContext(string connectionString, DatabaseProvider p, DbContextOptions? options = null)
     parameters:
     - id: connectionString
       type: System.String
+      description: The database connection string.
     - id: p
       type: nORM.Providers.DatabaseProvider
+      description: The provider used to create the connection.
     - id: options
       type: nORM.Configuration.DbContextOptions
+      description: Optional configuration for the context.
     content.vb: Public Sub New(connectionString As String, p As DatabaseProvider, options As DbContextOptions = Nothing)
   overload: nORM.Core.DbContext.#ctor*
   nameWithType.vb: DbContext.New(String, DatabaseProvider, DbContextOptions)
@@ -261,10 +703,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Connection
     path: src/nORM/Core/DbContext.cs
-    startLine: 172
+    startLine: 484
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets the raw <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref> associated with this context.
+
+    Consumers should avoid closing or disposing the connection as it is
+
+    managed by the context.
+  example: []
   syntax:
     content: public DbConnection Connection { get; }
     parameters: []
@@ -290,10 +739,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Core/DbContext.cs
-    startLine: 173
+    startLine: 490
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Gets the <xref href="nORM.Providers.DatabaseProvider" data-throw-if-not-resolved="false"></xref> that supplies provider-specific
+
+    behavior such as SQL generation and bulk operations.
+  example: []
   syntax:
     content: public DatabaseProvider Provider { get; }
     parameters: []
@@ -301,6 +755,155 @@ items:
       type: nORM.Providers.DatabaseProvider
     content.vb: Public ReadOnly Property Provider As DatabaseProvider
   overload: nORM.Core.DbContext.Provider*
+- uid: nORM.Core.DbContext.CreateCompiledQueryCommandAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.CreateCompiledQueryCommandAsync(System.Threading.CancellationToken)
+  id: CreateCompiledQueryCommandAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: CreateCompiledQueryCommandAsync(CancellationToken)
+  nameWithType: DbContext.CreateCompiledQueryCommandAsync(CancellationToken)
+  fullName: nORM.Core.DbContext.CreateCompiledQueryCommandAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CreateCompiledQueryCommandAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 574
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    X1: Creates a <xref href="System.Data.Common.DbCommand" data-throw-if-not-resolved="false"></xref> that is fully lifecycle-aware:
+
+    opens the connection if closed, binds the active transaction, and participates in
+
+    command interception. Generated <code>[CompileTimeQuery]</code> methods must use this
+
+    instead of <code>ctx.Connection.CreateCommand()</code> to avoid bypassing connection
+
+    initialisation, transaction scope, and interceptor pipelines.
+  example: []
+  syntax:
+    content: public Task<DbCommand> CreateCompiledQueryCommandAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Data.Common.DbCommand}
+      description: A ready-to-use <xref href="System.Data.Common.DbCommand" data-throw-if-not-resolved="false"></xref> bound to the current context.
+    content.vb: Public Function CreateCompiledQueryCommandAsync(ct As CancellationToken = Nothing) As Task(Of DbCommand)
+  overload: nORM.Core.DbContext.CreateCompiledQueryCommandAsync*
+- uid: nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)
+  id: ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ExecuteCompiledQueryListAsync<T>(DbCommand, Func<DbDataReader, CancellationToken, Task<T>>, CancellationToken)
+  nameWithType: DbContext.ExecuteCompiledQueryListAsync<T>(DbCommand, Func<DbDataReader, CancellationToken, Task<T>>, CancellationToken)
+  fullName: nORM.Core.DbContext.ExecuteCompiledQueryListAsync<T>(System.Data.Common.DbCommand, System.Func<System.Data.Common.DbDataReader, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteCompiledQueryListAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 592
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    X1: Executes a pre-built command through the interception pipeline and materializes
+
+    all rows into a <xref href="System.Collections.Generic.List%601" data-throw-if-not-resolved="false"></xref>. Generated <code>[CompileTimeQuery]</code> methods
+
+    must use this instead of calling <code>cmd.ExecuteReaderAsync</code> directly so that
+
+    command interceptors (logging, tracing, auditing) are invoked.
+  example: []
+  syntax:
+    content: public Task<List<T>> ExecuteCompiledQueryListAsync<T>(DbCommand cmd, Func<DbDataReader, CancellationToken, Task<T>> materializer, CancellationToken ct = default)
+    parameters:
+    - id: cmd
+      type: System.Data.Common.DbCommand
+      description: The prepared command with <code>CommandText</code> and parameters already set.
+    - id: materializer
+      type: System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{{T}}}
+      description: Delegate that converts one reader row into an entity.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    typeParameters:
+    - id: T
+      description: Entity type returned by each row.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+      description: A list of materialized entities.
+    content.vb: Public Function ExecuteCompiledQueryListAsync(Of T)(cmd As DbCommand, materializer As Func(Of DbDataReader, CancellationToken, Task(Of T)), ct As CancellationToken = Nothing) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.ExecuteCompiledQueryListAsync*
+  nameWithType.vb: DbContext.ExecuteCompiledQueryListAsync(Of T)(DbCommand, Func(Of DbDataReader, CancellationToken, Task(Of T)), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.ExecuteCompiledQueryListAsync(Of T)(System.Data.Common.DbCommand, System.Func(Of System.Data.Common.DbDataReader, System.Threading.CancellationToken, System.Threading.Tasks.Task(Of T)), System.Threading.CancellationToken)
+  name.vb: ExecuteCompiledQueryListAsync(Of T)(DbCommand, Func(Of DbDataReader, CancellationToken, Task(Of T)), CancellationToken)
+- uid: nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String)
+  commentId: M:nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String)
+  id: GetCompiledQueryMaterializer``1(System.String)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetCompiledQueryMaterializer<T>(string)
+  nameWithType: DbContext.GetCompiledQueryMaterializer<T>(string)
+  fullName: nORM.Core.DbContext.GetCompiledQueryMaterializer<T>(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetCompiledQueryMaterializer
+    path: src/nORM/Core/DbContext.cs
+    startLine: 614
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    SG1/SG2: Returns the correct materializer for <code class="typeparamref">T</code> for use in
+
+    [CompileTimeQuery]-generated methods. When the entity is registered in this context,
+
+    delegates to <xref href="nORM.Query.MaterializerFactory" data-throw-if-not-resolved="false"></xref> which applies the same eligibility
+
+    guards as the regular LINQ path (fluent renames, value converters, owned navigations),
+
+    falling back to the runtime reflection materializer when any unsafe condition is present.
+
+    When the entity is not registered, uses the compiled materializer directly (no runtime
+
+    config can override it). Throws a descriptive exception if no materializer exists at all.
+  example: []
+  syntax:
+    content: public Func<DbDataReader, CancellationToken, Task<T>> GetCompiledQueryMaterializer<T>(string tableName)
+    parameters:
+    - id: tableName
+      type: System.String
+    typeParameters:
+    - id: T
+    return:
+      type: System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{{T}}}
+    content.vb: Public Function GetCompiledQueryMaterializer(Of T)(tableName As String) As Func(Of DbDataReader, CancellationToken, Task(Of T))
+  overload: nORM.Core.DbContext.GetCompiledQueryMaterializer*
+  nameWithType.vb: DbContext.GetCompiledQueryMaterializer(Of T)(String)
+  fullName.vb: nORM.Core.DbContext.GetCompiledQueryMaterializer(Of T)(String)
+  name.vb: GetCompiledQueryMaterializer(Of T)(String)
 - uid: nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)
   id: IsHealthyAsync(System.Threading.CancellationToken)
@@ -319,7 +922,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsHealthyAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 192
+    startLine: 645
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -354,7 +957,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Query
     path: src/nORM/Core/DbContext.cs
-    startLine: 242
+    startLine: 856
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -368,7 +971,12 @@ items:
     on-demand and cached so subsequent calls incur minimal overhead.
   example: []
   syntax:
-    content: public IQueryable Query(string tableName)
+    content: >-
+      [RequiresDynamicCode("Query(string) generates a CLR entity type at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
+
+      [RequiresUnreferencedCode("Query(string) reflects database schema into a runtime-generated type and is not trim-safe.")]
+
+      public IQueryable Query(string tableName)
     parameters:
     - id: tableName
       type: System.String
@@ -376,7 +984,12 @@ items:
     return:
       type: System.Linq.IQueryable
       description: An <xref href="System.Linq.IQueryable" data-throw-if-not-resolved="false"></xref> that can be composed with LINQ operators.
-    content.vb: Public Function Query(tableName As String) As IQueryable
+    content.vb: >-
+      <RequiresDynamicCode("Query(string) generates a CLR entity type at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")>
+
+      <RequiresUnreferencedCode("Query(string) reflects database schema into a runtime-generated type and is not trim-safe.")>
+
+      Public Function Query(tableName As String) As IQueryable
   overload: nORM.Core.DbContext.Query*
   exceptions:
   - type: System.ArgumentException
@@ -385,626 +998,20 @@ items:
   - type: nORM.Core.NormUsageException
     commentId: T:nORM.Core.NormUsageException
     description: Thrown when the provided name contains invalid characters.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Query(string) generates a CLR entity type at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Query(string) reflects database schema into a runtime-generated type and is not trim-safe.
   nameWithType.vb: DbContext.Query(String)
   fullName.vb: nORM.Core.DbContext.Query(String)
   name.vb: Query(String)
-- uid: nORM.Core.DbContext.Add``1(``0)
-  commentId: M:nORM.Core.DbContext.Add``1(``0)
-  id: Add``1(``0)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: Add<T>(T)
-  nameWithType: DbContext.Add<T>(T)
-  fullName: nORM.Core.DbContext.Add<T>(T)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: Add
-    path: src/nORM/Core/DbContext.cs
-    startLine: 258
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public EntityEntry Add<T>(T entity) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    typeParameters:
-    - id: T
-    return:
-      type: nORM.Core.EntityEntry
-    content.vb: Public Function Add(Of T As Class)(entity As T) As EntityEntry
-  overload: nORM.Core.DbContext.Add*
-  nameWithType.vb: DbContext.Add(Of T)(T)
-  fullName.vb: nORM.Core.DbContext.Add(Of T)(T)
-  name.vb: Add(Of T)(T)
-- uid: nORM.Core.DbContext.Attach``1(``0)
-  commentId: M:nORM.Core.DbContext.Attach``1(``0)
-  id: Attach``1(``0)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: Attach<T>(T)
-  nameWithType: DbContext.Attach<T>(T)
-  fullName: nORM.Core.DbContext.Attach<T>(T)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: Attach
-    path: src/nORM/Core/DbContext.cs
-    startLine: 264
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public EntityEntry Attach<T>(T entity) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    typeParameters:
-    - id: T
-    return:
-      type: nORM.Core.EntityEntry
-    content.vb: Public Function Attach(Of T As Class)(entity As T) As EntityEntry
-  overload: nORM.Core.DbContext.Attach*
-  nameWithType.vb: DbContext.Attach(Of T)(T)
-  fullName.vb: nORM.Core.DbContext.Attach(Of T)(T)
-  name.vb: Attach(Of T)(T)
-- uid: nORM.Core.DbContext.Update``1(``0)
-  commentId: M:nORM.Core.DbContext.Update``1(``0)
-  id: Update``1(``0)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: Update<T>(T)
-  nameWithType: DbContext.Update<T>(T)
-  fullName: nORM.Core.DbContext.Update<T>(T)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: Update
-    path: src/nORM/Core/DbContext.cs
-    startLine: 270
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public EntityEntry Update<T>(T entity) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    typeParameters:
-    - id: T
-    return:
-      type: nORM.Core.EntityEntry
-    content.vb: Public Function Update(Of T As Class)(entity As T) As EntityEntry
-  overload: nORM.Core.DbContext.Update*
-  nameWithType.vb: DbContext.Update(Of T)(T)
-  fullName.vb: nORM.Core.DbContext.Update(Of T)(T)
-  name.vb: Update(Of T)(T)
-- uid: nORM.Core.DbContext.Remove``1(``0)
-  commentId: M:nORM.Core.DbContext.Remove``1(``0)
-  id: Remove``1(``0)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: Remove<T>(T)
-  nameWithType: DbContext.Remove<T>(T)
-  fullName: nORM.Core.DbContext.Remove<T>(T)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: Remove
-    path: src/nORM/Core/DbContext.cs
-    startLine: 275
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public EntityEntry Remove<T>(T entity) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    typeParameters:
-    - id: T
-    return:
-      type: nORM.Core.EntityEntry
-    content.vb: Public Function Remove(Of T As Class)(entity As T) As EntityEntry
-  overload: nORM.Core.DbContext.Remove*
-  nameWithType.vb: DbContext.Remove(Of T)(T)
-  fullName.vb: nORM.Core.DbContext.Remove(Of T)(T)
-  name.vb: Remove(Of T)(T)
-- uid: nORM.Core.DbContext.Entry(System.Object)
-  commentId: M:nORM.Core.DbContext.Entry(System.Object)
-  id: Entry(System.Object)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: Entry(object)
-  nameWithType: DbContext.Entry(object)
-  fullName: nORM.Core.DbContext.Entry(object)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: Entry
-    path: src/nORM/Core/DbContext.cs
-    startLine: 289
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  summary: >-
-    Returns the <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> for the supplied entity and ensures
-
-    that lazy-loading proxies are wired up when supported. The entity is
-
-    automatically attached to the change tracker in the <xref href="nORM.Core.EntityState.Unchanged" data-throw-if-not-resolved="false"></xref>
-
-    state.
-  example: []
-  syntax:
-    content: public EntityEntry Entry(object entity)
-    parameters:
-    - id: entity
-      type: System.Object
-      description: The entity whose tracking entry is requested.
-    return:
-      type: nORM.Core.EntityEntry
-      description: An <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref> representing the entity's tracking information.
-    content.vb: Public Function Entry(entity As Object) As EntityEntry
-  overload: nORM.Core.DbContext.Entry*
-  exceptions:
-  - type: System.ArgumentException
-    commentId: T:System.ArgumentException
-    description: Thrown when <code class="paramref">entity</code> is null or invalid.
-  nameWithType.vb: DbContext.Entry(Object)
-  fullName.vb: nORM.Core.DbContext.Entry(Object)
-  name.vb: Entry(Object)
-- uid: nORM.Core.DbContext.UseDeadlockResilientSaveChanges
-  commentId: M:nORM.Core.DbContext.UseDeadlockResilientSaveChanges
-  id: UseDeadlockResilientSaveChanges
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: UseDeadlockResilientSaveChanges()
-  nameWithType: DbContext.UseDeadlockResilientSaveChanges()
-  fullName: nORM.Core.DbContext.UseDeadlockResilientSaveChanges()
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: UseDeadlockResilientSaveChanges
-    path: src/nORM/Core/DbContext.cs
-    startLine: 303
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  summary: >-
-    Configures the context to automatically retry failed <code>SaveChanges</code>
-
-    operations when the database reports a deadlock (SQL Server error 1205).
-
-    A default retry policy with exponential backoff is applied.
-  example: []
-  syntax:
-    content: public DbContextOptions UseDeadlockResilientSaveChanges()
-    return:
-      type: nORM.Configuration.DbContextOptions
-      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for fluent configuration.
-    content.vb: Public Function UseDeadlockResilientSaveChanges() As DbContextOptions
-  overload: nORM.Core.DbContext.UseDeadlockResilientSaveChanges*
-- uid: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
-  id: SaveChangesAsync(System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: SaveChangesAsync(CancellationToken)
-  nameWithType: DbContext.SaveChangesAsync(CancellationToken)
-  fullName: nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: SaveChangesAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 321
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  summary: >-
-    Persists all tracked changes to the database. The operation is executed
-
-    using the configured retry policy which transparently retries transient
-
-    failures such as deadlocks.
-  example: []
-  syntax:
-    content: public Task<int> SaveChangesAsync(CancellationToken ct = default)
-    parameters:
-    - id: ct
-      type: System.Threading.CancellationToken
-      description: Token used to cancel the asynchronous operation.
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-      description: The total number of state entries written to the database.
-    content.vb: Public Function SaveChangesAsync(ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.SaveChangesAsync*
-- uid: nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
-  id: InsertAsync``1(``0,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: InsertAsync<T>(T, CancellationToken)
-  nameWithType: DbContext.InsertAsync<T>(T, CancellationToken)
-  fullName: nORM.Core.DbContext.InsertAsync<T>(T, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: InsertAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 602
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function InsertAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.InsertAsync*
-  nameWithType.vb: DbContext.InsertAsync(Of T)(T, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.InsertAsync(Of T)(T, System.Threading.CancellationToken)
-  name.vb: InsertAsync(Of T)(T, CancellationToken)
-- uid: nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  id: InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: InsertAsync<T>(T, DbTransaction?, CancellationToken)
-  nameWithType: DbContext.InsertAsync<T>(T, DbTransaction?, CancellationToken)
-  fullName: nORM.Core.DbContext.InsertAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: InsertAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 604
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: transaction
-      type: System.Data.Common.DbTransaction
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function InsertAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.InsertAsync*
-  nameWithType.vb: DbContext.InsertAsync(Of T)(T, DbTransaction, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.InsertAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
-  name.vb: InsertAsync(Of T)(T, DbTransaction, CancellationToken)
-- uid: nORM.Core.DbContext.UpdateAsync``1(``0,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.UpdateAsync``1(``0,System.Threading.CancellationToken)
-  id: UpdateAsync``1(``0,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: UpdateAsync<T>(T, CancellationToken)
-  nameWithType: DbContext.UpdateAsync<T>(T, CancellationToken)
-  fullName: nORM.Core.DbContext.UpdateAsync<T>(T, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: UpdateAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 610
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function UpdateAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.UpdateAsync*
-  nameWithType.vb: DbContext.UpdateAsync(Of T)(T, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.UpdateAsync(Of T)(T, System.Threading.CancellationToken)
-  name.vb: UpdateAsync(Of T)(T, CancellationToken)
-- uid: nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  id: UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: UpdateAsync<T>(T, DbTransaction?, CancellationToken)
-  nameWithType: DbContext.UpdateAsync<T>(T, DbTransaction?, CancellationToken)
-  fullName: nORM.Core.DbContext.UpdateAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: UpdateAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 612
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: transaction
-      type: System.Data.Common.DbTransaction
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function UpdateAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.UpdateAsync*
-  nameWithType.vb: DbContext.UpdateAsync(Of T)(T, DbTransaction, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.UpdateAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
-  name.vb: UpdateAsync(Of T)(T, DbTransaction, CancellationToken)
-- uid: nORM.Core.DbContext.DeleteAsync``1(``0,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.DeleteAsync``1(``0,System.Threading.CancellationToken)
-  id: DeleteAsync``1(``0,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: DeleteAsync<T>(T, CancellationToken)
-  nameWithType: DbContext.DeleteAsync<T>(T, CancellationToken)
-  fullName: nORM.Core.DbContext.DeleteAsync<T>(T, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: DeleteAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 614
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function DeleteAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.DeleteAsync*
-  nameWithType.vb: DbContext.DeleteAsync(Of T)(T, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.DeleteAsync(Of T)(T, System.Threading.CancellationToken)
-  name.vb: DeleteAsync(Of T)(T, CancellationToken)
-- uid: nORM.Core.DbContext.DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  id: DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: DeleteAsync<T>(T, DbTransaction?, CancellationToken)
-  nameWithType: DbContext.DeleteAsync<T>(T, DbTransaction?, CancellationToken)
-  fullName: nORM.Core.DbContext.DeleteAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: DeleteAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 616
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entity
-      type: '{T}'
-    - id: transaction
-      type: System.Data.Common.DbTransaction
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function DeleteAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.DeleteAsync*
-  nameWithType.vb: DbContext.DeleteAsync(Of T)(T, DbTransaction, CancellationToken)
-  fullName.vb: nORM.Core.DbContext.DeleteAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
-  name.vb: DeleteAsync(Of T)(T, DbTransaction, CancellationToken)
-- uid: nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  id: BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: BulkInsertAsync<T>(IEnumerable<T>, CancellationToken)
-  nameWithType: DbContext.BulkInsertAsync<T>(IEnumerable<T>, CancellationToken)
-  fullName: nORM.Core.DbContext.BulkInsertAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: BulkInsertAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 882
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entities
-      type: System.Collections.Generic.IEnumerable{{T}}
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function BulkInsertAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.BulkInsertAsync*
-  nameWithType.vb: DbContext.BulkInsertAsync(Of T)(IEnumerable(Of T), CancellationToken)
-  fullName.vb: nORM.Core.DbContext.BulkInsertAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
-  name.vb: BulkInsertAsync(Of T)(IEnumerable(Of T), CancellationToken)
-- uid: nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  id: BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: BulkUpdateAsync<T>(IEnumerable<T>, CancellationToken)
-  nameWithType: DbContext.BulkUpdateAsync<T>(IEnumerable<T>, CancellationToken)
-  fullName: nORM.Core.DbContext.BulkUpdateAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: BulkUpdateAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 896
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entities
-      type: System.Collections.Generic.IEnumerable{{T}}
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function BulkUpdateAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.BulkUpdateAsync*
-  nameWithType.vb: DbContext.BulkUpdateAsync(Of T)(IEnumerable(Of T), CancellationToken)
-  fullName.vb: nORM.Core.DbContext.BulkUpdateAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
-  name.vb: BulkUpdateAsync(Of T)(IEnumerable(Of T), CancellationToken)
-- uid: nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  commentId: M:nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  id: BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: BulkDeleteAsync<T>(IEnumerable<T>, CancellationToken)
-  nameWithType: DbContext.BulkDeleteAsync<T>(IEnumerable<T>, CancellationToken)
-  fullName: nORM.Core.DbContext.BulkDeleteAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: BulkDeleteAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 910
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
-    parameters:
-    - id: entities
-      type: System.Collections.Generic.IEnumerable{{T}}
-    - id: ct
-      type: System.Threading.CancellationToken
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Int32}
-    content.vb: Public Function BulkDeleteAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
-  overload: nORM.Core.DbContext.BulkDeleteAsync*
-  nameWithType.vb: DbContext.BulkDeleteAsync(Of T)(IEnumerable(Of T), CancellationToken)
-  fullName.vb: nORM.Core.DbContext.BulkDeleteAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
-  name.vb: BulkDeleteAsync(Of T)(IEnumerable(Of T), CancellationToken)
 - uid: nORM.Core.DbContext.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   commentId: M:nORM.Core.DbContext.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   id: CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
@@ -1023,7 +1030,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateSavepointAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 936
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1077,7 +1084,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackToSavepointAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 954
+    startLine: 922
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1110,208 +1117,6 @@ items:
   nameWithType.vb: DbContext.RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
   fullName.vb: nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
   name.vb: RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
-- uid: nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  commentId: M:nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  id: QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: QueryUnchangedAsync<T>(string, CancellationToken, params object[])
-  nameWithType: DbContext.QueryUnchangedAsync<T>(string, CancellationToken, params object[])
-  fullName: nORM.Core.DbContext.QueryUnchangedAsync<T>(string, System.Threading.CancellationToken, params object[])
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: QueryUnchangedAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 965
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()'
-    parameters:
-    - id: sql
-      type: System.String
-    - id: ct
-      type: System.Threading.CancellationToken
-    - id: parameters
-      type: System.Object[]
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
-    content.vb: Public Function QueryUnchangedAsync(Of T As {Class, New})(sql As String, ct As CancellationToken = Nothing, ParamArray parameters As Object()) As Task(Of List(Of T))
-  overload: nORM.Core.DbContext.QueryUnchangedAsync*
-  nameWithType.vb: DbContext.QueryUnchangedAsync(Of T)(String, CancellationToken, ParamArray Object())
-  fullName.vb: nORM.Core.DbContext.QueryUnchangedAsync(Of T)(String, System.Threading.CancellationToken, ParamArray Object())
-  name.vb: QueryUnchangedAsync(Of T)(String, CancellationToken, ParamArray Object())
-- uid: nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  commentId: M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  id: FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: FromSqlRawAsync<T>(string, CancellationToken, params object[])
-  nameWithType: DbContext.FromSqlRawAsync<T>(string, CancellationToken, params object[])
-  fullName: nORM.Core.DbContext.FromSqlRawAsync<T>(string, System.Threading.CancellationToken, params object[])
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: FromSqlRawAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1014
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()'
-    parameters:
-    - id: sql
-      type: System.String
-    - id: ct
-      type: System.Threading.CancellationToken
-    - id: parameters
-      type: System.Object[]
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
-    content.vb: Public Function FromSqlRawAsync(Of T As {Class, New})(sql As String, ct As CancellationToken = Nothing, ParamArray parameters As Object()) As Task(Of List(Of T))
-  overload: nORM.Core.DbContext.FromSqlRawAsync*
-  nameWithType.vb: DbContext.FromSqlRawAsync(Of T)(String, CancellationToken, ParamArray Object())
-  fullName.vb: nORM.Core.DbContext.FromSqlRawAsync(Of T)(String, System.Threading.CancellationToken, ParamArray Object())
-  name.vb: FromSqlRawAsync(Of T)(String, CancellationToken, ParamArray Object())
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
-  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
-  id: ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: ExecuteStoredProcedureAsync<T>(string, CancellationToken, object?)
-  nameWithType: DbContext.ExecuteStoredProcedureAsync<T>(string, CancellationToken, object?)
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsync<T>(string, System.Threading.CancellationToken, object?)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: ExecuteStoredProcedureAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1039
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()'
-    parameters:
-    - id: procedureName
-      type: System.String
-    - id: ct
-      type: System.Threading.CancellationToken
-    - id: parameters
-      type: System.Object
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
-    content.vb: Public Function ExecuteStoredProcedureAsync(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing) As Task(Of List(Of T))
-  overload: nORM.Core.DbContext.ExecuteStoredProcedureAsync*
-  nameWithType.vb: DbContext.ExecuteStoredProcedureAsync(Of T)(String, CancellationToken, Object)
-  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureAsync(Of T)(String, System.Threading.CancellationToken, Object)
-  name.vb: ExecuteStoredProcedureAsync(Of T)(String, CancellationToken, Object)
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
-  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
-  id: ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: ExecuteStoredProcedureAsAsyncEnumerable<T>(string, CancellationToken, object?)
-  nameWithType: DbContext.ExecuteStoredProcedureAsAsyncEnumerable<T>(string, CancellationToken, object?)
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable<T>(string, System.Threading.CancellationToken, object?)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: ExecuteStoredProcedureAsAsyncEnumerable
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1081
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()'
-    parameters:
-    - id: procedureName
-      type: System.String
-    - id: ct
-      type: System.Threading.CancellationToken
-    - id: parameters
-      type: System.Object
-    typeParameters:
-    - id: T
-    return:
-      type: System.Collections.Generic.IAsyncEnumerable{{T}}
-    content.vb: Public Function ExecuteStoredProcedureAsAsyncEnumerable(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing) As IAsyncEnumerable(Of T)
-  overload: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable*
-  nameWithType.vb: DbContext.ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, CancellationToken, Object)
-  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, System.Threading.CancellationToken, Object)
-  name.vb: ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, CancellationToken, Object)
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
-  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
-  id: ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
-  parent: nORM.Core.DbContext
-  langs:
-  - csharp
-  - vb
-  name: ExecuteStoredProcedureWithOutputAsync<T>(string, CancellationToken, object?, params OutputParameter[])
-  nameWithType: DbContext.ExecuteStoredProcedureWithOutputAsync<T>(string, CancellationToken, object?, params OutputParameter[])
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync<T>(string, System.Threading.CancellationToken, object?, params nORM.Core.OutputParameter[])
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/DbContext.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: ExecuteStoredProcedureWithOutputAsync
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1125
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  syntax:
-    content: 'public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()'
-    parameters:
-    - id: procedureName
-      type: System.String
-    - id: ct
-      type: System.Threading.CancellationToken
-    - id: parameters
-      type: System.Object
-    - id: outputParameters
-      type: nORM.Core.OutputParameter[]
-    typeParameters:
-    - id: T
-    return:
-      type: System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{{T}}}
-    content.vb: Public Function ExecuteStoredProcedureWithOutputAsync(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing, ParamArray outputParameters As OutputParameter()) As Task(Of StoredProcedureResult(Of T))
-  overload: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*
-  nameWithType.vb: DbContext.ExecuteStoredProcedureWithOutputAsync(Of T)(String, CancellationToken, Object, ParamArray OutputParameter())
-  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync(Of T)(String, System.Threading.CancellationToken, Object, ParamArray nORM.Core.OutputParameter())
-  name.vb: ExecuteStoredProcedureWithOutputAsync(Of T)(String, CancellationToken, Object, ParamArray OutputParameter())
 - uid: nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)
   commentId: M:nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)
   id: SetShadowProperty(System.Object,System.String,System.Object)
@@ -1330,7 +1135,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetShadowProperty
     path: src/nORM/Core/DbContext.cs
-    startLine: 1218
+    startLine: 982
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1371,7 +1176,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetShadowProperty
     path: src/nORM/Core/DbContext.cs
-    startLine: 1227
+    startLine: 994
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1412,7 +1217,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateTagAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 1236
+    startLine: 1006
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1453,15 +1258,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContext.cs
-    startLine: 1254
+    startLine: 1033
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Releases resources used by the context. When <code class="paramref">disposing</code>
+
+    is <code>true</code>, both managed and unmanaged resources are released; otherwise
+
+    only unmanaged resources are cleaned up.
+  example: []
   syntax:
     content: protected virtual void Dispose(bool disposing)
     parameters:
     - id: disposing
       type: System.Boolean
+      description: Indicates whether the method was invoked from <xref href="nORM.Core.DbContext.Dispose" data-throw-if-not-resolved="false"></xref>.
     content.vb: Protected Overridable Sub Dispose(disposing As Boolean)
   overload: nORM.Core.DbContext.Dispose*
   nameWithType.vb: DbContext.Dispose(Boolean)
@@ -1485,7 +1298,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RegisterForDisposal
     path: src/nORM/Core/DbContext.cs
-    startLine: 1325
+    startLine: 1138
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1517,7 +1330,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContext.cs
-    startLine: 1340
+    startLine: 1164
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1547,7 +1360,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 1350
+    startLine: 1174
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1565,7 +1378,825 @@ items:
   overload: nORM.Core.DbContext.DisposeAsync*
   implements:
   - System.IAsyncDisposable.DisposeAsync
+- uid: nORM.Core.DbContext.PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean)
+  commentId: M:nORM.Core.DbContext.PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean)
+  id: PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: PrepareInsertAsync<T>(CancellationToken, bool)
+  nameWithType: DbContext.PrepareInsertAsync<T>(CancellationToken, bool)
+  fullName: nORM.Core.DbContext.PrepareInsertAsync<T>(System.Threading.CancellationToken, bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.PreparedStatements.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PrepareInsertAsync
+    path: src/nORM/Core/DbContext.PreparedStatements.cs
+    startLine: 40
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Creates a prepared INSERT statement for the specified entity type. This allows
+
+    the cost of SQL generation and command preparation to be paid only once, with
+
+    subsequent executions only updating parameter values. Ideal for batch insert
+
+    scenarios where the same operation is repeated many times.
+  remarks: >-
+    Example usage:
+
+
+    <pre><code class="lang-csharp">await using var preparedInsert = await context.PrepareInsertAsync&lt;User&gt;();
+
+    for (int i = 0; i &lt; users.Length; i++)
+
+    {
+        await preparedInsert.ExecuteAsync(users[i]);
+    }</code></pre>
+  example: []
+  syntax:
+    content: 'public Task<PreparedOperation<T>> PrepareInsertAsync<T>(CancellationToken ct = default, bool hydrateGeneratedKeys = true) where T : class'
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    - id: hydrateGeneratedKeys
+      type: System.Boolean
+      description: When <code>false</code>, uses a plain <code>INSERT</code> shape and skips generated-key backfill.
+    typeParameters:
+    - id: T
+      description: The entity type to prepare the insert for.
+    return:
+      type: System.Threading.Tasks.Task{nORM.Core.PreparedOperation{{T}}}
+      description: A <xref href="nORM.Core.PreparedOperation%601" data-throw-if-not-resolved="false"></xref> that can be executed multiple times.
+    content.vb: Public Function PrepareInsertAsync(Of T As Class)(ct As CancellationToken = Nothing, hydrateGeneratedKeys As Boolean = True) As Task(Of PreparedOperation(Of T))
+  overload: nORM.Core.DbContext.PrepareInsertAsync*
+  nameWithType.vb: DbContext.PrepareInsertAsync(Of T)(CancellationToken, Boolean)
+  fullName.vb: nORM.Core.DbContext.PrepareInsertAsync(Of T)(System.Threading.CancellationToken, Boolean)
+  name.vb: PrepareInsertAsync(Of T)(CancellationToken, Boolean)
+- uid: nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  commentId: M:nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  id: QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: QueryUnchangedAsync<T>(string, CancellationToken, params object[])
+  nameWithType: DbContext.QueryUnchangedAsync<T>(string, CancellationToken, params object[])
+  fullName: nORM.Core.DbContext.QueryUnchangedAsync<T>(string, System.Threading.CancellationToken, params object[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: QueryUnchangedAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 30
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes the provided SQL and materializes the results into instances of
+
+    <code class="typeparamref">T</code> without tracking them in the <xref href="nORM.Core.DbContext.ChangeTracker" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: 'public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()'
+    parameters:
+    - id: sql
+      type: System.String
+      description: Raw SQL query to execute.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token.
+    - id: parameters
+      type: System.Object[]
+      description: Optional parameters for the SQL query.
+    typeParameters:
+    - id: T
+      description: Type to materialize each row to.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+      description: A list of entities populated from the query results.
+    content.vb: Public Function QueryUnchangedAsync(Of T As {Class, New})(sql As String, ct As CancellationToken = Nothing, ParamArray parameters As Object()) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.QueryUnchangedAsync*
+  nameWithType.vb: DbContext.QueryUnchangedAsync(Of T)(String, CancellationToken, ParamArray Object())
+  fullName.vb: nORM.Core.DbContext.QueryUnchangedAsync(Of T)(String, System.Threading.CancellationToken, ParamArray Object())
+  name.vb: QueryUnchangedAsync(Of T)(String, CancellationToken, ParamArray Object())
+- uid: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  id: QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: QueryUnchangedInterpolatedAsync<T>(FormattableString, CancellationToken)
+  nameWithType: DbContext.QueryUnchangedInterpolatedAsync<T>(FormattableString, CancellationToken)
+  fullName: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync<T>(System.FormattableString, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: QueryUnchangedInterpolatedAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 63
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes interpolated SQL with every interpolation hole converted into a
+
+    database parameter before execution.
+  example: []
+  syntax:
+    content: 'public Task<List<T>> QueryUnchangedInterpolatedAsync<T>(FormattableString sql, CancellationToken ct = default) where T : class, new()'
+    parameters:
+    - id: sql
+      type: System.FormattableString
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+    content.vb: Public Function QueryUnchangedInterpolatedAsync(Of T As {Class, New})(sql As FormattableString, ct As CancellationToken = Nothing) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync*
+  nameWithType.vb: DbContext.QueryUnchangedInterpolatedAsync(Of T)(FormattableString, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync(Of T)(System.FormattableString, System.Threading.CancellationToken)
+  name.vb: QueryUnchangedInterpolatedAsync(Of T)(FormattableString, CancellationToken)
+- uid: nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  commentId: M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  id: FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: FromSqlRawAsync<T>(string, CancellationToken, params object[])
+  nameWithType: DbContext.FromSqlRawAsync<T>(string, CancellationToken, params object[])
+  fullName: nORM.Core.DbContext.FromSqlRawAsync<T>(string, System.Threading.CancellationToken, params object[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FromSqlRawAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 168
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes a raw SQL query and materializes the results into instances of
+
+    <code class="typeparamref">T</code>.
+  example: []
+  syntax:
+    content: 'public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()'
+    parameters:
+    - id: sql
+      type: System.String
+    - id: ct
+      type: System.Threading.CancellationToken
+    - id: parameters
+      type: System.Object[]
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+    content.vb: Public Function FromSqlRawAsync(Of T As {Class, New})(sql As String, ct As CancellationToken = Nothing, ParamArray parameters As Object()) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.FromSqlRawAsync*
+  nameWithType.vb: DbContext.FromSqlRawAsync(Of T)(String, CancellationToken, ParamArray Object())
+  fullName.vb: nORM.Core.DbContext.FromSqlRawAsync(Of T)(String, System.Threading.CancellationToken, ParamArray Object())
+  name.vb: FromSqlRawAsync(Of T)(String, CancellationToken, ParamArray Object())
+- uid: nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  id: FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: FromSqlInterpolatedAsync<T>(FormattableString, CancellationToken)
+  nameWithType: DbContext.FromSqlInterpolatedAsync<T>(FormattableString, CancellationToken)
+  fullName: nORM.Core.DbContext.FromSqlInterpolatedAsync<T>(System.FormattableString, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FromSqlInterpolatedAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 200
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes interpolated SQL with every interpolation hole converted into a
+
+    database parameter before execution.
+  example: []
+  syntax:
+    content: 'public Task<List<T>> FromSqlInterpolatedAsync<T>(FormattableString sql, CancellationToken ct = default) where T : class, new()'
+    parameters:
+    - id: sql
+      type: System.FormattableString
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+    content.vb: Public Function FromSqlInterpolatedAsync(Of T As {Class, New})(sql As FormattableString, ct As CancellationToken = Nothing) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.FromSqlInterpolatedAsync*
+  nameWithType.vb: DbContext.FromSqlInterpolatedAsync(Of T)(FormattableString, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.FromSqlInterpolatedAsync(Of T)(System.FormattableString, System.Threading.CancellationToken)
+  name.vb: FromSqlInterpolatedAsync(Of T)(FormattableString, CancellationToken)
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
+  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
+  id: ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ExecuteStoredProcedureAsync<T>(string, CancellationToken, object?)
+  nameWithType: DbContext.ExecuteStoredProcedureAsync<T>(string, CancellationToken, object?)
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsync<T>(string, System.Threading.CancellationToken, object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteStoredProcedureAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 229
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes a stored procedure and materializes the first result set into
+
+    instances of <code class="typeparamref">T</code>.
+  example: []
+  syntax:
+    content: 'public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()'
+    parameters:
+    - id: procedureName
+      type: System.String
+    - id: ct
+      type: System.Threading.CancellationToken
+    - id: parameters
+      type: System.Object
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+    content.vb: Public Function ExecuteStoredProcedureAsync(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing) As Task(Of List(Of T))
+  overload: nORM.Core.DbContext.ExecuteStoredProcedureAsync*
+  nameWithType.vb: DbContext.ExecuteStoredProcedureAsync(Of T)(String, CancellationToken, Object)
+  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureAsync(Of T)(String, System.Threading.CancellationToken, Object)
+  name.vb: ExecuteStoredProcedureAsync(Of T)(String, CancellationToken, Object)
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
+  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
+  id: ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ExecuteStoredProcedureAsAsyncEnumerable<T>(string, CancellationToken, object?)
+  nameWithType: DbContext.ExecuteStoredProcedureAsAsyncEnumerable<T>(string, CancellationToken, object?)
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable<T>(string, System.Threading.CancellationToken, object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteStoredProcedureAsAsyncEnumerable
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 276
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Streams the results of a stored procedure as an <xref href="System.Collections.Generic.IAsyncEnumerable%601" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: 'public IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()'
+    parameters:
+    - id: procedureName
+      type: System.String
+    - id: ct
+      type: System.Threading.CancellationToken
+    - id: parameters
+      type: System.Object
+    typeParameters:
+    - id: T
+    return:
+      type: System.Collections.Generic.IAsyncEnumerable{{T}}
+    content.vb: Public Function ExecuteStoredProcedureAsAsyncEnumerable(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing) As IAsyncEnumerable(Of T)
+  overload: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable*
+  nameWithType.vb: DbContext.ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, CancellationToken, Object)
+  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, System.Threading.CancellationToken, Object)
+  name.vb: ExecuteStoredProcedureAsAsyncEnumerable(Of T)(String, CancellationToken, Object)
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
+  commentId: M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
+  id: ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ExecuteStoredProcedureWithOutputAsync<T>(string, CancellationToken, object?, params OutputParameter[])
+  nameWithType: DbContext.ExecuteStoredProcedureWithOutputAsync<T>(string, CancellationToken, object?, params OutputParameter[])
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync<T>(string, System.Threading.CancellationToken, object?, params nORM.Core.OutputParameter[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.RawSql.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteStoredProcedureWithOutputAsync
+    path: src/nORM/Core/DbContext.RawSql.cs
+    startLine: 324
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes a stored procedure that returns both a result set and output
+
+    parameters.
+  example: []
+  syntax:
+    content: 'public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()'
+    parameters:
+    - id: procedureName
+      type: System.String
+    - id: ct
+      type: System.Threading.CancellationToken
+    - id: parameters
+      type: System.Object
+    - id: outputParameters
+      type: nORM.Core.OutputParameter[]
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{{T}}}
+    content.vb: Public Function ExecuteStoredProcedureWithOutputAsync(Of T As {Class, New})(procedureName As String, ct As CancellationToken = Nothing, parameters As Object = Nothing, ParamArray outputParameters As OutputParameter()) As Task(Of StoredProcedureResult(Of T))
+  overload: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*
+  nameWithType.vb: DbContext.ExecuteStoredProcedureWithOutputAsync(Of T)(String, CancellationToken, Object, ParamArray OutputParameter())
+  fullName.vb: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync(Of T)(String, System.Threading.CancellationToken, Object, ParamArray nORM.Core.OutputParameter())
+  name.vb: ExecuteStoredProcedureWithOutputAsync(Of T)(String, CancellationToken, Object, ParamArray OutputParameter())
+- uid: nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
+  id: InsertAsync``1(``0,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: InsertAsync<T>(T, CancellationToken)
+  nameWithType: DbContext.InsertAsync<T>(T, CancellationToken)
+  fullName: nORM.Core.DbContext.InsertAsync<T>(T, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: InsertAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 27
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Inserts the specified entity into the database asynchronously using any
+
+    configured retry policies.
+  example: []
+  syntax:
+    content: 'public Task<int> InsertAsync<T>(T entity, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to insert.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function InsertAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.InsertAsync*
+  nameWithType.vb: DbContext.InsertAsync(Of T)(T, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.InsertAsync(Of T)(T, System.Threading.CancellationToken)
+  name.vb: InsertAsync(Of T)(T, CancellationToken)
+- uid: nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  id: InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: InsertAsync<T>(T, DbTransaction?, CancellationToken)
+  nameWithType: DbContext.InsertAsync<T>(T, DbTransaction?, CancellationToken)
+  fullName: nORM.Core.DbContext.InsertAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: InsertAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 87
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Inserts the specified entity within the provided transaction scope.
+  example: []
+  syntax:
+    content: 'public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to insert.
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: Optional transaction used to execute the command.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function InsertAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.InsertAsync*
+  nameWithType.vb: DbContext.InsertAsync(Of T)(T, DbTransaction, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.InsertAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
+  name.vb: InsertAsync(Of T)(T, DbTransaction, CancellationToken)
+- uid: nORM.Core.DbContext.UpdateAsync``1(``0,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.UpdateAsync``1(``0,System.Threading.CancellationToken)
+  id: UpdateAsync``1(``0,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: UpdateAsync<T>(T, CancellationToken)
+  nameWithType: DbContext.UpdateAsync<T>(T, CancellationToken)
+  fullName: nORM.Core.DbContext.UpdateAsync<T>(T, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UpdateAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 102
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Updates the specified entity in the database asynchronously.
+  example: []
+  syntax:
+    content: 'public Task<int> UpdateAsync<T>(T entity, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to update.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function UpdateAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.UpdateAsync*
+  nameWithType.vb: DbContext.UpdateAsync(Of T)(T, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.UpdateAsync(Of T)(T, System.Threading.CancellationToken)
+  name.vb: UpdateAsync(Of T)(T, CancellationToken)
+- uid: nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  id: UpdateAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: UpdateAsync<T>(T, DbTransaction?, CancellationToken)
+  nameWithType: DbContext.UpdateAsync<T>(T, DbTransaction?, CancellationToken)
+  fullName: nORM.Core.DbContext.UpdateAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UpdateAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 116
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Updates the entity within the given transaction.
+  example: []
+  syntax:
+    content: 'public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to update.
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: Transaction to use; if null the context manages one.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function UpdateAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.UpdateAsync*
+  nameWithType.vb: DbContext.UpdateAsync(Of T)(T, DbTransaction, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.UpdateAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
+  name.vb: UpdateAsync(Of T)(T, DbTransaction, CancellationToken)
+- uid: nORM.Core.DbContext.DeleteAsync``1(``0,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.DeleteAsync``1(``0,System.Threading.CancellationToken)
+  id: DeleteAsync``1(``0,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: DeleteAsync<T>(T, CancellationToken)
+  nameWithType: DbContext.DeleteAsync<T>(T, CancellationToken)
+  fullName: nORM.Core.DbContext.DeleteAsync<T>(T, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DeleteAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 129
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deletes the specified entity from the database asynchronously.
+  example: []
+  syntax:
+    content: 'public Task<int> DeleteAsync<T>(T entity, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to delete.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function DeleteAsync(Of T As Class)(entity As T, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.DeleteAsync*
+  nameWithType.vb: DbContext.DeleteAsync(Of T)(T, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.DeleteAsync(Of T)(T, System.Threading.CancellationToken)
+  name.vb: DeleteAsync(Of T)(T, CancellationToken)
+- uid: nORM.Core.DbContext.DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  id: DeleteAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: DeleteAsync<T>(T, DbTransaction?, CancellationToken)
+  nameWithType: DbContext.DeleteAsync<T>(T, DbTransaction?, CancellationToken)
+  fullName: nORM.Core.DbContext.DeleteAsync<T>(T, System.Data.Common.DbTransaction?, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DeleteAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 143
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deletes the entity within the supplied transaction.
+  example: []
+  syntax:
+    content: 'public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The entity to delete.
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: Optional transaction for the delete operation.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token for the operation.
+    typeParameters:
+    - id: T
+      description: CLR type of the entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of affected rows.
+    content.vb: Public Function DeleteAsync(Of T As Class)(entity As T, transaction As DbTransaction, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.DeleteAsync*
+  nameWithType.vb: DbContext.DeleteAsync(Of T)(T, DbTransaction, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.DeleteAsync(Of T)(T, System.Data.Common.DbTransaction, System.Threading.CancellationToken)
+  name.vb: DeleteAsync(Of T)(T, DbTransaction, CancellationToken)
+- uid: nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: BulkInsertAsync<T>(IEnumerable<T>, CancellationToken)
+  nameWithType: DbContext.BulkInsertAsync<T>(IEnumerable<T>, CancellationToken)
+  fullName: nORM.Core.DbContext.BulkInsertAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkInsertAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 677
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Efficiently inserts a collection of entities using provider specific bulk
+
+    techniques. Validation and tenant checks are applied to each entity before
+
+    execution.
+  example: []
+  syntax:
+    content: 'public Task<int> BulkInsertAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+      description: Entities to insert.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token.
+    typeParameters:
+    - id: T
+      description: CLR type of the entities.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: Total number of inserted rows.
+    content.vb: Public Function BulkInsertAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.BulkInsertAsync*
+  nameWithType.vb: DbContext.BulkInsertAsync(Of T)(IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.BulkInsertAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkInsertAsync(Of T)(IEnumerable(Of T), CancellationToken)
+- uid: nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkUpdateAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: BulkUpdateAsync<T>(IEnumerable<T>, CancellationToken)
+  nameWithType: DbContext.BulkUpdateAsync<T>(IEnumerable<T>, CancellationToken)
+  fullName: nORM.Core.DbContext.BulkUpdateAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkUpdateAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 704
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Performs a set based update of the provided entities using the provider's
+
+    bulk update facilities.
+  example: []
+  syntax:
+    content: 'public Task<int> BulkUpdateAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+      description: Entities to update.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token.
+    typeParameters:
+    - id: T
+      description: CLR type of the entities.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: Total number of updated rows.
+    content.vb: Public Function BulkUpdateAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.BulkUpdateAsync*
+  nameWithType.vb: DbContext.BulkUpdateAsync(Of T)(IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.BulkUpdateAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkUpdateAsync(Of T)(IEnumerable(Of T), CancellationToken)
+- uid: nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  id: BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: BulkDeleteAsync<T>(IEnumerable<T>, CancellationToken)
+  nameWithType: DbContext.BulkDeleteAsync<T>(IEnumerable<T>, CancellationToken)
+  fullName: nORM.Core.DbContext.BulkDeleteAsync<T>(System.Collections.Generic.IEnumerable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.WriteOperations.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkDeleteAsync
+    path: src/nORM/Core/DbContext.WriteOperations.cs
+    startLine: 731
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Removes a collection of entities from the database using bulk delete
+
+    operations.
+  example: []
+  syntax:
+    content: 'public Task<int> BulkDeleteAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+      description: Entities to delete.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Cancellation token.
+    typeParameters:
+    - id: T
+      description: CLR type of the entities.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: Total number of deleted rows.
+    content.vb: Public Function BulkDeleteAsync(Of T As Class)(entities As IEnumerable(Of T), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.BulkDeleteAsync*
+  nameWithType.vb: DbContext.BulkDeleteAsync(Of T)(IEnumerable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.BulkDeleteAsync(Of T)(System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
+  name.vb: BulkDeleteAsync(Of T)(IEnumerable(Of T), CancellationToken)
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: System.Data.Common.DbConnection
+  commentId: T:System.Data.Common.DbConnection
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  name: DbConnection
+  nameWithType: DbConnection
+  fullName: System.Data.Common.DbConnection
+- uid: nORM.Mapping.TableMapping
+  commentId: T:nORM.Mapping.TableMapping
+  parent: nORM.Mapping
+  href: nORM.Mapping.TableMapping.html
+  name: TableMapping
+  nameWithType: TableMapping
+  fullName: nORM.Mapping.TableMapping
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -2233,6 +2864,65 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: nORM.Mapping
+  commentId: N:nORM.Mapping
+  href: nORM.html
+  name: nORM.Mapping
+  nameWithType: nORM.Mapping
+  fullName: nORM.Mapping
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Mapping
+    name: Mapping
+    href: nORM.Mapping.html
 - uid: System
   commentId: N:System
   isExternal: true
@@ -2624,12 +3314,116 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
-- uid: nORM.Core.DbContext.Options*
-  commentId: Overload:nORM.Core.DbContext.Options
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Options
-  name: Options
-  nameWithType: DbContext.Options
-  fullName: nORM.Core.DbContext.Options
+- uid: nORM.Core.DbContext.ChangeTracker
+  commentId: P:nORM.Core.DbContext.ChangeTracker
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ChangeTracker
+  name: ChangeTracker
+  nameWithType: DbContext.ChangeTracker
+  fullName: nORM.Core.DbContext.ChangeTracker
+- uid: nORM.Core.EntityState.Added
+  commentId: F:nORM.Core.EntityState.Added
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Added
+  name: Added
+  nameWithType: EntityState.Added
+  fullName: nORM.Core.EntityState.Added
+- uid: nORM.Core.EntityEntry
+  commentId: T:nORM.Core.EntityEntry
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry.html
+  name: EntityEntry
+  nameWithType: EntityEntry
+  fullName: nORM.Core.EntityEntry
+- uid: nORM.Core.DbContext.Add*
+  commentId: Overload:nORM.Core.DbContext.Add
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Add__1___0_
+  name: Add
+  nameWithType: DbContext.Add
+  fullName: nORM.Core.DbContext.Add
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: nORM.Core.DbContext.Attach*
+  commentId: Overload:nORM.Core.DbContext.Attach
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Attach__1___0_
+  name: Attach
+  nameWithType: DbContext.Attach
+  fullName: nORM.Core.DbContext.Attach
+- uid: nORM.Core.EntityState.Modified
+  commentId: F:nORM.Core.EntityState.Modified
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Modified
+  name: Modified
+  nameWithType: EntityState.Modified
+  fullName: nORM.Core.EntityState.Modified
+- uid: nORM.Core.DbContext.Update*
+  commentId: Overload:nORM.Core.DbContext.Update
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Update__1___0_
+  name: Update
+  nameWithType: DbContext.Update
+  fullName: nORM.Core.DbContext.Update
+- uid: nORM.Core.DbContext.Remove*
+  commentId: Overload:nORM.Core.DbContext.Remove
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Remove__1___0_
+  name: Remove
+  nameWithType: DbContext.Remove
+  fullName: nORM.Core.DbContext.Remove
+- uid: nORM.Core.DbContext.Attach``1(``0)
+  commentId: M:nORM.Core.DbContext.Attach``1(``0)
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Attach__1___0_
+  name: Attach<T>(T)
+  nameWithType: DbContext.Attach<T>(T)
+  fullName: nORM.Core.DbContext.Attach<T>(T)
+  nameWithType.vb: DbContext.Attach(Of T)(T)
+  fullName.vb: nORM.Core.DbContext.Attach(Of T)(T)
+  name.vb: Attach(Of T)(T)
+  spec.csharp:
+  - uid: nORM.Core.DbContext.Attach``1(``0)
+    name: Attach
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_Attach__1___0_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DbContext.Attach``1(``0)
+    name: Attach
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_Attach__1___0_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: )
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Core.DbContext.Entry*
+  commentId: Overload:nORM.Core.DbContext.Entry
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Entry_System_Object_
+  name: Entry
+  nameWithType: DbContext.Entry
+  fullName: nORM.Core.DbContext.Entry
 - uid: nORM.Configuration.DbContextOptions
   commentId: T:nORM.Configuration.DbContextOptions
   parent: nORM.Configuration
@@ -2637,6 +3431,12 @@ references:
   name: DbContextOptions
   nameWithType: DbContextOptions
   fullName: nORM.Configuration.DbContextOptions
+- uid: nORM.Core.DbContext.UseDeadlockResilientSaveChanges*
+  commentId: Overload:nORM.Core.DbContext.UseDeadlockResilientSaveChanges
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_UseDeadlockResilientSaveChanges
+  name: UseDeadlockResilientSaveChanges
+  nameWithType: DbContext.UseDeadlockResilientSaveChanges
+  fullName: nORM.Core.DbContext.UseDeadlockResilientSaveChanges
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
   href: nORM.html
@@ -2659,144 +3459,12 @@ references:
   - uid: nORM.Configuration
     name: Configuration
     href: nORM.Configuration.html
-- uid: nORM.Core.DbContext.ChangeTracker*
-  commentId: Overload:nORM.Core.DbContext.ChangeTracker
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ChangeTracker
-  name: ChangeTracker
-  nameWithType: DbContext.ChangeTracker
-  fullName: nORM.Core.DbContext.ChangeTracker
-- uid: nORM.Core.ChangeTracker
-  commentId: T:nORM.Core.ChangeTracker
-  parent: nORM.Core
-  href: nORM.Core.ChangeTracker.html
-  name: ChangeTracker
-  nameWithType: ChangeTracker
-  fullName: nORM.Core.ChangeTracker
-- uid: nORM.Core.DbContext.Database*
-  commentId: Overload:nORM.Core.DbContext.Database
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Database
-  name: Database
-  nameWithType: DbContext.Database
-  fullName: nORM.Core.DbContext.Database
-- uid: nORM.Core.DatabaseFacade
-  commentId: T:nORM.Core.DatabaseFacade
-  parent: nORM.Core
-  href: nORM.Core.DatabaseFacade.html
-  name: DatabaseFacade
-  nameWithType: DatabaseFacade
-  fullName: nORM.Core.DatabaseFacade
-- uid: nORM.Core.DbContext.#ctor*
-  commentId: Overload:nORM.Core.DbContext.#ctor
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext__ctor_System_Data_Common_DbConnection_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_
-  name: DbContext
-  nameWithType: DbContext.DbContext
-  fullName: nORM.Core.DbContext.DbContext
-  nameWithType.vb: DbContext.New
-  fullName.vb: nORM.Core.DbContext.New
-  name.vb: New
-- uid: System.Data.Common.DbConnection
-  commentId: T:System.Data.Common.DbConnection
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
-  name: DbConnection
-  nameWithType: DbConnection
-  fullName: System.Data.Common.DbConnection
-- uid: nORM.Providers.DatabaseProvider
-  commentId: T:nORM.Providers.DatabaseProvider
-  parent: nORM.Providers
-  href: nORM.Providers.DatabaseProvider.html
-  name: DatabaseProvider
-  nameWithType: DatabaseProvider
-  fullName: nORM.Providers.DatabaseProvider
-- uid: System.Data.Common
-  commentId: N:System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Data.Common
-  nameWithType: System.Data.Common
-  fullName: System.Data.Common
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-- uid: nORM.Providers
-  commentId: N:nORM.Providers
-  href: nORM.html
-  name: nORM.Providers
-  nameWithType: nORM.Providers
-  fullName: nORM.Providers
-  spec.csharp:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Providers
-    name: Providers
-    href: nORM.Providers.html
-  spec.vb:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Providers
-    name: Providers
-    href: nORM.Providers.html
-- uid: System.String
-  commentId: T:System.String
-  parent: System
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.string
-  name: string
-  nameWithType: string
-  fullName: string
-  nameWithType.vb: String
-  fullName.vb: String
-  name.vb: String
-- uid: nORM.Core.DbContext.Connection*
-  commentId: Overload:nORM.Core.DbContext.Connection
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Connection
-  name: Connection
-  nameWithType: DbContext.Connection
-  fullName: nORM.Core.DbContext.Connection
-- uid: nORM.Core.DbContext.Provider*
-  commentId: Overload:nORM.Core.DbContext.Provider
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Provider
-  name: Provider
-  nameWithType: DbContext.Provider
-  fullName: nORM.Core.DbContext.Provider
-- uid: nORM.Core.DbContext.IsHealthyAsync*
-  commentId: Overload:nORM.Core.DbContext.IsHealthyAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_IsHealthyAsync_System_Threading_CancellationToken_
-  name: IsHealthyAsync
-  nameWithType: DbContext.IsHealthyAsync
-  fullName: nORM.Core.DbContext.IsHealthyAsync
+- uid: nORM.Core.DbContext.SaveChangesAsync*
+  commentId: Overload:nORM.Core.DbContext.SaveChangesAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_
+  name: SaveChangesAsync
+  nameWithType: DbContext.SaveChangesAsync
+  fullName: nORM.Core.DbContext.SaveChangesAsync
 - uid: System.Threading.CancellationToken
   commentId: T:System.Threading.CancellationToken
   parent: System.Threading
@@ -2805,27 +3473,27 @@ references:
   name: CancellationToken
   nameWithType: CancellationToken
   fullName: System.Threading.CancellationToken
-- uid: System.Threading.Tasks.Task{System.Boolean}
-  commentId: T:System.Threading.Tasks.Task{System.Boolean}
+- uid: System.Threading.Tasks.Task{System.Int32}
+  commentId: T:System.Threading.Tasks.Task{System.Int32}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<bool>
-  nameWithType: Task<bool>
-  fullName: System.Threading.Tasks.Task<bool>
-  nameWithType.vb: Task(Of Boolean)
-  fullName.vb: System.Threading.Tasks.Task(Of Boolean)
-  name.vb: Task(Of Boolean)
+  name: Task<int>
+  nameWithType: Task<int>
+  fullName: System.Threading.Tasks.Task<int>
+  nameWithType.vb: Task(Of Integer)
+  fullName.vb: System.Threading.Tasks.Task(Of Integer)
+  name.vb: Task(Of Integer)
   spec.csharp:
   - uid: System.Threading.Tasks.Task`1
     name: Task
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
   - name: <
-  - uid: System.Boolean
-    name: bool
+  - uid: System.Int32
+    name: int
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.boolean
+    href: https://learn.microsoft.com/dotnet/api/system.int32
   - name: '>'
   spec.vb:
   - uid: System.Threading.Tasks.Task`1
@@ -2835,10 +3503,10 @@ references:
   - name: (
   - name: Of
   - name: " "
-  - uid: System.Boolean
-    name: Boolean
+  - uid: System.Int32
+    name: Integer
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.boolean
+    href: https://learn.microsoft.com/dotnet/api/system.int32
   - name: )
 - uid: System.Threading
   commentId: N:System.Threading
@@ -2932,6 +3600,410 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Core.ChangeTracker.DetectChanges
+  commentId: M:nORM.Core.ChangeTracker.DetectChanges
+  name: DetectChanges()
+  nameWithType: ChangeTracker.DetectChanges()
+  fullName: nORM.Core.ChangeTracker.DetectChanges()
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.DetectChanges
+    name: DetectChanges
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.DetectChanges
+    name: DetectChanges
+  - name: (
+  - name: )
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Core.DbContext.Options*
+  commentId: Overload:nORM.Core.DbContext.Options
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Options
+  name: Options
+  nameWithType: DbContext.Options
+  fullName: nORM.Core.DbContext.Options
+- uid: nORM.Core.DbContext.ChangeTracker*
+  commentId: Overload:nORM.Core.DbContext.ChangeTracker
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ChangeTracker
+  name: ChangeTracker
+  nameWithType: DbContext.ChangeTracker
+  fullName: nORM.Core.DbContext.ChangeTracker
+- uid: nORM.Core.ChangeTracker
+  commentId: T:nORM.Core.ChangeTracker
+  parent: nORM.Core
+  href: nORM.Core.ChangeTracker.html
+  name: ChangeTracker
+  nameWithType: ChangeTracker
+  fullName: nORM.Core.ChangeTracker
+- uid: nORM.Core.DbContext.Database*
+  commentId: Overload:nORM.Core.DbContext.Database
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Database
+  name: Database
+  nameWithType: DbContext.Database
+  fullName: nORM.Core.DbContext.Database
+- uid: nORM.Core.DatabaseFacade
+  commentId: T:nORM.Core.DatabaseFacade
+  parent: nORM.Core
+  href: nORM.Core.DatabaseFacade.html
+  name: DatabaseFacade
+  nameWithType: DatabaseFacade
+  fullName: nORM.Core.DatabaseFacade
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
+- uid: nORM.Core.DbContext.#ctor*
+  commentId: Overload:nORM.Core.DbContext.#ctor
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext__ctor_System_Data_Common_DbConnection_nORM_Providers_DatabaseProvider_nORM_Configuration_DbContextOptions_
+  name: DbContext
+  nameWithType: DbContext.DbContext
+  fullName: nORM.Core.DbContext.DbContext
+  nameWithType.vb: DbContext.New
+  fullName.vb: nORM.Core.DbContext.New
+  name.vb: New
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Core.DbContext.Connection*
+  commentId: Overload:nORM.Core.DbContext.Connection
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Connection
+  name: Connection
+  nameWithType: DbContext.Connection
+  fullName: nORM.Core.DbContext.Connection
+- uid: nORM.Core.DbContext.Provider*
+  commentId: Overload:nORM.Core.DbContext.Provider
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Provider
+  name: Provider
+  nameWithType: DbContext.Provider
+  fullName: nORM.Core.DbContext.Provider
+- uid: System.Data.Common.DbCommand
+  commentId: T:System.Data.Common.DbCommand
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  name: DbCommand
+  nameWithType: DbCommand
+  fullName: System.Data.Common.DbCommand
+- uid: nORM.Core.DbContext.CreateCompiledQueryCommandAsync*
+  commentId: Overload:nORM.Core.DbContext.CreateCompiledQueryCommandAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_CreateCompiledQueryCommandAsync_System_Threading_CancellationToken_
+  name: CreateCompiledQueryCommandAsync
+  nameWithType: DbContext.CreateCompiledQueryCommandAsync
+  fullName: nORM.Core.DbContext.CreateCompiledQueryCommandAsync
+- uid: System.Threading.Tasks.Task{System.Data.Common.DbCommand}
+  commentId: T:System.Threading.Tasks.Task{System.Data.Common.DbCommand}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<DbCommand>
+  nameWithType: Task<DbCommand>
+  fullName: System.Threading.Tasks.Task<System.Data.Common.DbCommand>
+  nameWithType.vb: Task(Of DbCommand)
+  fullName.vb: System.Threading.Tasks.Task(Of System.Data.Common.DbCommand)
+  name.vb: Task(Of DbCommand)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Data.Common.DbCommand
+    name: DbCommand
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbcommand
+  - name: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.DbContext.ExecuteCompiledQueryListAsync*
+  commentId: Overload:nORM.Core.DbContext.ExecuteCompiledQueryListAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteCompiledQueryListAsync__1_System_Data_Common_DbCommand_System_Func_System_Data_Common_DbDataReader_System_Threading_CancellationToken_System_Threading_Tasks_Task___0___System_Threading_CancellationToken_
+  name: ExecuteCompiledQueryListAsync
+  nameWithType: DbContext.ExecuteCompiledQueryListAsync
+  fullName: nORM.Core.DbContext.ExecuteCompiledQueryListAsync
+- uid: System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{{T}}}
+  commentId: T:System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}}
+  parent: System
+  definition: System.Func`3
+  href: https://learn.microsoft.com/dotnet/api/system.func-3
+  name: Func<DbDataReader, CancellationToken, Task<T>>
+  nameWithType: Func<DbDataReader, CancellationToken, Task<T>>
+  fullName: System.Func<System.Data.Common.DbDataReader, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>>
+  nameWithType.vb: Func(Of DbDataReader, CancellationToken, Task(Of T))
+  fullName.vb: System.Func(Of System.Data.Common.DbDataReader, System.Threading.CancellationToken, System.Threading.Tasks.Task(Of T))
+  name.vb: Func(Of DbDataReader, CancellationToken, Task(Of T))
+  spec.csharp:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - uid: System.Data.Common.DbDataReader
+    name: DbDataReader
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbdatareader
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: ','
+  - name: " "
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Data.Common.DbDataReader
+    name: DbDataReader
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common.dbdatareader
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: ','
+  - name: " "
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.List{``0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<List<T>>
+  nameWithType: Task<List<T>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.List<T>>
+  nameWithType.vb: Task(Of List(Of T))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.List(Of T))
+  name.vb: Task(Of List(Of T))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: System.Func`3
+  commentId: T:System.Func`3
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-3
+  name: Func<T1, T2, TResult>
+  nameWithType: Func<T1, T2, TResult>
+  fullName: System.Func<T1, T2, TResult>
+  nameWithType.vb: Func(Of T1, T2, TResult)
+  fullName.vb: System.Func(Of T1, T2, TResult)
+  name.vb: Func(Of T1, T2, TResult)
+  spec.csharp:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - name: T1
+  - name: ','
+  - name: " "
+  - name: T2
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T1
+  - name: ','
+  - name: " "
+  - name: T2
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: nORM.Query.MaterializerFactory
+  commentId: T:nORM.Query.MaterializerFactory
+  name: MaterializerFactory
+  nameWithType: MaterializerFactory
+  fullName: nORM.Query.MaterializerFactory
+- uid: nORM.Core.DbContext.GetCompiledQueryMaterializer*
+  commentId: Overload:nORM.Core.DbContext.GetCompiledQueryMaterializer
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetCompiledQueryMaterializer__1_System_String_
+  name: GetCompiledQueryMaterializer
+  nameWithType: DbContext.GetCompiledQueryMaterializer
+  fullName: nORM.Core.DbContext.GetCompiledQueryMaterializer
+- uid: nORM.Core.DbContext.IsHealthyAsync*
+  commentId: Overload:nORM.Core.DbContext.IsHealthyAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_IsHealthyAsync_System_Threading_CancellationToken_
+  name: IsHealthyAsync
+  nameWithType: DbContext.IsHealthyAsync
+  fullName: nORM.Core.DbContext.IsHealthyAsync
+- uid: System.Threading.Tasks.Task{System.Boolean}
+  commentId: T:System.Threading.Tasks.Task{System.Boolean}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<bool>
+  nameWithType: Task<bool>
+  fullName: System.Threading.Tasks.Task<bool>
+  nameWithType.vb: Task(Of Boolean)
+  fullName.vb: System.Threading.Tasks.Task(Of Boolean)
+  name.vb: Task(Of Boolean)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
 - uid: System.Linq.IQueryable
   commentId: T:System.Linq.IQueryable
   parent: System.Linq
@@ -2940,13 +4012,6 @@ references:
   name: IQueryable
   nameWithType: IQueryable
   fullName: System.Linq.IQueryable
-- uid: System.ArgumentException
-  commentId: T:System.ArgumentException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
-  name: ArgumentException
-  nameWithType: ArgumentException
-  fullName: System.ArgumentException
 - uid: nORM.Core.NormUsageException
   commentId: T:nORM.Core.NormUsageException
   href: nORM.Core.NormUsageException.html
@@ -2986,92 +4051,194 @@ references:
     name: Linq
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.linq
-- uid: nORM.Core.DbContext.Add*
-  commentId: Overload:nORM.Core.DbContext.Add
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Add__1___0_
-  name: Add
-  nameWithType: DbContext.Add
-  fullName: nORM.Core.DbContext.Add
-- uid: '{T}'
-  commentId: '!:T'
-  definition: T
-  name: T
-  nameWithType: T
-  fullName: T
-- uid: nORM.Core.EntityEntry
-  commentId: T:nORM.Core.EntityEntry
-  parent: nORM.Core
-  href: nORM.Core.EntityEntry.html
-  name: EntityEntry
-  nameWithType: EntityEntry
-  fullName: nORM.Core.EntityEntry
-- uid: T
-  name: T
-  nameWithType: T
-  fullName: T
-- uid: nORM.Core.DbContext.Attach*
-  commentId: Overload:nORM.Core.DbContext.Attach
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Attach__1___0_
-  name: Attach
-  nameWithType: DbContext.Attach
-  fullName: nORM.Core.DbContext.Attach
-- uid: nORM.Core.DbContext.Update*
-  commentId: Overload:nORM.Core.DbContext.Update
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Update__1___0_
-  name: Update
-  nameWithType: DbContext.Update
-  fullName: nORM.Core.DbContext.Update
-- uid: nORM.Core.DbContext.Remove*
-  commentId: Overload:nORM.Core.DbContext.Remove
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Remove__1___0_
-  name: Remove
-  nameWithType: DbContext.Remove
-  fullName: nORM.Core.DbContext.Remove
-- uid: nORM.Core.EntityState.Unchanged
-  commentId: F:nORM.Core.EntityState.Unchanged
-  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Unchanged
-  name: Unchanged
-  nameWithType: EntityState.Unchanged
-  fullName: nORM.Core.EntityState.Unchanged
-- uid: nORM.Core.DbContext.Entry*
-  commentId: Overload:nORM.Core.DbContext.Entry
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Entry_System_Object_
-  name: Entry
-  nameWithType: DbContext.Entry
-  fullName: nORM.Core.DbContext.Entry
-- uid: nORM.Core.DbContext.UseDeadlockResilientSaveChanges*
-  commentId: Overload:nORM.Core.DbContext.UseDeadlockResilientSaveChanges
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_UseDeadlockResilientSaveChanges
-  name: UseDeadlockResilientSaveChanges
-  nameWithType: DbContext.UseDeadlockResilientSaveChanges
-  fullName: nORM.Core.DbContext.UseDeadlockResilientSaveChanges
-- uid: nORM.Core.DbContext.SaveChangesAsync*
-  commentId: Overload:nORM.Core.DbContext.SaveChangesAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_SaveChangesAsync_System_Threading_CancellationToken_
-  name: SaveChangesAsync
-  nameWithType: DbContext.SaveChangesAsync
-  fullName: nORM.Core.DbContext.SaveChangesAsync
-- uid: System.Threading.Tasks.Task{System.Int32}
-  commentId: T:System.Threading.Tasks.Task{System.Int32}
+- uid: nORM.Core.DbContext.CreateSavepointAsync*
+  commentId: Overload:nORM.Core.DbContext.CreateSavepointAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: CreateSavepointAsync
+  nameWithType: DbContext.CreateSavepointAsync
+  fullName: nORM.Core.DbContext.CreateSavepointAsync
+- uid: System.Data.Common.DbTransaction
+  commentId: T:System.Data.Common.DbTransaction
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  name: DbTransaction
+  nameWithType: DbTransaction
+  fullName: System.Data.Common.DbTransaction
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: nORM.Core.DbContext.RollbackToSavepointAsync*
+  commentId: Overload:nORM.Core.DbContext.RollbackToSavepointAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
+  name: RollbackToSavepointAsync
+  nameWithType: DbContext.RollbackToSavepointAsync
+  fullName: nORM.Core.DbContext.RollbackToSavepointAsync
+- uid: nORM.Core.DbContext.SetShadowProperty*
+  commentId: Overload:nORM.Core.DbContext.SetShadowProperty
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_SetShadowProperty_System_Object_System_String_System_Object_
+  name: SetShadowProperty
+  nameWithType: DbContext.SetShadowProperty
+  fullName: nORM.Core.DbContext.SetShadowProperty
+- uid: nORM.Core.DbContext.GetShadowProperty*
+  commentId: Overload:nORM.Core.DbContext.GetShadowProperty
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetShadowProperty_System_Object_System_String_
+  name: GetShadowProperty
+  nameWithType: DbContext.GetShadowProperty
+  fullName: nORM.Core.DbContext.GetShadowProperty
+- uid: nORM.Core.DbContext.CreateTagAsync*
+  commentId: Overload:nORM.Core.DbContext.CreateTagAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_CreateTagAsync_System_String_
+  name: CreateTagAsync
+  nameWithType: DbContext.CreateTagAsync
+  fullName: nORM.Core.DbContext.CreateTagAsync
+- uid: nORM.Core.DbContext.Dispose
+  commentId: M:nORM.Core.DbContext.Dispose
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose
+  name: Dispose()
+  nameWithType: DbContext.Dispose()
+  fullName: nORM.Core.DbContext.Dispose()
+  spec.csharp:
+  - uid: nORM.Core.DbContext.Dispose
+    name: Dispose
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DbContext.Dispose
+    name: Dispose
+    href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose
+  - name: (
+  - name: )
+- uid: nORM.Core.DbContext.Dispose*
+  commentId: Overload:nORM.Core.DbContext.Dispose
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose_System_Boolean_
+  name: Dispose
+  nameWithType: DbContext.Dispose
+  fullName: nORM.Core.DbContext.Dispose
+- uid: nORM.Core.DbContext.RegisterForDisposal*
+  commentId: Overload:nORM.Core.DbContext.RegisterForDisposal
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_RegisterForDisposal_System_IDisposable_
+  name: RegisterForDisposal
+  nameWithType: DbContext.RegisterForDisposal
+  fullName: nORM.Core.DbContext.RegisterForDisposal
+- uid: System.IDisposable.Dispose
+  commentId: M:System.IDisposable.Dispose
+  parent: System.IDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  name: Dispose()
+  nameWithType: IDisposable.Dispose()
+  fullName: System.IDisposable.Dispose()
+  spec.csharp:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IDisposable.Dispose
+    name: Dispose
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
+  - name: (
+  - name: )
+- uid: nORM.Core.DbContext.DisposeAsync*
+  commentId: Overload:nORM.Core.DbContext.DisposeAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_DisposeAsync
+  name: DisposeAsync
+  nameWithType: DbContext.DisposeAsync
+  fullName: nORM.Core.DbContext.DisposeAsync
+- uid: System.IAsyncDisposable.DisposeAsync
+  commentId: M:System.IAsyncDisposable.DisposeAsync
+  parent: System.IAsyncDisposable
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  name: DisposeAsync()
+  nameWithType: IAsyncDisposable.DisposeAsync()
+  fullName: System.IAsyncDisposable.DisposeAsync()
+  spec.csharp:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.IAsyncDisposable.DisposeAsync
+    name: DisposeAsync
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.ValueTask
+  commentId: T:System.Threading.Tasks.ValueTask
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask
+  name: ValueTask
+  nameWithType: ValueTask
+  fullName: System.Threading.Tasks.ValueTask
+- uid: nORM.Core.PreparedOperation`1
+  commentId: T:nORM.Core.PreparedOperation`1
+  href: nORM.Core.PreparedOperation-1.html
+  name: PreparedOperation<T>
+  nameWithType: PreparedOperation<T>
+  fullName: nORM.Core.PreparedOperation<T>
+  nameWithType.vb: PreparedOperation(Of T)
+  fullName.vb: nORM.Core.PreparedOperation(Of T)
+  name.vb: PreparedOperation(Of T)
+  spec.csharp:
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.DbContext.PrepareInsertAsync*
+  commentId: Overload:nORM.Core.DbContext.PrepareInsertAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_PrepareInsertAsync__1_System_Threading_CancellationToken_System_Boolean_
+  name: PrepareInsertAsync
+  nameWithType: DbContext.PrepareInsertAsync
+  fullName: nORM.Core.DbContext.PrepareInsertAsync
+- uid: System.Threading.Tasks.Task{nORM.Core.PreparedOperation{{T}}}
+  commentId: T:System.Threading.Tasks.Task{nORM.Core.PreparedOperation{``0}}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<int>
-  nameWithType: Task<int>
-  fullName: System.Threading.Tasks.Task<int>
-  nameWithType.vb: Task(Of Integer)
-  fullName.vb: System.Threading.Tasks.Task(Of Integer)
-  name.vb: Task(Of Integer)
+  name: Task<PreparedOperation<T>>
+  nameWithType: Task<PreparedOperation<T>>
+  fullName: System.Threading.Tasks.Task<nORM.Core.PreparedOperation<T>>
+  nameWithType.vb: Task(Of PreparedOperation(Of T))
+  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.PreparedOperation(Of T))
+  name.vb: Task(Of PreparedOperation(Of T))
   spec.csharp:
   - uid: System.Threading.Tasks.Task`1
     name: Task
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
   - name: <
-  - uid: System.Int32
-    name: int
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
+  - name: <
+  - name: T
+  - name: '>'
   - name: '>'
   spec.vb:
   - uid: System.Threading.Tasks.Task`1
@@ -3081,10 +4248,243 @@ references:
   - name: (
   - name: Of
   - name: " "
-  - uid: System.Int32
-    name: Integer
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation
+    href: nORM.Core.PreparedOperation-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: nORM.Core.DbContext.QueryUnchangedAsync*
+  commentId: Overload:nORM.Core.DbContext.QueryUnchangedAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_QueryUnchangedAsync__1_System_String_System_Threading_CancellationToken_System_Object___
+  name: QueryUnchangedAsync
+  nameWithType: DbContext.QueryUnchangedAsync
+  fullName: nORM.Core.DbContext.QueryUnchangedAsync
+- uid: System.Object[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object[]
+  nameWithType: object[]
+  fullName: object[]
+  nameWithType.vb: Object()
+  fullName.vb: Object()
+  name.vb: Object()
+  spec.csharp:
+  - uid: System.Object
+    name: object
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.int32
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: (
+  - name: )
+- uid: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync*
+  commentId: Overload:nORM.Core.DbContext.QueryUnchangedInterpolatedAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_QueryUnchangedInterpolatedAsync__1_System_FormattableString_System_Threading_CancellationToken_
+  name: QueryUnchangedInterpolatedAsync
+  nameWithType: DbContext.QueryUnchangedInterpolatedAsync
+  fullName: nORM.Core.DbContext.QueryUnchangedInterpolatedAsync
+- uid: System.FormattableString
+  commentId: T:System.FormattableString
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.formattablestring
+  name: FormattableString
+  nameWithType: FormattableString
+  fullName: System.FormattableString
+- uid: nORM.Core.DbContext.FromSqlRawAsync*
+  commentId: Overload:nORM.Core.DbContext.FromSqlRawAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_FromSqlRawAsync__1_System_String_System_Threading_CancellationToken_System_Object___
+  name: FromSqlRawAsync
+  nameWithType: DbContext.FromSqlRawAsync
+  fullName: nORM.Core.DbContext.FromSqlRawAsync
+- uid: nORM.Core.DbContext.FromSqlInterpolatedAsync*
+  commentId: Overload:nORM.Core.DbContext.FromSqlInterpolatedAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_FromSqlInterpolatedAsync__1_System_FormattableString_System_Threading_CancellationToken_
+  name: FromSqlInterpolatedAsync
+  nameWithType: DbContext.FromSqlInterpolatedAsync
+  fullName: nORM.Core.DbContext.FromSqlInterpolatedAsync
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsync*
+  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureAsync__1_System_String_System_Threading_CancellationToken_System_Object_
+  name: ExecuteStoredProcedureAsync
+  nameWithType: DbContext.ExecuteStoredProcedureAsync
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsync
+- uid: System.Collections.Generic.IAsyncEnumerable`1
+  commentId: T:System.Collections.Generic.IAsyncEnumerable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<T>
+  nameWithType: IAsyncEnumerable<T>
+  fullName: System.Collections.Generic.IAsyncEnumerable<T>
+  nameWithType.vb: IAsyncEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
+  name.vb: IAsyncEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable*
+  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureAsAsyncEnumerable__1_System_String_System_Threading_CancellationToken_System_Object_
+  name: ExecuteStoredProcedureAsAsyncEnumerable
+  nameWithType: DbContext.ExecuteStoredProcedureAsAsyncEnumerable
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable
+- uid: System.Collections.Generic.IAsyncEnumerable{{T}}
+  commentId: T:System.Collections.Generic.IAsyncEnumerable{``0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IAsyncEnumerable`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<T>
+  nameWithType: IAsyncEnumerable<T>
+  fullName: System.Collections.Generic.IAsyncEnumerable<T>
+  nameWithType.vb: IAsyncEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
+  name.vb: IAsyncEnumerable(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*
+  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync__1_System_String_System_Threading_CancellationToken_System_Object_nORM_Core_OutputParameter___
+  name: ExecuteStoredProcedureWithOutputAsync
+  nameWithType: DbContext.ExecuteStoredProcedureWithOutputAsync
+  fullName: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync
+- uid: nORM.Core.OutputParameter[]
+  isExternal: true
+  href: nORM.Core.OutputParameter.html
+  name: OutputParameter[]
+  nameWithType: OutputParameter[]
+  fullName: nORM.Core.OutputParameter[]
+  nameWithType.vb: OutputParameter()
+  fullName.vb: nORM.Core.OutputParameter()
+  name.vb: OutputParameter()
+  spec.csharp:
+  - uid: nORM.Core.OutputParameter
+    name: OutputParameter
+    href: nORM.Core.OutputParameter.html
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: nORM.Core.OutputParameter
+    name: OutputParameter
+    href: nORM.Core.OutputParameter.html
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{{T}}}
+  commentId: T:System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{``0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<StoredProcedureResult<T>>
+  nameWithType: Task<StoredProcedureResult<T>>
+  fullName: System.Threading.Tasks.Task<nORM.Core.StoredProcedureResult<T>>
+  nameWithType.vb: Task(Of StoredProcedureResult(Of T))
+  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.StoredProcedureResult(Of T))
+  name.vb: Task(Of StoredProcedureResult(Of T))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.StoredProcedureResult`1
+    name: StoredProcedureResult
+    href: nORM.Core.StoredProcedureResult-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
   - name: )
 - uid: nORM.Core.DbContext.InsertAsync*
   commentId: Overload:nORM.Core.DbContext.InsertAsync
@@ -3092,14 +4492,6 @@ references:
   name: InsertAsync
   nameWithType: DbContext.InsertAsync
   fullName: nORM.Core.DbContext.InsertAsync
-- uid: System.Data.Common.DbTransaction
-  commentId: T:System.Data.Common.DbTransaction
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
-  name: DbTransaction
-  nameWithType: DbTransaction
-  fullName: System.Data.Common.DbTransaction
 - uid: nORM.Core.DbContext.UpdateAsync*
   commentId: Overload:nORM.Core.DbContext.UpdateAsync
   href: nORM.Core.DbContext.html#nORM_Core_DbContext_UpdateAsync__1___0_System_Threading_CancellationToken_
@@ -3175,43 +4567,6 @@ references:
   - name: " "
   - name: T
   - name: )
-- uid: System.Collections.Generic
-  commentId: N:System.Collections.Generic
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Collections.Generic
-  nameWithType: System.Collections.Generic
-  fullName: System.Collections.Generic
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Collections
-    name: Collections
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections
-  - name: .
-  - uid: System.Collections.Generic
-    name: Generic
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Collections
-    name: Collections
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections
-  - name: .
-  - uid: System.Collections.Generic
-    name: Generic
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
 - uid: nORM.Core.DbContext.BulkUpdateAsync*
   commentId: Overload:nORM.Core.DbContext.BulkUpdateAsync
   href: nORM.Core.DbContext.html#nORM_Core_DbContext_BulkUpdateAsync__1_System_Collections_Generic_IEnumerable___0__System_Threading_CancellationToken_
@@ -3224,344 +4579,3 @@ references:
   name: BulkDeleteAsync
   nameWithType: DbContext.BulkDeleteAsync
   fullName: nORM.Core.DbContext.BulkDeleteAsync
-- uid: System.InvalidOperationException
-  commentId: T:System.InvalidOperationException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
-  name: InvalidOperationException
-  nameWithType: InvalidOperationException
-  fullName: System.InvalidOperationException
-- uid: nORM.Core.DbContext.CreateSavepointAsync*
-  commentId: Overload:nORM.Core.DbContext.CreateSavepointAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_CreateSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
-  name: CreateSavepointAsync
-  nameWithType: DbContext.CreateSavepointAsync
-  fullName: nORM.Core.DbContext.CreateSavepointAsync
-- uid: System.Threading.Tasks.Task
-  commentId: T:System.Threading.Tasks.Task
-  parent: System.Threading.Tasks
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
-  name: Task
-  nameWithType: Task
-  fullName: System.Threading.Tasks.Task
-- uid: nORM.Core.DbContext.RollbackToSavepointAsync*
-  commentId: Overload:nORM.Core.DbContext.RollbackToSavepointAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_RollbackToSavepointAsync_System_Data_Common_DbTransaction_System_String_System_Threading_CancellationToken_
-  name: RollbackToSavepointAsync
-  nameWithType: DbContext.RollbackToSavepointAsync
-  fullName: nORM.Core.DbContext.RollbackToSavepointAsync
-- uid: nORM.Core.DbContext.QueryUnchangedAsync*
-  commentId: Overload:nORM.Core.DbContext.QueryUnchangedAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_QueryUnchangedAsync__1_System_String_System_Threading_CancellationToken_System_Object___
-  name: QueryUnchangedAsync
-  nameWithType: DbContext.QueryUnchangedAsync
-  fullName: nORM.Core.DbContext.QueryUnchangedAsync
-- uid: System.Object[]
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.object
-  name: object[]
-  nameWithType: object[]
-  fullName: object[]
-  nameWithType.vb: Object()
-  fullName.vb: Object()
-  name.vb: Object()
-  spec.csharp:
-  - uid: System.Object
-    name: object
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.object
-  - name: '['
-  - name: ']'
-  spec.vb:
-  - uid: System.Object
-    name: Object
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.object
-  - name: (
-  - name: )
-- uid: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
-  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.List{``0}}
-  parent: System.Threading.Tasks
-  definition: System.Threading.Tasks.Task`1
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<List<T>>
-  nameWithType: Task<List<T>>
-  fullName: System.Threading.Tasks.Task<System.Collections.Generic.List<T>>
-  nameWithType.vb: Task(Of List(Of T))
-  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.List(Of T))
-  name.vb: Task(Of List(Of T))
-  spec.csharp:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: <
-  - uid: System.Collections.Generic.List`1
-    name: List
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  - name: <
-  - name: T
-  - name: '>'
-  - name: '>'
-  spec.vb:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: (
-  - name: Of
-  - name: " "
-  - uid: System.Collections.Generic.List`1
-    name: List
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
-  - name: )
-- uid: nORM.Core.DbContext.FromSqlRawAsync*
-  commentId: Overload:nORM.Core.DbContext.FromSqlRawAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_FromSqlRawAsync__1_System_String_System_Threading_CancellationToken_System_Object___
-  name: FromSqlRawAsync
-  nameWithType: DbContext.FromSqlRawAsync
-  fullName: nORM.Core.DbContext.FromSqlRawAsync
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsync*
-  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureAsync__1_System_String_System_Threading_CancellationToken_System_Object_
-  name: ExecuteStoredProcedureAsync
-  nameWithType: DbContext.ExecuteStoredProcedureAsync
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsync
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable*
-  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureAsAsyncEnumerable__1_System_String_System_Threading_CancellationToken_System_Object_
-  name: ExecuteStoredProcedureAsAsyncEnumerable
-  nameWithType: DbContext.ExecuteStoredProcedureAsAsyncEnumerable
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable
-- uid: System.Collections.Generic.IAsyncEnumerable{{T}}
-  commentId: T:System.Collections.Generic.IAsyncEnumerable{``0}
-  parent: System.Collections.Generic
-  definition: System.Collections.Generic.IAsyncEnumerable`1
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  name: IAsyncEnumerable<T>
-  nameWithType: IAsyncEnumerable<T>
-  fullName: System.Collections.Generic.IAsyncEnumerable<T>
-  nameWithType.vb: IAsyncEnumerable(Of T)
-  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
-  name.vb: IAsyncEnumerable(Of T)
-  spec.csharp:
-  - uid: System.Collections.Generic.IAsyncEnumerable`1
-    name: IAsyncEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: System.Collections.Generic.IAsyncEnumerable`1
-    name: IAsyncEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
-- uid: System.Collections.Generic.IAsyncEnumerable`1
-  commentId: T:System.Collections.Generic.IAsyncEnumerable`1
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  name: IAsyncEnumerable<T>
-  nameWithType: IAsyncEnumerable<T>
-  fullName: System.Collections.Generic.IAsyncEnumerable<T>
-  nameWithType.vb: IAsyncEnumerable(Of T)
-  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
-  name.vb: IAsyncEnumerable(Of T)
-  spec.csharp:
-  - uid: System.Collections.Generic.IAsyncEnumerable`1
-    name: IAsyncEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: System.Collections.Generic.IAsyncEnumerable`1
-    name: IAsyncEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
-- uid: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*
-  commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync__1_System_String_System_Threading_CancellationToken_System_Object_nORM_Core_OutputParameter___
-  name: ExecuteStoredProcedureWithOutputAsync
-  nameWithType: DbContext.ExecuteStoredProcedureWithOutputAsync
-  fullName: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync
-- uid: nORM.Core.OutputParameter[]
-  isExternal: true
-  href: nORM.Core.OutputParameter.html
-  name: OutputParameter[]
-  nameWithType: OutputParameter[]
-  fullName: nORM.Core.OutputParameter[]
-  nameWithType.vb: OutputParameter()
-  fullName.vb: nORM.Core.OutputParameter()
-  name.vb: OutputParameter()
-  spec.csharp:
-  - uid: nORM.Core.OutputParameter
-    name: OutputParameter
-    href: nORM.Core.OutputParameter.html
-  - name: '['
-  - name: ']'
-  spec.vb:
-  - uid: nORM.Core.OutputParameter
-    name: OutputParameter
-    href: nORM.Core.OutputParameter.html
-  - name: (
-  - name: )
-- uid: System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{{T}}}
-  commentId: T:System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{``0}}
-  parent: System.Threading.Tasks
-  definition: System.Threading.Tasks.Task`1
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<StoredProcedureResult<T>>
-  nameWithType: Task<StoredProcedureResult<T>>
-  fullName: System.Threading.Tasks.Task<nORM.Core.StoredProcedureResult<T>>
-  nameWithType.vb: Task(Of StoredProcedureResult(Of T))
-  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.StoredProcedureResult(Of T))
-  name.vb: Task(Of StoredProcedureResult(Of T))
-  spec.csharp:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: <
-  - uid: nORM.Core.StoredProcedureResult`1
-    name: StoredProcedureResult
-    href: nORM.Core.StoredProcedureResult-1.html
-  - name: <
-  - name: T
-  - name: '>'
-  - name: '>'
-  spec.vb:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: (
-  - name: Of
-  - name: " "
-  - uid: nORM.Core.StoredProcedureResult`1
-    name: StoredProcedureResult
-    href: nORM.Core.StoredProcedureResult-1.html
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
-  - name: )
-- uid: nORM.Core.DbContext.SetShadowProperty*
-  commentId: Overload:nORM.Core.DbContext.SetShadowProperty
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_SetShadowProperty_System_Object_System_String_System_Object_
-  name: SetShadowProperty
-  nameWithType: DbContext.SetShadowProperty
-  fullName: nORM.Core.DbContext.SetShadowProperty
-- uid: nORM.Core.DbContext.GetShadowProperty*
-  commentId: Overload:nORM.Core.DbContext.GetShadowProperty
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetShadowProperty_System_Object_System_String_
-  name: GetShadowProperty
-  nameWithType: DbContext.GetShadowProperty
-  fullName: nORM.Core.DbContext.GetShadowProperty
-- uid: nORM.Core.DbContext.CreateTagAsync*
-  commentId: Overload:nORM.Core.DbContext.CreateTagAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_CreateTagAsync_System_String_
-  name: CreateTagAsync
-  nameWithType: DbContext.CreateTagAsync
-  fullName: nORM.Core.DbContext.CreateTagAsync
-- uid: nORM.Core.DbContext.Dispose*
-  commentId: Overload:nORM.Core.DbContext.Dispose
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose_System_Boolean_
-  name: Dispose
-  nameWithType: DbContext.Dispose
-  fullName: nORM.Core.DbContext.Dispose
-- uid: System.Boolean
-  commentId: T:System.Boolean
-  parent: System
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.boolean
-  name: bool
-  nameWithType: bool
-  fullName: bool
-  nameWithType.vb: Boolean
-  fullName.vb: Boolean
-  name.vb: Boolean
-- uid: nORM.Core.DbContext.RegisterForDisposal*
-  commentId: Overload:nORM.Core.DbContext.RegisterForDisposal
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_RegisterForDisposal_System_IDisposable_
-  name: RegisterForDisposal
-  nameWithType: DbContext.RegisterForDisposal
-  fullName: nORM.Core.DbContext.RegisterForDisposal
-- uid: System.IDisposable.Dispose
-  commentId: M:System.IDisposable.Dispose
-  parent: System.IDisposable
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
-  name: Dispose()
-  nameWithType: IDisposable.Dispose()
-  fullName: System.IDisposable.Dispose()
-  spec.csharp:
-  - uid: System.IDisposable.Dispose
-    name: Dispose
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
-  - name: (
-  - name: )
-  spec.vb:
-  - uid: System.IDisposable.Dispose
-    name: Dispose
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.idisposable.dispose
-  - name: (
-  - name: )
-- uid: nORM.Core.DbContext.DisposeAsync*
-  commentId: Overload:nORM.Core.DbContext.DisposeAsync
-  href: nORM.Core.DbContext.html#nORM_Core_DbContext_DisposeAsync
-  name: DisposeAsync
-  nameWithType: DbContext.DisposeAsync
-  fullName: nORM.Core.DbContext.DisposeAsync
-- uid: System.IAsyncDisposable.DisposeAsync
-  commentId: M:System.IAsyncDisposable.DisposeAsync
-  parent: System.IAsyncDisposable
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
-  name: DisposeAsync()
-  nameWithType: IAsyncDisposable.DisposeAsync()
-  fullName: System.IAsyncDisposable.DisposeAsync()
-  spec.csharp:
-  - uid: System.IAsyncDisposable.DisposeAsync
-    name: DisposeAsync
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
-  - name: (
-  - name: )
-  spec.vb:
-  - uid: System.IAsyncDisposable.DisposeAsync
-    name: DisposeAsync
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync
-  - name: (
-  - name: )
-- uid: System.Threading.Tasks.ValueTask
-  commentId: T:System.Threading.Tasks.ValueTask
-  parent: System.Threading.Tasks
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask
-  name: ValueTask
-  nameWithType: ValueTask
-  fullName: System.Threading.Tasks.ValueTask

@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContextLoggingExtensions
     path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
-    startLine: 9
+    startLine: 10
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.Logging
@@ -60,7 +60,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LogQuery
     path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
-    startLine: 14
+    startLine: 15
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.Logging
@@ -103,7 +103,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LogBulkOperation
     path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
-    startLine: 23
+    startLine: 40
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.Logging
@@ -146,7 +146,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LogError
     path: src/nORM/Enterprise/DbContextLoggingExtensions.cs
-    startLine: 32
+    startLine: 49
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.Logging

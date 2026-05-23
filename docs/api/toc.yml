@@ -11,6 +11,15 @@ items:
   name: nORM.Configuration
   type: Namespace
   items:
+  - uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+    name: AmbientTransactionEnlistmentPolicy
+    type: Enum
+  - uid: nORM.Configuration.ClientEvaluationPolicy
+    name: ClientEvaluationPolicy
+    type: Enum
+  - uid: nORM.Configuration.ConverterConfiguration
+    name: ConverterConfiguration
+    type: Class
   - uid: nORM.Configuration.DbContextOptions
     name: DbContextOptions
     type: Class
@@ -20,11 +29,17 @@ items:
   - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
     name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>
     type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+    name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder
+    type: Class
   - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
     name: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder
     type: Class
   - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
     name: EntityTypeBuilder<TEntity>.PropertyBuilder
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+    name: EntityTypeBuilder<TEntity>.PropertyBuilder<TProperty>
     type: Class
   - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
     name: EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
@@ -32,8 +47,14 @@ items:
   - uid: nORM.Configuration.IEntityTypeConfiguration
     name: IEntityTypeConfiguration
     type: Interface
+  - uid: nORM.Configuration.ManyToManyConfiguration
+    name: ManyToManyConfiguration
+    type: Class
   - uid: nORM.Configuration.ModelBuilder
     name: ModelBuilder
+    type: Class
+  - uid: nORM.Configuration.OwnedCollectionNavigation
+    name: OwnedCollectionNavigation
     type: Class
   - uid: nORM.Configuration.OwnedNavigation
     name: OwnedNavigation
@@ -150,6 +171,9 @@ items:
   - uid: nORM.Core.OutputParameter
     name: OutputParameter
     type: Class
+  - uid: nORM.Core.PreparedOperation`1
+    name: PreparedOperation<T>
+    type: Class
   - uid: nORM.Core.QueryTrackingBehavior
     name: QueryTrackingBehavior
     type: Enum
@@ -213,6 +237,9 @@ items:
   - uid: nORM.Internal.ConcurrentLruCache`2
     name: ConcurrentLruCache<TKey, TValue>
     type: Class
+  - uid: nORM.Internal.ParameterOptimizer
+    name: ParameterOptimizer
+    type: Class
 - uid: nORM.Mapping
   name: nORM.Mapping
   type: Namespace
@@ -229,8 +256,20 @@ items:
   - uid: nORM.Mapping.DiscriminatorValueAttribute
     name: DiscriminatorValueAttribute
     type: Class
+  - uid: nORM.Mapping.IValueConverter
+    name: IValueConverter
+    type: Interface
+  - uid: nORM.Mapping.JoinTableMapping
+    name: JoinTableMapping
+    type: Class
   - uid: nORM.Mapping.OwnedAttribute
     name: OwnedAttribute
+    type: Class
+  - uid: nORM.Mapping.OwnedCollectionMapping
+    name: OwnedCollectionMapping
+    type: Class
+  - uid: nORM.Mapping.RenameColumnAttribute
+    name: RenameColumnAttribute
     type: Class
   - uid: nORM.Mapping.TableMapping
     name: TableMapping
@@ -241,6 +280,9 @@ items:
   - uid: nORM.Mapping.TableSplitAttribute
     name: TableSplitAttribute
     type: Class
+  - uid: nORM.Mapping.ValueConverter`2
+    name: ValueConverter<TModel, TProvider>
+    type: Class
 - uid: nORM.Migration
   name: nORM.Migration
   type: Namespace
@@ -248,14 +290,23 @@ items:
   - uid: nORM.Migration.ColumnSchema
     name: ColumnSchema
     type: Class
+  - uid: nORM.Migration.ForeignKeySchema
+    name: ForeignKeySchema
+    type: Class
   - uid: nORM.Migration.IMigrationRunner
     name: IMigrationRunner
     type: Interface
   - uid: nORM.Migration.IMigrationSqlGenerator
     name: IMigrationSqlGenerator
     type: Interface
+  - uid: nORM.Migration.INormDesignTimeDbContextFactory`1
+    name: INormDesignTimeDbContextFactory<TContext>
+    type: Interface
   - uid: nORM.Migration.Migration
     name: Migration
+    type: Class
+  - uid: nORM.Migration.MigrationOptions
+    name: MigrationOptions
     type: Class
   - uid: nORM.Migration.MigrationSqlStatements
     name: MigrationSqlStatements
@@ -331,6 +382,9 @@ items:
   - uid: nORM.Providers.DatabaseProvider
     name: DatabaseProvider
     type: Class
+  - uid: nORM.Providers.DatabaseProvider.LiveColumnInfo
+    name: DatabaseProvider.LiveColumnInfo
+    type: Class
   - uid: nORM.Providers.DynamicBatchSizer
     name: DynamicBatchSizer
     type: Class
@@ -348,6 +402,9 @@ items:
     type: Class
   - uid: nORM.Providers.PostgresProvider
     name: PostgresProvider
+    type: Class
+  - uid: nORM.Providers.ProviderCapabilities
+    name: ProviderCapabilities
     type: Class
   - uid: nORM.Providers.SqlServerProvider
     name: SqlServerProvider

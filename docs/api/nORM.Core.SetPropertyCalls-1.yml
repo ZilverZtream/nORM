@@ -20,14 +20,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPropertyCalls
     path: src/nORM/Core/SetPropertyCalls.cs
-    startLine: 5
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Represents a fluent builder used to specify property assignments for bulk update operations.
+  remarks: >-
+    v1 supports literal constants and precomputed captured local values as assignment
+
+    values. Method calls, inline computed values, column-based updates, and server
+
+    expressions are rejected by <code>ExecuteUpdateAsync</code>.
+  example: []
   syntax:
     content: public sealed class SetPropertyCalls<T>
     typeParameters:
     - id: T
+      description: Type of the entity being updated.
     content.vb: Public NotInheritable Class SetPropertyCalls(Of T)
   inheritance:
   - System.Object
@@ -64,21 +73,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetProperty
     path: src/nORM/Core/SetPropertyCalls.cs
-    startLine: 7
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Specifies a property to set to the given value during a bulk update.
+  example: []
   syntax:
     content: public SetPropertyCalls<T> SetProperty<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
     parameters:
     - id: property
       type: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+      description: Expression pointing to the property to update.
     - id: value
       type: '{TProperty}'
+      description: Literal or precomputed captured local value to assign.
     typeParameters:
     - id: TProperty
+      description: Type of the property value.
     return:
       type: nORM.Core.SetPropertyCalls`1
+      description: The same <xref href="nORM.Core.SetPropertyCalls%601" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function SetProperty(Of TProperty)([property] As Expression(Of Func(Of T, TProperty)), value As TProperty) As SetPropertyCalls(Of T)
   overload: nORM.Core.SetPropertyCalls`1.SetProperty*
   nameWithType.vb: SetPropertyCalls(Of T).SetProperty(Of TProperty)(Expression(Of Func(Of T, TProperty)), TProperty)
@@ -1112,6 +1127,32 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.SetPropertyCalls`1
+  commentId: T:nORM.Core.SetPropertyCalls`1
+  parent: nORM.Core
+  href: nORM.Core.SetPropertyCalls-1.html
+  name: SetPropertyCalls<T>
+  nameWithType: SetPropertyCalls<T>
+  fullName: nORM.Core.SetPropertyCalls<T>
+  nameWithType.vb: SetPropertyCalls(Of T)
+  fullName.vb: nORM.Core.SetPropertyCalls(Of T)
+  name.vb: SetPropertyCalls(Of T)
+  spec.csharp:
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.SetPropertyCalls`1.SetProperty*
   commentId: Overload:nORM.Core.SetPropertyCalls`1.SetProperty
   href: nORM.Core.SetPropertyCalls-1.html#nORM_Core_SetPropertyCalls_1_SetProperty__1_System_Linq_Expressions_Expression_System_Func__0___0_____0_
@@ -1175,32 +1216,6 @@ references:
   name: TProperty
   nameWithType: TProperty
   fullName: TProperty
-- uid: nORM.Core.SetPropertyCalls`1
-  commentId: T:nORM.Core.SetPropertyCalls`1
-  parent: nORM.Core
-  href: nORM.Core.SetPropertyCalls-1.html
-  name: SetPropertyCalls<T>
-  nameWithType: SetPropertyCalls<T>
-  fullName: nORM.Core.SetPropertyCalls<T>
-  nameWithType.vb: SetPropertyCalls(Of T)
-  fullName.vb: nORM.Core.SetPropertyCalls(Of T)
-  name.vb: SetPropertyCalls(Of T)
-  spec.csharp:
-  - uid: nORM.Core.SetPropertyCalls`1
-    name: SetPropertyCalls
-    href: nORM.Core.SetPropertyCalls-1.html
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: nORM.Core.SetPropertyCalls`1
-    name: SetPropertyCalls
-    href: nORM.Core.SetPropertyCalls-1.html
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
 - uid: System.Linq.Expressions.Expression`1
   commentId: T:System.Linq.Expressions.Expression`1
   isExternal: true

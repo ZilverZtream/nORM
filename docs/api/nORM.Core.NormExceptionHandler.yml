@@ -6,6 +6,7 @@ items:
   parent: nORM.Core
   children:
   - nORM.Core.NormExceptionHandler.#ctor(Microsoft.Extensions.Logging.ILogger)
+  - nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync``1(System.Func{``0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
   - nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{``0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
   langs:
   - csharp
@@ -21,10 +22,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormExceptionHandler
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 10
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Provides rich exception handling for database operations, logging contextual information
+
+    and translating low-level exceptions into <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref> instances.
+  example: []
   syntax:
     content: public class NormExceptionHandler
     content.vb: Public Class NormExceptionHandler
@@ -61,20 +67,81 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 15
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Creates a new <xref href="nORM.Core.NormExceptionHandler" data-throw-if-not-resolved="false"></xref> that uses the specified logger for diagnostics.
+  example: []
   syntax:
     content: public NormExceptionHandler(ILogger logger)
     parameters:
     - id: logger
       type: Microsoft.Extensions.Logging.ILogger
+      description: Logger used to record successes and failures.
     content.vb: Public Sub New(logger As ILogger)
   overload: nORM.Core.NormExceptionHandler.#ctor*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">logger</code> is <code>null</code>.
   nameWithType.vb: NormExceptionHandler.New(ILogger)
   fullName.vb: nORM.Core.NormExceptionHandler.New(Microsoft.Extensions.Logging.ILogger)
   name.vb: New(ILogger)
+- uid: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync``1(System.Func{``0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
+  commentId: M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync``1(System.Func{``0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
+  id: ExecuteWithExceptionHandlingSync``1(System.Func{``0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
+  parent: nORM.Core.NormExceptionHandler
+  langs:
+  - csharp
+  - vb
+  name: ExecuteWithExceptionHandlingSync<T>(Func<T>, string, Dictionary<string, object>?)
+  nameWithType: NormExceptionHandler.ExecuteWithExceptionHandlingSync<T>(Func<T>, string, Dictionary<string, object>?)
+  fullName: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync<T>(System.Func<T>, string, System.Collections.Generic.Dictionary<string, object>?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormExceptionHandler.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteWithExceptionHandlingSync
+    path: src/nORM/Core/NormExceptionHandler.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Synchronous overload that executes the provided operation and wraps any thrown
+
+    exception into a <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref> with additional context information
+
+    and logging. <xref href="System.OperationCanceledException" data-throw-if-not-resolved="false"></xref> and <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref>
+
+    are re-thrown without wrapping.
+  example: []
+  syntax:
+    content: public T ExecuteWithExceptionHandlingSync<T>(Func<T> operation, string operationName, Dictionary<string, object>? context = null)
+    parameters:
+    - id: operation
+      type: System.Func{{T}}
+      description: The synchronous operation to execute.
+    - id: operationName
+      type: System.String
+      description: Human-readable name of the operation for logging.
+    - id: context
+      type: System.Collections.Generic.Dictionary{System.String,System.Object}
+      description: Optional additional context values.
+    typeParameters:
+    - id: T
+      description: Type of the result returned by the operation.
+    return:
+      type: '{T}'
+      description: The result of the operation if successful.
+    content.vb: Public Function ExecuteWithExceptionHandlingSync(Of T)(operation As Func(Of T), operationName As String, context As Dictionary(Of String, Object) = Nothing) As T
+  overload: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync*
+  nameWithType.vb: NormExceptionHandler.ExecuteWithExceptionHandlingSync(Of T)(Func(Of T), String, Dictionary(Of String, Object))
+  fullName.vb: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync(Of T)(System.Func(Of T), String, System.Collections.Generic.Dictionary(Of String, Object))
+  name.vb: ExecuteWithExceptionHandlingSync(Of T)(Func(Of T), String, Dictionary(Of String, Object))
 - uid: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{``0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
   commentId: M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{``0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
   id: ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{``0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object})
@@ -93,29 +160,50 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteWithExceptionHandling
     path: src/nORM/Core/NormExceptionHandler.cs
-    startLine: 21
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Executes the provided asynchronous operation and wraps any thrown exception into a
+
+    <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref> with additional context information and logging.
+
+    <xref href="System.OperationCanceledException" data-throw-if-not-resolved="false"></xref> and <xref href="nORM.Core.NormException" data-throw-if-not-resolved="false"></xref> are
+
+    re-thrown without wrapping.
+  example: []
   syntax:
     content: public Task<T> ExecuteWithExceptionHandling<T>(Func<Task<T>> operation, string operationName, Dictionary<string, object>? context = null)
     parameters:
     - id: operation
       type: System.Func{System.Threading.Tasks.Task{{T}}}
+      description: The asynchronous operation to execute.
     - id: operationName
       type: System.String
+      description: Human-readable name of the operation for logging.
     - id: context
       type: System.Collections.Generic.Dictionary{System.String,System.Object}
+      description: Optional additional context values.
     typeParameters:
     - id: T
+      description: Type of the result returned by the operation.
     return:
       type: System.Threading.Tasks.Task{{T}}
+      description: The result of the operation if successful.
     content.vb: Public Function ExecuteWithExceptionHandling(Of T)(operation As Func(Of Task(Of T)), operationName As String, context As Dictionary(Of String, Object) = Nothing) As Task(Of T)
   overload: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling*
   nameWithType.vb: NormExceptionHandler.ExecuteWithExceptionHandling(Of T)(Func(Of Task(Of T)), String, Dictionary(Of String, Object))
   fullName.vb: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling(Of T)(System.Func(Of System.Threading.Tasks.Task(Of T)), String, System.Collections.Generic.Dictionary(Of String, Object))
   name.vb: ExecuteWithExceptionHandling(Of T)(Func(Of Task(Of T)), String, Dictionary(Of String, Object))
 references:
+- uid: nORM.Core.NormException
+  commentId: T:nORM.Core.NormException
+  parent: nORM.Core
+  href: nORM.Core.NormException.html
+  name: NormException
+  nameWithType: NormException
+  fullName: nORM.Core.NormException
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -1079,6 +1167,19 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormExceptionHandler
+  commentId: T:nORM.Core.NormExceptionHandler
+  href: nORM.Core.NormExceptionHandler.html
+  name: NormExceptionHandler
+  nameWithType: NormExceptionHandler
+  fullName: nORM.Core.NormExceptionHandler
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
 - uid: nORM.Core.NormExceptionHandler.#ctor*
   commentId: Overload:nORM.Core.NormExceptionHandler.#ctor
   href: nORM.Core.NormExceptionHandler.html#nORM_Core_NormExceptionHandler__ctor_Microsoft_Extensions_Logging_ILogger_
@@ -1126,36 +1227,37 @@ references:
   - uid: Microsoft.Extensions.Logging
     name: Logging
     href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
-- uid: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling*
-  commentId: Overload:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling
-  href: nORM.Core.NormExceptionHandler.html#nORM_Core_NormExceptionHandler_ExecuteWithExceptionHandling__1_System_Func_System_Threading_Tasks_Task___0___System_String_System_Collections_Generic_Dictionary_System_String_System_Object__
-  name: ExecuteWithExceptionHandling
-  nameWithType: NormExceptionHandler.ExecuteWithExceptionHandling
-  fullName: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling
-- uid: System.Func{System.Threading.Tasks.Task{{T}}}
-  commentId: T:System.Func{System.Threading.Tasks.Task{``0}}
+- uid: System.OperationCanceledException
+  commentId: T:System.OperationCanceledException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.operationcanceledexception
+  name: OperationCanceledException
+  nameWithType: OperationCanceledException
+  fullName: System.OperationCanceledException
+- uid: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync*
+  commentId: Overload:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync
+  href: nORM.Core.NormExceptionHandler.html#nORM_Core_NormExceptionHandler_ExecuteWithExceptionHandlingSync__1_System_Func___0__System_String_System_Collections_Generic_Dictionary_System_String_System_Object__
+  name: ExecuteWithExceptionHandlingSync
+  nameWithType: NormExceptionHandler.ExecuteWithExceptionHandlingSync
+  fullName: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync
+- uid: System.Func{{T}}
+  commentId: T:System.Func{``0}
   parent: System
   definition: System.Func`1
   href: https://learn.microsoft.com/dotnet/api/system.func-1
-  name: Func<Task<T>>
-  nameWithType: Func<Task<T>>
-  fullName: System.Func<System.Threading.Tasks.Task<T>>
-  nameWithType.vb: Func(Of Task(Of T))
-  fullName.vb: System.Func(Of System.Threading.Tasks.Task(Of T))
-  name.vb: Func(Of Task(Of T))
+  name: Func<T>
+  nameWithType: Func<T>
+  fullName: System.Func<T>
+  nameWithType.vb: Func(Of T)
+  fullName.vb: System.Func(Of T)
+  name.vb: Func(Of T)
   spec.csharp:
   - uid: System.Func`1
     name: Func
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.func-1
   - name: <
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: <
   - name: T
-  - name: '>'
   - name: '>'
   spec.vb:
   - uid: System.Func`1
@@ -1165,15 +1267,7 @@ references:
   - name: (
   - name: Of
   - name: " "
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: (
-  - name: Of
-  - name: " "
   - name: T
-  - name: )
   - name: )
 - uid: System.String
   commentId: T:System.String
@@ -1233,35 +1327,12 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.object
   - name: )
-- uid: System.Threading.Tasks.Task{{T}}
-  commentId: T:System.Threading.Tasks.Task{``0}
-  parent: System.Threading.Tasks
-  definition: System.Threading.Tasks.Task`1
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<T>
-  nameWithType: Task<T>
-  fullName: System.Threading.Tasks.Task<T>
-  nameWithType.vb: Task(Of T)
-  fullName.vb: System.Threading.Tasks.Task(Of T)
-  name.vb: Task(Of T)
-  spec.csharp:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: System.Threading.Tasks.Task`1
-    name: Task
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
 - uid: System.Func`1
   commentId: T:System.Func`1
   isExternal: true
@@ -1361,6 +1432,88 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling*
+  commentId: Overload:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling
+  href: nORM.Core.NormExceptionHandler.html#nORM_Core_NormExceptionHandler_ExecuteWithExceptionHandling__1_System_Func_System_Threading_Tasks_Task___0___System_String_System_Collections_Generic_Dictionary_System_String_System_Object__
+  name: ExecuteWithExceptionHandling
+  nameWithType: NormExceptionHandler.ExecuteWithExceptionHandling
+  fullName: nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling
+- uid: System.Func{System.Threading.Tasks.Task{{T}}}
+  commentId: T:System.Func{System.Threading.Tasks.Task{``0}}
+  parent: System
+  definition: System.Func`1
+  href: https://learn.microsoft.com/dotnet/api/system.func-1
+  name: Func<Task<T>>
+  nameWithType: Func<Task<T>>
+  fullName: System.Func<System.Threading.Tasks.Task<T>>
+  nameWithType.vb: Func(Of Task(Of T))
+  fullName.vb: System.Func(Of System.Threading.Tasks.Task(Of T))
+  name.vb: Func(Of Task(Of T))
+  spec.csharp:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: <
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: System.Threading.Tasks.Task{{T}}
+  commentId: T:System.Threading.Tasks.Task{``0}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<T>
+  nameWithType: Task<T>
+  fullName: System.Threading.Tasks.Task<T>
+  nameWithType.vb: Task(Of T)
+  fullName.vb: System.Threading.Tasks.Task(Of T)
+  name.vb: Task(Of T)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: System.Threading.Tasks.Task`1
   commentId: T:System.Threading.Tasks.Task`1
   isExternal: true

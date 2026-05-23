@@ -7,17 +7,21 @@ items:
   children:
   - nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
   - nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
+  - nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
   - nORM.Configuration.DbContextOptions.BulkBatchSize
   - nORM.Configuration.DbContextOptions.CacheExpiration
   - nORM.Configuration.DbContextOptions.CacheProvider
+  - nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
   - nORM.Configuration.DbContextOptions.CommandInterceptors
-  - nORM.Configuration.DbContextOptions.CommandTimeout
   - nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
   - nORM.Configuration.DbContextOptions.EagerChangeTracking
   - nORM.Configuration.DbContextOptions.EnableTemporalVersioning
   - nORM.Configuration.DbContextOptions.GlobalFilters
   - nORM.Configuration.DbContextOptions.Logger
+  - nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  - nORM.Configuration.DbContextOptions.MaxRecursionDepth
   - nORM.Configuration.DbContextOptions.OnModelCreating
+  - nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
   - nORM.Configuration.DbContextOptions.RetryPolicy
   - nORM.Configuration.DbContextOptions.SaveChangesInterceptors
   - nORM.Configuration.DbContextOptions.TenantColumnName
@@ -41,10 +45,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContextOptions
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 13
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Represents the configurable options for a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> instance.
+
+    These settings control behavior such as command timeouts, logging, caching and
+
+    how entities are tracked and filtered across the context.
+  example: []
   syntax:
     content: public class DbContextOptions
     content.vb: Public Class DbContextOptions
@@ -81,10 +92,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutConfiguration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 18
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the timeout configuration used when executing database commands.
+
+    This allows fine grained control over different operation types like queries,
+
+    bulk operations or transactions.
+  example: []
   syntax:
     content: public AdaptiveTimeoutManager.TimeoutConfiguration TimeoutConfiguration { get; set; }
     parameters: []
@@ -92,47 +110,82 @@ items:
       type: nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
     content.vb: Public Property TimeoutConfiguration As AdaptiveTimeoutManager.TimeoutConfiguration
   overload: nORM.Configuration.DbContextOptions.TimeoutConfiguration*
-- uid: nORM.Configuration.DbContextOptions.CommandTimeout
-  commentId: P:nORM.Configuration.DbContextOptions.CommandTimeout
-  id: CommandTimeout
+- uid: nORM.Configuration.DbContextOptions.MaxRecursionDepth
+  commentId: P:nORM.Configuration.DbContextOptions.MaxRecursionDepth
+  id: MaxRecursionDepth
   parent: nORM.Configuration.DbContextOptions
   langs:
   - csharp
   - vb
-  name: CommandTimeout
-  nameWithType: DbContextOptions.CommandTimeout
-  fullName: nORM.Configuration.DbContextOptions.CommandTimeout
+  name: MaxRecursionDepth
+  nameWithType: DbContextOptions.MaxRecursionDepth
+  fullName: nORM.Configuration.DbContextOptions.MaxRecursionDepth
   type: Property
   source:
     remote:
       path: src/nORM/Configuration/DbContextOptions.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
-    id: CommandTimeout
+    id: MaxRecursionDepth
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 20
+    startLine: 114
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  syntax:
-    content: >-
-      [Obsolete("Use TimeoutConfiguration.BaseTimeout instead")]
+  summary: >-
+    Gets or sets the maximum LINQ expression tree translation depth (recursion limit).
 
-      public TimeSpan CommandTimeout { get; set; }
+    Default: 50. Maximum: 200. Raise this value for complex query builders that produce
+
+    deep nested LINQ trees (e.g., report composers with 30+ conditions). If you reach
+
+    this limit, consider breaking the query into multiple simpler queries or using CTEs.
+  example: []
+  syntax:
+    content: public int MaxRecursionDepth { get; set; }
     parameters: []
     return:
-      type: System.TimeSpan
-    content.vb: >-
-      <Obsolete("Use TimeoutConfiguration.BaseTimeout instead")>
+      type: System.Int32
+    content.vb: Public Property MaxRecursionDepth As Integer
+  overload: nORM.Configuration.DbContextOptions.MaxRecursionDepth*
+- uid: nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  commentId: P:nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  id: MaxGroupJoinSize
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: MaxGroupJoinSize
+  nameWithType: DbContextOptions.MaxGroupJoinSize
+  fullName: nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxGroupJoinSize
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 133
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the maximum number of child entities allowed per group in a GroupJoin operation.
 
-      Public Property CommandTimeout As TimeSpan
-  overload: nORM.Configuration.DbContextOptions.CommandTimeout*
-  attributes:
-  - type: System.ObsoleteAttribute
-    ctor: System.ObsoleteAttribute.#ctor(System.String)
-    arguments:
-    - type: System.String
-      value: Use TimeoutConfiguration.BaseTimeout instead
+    This prevents out-of-memory errors when joining large datasets. Set to a higher value for
+
+    datasets with legitimate large hierarchies, or to int.MaxValue to disable the limit entirely.
+
+    Default: 10,000 (reduced from 100,000 for better memory safety).
+  example: []
+  syntax:
+    content: public int MaxGroupJoinSize { get; set; }
+    parameters: []
+    return:
+      type: System.Int32
+    content.vb: Public Property MaxGroupJoinSize As Integer
+  overload: nORM.Configuration.DbContextOptions.MaxGroupJoinSize*
 - uid: nORM.Configuration.DbContextOptions.BulkBatchSize
   commentId: P:nORM.Configuration.DbContextOptions.BulkBatchSize
   id: BulkBatchSize
@@ -151,10 +204,17 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkBatchSize
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 27
+    startLine: 149
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the number of records processed in each batch during bulk
+
+    operations such as bulk insert, update or delete. The value must be between
+
+    1 and 10,000.
+  example: []
   syntax:
     content: public int BulkBatchSize { get; set; }
     parameters: []
@@ -180,10 +240,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Logger
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 37
+    startLine: 165
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the <xref href="Microsoft.Extensions.Logging.ILogger" data-throw-if-not-resolved="false"></xref> instance used to emit diagnostic
+
+    messages from the framework.
+  example: []
   syntax:
     content: public ILogger? Logger { get; set; }
     parameters: []
@@ -209,10 +274,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RetryPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 38
+    startLine: 171
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the retry policy that governs how transient failures are
+
+    handled during database operations.
+  example: []
   syntax:
     content: public RetryPolicy? RetryPolicy { get; set; }
     parameters: []
@@ -238,10 +308,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 39
+    startLine: 177
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the tenant provider used to determine the current tenant for
+
+    multi-tenant applications.
+  example: []
   syntax:
     content: public ITenantProvider? TenantProvider { get; set; }
     parameters: []
@@ -267,10 +342,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumnName
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 40
+    startLine: 183
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the name of the column used to store the tenant identifier in
+
+    multi-tenant schemas. Defaults to <code>"TenantId"</code>.
+  example: []
   syntax:
     content: public string TenantColumnName { get; set; }
     parameters: []
@@ -296,10 +376,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnModelCreating
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 41
+    startLine: 189
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets a callback invoked during model creation allowing additional
+
+    configuration of the model.
+  example: []
   syntax:
     content: public Action<ModelBuilder>? OnModelCreating { get; set; }
     parameters: []
@@ -325,10 +410,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseBatchedBulkOps
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 42
+    startLine: 195
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets a value indicating whether bulk operations should be executed
+
+    using smaller batched statements instead of a single large statement.
+  example: []
   syntax:
     content: public bool UseBatchedBulkOps { get; set; }
     parameters: []
@@ -354,10 +444,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsePreciseChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 43
+    startLine: 201
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets a value indicating whether the change tracker should capture
+
+    original values for all properties to allow precise change detection.
+  example: []
   syntax:
     content: public bool UsePreciseChangeTracking { get; set; }
     parameters: []
@@ -383,10 +478,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EagerChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 44
+    startLine: 207
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets a value determining whether entities should be marked as
+
+    tracked eagerly upon materialization.
+  example: []
   syntax:
     content: public bool EagerChangeTracking { get; set; }
     parameters: []
@@ -412,10 +512,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultTrackingBehavior
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 45
+    startLine: 213
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the default tracking behavior applied to queries executed
+
+    against the context.
+  example: []
   syntax:
     content: public QueryTrackingBehavior DefaultTrackingBehavior { get; set; }
     parameters: []
@@ -423,6 +528,44 @@ items:
       type: nORM.Core.QueryTrackingBehavior
     content.vb: Public Property DefaultTrackingBehavior As QueryTrackingBehavior
   overload: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior*
+- uid: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+  commentId: P:nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+  id: ClientEvaluationPolicy
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: ClientEvaluationPolicy
+  nameWithType: DbContextOptions.ClientEvaluationPolicy
+  fullName: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ClientEvaluationPolicy
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 221
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the policy used when an otherwise server-side query contains
+
+    a projection tail that nORM can only evaluate on the client after
+
+    materialization. Filters, joins, grouping, ordering and paging are still
+
+    translated server-side before any allowed client projection is applied.
+  example: []
+  syntax:
+    content: public ClientEvaluationPolicy ClientEvaluationPolicy { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ClientEvaluationPolicy
+    content.vb: Public Property ClientEvaluationPolicy As ClientEvaluationPolicy
+  overload: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy*
 - uid: nORM.Configuration.DbContextOptions.CommandInterceptors
   commentId: P:nORM.Configuration.DbContextOptions.CommandInterceptors
   id: CommandInterceptors
@@ -441,10 +584,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 46
+    startLine: 227
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets the collection of command interceptors that will be invoked for every
+
+    database command executed by the context.
+  example: []
   syntax:
     content: public IList<IDbCommandInterceptor> CommandInterceptors { get; }
     parameters: []
@@ -470,10 +618,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SaveChangesInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 47
+    startLine: 233
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets the collection of interceptors that run during <code>SaveChanges</code>
+
+    operations.
+  example: []
   syntax:
     content: public IList<ISaveChangesInterceptor> SaveChangesInterceptors { get; }
     parameters: []
@@ -499,10 +652,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 49
+    startLine: 240
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the cache provider used to cache query results. When null,
+
+    caching is disabled.
+  example: []
   syntax:
     content: public IDbCacheProvider? CacheProvider { get; set; }
     parameters: []
@@ -528,10 +686,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheExpiration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 50
+    startLine: 246
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the time period after which cached entries expire when
+
+    <xref href="nORM.Configuration.DbContextOptions.CacheProvider" data-throw-if-not-resolved="false"></xref> is configured.
+  example: []
   syntax:
     content: public TimeSpan CacheExpiration { get; set; }
     parameters: []
@@ -557,7 +720,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseInMemoryCache
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 58
+    startLine: 254
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -593,7 +756,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 69
+    startLine: 265
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -609,6 +772,108 @@ items:
       description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function EnableTemporalVersioning() As DbContextOptions
   overload: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
+- uid: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
+  commentId: P:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
+  id: AmbientTransactionPolicy
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: AmbientTransactionPolicy
+  nameWithType: DbContextOptions.AmbientTransactionPolicy
+  fullName: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AmbientTransactionPolicy
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 283
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gate E: Gets or sets the policy applied when the ORM attempts to enlist the
+
+    database connection in an ambient <xref href="System.Transactions.TransactionScope" data-throw-if-not-resolved="false"></xref>
+
+    but the provider throws during <code>EnlistTransaction()</code>.
+
+    Default is <xref href="nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast" data-throw-if-not-resolved="false"></xref> — this is the
+
+    safest choice because it surfaces enlistment failures rather than silently committing
+
+    outside the scope. Change to <xref href="nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort" data-throw-if-not-resolved="false"></xref>
+
+    for providers with known enlistment limitations, or
+
+    <xref href="nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore" data-throw-if-not-resolved="false"></xref> to skip enlistment entirely.
+  example: []
+  syntax:
+    content: public AmbientTransactionEnlistmentPolicy AmbientTransactionPolicy { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+    content.vb: Public Property AmbientTransactionPolicy As AmbientTransactionEnlistmentPolicy
+  overload: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy*
+- uid: nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
+  commentId: P:nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
+  id: RequireMatchedRowOccSemantics
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: RequireMatchedRowOccSemantics
+  nameWithType: DbContextOptions.RequireMatchedRowOccSemantics
+  fullName: nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RequireMatchedRowOccSemantics
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 303
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    When <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> (default), using <code>[Timestamp]</code> OCC columns with a
+
+    provider that uses affected-row semantics (e.g. MySQL with <code>useAffectedRows=true</code>)
+
+    causes <xref href="nORM.Core.NormConfigurationException" data-throw-if-not-resolved="false"></xref> to be thrown at save time, preventing
+
+    silent data-loss bugs.
+  remarks: >-
+    <p><b>⚠ ADVANCED UNSAFE MODE:</b> Setting this to <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a> is an
+
+    explicit opt-in to weakened OCC semantics. With affected-row MySQL semantics, a
+
+    concurrent writer that updates a row to the <em>same</em> token value will NOT be
+
+    detected as a conflict — the update will silently succeed even though the row was
+
+    modified externally. This is a known data-integrity gap (audit finding SP1).</p>
+
+    <p>Only disable this if you have verified that your workload cannot produce same-value
+
+    token collisions, or if you are using a SELECT-then-verify strategy to compensate.
+
+    Add <code>useAffectedRows=false</code> to the MySQL connection string for full OCC guarantees
+
+    instead.</p>
+  example: []
+  syntax:
+    content: public bool RequireMatchedRowOccSemantics { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property RequireMatchedRowOccSemantics As Boolean
+  overload: nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics*
 - uid: nORM.Configuration.DbContextOptions.GlobalFilters
   commentId: P:nORM.Configuration.DbContextOptions.GlobalFilters
   id: GlobalFilters
@@ -627,16 +892,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GlobalFilters
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 77
+    startLine: 318
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Gets a read-only view of global query filters keyed by entity type. Each entry
+
+    contains a list of lambda expressions that will be applied to queries for the
+
+    corresponding entity. Use <xref href="nORM.Configuration.DbContextOptions.AddGlobalFilter%60%601(System.Linq.Expressions.Expression%7bSystem.Func%7b%60%600%2cSystem.Boolean%7d%7d)" data-throw-if-not-resolved="false"></xref>
+
+    to register new filters.
+  example: []
   syntax:
-    content: public IDictionary<Type, List<LambdaExpression>> GlobalFilters { get; }
+    content: public IReadOnlyDictionary<Type, IReadOnlyList<LambdaExpression>> GlobalFilters { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
-    content.vb: Public ReadOnly Property GlobalFilters As IDictionary(Of Type, List(Of LambdaExpression))
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Type,System.Collections.Generic.IReadOnlyList{System.Linq.Expressions.LambdaExpression}}
+    content.vb: Public ReadOnly Property GlobalFilters As IReadOnlyDictionary(Of Type, IReadOnlyList(Of LambdaExpression))
   overload: nORM.Configuration.DbContextOptions.GlobalFilters*
 - uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
   commentId: M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,``0,System.Boolean}})
@@ -656,19 +930,29 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 79
+    startLine: 328
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: >-
+    Registers a global query filter that has access to both the current
+
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> and the entity instance. The filter expression is
+
+    applied to all queries for <code class="typeparamref">TEntity</code>.
+  example: []
   syntax:
     content: public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<DbContext, TEntity, bool>> filter)
     parameters:
     - id: filter
       type: System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TEntity},System.Boolean}}
+      description: A lambda expression representing the filter.
     typeParameters:
     - id: TEntity
+      description: The entity type the filter applies to.
     return:
       type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function AddGlobalFilter(Of TEntity)(filter As Expression(Of Func(Of DbContext, TEntity, Boolean))) As DbContextOptions
   overload: nORM.Configuration.DbContextOptions.AddGlobalFilter*
   nameWithType.vb: DbContextOptions.AddGlobalFilter(Of TEntity)(Expression(Of Func(Of DbContext, TEntity, Boolean)))
@@ -692,19 +976,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 90
+    startLine: 345
   assemblies:
   - nORM
   namespace: nORM.Configuration
+  summary: Registers a global query filter defined only in terms of the entity type.
+  example: []
   syntax:
     content: public DbContextOptions AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>> filter)
     parameters:
     - id: filter
       type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+      description: A lambda expression representing the filter.
     typeParameters:
     - id: TEntity
+      description: The entity type the filter applies to.
     return:
       type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function AddGlobalFilter(Of TEntity)(filter As Expression(Of Func(Of TEntity, Boolean))) As DbContextOptions
   overload: nORM.Configuration.DbContextOptions.AddGlobalFilter*
   nameWithType.vb: DbContextOptions.AddGlobalFilter(Of TEntity)(Expression(Of Func(Of TEntity, Boolean)))
@@ -728,7 +1017,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Validate
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 102
+    startLine: 358
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -744,6 +1033,13 @@ items:
     content.vb: Public Sub Validate()
   overload: nORM.Configuration.DbContextOptions.Validate*
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
   href: nORM.html
@@ -1358,6 +1654,28 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
 - uid: System
   commentId: N:System
   isExternal: true
@@ -1758,26 +2076,12 @@ references:
   - uid: nORM.Execution
     name: Execution
     href: nORM.Execution.html
-- uid: nORM.Configuration.DbContextOptions.CommandTimeout*
-  commentId: Overload:nORM.Configuration.DbContextOptions.CommandTimeout
-  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CommandTimeout
-  name: CommandTimeout
-  nameWithType: DbContextOptions.CommandTimeout
-  fullName: nORM.Configuration.DbContextOptions.CommandTimeout
-- uid: System.TimeSpan
-  commentId: T:System.TimeSpan
-  parent: System
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.timespan
-  name: TimeSpan
-  nameWithType: TimeSpan
-  fullName: System.TimeSpan
-- uid: nORM.Configuration.DbContextOptions.BulkBatchSize*
-  commentId: Overload:nORM.Configuration.DbContextOptions.BulkBatchSize
-  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_BulkBatchSize
-  name: BulkBatchSize
-  nameWithType: DbContextOptions.BulkBatchSize
-  fullName: nORM.Configuration.DbContextOptions.BulkBatchSize
+- uid: nORM.Configuration.DbContextOptions.MaxRecursionDepth*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxRecursionDepth
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxRecursionDepth
+  name: MaxRecursionDepth
+  nameWithType: DbContextOptions.MaxRecursionDepth
+  fullName: nORM.Configuration.DbContextOptions.MaxRecursionDepth
 - uid: System.Int32
   commentId: T:System.Int32
   parent: System
@@ -1789,12 +2093,18 @@ references:
   nameWithType.vb: Integer
   fullName.vb: Integer
   name.vb: Integer
-- uid: nORM.Configuration.DbContextOptions.Logger*
-  commentId: Overload:nORM.Configuration.DbContextOptions.Logger
-  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_Logger
-  name: Logger
-  nameWithType: DbContextOptions.Logger
-  fullName: nORM.Configuration.DbContextOptions.Logger
+- uid: nORM.Configuration.DbContextOptions.MaxGroupJoinSize*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxGroupJoinSize
+  name: MaxGroupJoinSize
+  nameWithType: DbContextOptions.MaxGroupJoinSize
+  fullName: nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+- uid: nORM.Configuration.DbContextOptions.BulkBatchSize*
+  commentId: Overload:nORM.Configuration.DbContextOptions.BulkBatchSize
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_BulkBatchSize
+  name: BulkBatchSize
+  nameWithType: DbContextOptions.BulkBatchSize
+  fullName: nORM.Configuration.DbContextOptions.BulkBatchSize
 - uid: Microsoft.Extensions.Logging.ILogger
   commentId: T:Microsoft.Extensions.Logging.ILogger
   parent: Microsoft.Extensions.Logging
@@ -1803,6 +2113,12 @@ references:
   name: ILogger
   nameWithType: ILogger
   fullName: Microsoft.Extensions.Logging.ILogger
+- uid: nORM.Configuration.DbContextOptions.Logger*
+  commentId: Overload:nORM.Configuration.DbContextOptions.Logger
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_Logger
+  name: Logger
+  nameWithType: DbContextOptions.Logger
+  fullName: nORM.Configuration.DbContextOptions.Logger
 - uid: Microsoft.Extensions.Logging
   commentId: N:Microsoft.Extensions.Logging
   href: https://learn.microsoft.com/dotnet/api/microsoft
@@ -2007,28 +2323,19 @@ references:
   name: QueryTrackingBehavior
   nameWithType: QueryTrackingBehavior
   fullName: nORM.Core.QueryTrackingBehavior
-- uid: nORM.Core
-  commentId: N:nORM.Core
-  href: nORM.html
-  name: nORM.Core
-  nameWithType: nORM.Core
-  fullName: nORM.Core
-  spec.csharp:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Core
-    name: Core
-    href: nORM.Core.html
-  spec.vb:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Core
-    name: Core
-    href: nORM.Core.html
+- uid: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy*
+  commentId: Overload:nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_ClientEvaluationPolicy
+  name: ClientEvaluationPolicy
+  nameWithType: DbContextOptions.ClientEvaluationPolicy
+  fullName: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+- uid: nORM.Configuration.ClientEvaluationPolicy
+  commentId: T:nORM.Configuration.ClientEvaluationPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.ClientEvaluationPolicy.html
+  name: ClientEvaluationPolicy
+  nameWithType: ClientEvaluationPolicy
+  fullName: nORM.Configuration.ClientEvaluationPolicy
 - uid: nORM.Configuration.DbContextOptions.CommandInterceptors*
   commentId: Overload:nORM.Configuration.DbContextOptions.CommandInterceptors
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CommandInterceptors
@@ -2185,12 +2492,26 @@ references:
   name: IDbCacheProvider
   nameWithType: IDbCacheProvider
   fullName: nORM.Enterprise.IDbCacheProvider
+- uid: nORM.Configuration.DbContextOptions.CacheProvider
+  commentId: P:nORM.Configuration.DbContextOptions.CacheProvider
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CacheProvider
+  name: CacheProvider
+  nameWithType: DbContextOptions.CacheProvider
+  fullName: nORM.Configuration.DbContextOptions.CacheProvider
 - uid: nORM.Configuration.DbContextOptions.CacheExpiration*
   commentId: Overload:nORM.Configuration.DbContextOptions.CacheExpiration
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CacheExpiration
   name: CacheExpiration
   nameWithType: DbContextOptions.CacheExpiration
   fullName: nORM.Configuration.DbContextOptions.CacheExpiration
+- uid: System.TimeSpan
+  commentId: T:System.TimeSpan
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.timespan
+  name: TimeSpan
+  nameWithType: TimeSpan
+  fullName: System.TimeSpan
 - uid: nORM.Core.NormMemoryCacheProvider
   commentId: T:nORM.Core.NormMemoryCacheProvider
   href: nORM.Core.NormMemoryCacheProvider.html
@@ -2216,28 +2537,150 @@ references:
   name: EnableTemporalVersioning
   nameWithType: DbContextOptions.EnableTemporalVersioning
   fullName: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+- uid: System.Transactions.TransactionScope
+  commentId: T:System.Transactions.TransactionScope
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.transactions.transactionscope
+  name: TransactionScope
+  nameWithType: TransactionScope
+  fullName: System.Transactions.TransactionScope
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html#nORM_Configuration_AmbientTransactionEnlistmentPolicy_FailFast
+  name: FailFast
+  nameWithType: AmbientTransactionEnlistmentPolicy.FailFast
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.FailFast
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html#nORM_Configuration_AmbientTransactionEnlistmentPolicy_BestEffort
+  name: BestEffort
+  nameWithType: AmbientTransactionEnlistmentPolicy.BestEffort
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.BestEffort
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  commentId: F:nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html#nORM_Configuration_AmbientTransactionEnlistmentPolicy_Ignore
+  name: Ignore
+  nameWithType: AmbientTransactionEnlistmentPolicy.Ignore
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy.Ignore
+- uid: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy*
+  commentId: Overload:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_AmbientTransactionPolicy
+  name: AmbientTransactionPolicy
+  nameWithType: DbContextOptions.AmbientTransactionPolicy
+  fullName: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
+- uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  commentId: T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.AmbientTransactionEnlistmentPolicy.html
+  name: AmbientTransactionEnlistmentPolicy
+  nameWithType: AmbientTransactionEnlistmentPolicy
+  fullName: nORM.Configuration.AmbientTransactionEnlistmentPolicy
+- uid: nORM.Core.NormConfigurationException
+  commentId: T:nORM.Core.NormConfigurationException
+  href: nORM.Core.NormConfigurationException.html
+  name: NormConfigurationException
+  nameWithType: NormConfigurationException
+  fullName: nORM.Core.NormConfigurationException
+- uid: nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics*
+  commentId: Overload:nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_RequireMatchedRowOccSemantics
+  name: RequireMatchedRowOccSemantics
+  nameWithType: DbContextOptions.RequireMatchedRowOccSemantics
+  fullName: nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
+- uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  commentId: M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+  isExternal: true
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_AddGlobalFilter__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___
+  name: AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>>)
+  nameWithType: DbContextOptions.AddGlobalFilter<TEntity>(Expression<Func<TEntity, bool>>)
+  fullName: nORM.Configuration.DbContextOptions.AddGlobalFilter<TEntity>(System.Linq.Expressions.Expression<System.Func<TEntity, bool>>)
+  nameWithType.vb: DbContextOptions.AddGlobalFilter(Of TEntity)(Expression(Of Func(Of TEntity, Boolean)))
+  fullName.vb: nORM.Configuration.DbContextOptions.AddGlobalFilter(Of TEntity)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean)))
+  name.vb: AddGlobalFilter(Of TEntity)(Expression(Of Func(Of TEntity, Boolean)))
+  spec.csharp:
+  - uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+    name: AddGlobalFilter
+    href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_AddGlobalFilter__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})
+    name: AddGlobalFilter
+    href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_AddGlobalFilter__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  - name: )
+  - name: )
 - uid: nORM.Configuration.DbContextOptions.GlobalFilters*
   commentId: Overload:nORM.Configuration.DbContextOptions.GlobalFilters
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_GlobalFilters
   name: GlobalFilters
   nameWithType: DbContextOptions.GlobalFilters
   fullName: nORM.Configuration.DbContextOptions.GlobalFilters
-- uid: System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
-  commentId: T:System.Collections.Generic.IDictionary{System.Type,System.Collections.Generic.List{System.Linq.Expressions.LambdaExpression}}
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Type,System.Collections.Generic.IReadOnlyList{System.Linq.Expressions.LambdaExpression}}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Type,System.Collections.Generic.IReadOnlyList{System.Linq.Expressions.LambdaExpression}}
   parent: System.Collections.Generic
-  definition: System.Collections.Generic.IDictionary`2
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
-  name: IDictionary<Type, List<LambdaExpression>>
-  nameWithType: IDictionary<Type, List<LambdaExpression>>
-  fullName: System.Collections.Generic.IDictionary<System.Type, System.Collections.Generic.List<System.Linq.Expressions.LambdaExpression>>
-  nameWithType.vb: IDictionary(Of Type, List(Of LambdaExpression))
-  fullName.vb: System.Collections.Generic.IDictionary(Of System.Type, System.Collections.Generic.List(Of System.Linq.Expressions.LambdaExpression))
-  name.vb: IDictionary(Of Type, List(Of LambdaExpression))
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<Type, IReadOnlyList<LambdaExpression>>
+  nameWithType: IReadOnlyDictionary<Type, IReadOnlyList<LambdaExpression>>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Type, System.Collections.Generic.IReadOnlyList<System.Linq.Expressions.LambdaExpression>>
+  nameWithType.vb: IReadOnlyDictionary(Of Type, IReadOnlyList(Of LambdaExpression))
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Type, System.Collections.Generic.IReadOnlyList(Of System.Linq.Expressions.LambdaExpression))
+  name.vb: IReadOnlyDictionary(Of Type, IReadOnlyList(Of LambdaExpression))
   spec.csharp:
-  - uid: System.Collections.Generic.IDictionary`2
-    name: IDictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - uid: System.Type
     name: Type
@@ -2245,10 +2688,10 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.type
   - name: ','
   - name: " "
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: <
   - uid: System.Linq.Expressions.LambdaExpression
     name: LambdaExpression
@@ -2257,10 +2700,10 @@ references:
   - name: '>'
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.IDictionary`2
-    name: IDictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "
@@ -2270,10 +2713,10 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.type
   - name: ','
   - name: " "
-  - uid: System.Collections.Generic.List`1
-    name: List
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
   - name: (
   - name: Of
   - name: " "
@@ -2283,21 +2726,21 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.lambdaexpression
   - name: )
   - name: )
-- uid: System.Collections.Generic.IDictionary`2
-  commentId: T:System.Collections.Generic.IDictionary`2
+- uid: System.Collections.Generic.IReadOnlyDictionary`2
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary`2
   isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
-  name: IDictionary<TKey, TValue>
-  nameWithType: IDictionary<TKey, TValue>
-  fullName: System.Collections.Generic.IDictionary<TKey, TValue>
-  nameWithType.vb: IDictionary(Of TKey, TValue)
-  fullName.vb: System.Collections.Generic.IDictionary(Of TKey, TValue)
-  name.vb: IDictionary(Of TKey, TValue)
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<TKey, TValue>
+  nameWithType: IReadOnlyDictionary<TKey, TValue>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>
+  nameWithType.vb: IReadOnlyDictionary(Of TKey, TValue)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of TKey, TValue)
+  name.vb: IReadOnlyDictionary(Of TKey, TValue)
   spec.csharp:
-  - uid: System.Collections.Generic.IDictionary`2
-    name: IDictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: <
   - name: TKey
   - name: ','
@@ -2305,10 +2748,10 @@ references:
   - name: TValue
   - name: '>'
   spec.vb:
-  - uid: System.Collections.Generic.IDictionary`2
-    name: IDictionary
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.idictionary-2
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
   - name: (
   - name: Of
   - name: " "

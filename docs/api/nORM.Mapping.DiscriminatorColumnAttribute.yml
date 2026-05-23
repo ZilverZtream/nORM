@@ -21,10 +21,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DiscriminatorColumnAttribute
     path: src/nORM/Mapping/DiscriminatorColumnAttribute.cs
-    startLine: 4
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Specifies the property that holds the discriminator value for table-per-hierarchy mappings.
+  example: []
   syntax:
     content: >-
       [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -112,10 +114,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyName
     path: src/nORM/Mapping/DiscriminatorColumnAttribute.cs
-    startLine: 7
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Gets the name of the discriminator property.
+  example: []
   syntax:
     content: public string PropertyName { get; }
     parameters: []
@@ -141,15 +145,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/DiscriminatorColumnAttribute.cs
-    startLine: 8
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Mapping
+  summary: Initializes the attribute with the discriminator property name.
+  example: []
   syntax:
     content: public DiscriminatorColumnAttribute(string propertyName)
     parameters:
     - id: propertyName
       type: System.String
+      description: Name of the property containing the discriminator value.
     content.vb: Public Sub New(propertyName As String)
   overload: nORM.Mapping.DiscriminatorColumnAttribute.#ctor*
   nameWithType.vb: DiscriminatorColumnAttribute.New(String)

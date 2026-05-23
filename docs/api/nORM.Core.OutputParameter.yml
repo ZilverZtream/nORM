@@ -18,12 +18,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: OutputParameter
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1371
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -61,12 +61,12 @@ items:
   type: Constructor
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1371
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -102,12 +102,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1371
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -133,12 +133,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbType
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1371
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -164,12 +164,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Core/DbContext.cs
+      path: src/nORM/Core/StoredProcedureResult.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Size
-    path: src/nORM/Core/DbContext.cs
-    startLine: 1371
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core

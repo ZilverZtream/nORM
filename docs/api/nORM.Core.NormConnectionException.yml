@@ -86,17 +86,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/NormConnectionException.cs
-    startLine: 9
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: >-
+    Initializes a new instance of the <xref href="nORM.Core.NormConnectionException" data-throw-if-not-resolved="false"></xref>
+
+    class with a specified error message and optional inner exception.
+  example: []
   syntax:
     content: public NormConnectionException(string message, Exception? innerException = null)
     parameters:
     - id: message
       type: System.String
+      description: Message describing the connection error.
     - id: innerException
       type: System.Exception
+      description: The exception that caused this error, if any.
     content.vb: Public Sub New(message As String, innerException As Exception = Nothing)
   overload: nORM.Core.NormConnectionException.#ctor*
   nameWithType.vb: NormConnectionException.New(String, Exception)
@@ -1368,6 +1375,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Core.NormConnectionException
+  commentId: T:nORM.Core.NormConnectionException
+  href: nORM.Core.NormConnectionException.html
+  name: NormConnectionException
+  nameWithType: NormConnectionException
+  fullName: nORM.Core.NormConnectionException
 - uid: nORM.Core.NormConnectionException.#ctor*
   commentId: Overload:nORM.Core.NormConnectionException.#ctor
   href: nORM.Core.NormConnectionException.html#nORM_Core_NormConnectionException__ctor_System_String_System_Exception_

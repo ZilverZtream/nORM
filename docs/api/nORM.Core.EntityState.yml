@@ -24,10 +24,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityState
     path: src/nORM/Core/EntityState.cs
-    startLine: 6
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: Describes the tracking state of an entity with respect to a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  example: []
   syntax:
     content: public enum EntityState
     content.vb: Public Enum EntityState
@@ -49,10 +51,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Detached
     path: src/nORM/Core/EntityState.cs
-    startLine: 8
+    startLine: 14
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The entity is not being tracked by the context.
+  example: []
   syntax:
     content: Detached = 0
     return:
@@ -75,10 +79,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Unchanged
     path: src/nORM/Core/EntityState.cs
-    startLine: 9
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The entity exists in the database and has not been modified.
+  example: []
   syntax:
     content: Unchanged = 1
     return:
@@ -101,10 +107,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Added
     path: src/nORM/Core/EntityState.cs
-    startLine: 10
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The entity has been added to the context and will be inserted on <code>SaveChanges</code>.
+  example: []
   syntax:
     content: Added = 2
     return:
@@ -127,10 +135,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Modified
     path: src/nORM/Core/EntityState.cs
-    startLine: 11
+    startLine: 26
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The entity was retrieved from the database and has since been modified.
+  example: []
   syntax:
     content: Modified = 3
     return:
@@ -153,15 +163,24 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Deleted
     path: src/nORM/Core/EntityState.cs
-    startLine: 12
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Core
+  summary: The entity has been marked for deletion and will be removed on <code>SaveChanges</code>.
+  example: []
   syntax:
     content: Deleted = 4
     return:
       type: nORM.Core.EntityState
 references:
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html

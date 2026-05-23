@@ -38,3 +38,19 @@ to the baseline.
 - Experimental surface should be internal or clearly documented before v1.0.
 - Provider-specific behavior must be documented when it differs between SQLite,
   SQL Server, PostgreSQL, and MySQL.
+
+## Reviewed Public API Additions
+
+The following public surface was added during v1 preparation and is intentionally part of the
+v1.0 contract:
+
+| Member | Status | Tested by | Documented in |
+|---|---|---|---|
+| `nORM.Mapping.RenameColumnAttribute` | Stable | `MigrationRenameTests`, `MigrationRenameDocContractTests` | `README.md` migration section |
+| `nORM.Migration.ColumnSchema.PreviousName` | Stable | `MigrationRenameTests`, `SchemaSnapshotTests` | `README.md` migration section |
+| `nORM.Migration.SchemaDiff.RenamedColumns` | Stable | `MigrationRenameTests` | `README.md` migration section |
+| `nORM.Providers.SqlServerProvider(IDbParameterFactory)` | Stable - dialect-only mode | `TestBase.CreateProvider`, `ProviderCapabilitiesTests`, cross-provider parity suite | `docs/provider-packages.md`; matches the existing `PostgresProvider(IDbParameterFactory)` and `MySqlProvider(IDbParameterFactory)` constructors |
+| `nORM.SourceGeneration.CompiledMaterializerStore.AddPermanent<T>` | Stable - source-generator registration helper | `SourceGeneratorIntegrationTests`, `SourceGenMaterializerCorrectnesTests` | `docs/source-generation.md` |
+
+`PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
+any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

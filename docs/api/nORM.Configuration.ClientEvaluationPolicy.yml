@@ -1,0 +1,165 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ClientEvaluationPolicy
+  commentId: T:nORM.Configuration.ClientEvaluationPolicy
+  id: ClientEvaluationPolicy
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ClientEvaluationPolicy.Allow
+  - nORM.Configuration.ClientEvaluationPolicy.Throw
+  - nORM.Configuration.ClientEvaluationPolicy.Warn
+  langs:
+  - csharp
+  - vb
+  name: ClientEvaluationPolicy
+  nameWithType: ClientEvaluationPolicy
+  fullName: nORM.Configuration.ClientEvaluationPolicy
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ClientEvaluationPolicy
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Controls how nORM handles projection expressions that cannot be fully
+
+    translated to SQL but can be completed after server-side materialization.
+  example: []
+  syntax:
+    content: public enum ClientEvaluationPolicy
+    content.vb: Public Enum ClientEvaluationPolicy
+- uid: nORM.Configuration.ClientEvaluationPolicy.Warn
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Warn
+  id: Warn
+  parent: nORM.Configuration.ClientEvaluationPolicy
+  langs:
+  - csharp
+  - vb
+  name: Warn
+  nameWithType: ClientEvaluationPolicy.Warn
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Warn
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Warn
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 51
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Allow the client-side projection tail and emit a diagnostic log entry
+
+    when a logger is configured. This is the default v1 compatibility mode.
+  example: []
+  syntax:
+    content: Warn = 0
+    return:
+      type: nORM.Configuration.ClientEvaluationPolicy
+- uid: nORM.Configuration.ClientEvaluationPolicy.Throw
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Throw
+  id: Throw
+  parent: nORM.Configuration.ClientEvaluationPolicy
+  langs:
+  - csharp
+  - vb
+  name: Throw
+  nameWithType: ClientEvaluationPolicy.Throw
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Throw
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Throw
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 57
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Throw <xref href="nORM.Core.NormUnsupportedFeatureException" data-throw-if-not-resolved="false"></xref> instead of running
+
+    any client-side projection tail.
+  example: []
+  syntax:
+    content: Throw = 1
+    return:
+      type: nORM.Configuration.ClientEvaluationPolicy
+- uid: nORM.Configuration.ClientEvaluationPolicy.Allow
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Allow
+  id: Allow
+  parent: nORM.Configuration.ClientEvaluationPolicy
+  langs:
+  - csharp
+  - vb
+  name: Allow
+  nameWithType: ClientEvaluationPolicy.Allow
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Allow
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Allow
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 63
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Allow the client-side projection tail without emitting the warning
+
+    diagnostic.
+  example: []
+  syntax:
+    content: Allow = 2
+    return:
+      type: nORM.Configuration.ClientEvaluationPolicy
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ClientEvaluationPolicy
+  commentId: T:nORM.Configuration.ClientEvaluationPolicy
+  parent: nORM.Configuration
+  href: nORM.Configuration.ClientEvaluationPolicy.html
+  name: ClientEvaluationPolicy
+  nameWithType: ClientEvaluationPolicy
+  fullName: nORM.Configuration.ClientEvaluationPolicy
+- uid: nORM.Core.NormUnsupportedFeatureException
+  commentId: T:nORM.Core.NormUnsupportedFeatureException
+  href: nORM.Core.NormUnsupportedFeatureException.html
+  name: NormUnsupportedFeatureException
+  nameWithType: NormUnsupportedFeatureException
+  fullName: nORM.Core.NormUnsupportedFeatureException
