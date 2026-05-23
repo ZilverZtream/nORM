@@ -44,6 +44,47 @@ public class AotTrimmingPolicyTests
     }
 
     [Fact]
+    public void Dynamic_table_query_annotation_message_mentions_aot()
+    {
+        // The RequiresDynamicCode message must mention AOT or NativeAOT so callers
+        // have actionable context when the build warning fires.
+        var method = typeof(DbContext).GetMethod(nameof(DbContext.Query), new[] { typeof(string) })
+            ?? throw new MissingMethodException(nameof(DbContext), nameof(DbContext.Query));
+
+        var dynAttr = method.GetCustomAttribute<RequiresDynamicCodeAttribute>();
+        Assert.NotNull(dynAttr);
+        Assert.Contains("AOT", dynAttr!.Message, StringComparison.OrdinalIgnoreCase);
+
+        var trimAttr = method.GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        Assert.NotNull(trimAttr);
+        Assert.Contains("trim", trimAttr!.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Dynamic_entity_generator_annotation_messages_mention_aot_and_trim()
+    {
+        // Type-level annotations must provide actionable messages.
+        var typeRdc = typeof(DynamicEntityTypeGenerator).GetCustomAttribute<RequiresDynamicCodeAttribute>();
+        Assert.NotNull(typeRdc);
+        Assert.Contains("AOT", typeRdc!.Message, StringComparison.OrdinalIgnoreCase);
+
+        var typeRuc = typeof(DynamicEntityTypeGenerator).GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        Assert.NotNull(typeRuc);
+        Assert.Contains("trim", typeRuc!.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormUnsupportedFeatureException_is_public_and_carries_message()
+    {
+        // Verify the exception taxonomy type used for unsupported feature paths is
+        // publicly accessible and preserves the caller-supplied message, so that
+        // future AOT/trimming runtime guards can surface actionable diagnostics.
+        var ex = new NormUnsupportedFeatureException("AOT and trimming are not supported for this path.");
+        Assert.Contains("AOT", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsAssignableFrom<NormException>(ex);
+    }
+
+    [Fact]
     public void PublishTrimmed_smoke_fails_with_trim_diagnostics_for_v1_runtime_package()
     {
         var root = FindRepositoryRoot();
