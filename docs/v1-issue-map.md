@@ -26,8 +26,8 @@ still needs release evidence.
 
 | ID | Area | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | Remove or prove remaining public marketing claims | Verified | README uses bounded performance and migration language; documentation tests reject unqualified claims. |
-| 2 | Fix stale generated API docs | Verified | Removed stale `ConnectionPool` API pages and index entries; documentation tests reject generated docs for missing public types. |
+| 1 | Remove or prove remaining public marketing claims | Verified | README uses bounded performance and migration language; documentation tests reject unqualified claims; "Production-Ready Features" heading changed to "v1 Features"; "Full support for major database engines" links to provider-capabilities.md; "Smart Relationship Handling" links to linq-support.md constraints; benchmark section references benchmarks/ artifacts only. |
+| 2 | Fix stale generated API docs | Verified | Removed stale `ConnectionPool` API pages and index entries; documentation tests reject generated docs for missing public types; `docs/api/README.md` documents the `docfx metadata docfx.json` regeneration command and the RC validation requirement. |
 | 3 | Decide whether `ConnectionPool` is removed or restored | Verified | Public docs now direct users to provider-native pooling and `ConnectionManager`; no public `ConnectionPool` examples remain. |
 | 4 | Fix v1 issue map and blocker accounting | Verified | This map tracks exactly 40 blockers with evidence-aware statuses. |
 | 5 | Make Release build warning-free | Verified | `dotnet build nORM.sln -c Release --nologo` reports 0 warnings on this tree. |
@@ -56,7 +56,7 @@ still needs release evidence.
 | 28 | Decide temporal/versioning stability | Verified | Temporal versioning is explicitly stable for nORM-managed history tables/triggers; docs define schema ownership, rollback responsibilities, and the RC live-provider evidence requirement. |
 | 29 | Enforce provider version support at startup | Verified | Provider initialization validates the actual opened connection against `Capabilities.MinimumServerVersion`; unsupported versions throw `NormConfigurationException`, and provider docs/tests lock the startup contract. |
 | 30 | Finish MySQL optimistic concurrency guarantees | Verified | MySQL affected-row OCC is refused by default through `RequireMatchedRowOccSemantics=true`; matched-row mode and explicit weakened opt-in are documented and covered by regression tests. |
-| 31 | Prove AOT and trimming claims with real publish tests | Verified | AOT/trimming is explicitly unsupported for v1; annotation tests and a negative `PublishTrimmed=true` smoke test lock the current boundary with real publish diagnostics. |
+| 31 | Prove AOT and trimming claims with real publish tests | Verified | AOT/trimming is explicitly unsupported for v1; annotation tests and a negative `PublishTrimmed=true` smoke test lock the current boundary with real publish diagnostics; additional tests verify annotation messages contain actionable AOT/trim context; `NormUnsupportedFeatureException` taxonomy test confirms the type is usable for future runtime guards; AOT publish warning scan added to `eng/v1-release-gate.ps1`. |
 | 32 | Harden source generator limitations | Verified | Source-generation docs now define the v1 materializer support contract and diagnostics; package-consumer tests verify unsupported mapped properties report `nORMSG005`. |
 | 33 | Stress cache and plan memory bounds as release gates | Verified | RC gate now has a dedicated cache memory bounds step; cache policy names the release evidence, and stress tests assert bounded counts/evictions for LRU, bounded FIFO, and compiled materializer caches. |
 | 34 | Normalize public exception taxonomy | Verified | Public unsupported query paths for bulk CUD, async streaming Include/GroupJoin, and composite-key includes now throw `NormUnsupportedFeatureException`; docs/tests lock the taxonomy. |

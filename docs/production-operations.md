@@ -54,6 +54,11 @@ database-write policy, not a blanket exception handler:
   unknown,
 - keep transaction scopes small.
 
+The full retry contract — retryable operations, non-retryable boundaries
+(explicit transactions, post-commit failures, timeouts), default limits,
+backoff math, and `AdaptiveTimeoutManager` interaction — is documented in
+[Retry Policy](retry-policy.md).
+
 ## Transactions
 
 Use `BeginTransactionAsync` for explicit transaction ownership. Commit and
