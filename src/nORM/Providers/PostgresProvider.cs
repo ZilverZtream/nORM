@@ -223,11 +223,21 @@ namespace nORM.Providers
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
+                    nameof(string.Trim) when args.Length == 1 => $"BTRIM({args[0]})",
+                    nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
+                    nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                    // PostgreSQL SUBSTRING is 1-indexed; .NET Substring is 0-indexed, add 1.
+                    nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]} FROM ({args[1]}) + 1)",
+                    nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]} FROM ({args[1]}) + 1 FOR {args[2]})",
+                    nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
+                    // STRPOS returns 1-based position or 0 if not found; .NET IndexOf is 0-based
+                    // returning -1, so subtract 1.
+                    nameof(string.IndexOf) when args.Length == 2 => $"(STRPOS({args[0]}, {args[1]}) - 1)",
                     _ => null
                 };
             }
 
-            if (declaringType == typeof(DateTime))
+            if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch
                 {
@@ -237,6 +247,23 @@ namespace nORM.Providers
                     nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
                     nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
                     nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {args[0]})",
+                    nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
+                    nameof(DateTime.Date) => $"DATE_TRUNC('day', {args[0]})",
+                    nameof(DateTime.AddDays) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 day')",
+                    nameof(DateTime.AddMonths) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 month')",
+                    nameof(DateTime.AddYears) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 year')",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateOnly))
+            {
+                return name switch
+                {
+                    nameof(DateOnly.Year) => $"EXTRACT(YEAR FROM {args[0]})",
+                    nameof(DateOnly.Month) => $"EXTRACT(MONTH FROM {args[0]})",
+                    nameof(DateOnly.Day) => $"EXTRACT(DAY FROM {args[0]})",
+                    nameof(DateOnly.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
                     _ => null
                 };
             }
