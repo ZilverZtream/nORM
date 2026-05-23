@@ -43,6 +43,7 @@ namespace nORM.Tests;
 ///
 ///   Tests for unavailable providers are marked as Skipped with an explanatory message.
 /// </summary>
+[Trait("Category", TestCategory.LiveProvider)]
 public class LiveProviderIntegrationTests
 {
     // ══════════════════════════════════════════════════════════════════════════

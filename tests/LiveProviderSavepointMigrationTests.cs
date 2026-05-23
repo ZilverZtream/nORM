@@ -32,6 +32,7 @@ namespace nORM.Tests;
 // 4. Cancellation races under load (CR-1, CR-2)
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Trait("Category", TestCategory.LiveProvider)]
 [Collection(ConcurrencyStressCollection.Name)]
 public class LiveProviderSavepointMigrationTests
 {
