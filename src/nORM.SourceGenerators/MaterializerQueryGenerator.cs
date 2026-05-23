@@ -279,7 +279,7 @@ namespace nORM.SourceGenerators
             // where the same CLR type maps to different tables each get their own materializer.
             var resolvedTableName = GetTableNameForType(type);
             var escapedTableName = resolvedTableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            sb.AppendLine($"        CompiledMaterializerStore.Add<{typeName}>(\"{escapedTableName}\", reader =>");
+            sb.AppendLine($"        CompiledMaterializerStore.AddPermanent<{typeName}>(\"{escapedTableName}\", reader =>");
             sb.AppendLine("        {");
             sb.AppendLine($"            var entity = new {typeName}();");
 

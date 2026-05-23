@@ -29,6 +29,10 @@ namespace nORM.SourceGeneration
 
         private static readonly ConcurrentLruCache<(Type, string), (Delegate Typed, Func<DbDataReader, CancellationToken, Task<object>> Untyped)> _map = new(maxSize: DefaultMaxCacheSize);
 
+        // Permanent registrations (e.g., source-generator ModuleInitializer entries) — never evicted by LRU churn
+        // and never affected by Clear(). User-facing Add* methods still go through the LRU map above.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string), (Delegate Typed, Func<DbDataReader, CancellationToken, Task<object>> Untyped)> _permanent = new();
+
         /// <summary>
         /// Gets the current number of cached compiled materializer entries.
         /// </summary>
@@ -120,6 +124,25 @@ namespace nORM.SourceGeneration
         }
 
         /// <summary>
+        /// Registers a materializer in the permanent (non-evictable) registry. Intended for
+        /// source-generator <c>ModuleInitializer</c> entries that must survive LRU churn and
+        /// test-driven <see cref="Clear"/> calls.
+        /// </summary>
+        /// <typeparam name="T">Entity type the materializer produces.</typeparam>
+        /// <param name="tableName">Table name used as the model discriminator.</param>
+        /// <param name="materializer">Function that converts a <see cref="DbDataReader"/> row into an entity instance.</param>
+        public static void AddPermanent<T>(string tableName, Func<DbDataReader, T> materializer)
+        {
+            ArgumentNullException.ThrowIfNull(tableName);
+            ArgumentNullException.ThrowIfNull(materializer);
+            _permanent.TryAdd((typeof(T), tableName), (materializer, (reader, ct) =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return Task.FromResult((object)materializer(reader)!);
+            }));
+        }
+
+        /// <summary>
         /// Attempts to retrieve a previously registered untyped materializer for the given entity type,
         /// using the <c>[Table]</c> attribute name (or CLR type name) as the model discriminator.
         /// </summary>
@@ -147,6 +170,11 @@ namespace nORM.SourceGeneration
         {
             ArgumentNullException.ThrowIfNull(type);
             ArgumentNullException.ThrowIfNull(tableName);
+            if (_permanent.TryGetValue((type, tableName), out var pinned))
+            {
+                materializer = pinned.Untyped;
+                return true;
+            }
             if (_map.TryGet((type, tableName), out var entry))
             {
                 materializer = entry.Untyped;
@@ -180,10 +208,15 @@ namespace nORM.SourceGeneration
         public static Func<DbDataReader, CancellationToken, Task<T>> Get<T>(string tableName)
         {
             ArgumentNullException.ThrowIfNull(tableName);
-            if (!_map.TryGet((typeof(T), tableName), out var entry))
+            Delegate? typedRaw = null;
+            if (_permanent.TryGetValue((typeof(T), tableName), out var pinned))
+                typedRaw = pinned.Typed;
+            else if (_map.TryGet((typeof(T), tableName), out var entry))
+                typedRaw = entry.Typed;
+            if (typedRaw == null)
                 throw new KeyNotFoundException($"Materializer for {typeof(T)} (table '{tableName}') not found.");
-            var typedDelegate = entry.Typed as Func<DbDataReader, T>
-                ?? throw new InvalidCastException($"Registered materializer for {typeof(T)} (table '{tableName}') has incompatible delegate type {entry.Typed.GetType()}.");
+            var typedDelegate = typedRaw as Func<DbDataReader, T>
+                ?? throw new InvalidCastException($"Registered materializer for {typeof(T)} (table '{tableName}') has incompatible delegate type {typedRaw.GetType()}.");
             return (reader, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
