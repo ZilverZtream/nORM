@@ -1,1046 +1,993 @@
 # nORM v1.0 Blocker Developer Spec
 
-Date: 2026-05-22
+Date: 2026-05-23
 
-This is a fresh blocker audit of the current repository state, not a status
-copy of the earlier spec. I inspected the solution/project files, README, docs,
-CLI, migration tooling, LINQ/query pipeline, provider layer, package consumer
-tests, benchmark governance, CI workflows, and release gate scripts.
+This is a current v1.0 blocker spec for the repository as it stands on
+2026-05-23. It is intentionally written as an engineering backlog, not as a
+marketing launch checklist. A blocker is considered closed only when the code,
+tests, documentation, release automation, and release artifacts all line up.
 
-Observed local evidence:
+## Audit Evidence
 
-- `dotnet build nORM.sln -c Release --nologo` succeeds with 0 warnings after
-  the P0 documentation/warning cleanup.
-- Focused package/API/docs contract tests pass:
-  `PackageConsumerIntegrationTests`, `PublicApiSnapshotTests`, and
-  `DocumentationContractTests` passed 29 tests.
-- I did not run the full test suite, live SQL Server/PostgreSQL/MySQL gates, or
-  full BenchmarkDotNet provider matrix in this pass.
+Local evidence gathered during this pass:
 
-Several blockers from the earlier spec are no longer accurate: the source
-generator is now packed, PostgreSQL/MySQL providers have public constructors,
-`global.json` exists, governance files exist, and the CLI now uses
-`ConnectionStringValidator.Validate(...)` so it can keep the real connection
-string separate from the redacted one. The blockers below are the largest
-remaining obstacles before a credible v1.0.
+- `dotnet build nORM.sln -c Release --nologo` succeeds with 0 warnings.
+- The Release build produces `nORM.0.9.0-preview.1` and
+  `dotnet-norm.0.9.0-preview.1` packages, so the repo is still versioned as a
+  preview build.
+- `tests/PublicApi.Shipped.txt` exposes a broad API surface and includes
+  `nORM.Internal.ConcurrentLruCache<T, TValue>` and
+  `nORM.Internal.ParameterOptimizer`.
+- `src/nORM.csproj` still ships SQL Server, SQLite, ScriptDom, caching, logging,
+  object-pool, annotations, hashing, and SourceLink dependencies in the core
+  package.
+- Benchmarks use some package versions that differ from tests/runtime, including
+  `Npgsql` 8.x in benchmarks and 10.x in tests.
+- A focused contract-test command covering public API, docs, repository hygiene,
+  package consumer, and CLI tests timed out locally after about 184 seconds
+  before a clean result was returned.
+- The live provider and RC gates exist, but no successful full RC artifact
+  manifest was produced during this audit.
 
-## Release Bar
+## v1.0 Release Bar
 
-v1.0 means:
+v1.0 should mean:
 
-- README examples compile against the shipped NuGet package.
-- Generated API docs match the current public assembly.
-- Public claims are backed by tests, docs, or release artifacts.
-- The full live provider matrix passes in CI or release automation.
-- Performance claims map to reproducible BenchmarkDotNet artifacts.
-- Unsupported LINQ/provider behavior is explicit, deterministic, and documented.
+- Public API is frozen, intentional, documented, and supportable.
+- README, DocFX output, package metadata, and examples compile against the
+  shipped NuGet package.
+- LINQ support is precise, test-backed, and deterministic for unsupported
+  shapes.
+- SQL Server, PostgreSQL, MySQL, and SQLite behavior is verified against live
+  provider gates where provider behavior matters.
+- Tenant isolation, raw SQL boundaries, logging redaction, transactions, caches,
+  retries, and interceptors are treated as production contracts.
+- Performance claims are backed by raw BenchmarkDotNet artifacts from the
+  release commit and named baselines.
+- A real RC run publishes packages, TRX files, benchmark output, environment
+  metadata, and an artifact manifest.
 
-## P0 Blockers
+## 40 Biggest Blockers
 
-### 1. Remove or prove remaining public marketing claims
+### 1. Freeze and reduce the public API surface
 
-Problem: README still contains v1-risk language such as "drop-in replacement
-for EF Core", "Why nORM Outperforms EF Core", "Enterprise Ready", "built-in
-pooling", "lazy loading", and Dapper/Raw ADO comparison language. Some of this
-is plausible, but v1 should not ship claims broader than the verified contract.
-
-Evidence:
-
-- `README.md` still has "Drop-in replacement for EF Core setup".
-- `README.md` still has "nORM is designed as a drop-in replacement for EF Core".
-- `README.md` still has "Why nORM Outperforms EF Core".
-- Release benchmark artifacts were not produced in this pass.
-
-Scope:
-
-- Rewrite README claims into bounded, testable statements.
-- Link every performance claim to a benchmark artifact requirement.
-- Replace "drop-in replacement" with a migration guide that lists differences.
-
-Done when:
-
-- Documentation contract tests reject unqualified "drop-in", "outperforms",
-  "beats raw ADO", and "Enterprise Ready" language.
-
-### 2. Fix stale generated API docs
-
-Problem: `docs/api` contains generated API pages for types that are not present
-in `src`, including `nORM.Core.ConnectionPool` and
-`nORM.Core.ConnectionPoolOptions`. Stale generated docs are dangerous for v1
-because users will try APIs that no longer exist.
+Problem: The public API is too broad for a v1 freeze, and it exposes implementation
+details under `nORM.Internal`.
 
 Evidence:
 
-- `rg --files src | rg ConnectionPool` finds no source file.
-- `docs/api/nORM.Core.ConnectionPool.yml` documents a public type.
-- `docs/api/toc.yml` still lists `ConnectionPool`.
-- README shows `new ConnectionPool(...)`.
+- `tests/PublicApi.Shipped.txt` contains over 1,000 public API lines.
+- `nORM.Internal.ConcurrentLruCache<T, TValue>` and
+  `nORM.Internal.ParameterOptimizer` are public in the shipped baseline.
+- Mapping, migration, provider, navigation, source-generation, and execution
+  implementation types are all exposed.
 
-Scope:
+Work:
 
-- Regenerate DocFX metadata from the current Release assembly.
-- Delete generated pages for removed public types.
-- Add a docs contract test that fails when docs reference missing public types.
+- Classify every public type as stable user API, stable provider API, preview
+  API, or accidental exposure.
+- Make accidental implementation types internal, or move them to a deliberately
+  named advanced namespace with documentation.
+- Require XML docs and behavioral tests for every type retained as stable.
 
-Done when:
+Acceptance gate:
 
-- `docs/api` can be regenerated cleanly from source and contains no removed API.
+- Public API diffs are reviewed against a supportability classification file.
+- No `nORM.Internal.*` type remains in the stable public API without an explicit
+  v1 decision.
 
-### 3. Decide whether `ConnectionPool` is removed or restored
+### 2. Move from preview packages to deterministic v1 package versioning
 
-Problem: Runtime code says custom connection pooling was removed in favor of
-ADO.NET provider pooling, while README and production docs still tell users to
-use nORM's `ConnectionPool`.
-
-Evidence:
-
-- `src/nORM/Core/ConnectionManager.cs` remarks say it no longer uses custom
-  connection pooling.
-- `README.md` shows a `ConnectionPool` example.
-- `docs/production-operations.md` says to use nORM's `ConnectionPool` for
-  specific reasons.
-
-Scope:
-
-- Either restore a tested public `ConnectionPool` API or remove all docs for it.
-- Clarify the difference between `ConnectionManager` and provider-native pooling.
-- Add compile-tested README snippets for connection management.
-
-Done when:
-
-- A README consumer can compile every connection-management example.
-
-### 4. Fix the v1 issue map and blocker accounting
-
-Problem: `docs/v1-issue-map.md` marks all 40 blockers done, then also lists a
-41st benchmark blocker. That undermines release governance and makes it look
-like the checklist is being used to close work prematurely.
+Problem: The repository still packages as `0.9.0-preview.1`.
 
 Evidence:
 
-- `docs/v1-issue-map.md` contains rows 1-41.
-- The current blocker spec is supposed to contain exactly 40 items.
+- `Directory.Build.props` sets `NormVersion` to `0.9.0-preview.1`.
+- Release builds currently produce preview package filenames.
 
-Scope:
+Work:
 
-- Replace "Done" rows with current status: Open, In Progress, Verified, or
-  Not Applicable.
-- Remove the 41st row or merge it into the benchmark blocker.
-- Require evidence links for every "Verified" row.
+- Define the final v1 versioning flow, including RC prereleases, stable v1, and
+  post-v1 development versions.
+- Make release scripts validate the expected package version and reject stale
+  package outputs.
+- Ensure docs, package tests, and release manifests all read version from the
+  same source.
 
-Done when:
+Acceptance gate:
 
-- The v1 issue map and this spec agree on exactly 40 tracked blockers.
+- The RC gate can produce exactly the expected package set for a chosen v1
+  candidate version, with no stale `.nupkg` or `.snupkg` artifacts.
 
-### 5. Make the Release build warning-free
+### 3. Decide the core package and provider package architecture
 
-Problem: The Release build must stay warning-free. Earlier audit passes found
-test `CS1998` warnings and a broad project-level exemption, which would have
-made warning regressions too easy to hide before v1.
+Problem: The runtime package has a large dependency footprint and mixed provider
+ownership.
 
 Evidence:
 
-- `tests/nORM.Tests.csproj` no longer contains a `CS1998` or
-  `WarningsNotAsErrors` exemption.
-- `RepositoryHygieneTests` locks that suppression out.
-- `dotnet build nORM.sln -c Release --no-restore --nologo` reports zero
-  warnings on this tree.
+- `src/nORM.csproj` includes SQL Server, SQLite, ScriptDom, caching, logging,
+  object pooling, annotations, and hashing.
+- PostgreSQL and MySQL drivers are optional and reflection-loaded.
+- Provider docs say SQL Server and SQLite drivers are included, while
+  PostgreSQL/MySQL require consumer packages.
 
-Scope:
+Work:
 
-- Keep the Release build warning-free.
-- Avoid project-wide warning exemptions for tests.
-- Use targeted suppressions with comments only when a warning is intentional.
+- Decide whether v1 ships one monolithic package or splits provider packages.
+- Move provider-specific heavy dependencies out of core if that is the selected
+  model.
+- Document package dependency and driver version policy per provider.
 
-Done when:
+Acceptance gate:
 
-- Release build emits zero warnings, or every remaining warning has a tracked
+- Package dependency graph is intentional, tested with package-consumer projects,
+  and documented in `docs/provider-packages.md`.
+
+### 4. Prove package consumer behavior cross-platform
+
+Problem: Local package consumption is not enough for v1.
+
+Evidence:
+
+- Package consumer tests exist, but the focused local command timed out during
+  this audit.
+- Analyzer packing, source generation, tool installation, path casing, and CLI
+  behavior can differ between Windows and Linux.
+
+Work:
+
+- Run package consumer tests on Windows and Linux from produced packages.
+- Verify analyzer inclusion, source-generation diagnostics, `dotnet tool`
+  install, README snippets, and optional provider dependencies.
+- Ensure package tests use current versioned package paths, not stale preview
+  assumptions.
+
+Acceptance gate:
+
+- CI publishes successful package-consumer artifacts for Windows and Linux from
+  the same package files intended for release.
+
+### 5. Regenerate and validate generated API documentation
+
+Problem: Generated API docs must match the actual v1 assembly.
+
+Evidence:
+
+- `docs/api` is generated output and can drift from source.
+- The old blocker spec previously identified stale API docs, so this needs to
+  remain mechanically guarded.
+
+Work:
+
+- Regenerate DocFX metadata from the Release assembly.
+- Add or keep a test that fails when `docs/api` references missing public types.
+- Ensure docs for preview APIs clearly say preview.
+
+Acceptance gate:
+
+- `docs/api` can be regenerated cleanly from the current build and contains no
+  missing, stale, or accidentally stable APIs.
+
+### 6. Tighten README and package metadata claims
+
+Problem: Some user-facing language still reads broader than the verified v1
+contract.
+
+Evidence:
+
+- README has headings such as "Production-Ready Features" and "Full support for
+  major database engines".
+- README advertises "Smart Relationship Handling", preview scaffolding, temporal
+  versioning, JSON, window functions, raw SQL, stored procedures, and full
+  provider coverage in one document.
+
+Work:
+
+- Replace broad launch language with bounded, test-backed claims.
+- Link every performance, provider, LINQ, and production claim to evidence or
+  a support matrix.
+- Add documentation tests that reject unqualified "full LINQ", "drop-in",
+  "beats raw ADO", and similar claims.
+
+Acceptance gate:
+
+- README and package metadata describe the v1 contract without overclaiming.
+
+### 7. Turn the LINQ matrix into a hard compatibility contract
+
+Problem: The docs say nORM supports a broad LINQ subset, but "full LINQ" is not a
+credible v1 claim unless every advertised shape is locked down.
+
+Evidence:
+
+- `docs/linq-support.md` lists supported, constrained, preview, and unsupported
+  features.
+- `docs/linq-support-coverage.md` maps rows to tests, but it is still file-level
+  evidence, not provider/result-path proof for every shape.
+
+Work:
+
+- Convert the matrix into table-driven tests for SQLite plus live provider
+  parity for SQL Server, PostgreSQL, and MySQL.
+- Record which execution paths are covered: normal, fast path, compiled query,
+  sync helper, async helper, and source-generated path where applicable.
+- Reject unsupported shapes with stable nORM exceptions.
+
+Acceptance gate:
+
+- Every non-unsupported LINQ matrix row has executable result-behavior evidence
+  and provider parity evidence or a documented provider limitation.
+
+### 8. Prove terminal operator parity across every execution path
+
+Problem: Terminal operators are easy to make fast but subtly wrong.
+
+Evidence:
+
+- `First`, `FirstOrDefault`, `Single`, `SingleOrDefault`, `Last`,
+  `LastOrDefault`, `ElementAt`, `Any`, `All`, `Count`, and aggregate paths span
+  several query execution paths.
+- Compiled-query and fast-path implementations contain separate logic.
+
+Work:
+
+- Add table-driven tests for empty, one-row, two-row, ordered, unordered,
+  filtered, skipped, and paged inputs.
+- Cover sync, async, compiled, source-generated, and provider-specific paths.
+- Document any deviation from LINQ-to-Objects semantics.
+
+Acceptance gate:
+
+- Terminal operators either match LINQ semantics or fail deterministically with a
   documented exception.
 
-### 6. Harden public API snapshotting before freeze
+### 9. Finish aggregate, null, boolean, enum, and type-conversion parity
 
-Problem: `PublicApiSnapshotTests` is useful, but it is a custom reflection
-formatter. v1 API freeze needs review-quality output and intentional handling
-for advanced/provider-facing APIs.
+Problem: ORM correctness often fails in type edge cases rather than happy paths.
 
 Evidence:
 
-- `tests/PublicApi.Shipped.txt` is generated by custom reflection code.
-- The public surface includes many advanced types across Core, Configuration,
-  Providers, Migration, Navigation, Enterprise, and SourceGeneration.
+- Tests exist for null semantics, aggregate operators, booleans, enums,
+  materialization conversions, and provider parameter binding.
+- Provider SQL dialects differ materially for booleans, dates, JSON, decimals,
+  and enums.
 
-Scope:
+Work:
 
-- Review every public type for v1 supportability.
-- Hide or mark preview/provider-facing APIs before v1.
-- Consider adding a standard PublicApiGenerator/Roslyn-based snapshot in
-  addition to the current reflection test.
+- Build a provider matrix for scalar aggregates and type conversions.
+- Include nullable columns, nullable concurrency tokens, decimal precision,
+  DateOnly/TimeOnly, enums, booleans, GUIDs, and provider-native JSON values.
+- Ensure parameter metadata does not contaminate cached plans.
 
-Done when:
+Acceptance gate:
 
-- Public API changes require explicit review and release-note classification.
+- Scalar query semantics are equivalent across supported providers or documented
+  as provider-specific.
 
-### 7. Revisit runtime package dependency architecture
+### 10. Stabilize Include, ThenInclude, and lazy loading
 
-Problem: The runtime package pulls in SQL Server, SQLite, ScriptDom, memory
-cache, logging abstractions, object pooling, hashing, and annotations, while
-PostgreSQL/MySQL drivers are optional reflection-loaded dependencies. That may
-be acceptable, but it is a large dependency footprint for an ORM core package.
-
-Evidence:
-
-- `src/nORM.csproj` references `Microsoft.Data.SqlClient`,
-  `Microsoft.Data.Sqlite`, `Microsoft.SqlServer.TransactSql.ScriptDom`, and
-  several Microsoft.Extensions packages.
-- Package consumer tests assert that Npgsql/MySQL are not dependencies.
-
-Scope:
-
-- Decide whether v1 ships a monolithic `nORM` package or split provider/tooling
-  packages.
-- Move SQL Server-specific ScriptDom validation out of the hot runtime package if
-  possible.
-- Document exact package dependencies per provider.
-
-Done when:
-
-- Package dependency graph is intentional and documented.
-
-### 8. Clean release artifact and version hygiene
-
-Problem: The local release output contains both `nORM.0.9.0-preview.1.nupkg` and
-`nORM.1.0.0.nupkg`. Stale packages in output folders can confuse tests,
-manual installs, and release uploads.
+Problem: Relationship loading is a major v1 support surface and still has
+documented constraints.
 
 Evidence:
 
-- `src/bin/Release` contains `nORM.0.9.0-preview.1.nupkg`.
-- `src/bin/Release` also contains `nORM.1.0.0.nupkg`.
-- Project versions are hard-coded in multiple `.csproj` files.
+- `docs/linq-support.md` says Include is constrained.
+- Composite-key dependent includes and async streaming with Include are
+  constrained or rejected.
+- Public lazy-loading wrapper types are in the API surface.
 
-Scope:
+Work:
 
-- Centralize package versioning.
-- Make release scripts clean package output before packing.
-- Validate that only expected package versions exist after release gate.
+- Define exact v1 support for reference, collection, many-to-many, owned,
+  split-query, composite-key, and nested include shapes.
+- Ensure every unsupported shape throws `NormUnsupportedFeatureException`.
+- Document that nORM lazy loading uses wrapper types, not EF proxy semantics.
 
-Done when:
+Acceptance gate:
 
-- Release artifacts are deterministic and stale package files cannot be uploaded.
+- Relationship-loading docs, tests, and public API behavior agree for every
+  supported and unsupported shape.
 
-### 9. Run package consumer tests cross-platform
+### 11. Harden GroupBy, GroupJoin, SelectMany, and set operations
 
-Problem: Package consumer tests are strong, but local Windows success is not
-enough. Package casing, analyzer paths, tool installation, and generated file
-paths can behave differently on Linux.
-
-Evidence:
-
-- Package consumer tests inspect `src/bin/Release/nORM.0.9.0-preview.1.nupkg`.
-- CI has Windows and Ubuntu jobs, but the quick release gate runs on Windows.
-
-Scope:
-
-- Run package consumer tests on Windows and Linux.
-- Verify analyzer packing, source generation, and dotnet tool installation on
-  both OSes.
-- Add a case-sensitive package-path assertion on Linux.
-
-Done when:
-
-- Package consumer tests pass in CI on Windows and Linux from produced packages.
-
-### 10. Replace or freeze the beta CLI dependency
-
-Problem: `dotnet-norm` depends on `System.CommandLine` beta bits. A v1 tool
-should avoid beta command-line parsing APIs unless the project explicitly owns
-that compatibility risk.
+Problem: These operators are common sources of semantic drift between LINQ and
+SQL.
 
 Evidence:
 
-- `src/dotnet-norm/dotnet-norm.csproj` references
-  `System.CommandLine` version `2.0.0-beta7.25380.108`.
+- The LINQ matrix marks `GroupBy`, `GroupJoin`, and `SelectMany` as constrained.
+- Group joins are bounded by `DbContextOptions.MaxGroupJoinSize`.
 
-Scope:
+Work:
 
-- Move to a stable CLI parser or document the beta dependency as an explicit v1
-  risk.
-- Add tool package compatibility tests for help, invalid options, exit codes,
-  and cancellation.
+- Add cross-provider result tests for simple and nested joins, grouped aggregate
+  projections, correlated collections, set operation ordering, and duplicate
+  behavior.
+- Keep unsupported `IGrouping` and streaming scenarios deterministic.
+- Document complexity limits and memory behavior.
 
-Done when:
+Acceptance gate:
 
-- CLI command behavior is stable across supported SDK/runtime versions.
+- Complex LINQ shapes are either stable across providers or explicitly outside
+  the v1 contract.
 
-### 11. Isolate CLI design-time assembly loading
+### 12. Make client evaluation impossible to misunderstand
 
-Problem: `norm migrations add` loads user assemblies through `Assembly.LoadFrom`.
-That is fragile for dependency probing, multiple target frameworks, shadow
-copying, and repeated invocations in the same process.
-
-Evidence:
-
-- `src/dotnet-norm/Program.cs` uses `Assembly.LoadFrom(asmPath)`.
-- Design-time context discovery is central to migration generation.
-
-Scope:
-
-- Use `AssemblyLoadContext` with dependency resolution.
-- Add tests for assemblies with external dependencies.
-- Support explicit startup/project/deps paths if needed.
-
-Done when:
-
-- CLI migrations work against realistic app assemblies, not only simple test
-  assemblies.
-
-### 12. Harden destructive database drop behavior
-
-Problem: `norm database drop` enumerates tables and drops them. That needs
-provider-specific safety around schemas, foreign-key order, views, system
-objects, migration history, protected database names, and dry-run output.
+Problem: Client evaluation can hide performance cliffs and security bugs if it
+applies before filtering or paging.
 
 Evidence:
 
-- `src/dotnet-norm/Program.cs` gets `connection.GetSchema("Tables")` and issues
-  `DROP TABLE`.
-- There is a `--yes` and `--dry-run` path, but v1 needs stronger provider
-  contracts.
+- `docs/linq-support.md` says v1 default is `ClientEvaluationPolicy.Throw`.
+- `DbContextOptions` exposes `Throw`, `Warn`, and `Allow`.
 
-Scope:
+Work:
 
-- Make drop ordering provider-aware.
-- Exclude system schemas and views explicitly.
-- Add live-provider destructive-operation tests in disposable databases.
+- Verify the runtime default is `Throw`.
+- Test that `Warn` and `Allow` only permit projection-tail evaluation after
+  server filtering, ordering, and paging.
+- Ensure logs make client evaluation visible without leaking values.
 
-Done when:
+Acceptance gate:
 
-- Drop behavior is safe, predictable, and provider-documented.
+- Client evaluation cannot pull unbounded rows before server-side restrictions.
 
-### 13. Make migration rename/data-loss handling first-class
+### 13. Prove compiled query isolation and shape parity
 
-Problem: The migration diff still treats rename-like changes as drop/add unless
-the user manually edits the migration. That is acceptable only if v1 loudly
-forces a safe workflow.
+Problem: Compiled queries are central to the performance story and can leak
+state through caches.
 
 Evidence:
 
-- README warns that column renames produce drop/add diffs.
-- Forced migrations include TODO warnings.
+- Tests exist for compiled query tenant isolation, provider matrix, parameter
+  binding, fast path, lifecycle, and SQL shape.
+- Compiled paths still need release-gate evidence across live providers.
 
-Scope:
+Work:
+
+- Compare compiled and non-compiled SQL shape, parameters, tenant filters,
+  materialization, cancellation, and exceptions.
+- Stress compiled caches under dynamic query and tenant churn.
+- Include compiled queries in benchmark and RC gates.
+
+Acceptance gate:
+
+- Compiled queries are semantically identical to normal nORM queries for the
+  advertised shapes.
+
+### 14. Finish source generator and compile-time query contracts
+
+Problem: Source generation is shipped in the runtime package but supports a
+narrower mapping subset than runtime materialization.
+
+Evidence:
+
+- The source generator targets `netstandard2.0`.
+- Docs describe limitations and diagnostics.
+- Source-generation paths interact with package-consumer tests and AOT docs.
+
+Work:
+
+- Keep analyzer diagnostics precise for unsupported shapes.
+- Cover fluent renames, owned types, converters, nullability, constructors, and
+  generated materializer cache behavior.
+- Verify generated code compiles and behaves in package-consumer projects.
+
+Acceptance gate:
+
+- Source generation either works or fails with a stable diagnostic for every
+  documented v1 scenario.
+
+### 15. Treat raw SQL and stored procedures as privileged security boundaries
+
+Problem: Raw SQL and stored procedures bypass parts of ORM-generated query
+protection.
+
+Evidence:
+
+- README and docs say raw SQL is read-only gated and stored procedures are
+  privileged.
+- Multi-tenancy docs say stored procedures must enforce tenant isolation
+  themselves.
+
+Work:
+
+- Prove provider-aware raw SQL validation for SELECT/CTE only.
+- Keep stored procedure command-name validation provider-specific.
+- Add examples and tests for tenant-safe stored procedure parameters.
+
+Acceptance gate:
+
+- Users cannot mistake raw SQL or stored procedures for automatically tenant-
+  filtered ORM queries.
+
+### 16. Verify multi-tenancy as a security contract
+
+Problem: Tenant isolation crosses queries, includes, compiled queries, caches,
+bulk operations, raw SQL, stored procedures, migrations, and direct connection
+access.
+
+Evidence:
+
+- The test suite contains many adversarial tenant and cache-poisoning tests.
+- Docs classify raw SQL, stored procedures, migrations, scaffolding, and direct
+  connection access as caller-controlled privileged paths.
+
+Work:
+
+- Build a single threat-model table listing protected paths and bypass-capable
+  paths.
+- Run tenant isolation tests in the live provider matrix.
+- Require tenant cache-key tests for every new query execution path.
+
+Acceptance gate:
+
+- Multi-tenancy is verified as a boundary, not just a convenience filter.
+
+### 17. Prove cache memory bounds, cache keys, and invalidation
+
+Problem: nORM uses many caches, and unbounded or cross-tenant cache behavior is a
+v1 production risk.
+
+Evidence:
+
+- `docs/cache-policy.md` documents cache bounds.
+- Tests cover cache collisions, tenant cache poisoning, cache eviction, and
+  compiled materializer store bounds.
+
+Work:
+
+- Keep stress tests in the RC gate.
+- Expose or document diagnostics for critical shared caches.
+- Validate result-cache keys include provider, database identity, SQL shape,
+  parameters, tracking mode, tenant, and model fingerprint where needed.
+
+Acceptance gate:
+
+- Dynamic query churn and tenant churn cannot grow caches without bound or reuse
+  the wrong result.
+
+### 18. Harden change tracking, identity maps, and snapshots
+
+Problem: Change tracking correctness is as important as query speed for a v1 ORM.
+
+Evidence:
+
+- Tests exist for precise change tracking, constructor-bound entities, primary
+  key mutation, composite keys, snapshot aliasing, notifications, and cleanup.
+- Public APIs expose `ChangeTracker`, `EntityEntry`, attach/add/delete/update,
+  and tracking modes.
+
+Work:
+
+- Define stable semantics for attaching, detaching, PK mutation, owned entities,
+  relationship fixup, shadow properties, immutable/constructor-bound entities,
+  and notification-based tracking.
+- Stress identity maps under repeated load/save/clear cycles.
+- Ensure failures are stable nORM exceptions where callers can recover.
+
+Acceptance gate:
+
+- Change tracking semantics are documented and covered for the supported entity
+  model shapes.
+
+### 19. Finalize SaveChanges, graph ordering, and cascade behavior
+
+Problem: Write ordering bugs cause data corruption and foreign-key failures.
+
+Evidence:
+
+- Tests cover FK ordering, cascade delete, owned collections, composite keys,
+  many-to-many, concurrency tokens, and batching.
+- `SaveChangesAsync` is the only save API, while sync query APIs still exist.
+
+Work:
+
+- Prove insert/update/delete ordering across aggregate graphs.
+- Define cascade behavior and ownership semantics for owned and many-to-many
+  relationships.
+- Keep batching behavior observable and provider-safe.
+
+Acceptance gate:
+
+- Complex graph writes are atomic, ordered, and correctly accepted or rejected
+  across providers.
+
+### 20. Finish optimistic concurrency across all write paths
+
+Problem: Concurrency semantics must be consistent across normal writes, bulk
+writes, deletes, and provider-specific affected-row behavior.
+
+Evidence:
+
+- README documents a residual MySQL same-value token conflict gap.
+- Tests cover optimistic concurrency and provider-specific MySQL behavior.
+
+Work:
+
+- Align normal write, bulk update, bulk delete, timestamp, nullable token, and
+  composite-key concurrency behavior.
+- Keep MySQL affected-row semantics fail-fast by default or explicitly weakened
+  by opt-in.
+- Document the residual same-value token gap and recommended token strategy.
+
+Acceptance gate:
+
+- Concurrency conflicts are detected consistently or the provider-specific gap
+  is explicit and opt-in.
+
+### 21. Finish transaction, savepoint, ambient, retry, and interceptor semantics
+
+Problem: Transactions touch almost every subsystem and vary by provider.
+
+Evidence:
+
+- Docs cover transactions and sync policy.
+- Providers implement savepoint methods with provider-specific behavior, while
+  base provider paths throw unsupported exceptions.
+
+Work:
+
+- Verify explicit transactions, ambient `TransactionScope`, savepoints,
+  retries, cancellation, raw SQL, stored procedures, bulk operations, temporal
+  bootstrap, migrations, and interceptors together.
+- Normalize unsupported savepoint failures.
+- Document ownership rules for externally supplied connections and
+  transactions.
+
+Acceptance gate:
+
+- Transaction behavior is predictable for each provider and execution path.
+
+### 22. Complete cancellation and timeout audits
+
+Problem: Cancellation bugs can leave commands, transactions, temp tables, and
+connection state inconsistent.
+
+Evidence:
+
+- Tests exist for cancellation across queries, materialization, migrations, bulk
+  operations, commits, savepoints, temporal bootstrap, and fault-injected races.
+- `AdaptiveTimeoutManager` is public.
+
+Work:
+
+- Audit every async public API for cancellation-token propagation.
+- Verify cleanup after cancellation for transactions, temp tables, connection
+  ownership, readers, command pools, and interceptors.
+- Define timeout exception taxonomy and retry interaction.
+
+Acceptance gate:
+
+- Cancellation either completes cleanup or reports a documented recoverable
+  state.
+
+### 23. Prove provider dialect parity and version gates
+
+Problem: Provider-specific SQL is a large part of nORM's surface area.
+
+Evidence:
+
+- Provider capabilities docs define minimum versions and supported features.
+- Providers differ on paging, booleans, JSON, identifiers, savepoints, bulk
+  operations, and parameter prefixes.
+
+Work:
+
+- Run provider parity for SQL generation and result behavior across SQLite, SQL
+  Server, PostgreSQL, and MySQL.
+- Validate actual server versions at connection initialization.
+- Keep missing optional-driver errors actionable.
+
+Acceptance gate:
+
+- Provider differences are either hidden by nORM or documented as provider
+  limitations with tests.
+
+### 24. Harden bulk operations as provider-specific contracts
+
+Problem: Bulk operations are a major performance feature and a major correctness
+risk.
+
+Evidence:
+
+- README advertises provider-specific bulk insert, update, and delete.
+- Base `DatabaseProvider` native bulk update/delete methods throw
+  `NotImplementedException`.
+- Tests cover bulk provider parity, tenant isolation, temp-table leaks, OCC, and
+  transactions.
+
+Work:
+
+- Define native and fallback behavior per provider.
+- Prove atomicity, rollback, cancellation cleanup, temp-table cleanup, tenant
+  filters, concurrency checks, generated keys, and cache invalidation.
+- Normalize unsupported native bulk paths to the v1 exception taxonomy.
+
+Acceptance gate:
+
+- Bulk operations are both fast and semantically equivalent to row-wise writes
+  for supported scenarios.
+
+### 25. Make migration rename and data-loss handling first-class
+
+Problem: Rename-like changes still require manual correction to avoid data loss.
+
+Evidence:
+
+- README warns that property/column renames become drop/add diffs.
+- Forced generated migrations include TODO warnings.
+
+Work:
 
 - Add explicit rename operations or a guided rename annotation/command.
-- Require destructive diffs to be reviewed in generated migration source.
-- Add round-trip tests for rename workflows.
+- Require destructive diffs to be visibly reviewed in generated migration
+  source.
+- Add tests that prove generated migrations cannot silently drop data.
 
-Done when:
+Acceptance gate:
 
-- A property/table rename cannot silently become data loss.
+- A table or column rename cannot become data loss without an explicit developer
+  decision.
 
-### 14. Prove migration recovery and idempotency across providers
+### 26. Prove migration recovery, idempotency, and live DDL parity
 
-Problem: SQL Server/PostgreSQL/SQLite/MySQL have different transactional DDL
-semantics. MySQL DDL can auto-commit per step, so v1 needs explicit recovery
-behavior for partial failures.
-
-Evidence:
-
-- README notes MySQL DDL auto-commit behavior.
-- The release gate has migration filters, but this pass did not run live gates.
-
-Scope:
-
-- Add fault-injected live migration tests for each provider.
-- Verify advisory locks, replay behavior, and migration history consistency.
-- Document manual recovery procedures.
-
-Done when:
-
-- A failed migration leaves a known recoverable state for every provider.
-
-### 15. Complete migration SQL live parity
-
-Problem: SQL generator unit tests are not enough for v1. Generated DDL must be
-executed against the actual provider versions that v1 claims to support.
+Problem: DDL behavior differs sharply across providers, especially MySQL
+auto-commit behavior.
 
 Evidence:
 
-- Migration SQL generator tests exist.
-- Live provider gates are present but were not run in this pass.
+- Migration runners and SQL generators exist for SQLite, SQL Server,
+  PostgreSQL, and MySQL.
+- Release gates include migration filters, but a full RC run was not produced in
+  this audit.
 
-Scope:
+Work:
 
-- Run generated create/alter/drop/index/fk/default migrations live on all four
-  providers.
-- Store provider version and driver version in release artifacts.
-- Add failing SQL text to test output with secrets redacted.
+- Execute generated create/alter/drop/index/default/fk migrations live on all
+  supported providers.
+- Fault-inject failures and verify history table consistency.
+- Document manual recovery for partially applied provider-specific DDL.
 
-Done when:
+Acceptance gate:
 
-- Migration SQL parity is verified by live provider gates.
+- Failed migrations leave a known recoverable state for every supported
+  provider.
 
-## P1 Blockers
+### 27. Harden destructive CLI database drop
 
-### 16. Generate the LINQ support matrix from tests
-
-Problem: `docs/linq-support.md` is useful, but it is hand-maintained. v1 needs
-the matrix to be anchored to executable coverage so docs cannot drift from the
-translator.
-
-Evidence:
-
-- The docs say set operations and `Any` are supported.
-- Tests contain comments and workarounds for some operator edge cases.
-
-Scope:
-
-- Create a LINQ matrix test inventory.
-- Link each supported/constrained/unsupported row to tests.
-- Fail documentation contract tests when matrix rows lose coverage.
-
-Done when:
-
-- Every advertised LINQ shape has a matching test or documented exclusion.
-
-### 17. Resolve `Any` and `All` semantics across providers
-
-Problem: A test comment says `AnyAsync` can fail with SQLite datatype mismatch
-and uses `CountAsync > 0` as an equivalent idiom, while the LINQ matrix says
-`Any` is supported.
+Problem: `norm database drop` is intentionally destructive.
 
 Evidence:
 
-- `tests/LinqOperatorCardinalityTests.cs` comments mention `AnyAsync` datatype
-  mismatch on SQLite configurations.
-- `docs/linq-support.md` lists `Any` and `All` as supported.
+- README says `--yes` is required and `--dry-run` previews objects.
+- CLI code enumerates database tables and drops them.
 
-Scope:
+Work:
 
-- Add direct `AnyAsync` and `AllAsync` cardinality tests.
-- Verify predicate overloads across SQLite, SQL Server, PostgreSQL, and MySQL.
-- Fix translation or mark constrained/unsupported precisely.
+- Make object discovery schema-aware and provider-aware.
+- Exclude system schemas, views, migration history where appropriate, and
+  protected database names.
+- Add live disposable-database tests for every provider.
 
-Done when:
+Acceptance gate:
 
-- `Any`/`All` behavior is consistent with the matrix.
+- The drop command cannot destroy an unintended system database or unsupported
+  object type.
 
-### 18. Stabilize Include and lazy-loading contracts
+### 28. Finish CLI design-time loading and project discovery
 
-Problem: Relationship loading is complex and currently constrained. Composite
-key dependent includes throw `NotSupportedException`, async streaming rejects
-Include, and lazy loading uses nORM wrapper types rather than EF-style proxy
-semantics.
+Problem: Migration generation depends on loading user assemblies correctly.
 
 Evidence:
 
-- `docs/linq-support.md` says composite-key dependent includes throw
-  `NotSupportedException`.
-- `src/nORM/Navigation/NavigationPropertyExtensions.cs` uses
-  `LazyNavigationCollection<T>` and `LazyNavigationReference<T>`.
+- CLI uses a custom `AssemblyLoadContext` and `AssemblyDependencyResolver`.
+- Real projects have multiple target frameworks, external dependencies,
+  startup projects, appsettings, and environment-specific configuration.
 
-Scope:
+Work:
 
-- Decide which Include shapes are v1-stable.
-- Convert public unsupported Include failures to nORM exception taxonomy.
-- Document lazy-loading model and non-EF differences clearly.
+- Support explicit project, startup project, assembly, deps, runtimeconfig, and
+  target framework selection where needed.
+- Test design-time factory discovery with external dependencies.
+- Make errors actionable and redact connection strings.
 
-Done when:
+Acceptance gate:
 
-- Relationship loading is either supported or predictably rejected for each
-  documented shape.
+- `norm migrations add` works against realistic application assemblies, not just
+  simple test assemblies.
 
-### 19. Prove terminal operator parity in every execution path
+### 29. Decide whether scaffolding is preview or v1-stable
 
-Problem: Single-result operators (`First`, `Single`, `Last`, `ElementAt`, and
-default variants) have multiple execution paths: simple fast path, normal
-query executor, sync APIs, async APIs, and compiled queries. These are easy to
-diverge.
+Problem: Scaffolding is advertised but marked preview.
 
 Evidence:
 
-- `NormQueryProvider.Compiled.cs` has repeated switch blocks for single-result
-  handling.
-- `Last`/`LastOrDefault` depend on translator ordering reversal and then return
-  `list[0]`.
+- README says scaffolding is preview in v1.
+- `docs/scaffolding.md` says relationship and index generation remain explicit
+  post-processing.
+- Public scaffolding APIs exist.
 
-Scope:
+Work:
 
-- Add a table-driven test suite covering terminal operators across all paths.
-- Include empty, one-row, two-row, ordered, unordered, skipped, and filtered
-  cases.
-- Add compiled-query variants.
+- Either keep scaffolding clearly preview and exclude it from compatibility
+  guarantees, or stabilize reverse engineering for tables, columns, indexes,
+  FKs, nullability, keys, and relationships.
+- Ensure generated C# compiles and follows naming/escaping rules.
+- Define provider-specific type mapping.
 
-Done when:
+Acceptance gate:
 
-- Terminal operator behavior matches LINQ semantics or is documented otherwise.
+- Scaffolding status is unambiguous in API docs, CLI help, README, and package
+  metadata.
 
-### 20. Decide the v1 default for client evaluation
+### 30. Stabilize temporal versioning and schema side effects
 
-Problem: `ClientEvaluationPolicy.Warn` is the current default. That is
-developer-friendly, but it can hide performance cliffs and execute user code
-after materializing rows.
-
-Evidence:
-
-- `DbContextOptions.ClientEvaluationPolicy` defaults to `Warn`.
-- `docs/linq-support.md` documents warn/throw/allow modes.
-
-Scope:
-
-- Decide whether v1 default should be `Throw` for safety or `Warn` for
-  compatibility.
-- Add prominent docs and logging behavior for the chosen default.
-- Ensure server filters/paging always execute before allowed client projection.
-
-Done when:
-
-- Client evaluation behavior is a deliberate v1 compatibility decision.
-
-### 21. Remove legacy string-based bulk CUD paths
-
-Status: Verified.
-
-Problem addressed: Bulk CUD has structural shape validation, and the legacy SQL
-string validation/extraction entry points have been removed so generated SQL
-comments, literals, aliases, or provider quoting cannot steer the CUD safety
-decision.
+Problem: Temporal versioning creates schema objects during context
+initialization.
 
 Evidence:
 
-- `BulkCudBuilder` exposes only `ValidateCudPlan(BulkCudQueryShape? shape)` and
-  `GetWhereClause(BulkCudQueryShape? shape)`.
-- `NormQueryProvider` passes `plan.BulkCudShape` into both delete and update
-  CUD paths.
-- `DocumentationContractTests.Bulk_cud_uses_structural_query_shape_not_sql_text_parsing`
-  rejects the removed SQL string parser signatures.
+- `DbContextOptions.EnableTemporalVersioning()` exists.
+- Docs describe nORM-managed history tables and triggers rather than native
+  provider temporal tables.
 
-Scope:
+Work:
 
-- Keep bulk update/delete on structural metadata only.
-- Keep tests that reject reintroducing SQL text parsing.
+- Prove bootstrap idempotency, cancellation cleanup, migration interaction,
+  provider DDL validity, rollback behavior, and permission requirements.
+- Document how applications own generated history schema.
+- Ensure temporal initialization does not surprise ordinary read-only contexts.
 
-Done when:
+Acceptance gate:
 
-- Bulk CUD does not depend on ad hoc SQL text parsing.
+- Temporal versioning is safe to enable deliberately and impossible to trigger
+  accidentally.
 
-### 22. Define bulk update value-expression support
+### 31. Keep AOT and trimming boundaries honest
 
-Status: Verified.
-
-Problem addressed: `ExecuteUpdate` set values are limited to literal constants
-and precomputed captured local values. That is safer than invoking arbitrary
-expressions and is now documented as the v1 contract instead of being left as an
-implicit EF-style expectation.
+Problem: nORM is JIT-first but ships source-generation support, which can create
+confusion about NativeAOT support.
 
 Evidence:
 
-- `BulkCudBuilder.TryGetSetValue` only accepts constants and captured fields.
-- `BatchCudTests` verifies method calls are rejected.
-- `BatchCudTests` verifies inline computed assignment values are rejected with
-  an actionable message.
-- `docs/bulk-operations.md` documents that server-side computed updates are a
-  post-v1 feature.
+- Docs explicitly say AOT/trimming are unsupported for v1.
+- Runtime paths use reflection, dynamic materialization, and dynamic scaffolding.
 
-Scope:
+Work:
 
-- Keep supported set expressions documented.
-- Keep computed server expressions out of the v1 compatibility contract.
-- Keep clear exception messages for unsupported computed updates.
-
-Done when:
-
-- Users know exactly what `ExecuteUpdate` can express.
-
-### 23. Replace raw SQL safety heuristics with provider-aware validation
-
-Status: Verified for read-only raw query APIs; stored-procedure hardening remains
-tracked by blocker 24.
-
-Problem addressed: `FromSqlRawAsync` and `QueryUnchangedAsync` now use a single
-provider-aware raw query gate instead of hand-assembling validation in each API.
-The gate rejects non-read-only statements before execution and then applies the
-shared injection-pattern and parameter-budget checks.
-
-Evidence:
-
-- Raw SQL docs say caller owns SQL shape.
-- `NormValidator.IsSafeRawSql` has extensive adversarial tests.
-- SQL Server ScriptDom is already a runtime dependency.
-- `NormValidator.ValidateRawQuerySql` combines provider-aware SELECT/CTE gating
-  with shared raw SQL validation.
-- `DbContext.RawSql.cs` routes `FromSqlRawAsync` and `QueryUnchangedAsync`
-  through `ValidateRawQuerySql`.
-- `docs/raw-sql-security.md` separates read-only raw query APIs from privileged
-  stored procedure, migration, scaffolding, and direct connection paths.
-
-Scope:
-
-- Keep the provider-aware raw SQL policy documented.
-- Use structured parsing where practical.
-- Keep read-only raw query APIs separate from privileged escape hatches.
-
-Done when:
-
-- Raw SQL safety is deterministic and documented per provider.
-
-### 24. Tighten stored procedure security and tenant boundaries
-
-Status: Verified.
-
-Problem addressed: Stored procedures bypass LINQ tenant filters unless the
-procedure itself enforces tenant isolation. The runtime now rejects unsafe
-procedure command text/name shapes, and the docs make the privileged tenant
-boundary explicit.
-
-Evidence:
-
-- `docs/multi-tenancy-security.md` says stored procedures must enforce tenant
-  isolation internally or receive a tenant parameter.
-- `DbContext.RawSql.cs` exposes stored procedure APIs.
-- `DbContext.RawSql.cs` validates stored procedure command text through provider
-  command-type rules: SQLite text mode uses the read-only raw query gate, while
-  stored-procedure providers accept only simple/schema-qualified identifiers.
-- `docs/stored-procedure-security.md` documents tenant-safe parameter patterns
-  and review rules.
-
-Scope:
-
-- Keep examples for tenant-safe stored procedures.
-- Keep tenant-parameter helper patterns documented.
-- Ensure docs label stored procedures as privileged/bypass-capable.
-
-Done when:
-
-- Multi-tenant users cannot mistake stored procedures for automatically filtered
-  nORM queries.
-
-### 25. Finish transaction and sync/async policy hardening
-
-Problem: Transaction behavior spans explicit transactions, ambient
-`TransactionScope`, savepoints, sync APIs, async APIs, temporal bootstrap, and
-provider-specific unsupported operations.
-
-Status: In Progress.
-
-Evidence:
-
-- `DbContext.EnsureConnectionSync` can run temporal bootstrap synchronously.
-- `TransactionManager` has provider fallback policies.
-- Savepoint support differs by provider.
-- `docs/transactions.md` and `docs/sync-policy.md` are linked from README and
-  covered by documentation contract tests.
-- Raw SQL and SQLite text-mode stored procedure paths have active-transaction
-  binding tests.
-
-Scope:
-
-- Verify transaction behavior under cancellation, disposal, retry, interceptors,
-  and live providers.
-- Document unsupported savepoint/ambient transaction cases per provider.
-- Avoid sync-over-async deadlock hazards in docs and implementation.
-
-Done when:
-
-- Transaction behavior is predictable for each supported provider.
-
-### 26. Prove `ConnectionManager` failover behavior under load
-
-Problem: `ConnectionManager` handles health checks, primary selection, read
-replicas, circuit breaking, and background disposal. That is production-critical
-and separate from simple DbContext connection use.
-
-Status: In Progress.
-
-Evidence:
-
-- `ConnectionManager` starts a background health-check task.
-- It creates fresh connections and relies on provider-native pooling.
-- Write failover now treats an unhealthy current primary as unavailable and
-  selects a healthy secondary.
-- Tests cover deterministic secondary failover, read-replica fallback, circuit
-  breaker behavior, and concurrent read/dispose races.
-
-Scope:
-
-- Add stress tests for health-check failures, dispose races, replica churn, and
-  failover under concurrent reads/writes.
-- Document operational limits.
-- Clarify logger/null behavior and ownership.
-
-Done when:
-
-- Failover/replica behavior is tested as a production feature, not just an API.
-
-### 27. Treat multi-tenancy as a verified security boundary
-
-Problem: Multi-tenancy touches queries, includes, bulk operations, compiled
-queries, cache keys, raw SQL, stored procedures, migrations, and direct
-connection access. Any one bypass can become a data leak.
-
-Evidence:
-
-- There are extensive adversarial tenant tests.
-- Docs still classify raw SQL and stored procedures as caller-owned.
-- `docs/multi-tenancy-security.md` now includes a boundary inventory that lists
-  protected ORM paths, bypass-capable APIs, and required controls.
-
-Scope:
-
-- Run tenant security tests in the full live provider matrix.
-- Keep a threat model table with bypass-capable APIs.
-- Require tenant cache-key and compiled-query isolation tests for every new
-  query path.
-
-Done when:
-
-- "multi-tenancy" is a documented and tested security contract.
-
-### 28. Decide temporal/versioning stability
-
-Problem: Temporal versioning creates provider-specific history tables and
-triggers during connection initialization. That is a big schema side effect for
-a v1-stable feature.
-
-Evidence:
-
-- `DbContextOptions.EnableTemporalVersioning()` bootstraps temporal objects.
-- `TemporalManager` validates and executes provider DDL.
-- `docs/temporal-versioning.md` defines temporal as a stable v1 feature for
-  nORM-managed history tables/triggers, not provider-native temporal tables.
-- Docs describe temporal schema ownership, migration interaction, rollback
-  responsibilities, and RC live-provider evidence requirements.
-
-Scope:
-
-- Keep temporal stable for v1 with the documented nORM-managed storage model.
-- Verify bootstrap/migration interaction in RC live-provider gates.
-- Keep schema ownership and rollback strategy documented.
-
-Done when:
-
-- Temporal versioning has a clear v1 support level.
-
-### 29. Enforce provider version support at startup
-
-Problem: Providers depend on driver behavior and database version capabilities,
-but PostgreSQL/MySQL drivers are loaded by reflection and many failures can show
-up late.
-
-Evidence:
-
-- `PostgresProvider` and `MySqlProvider` use reflection parameter factories.
-- Provider capability docs define `IsAvailableAsync` and actual-connection
-  startup validation.
-- Provider initialization validates opened connections against
-  `Capabilities.MinimumServerVersion` and throws `NormConfigurationException`
-  before query execution for unsupported versions.
-
-Scope:
-
-- Keep driver presence and minimum versions validated at startup.
-- Keep actual database version/capability checks on opened connections.
-- Produce actionable errors for missing optional drivers.
-
-Done when:
-
-- Provider setup fails early and clearly.
-
-### 30. Finish MySQL optimistic concurrency guarantees
-
-Problem: MySQL affected-row semantics can weaken optimistic concurrency when a
-concurrent writer updates a token to the same value. The repo has an option and
-docs, but this remains a serious data-integrity edge.
-
-Evidence:
-
-- `DbContextOptions.RequireMatchedRowOccSemantics` defaults to true.
-- Its XML docs describe an unsafe same-value token collision mode.
-- MySQL affected-row timestamp updates fail fast by default unless the
-  application configures matched-row mode or explicitly sets
-  `RequireMatchedRowOccSemantics=false`.
-
-Scope:
-
-- Keep default behavior strong by refusing affected-row timestamp updates.
-- Verify matched-row and explicit affected-row opt-in behavior.
-- Keep unsafe mode very explicit in docs and exception messages.
-
-Done when:
-
-- MySQL OCC semantics are either strong by default or loudly refused.
-
-### 31. Prove AOT and trimming claims with real publish tests
-
-Problem: Docs describe JIT-first behavior and AOT/trimming limits, but v1 should
-have actual publish-time validation for the supported subset.
-
-Evidence:
-
-- `docs/aot-trimming.md` documents reflection, dynamic code, and source
-  generation boundaries.
-- Runtime materialization and scaffolding use reflection/dynamic code paths.
-- `AotTrimmingPolicyTests` verifies dynamic-code annotations and runs a negative
-  `PublishTrimmed=true` smoke test that must fail with trim or SDK publish
+- Maintain publish tests that prove unsupported dynamic paths fail with clear
   diagnostics.
+- Annotate public APIs that require dynamic code or unreferenced code.
+- Ensure package docs and README do not imply broad AOT support.
 
-Scope:
+Acceptance gate:
 
-- Keep v1 AOT/trimming unsupported unless a future source-generator-first
-  runtime path is added.
-- Ensure unsupported dynamic features fail at build or startup with clear
-  messages and publish diagnostics.
-- Document exact linker warnings that are accepted.
+- AOT/trimming behavior is verified by publish diagnostics, not just prose.
 
-Done when:
+### 32. Freeze interceptor contracts
 
-- AOT/trimming support is verified by publish artifacts, not only docs.
-
-### 32. Harden source generator limitations
-
-Problem: Source generation now ships in the package, but generator support is
-intentionally narrower than runtime materialization. Limitations around
-parameterless constructors, fluent-only renames, owned types, converters, and
-nullability need sharp diagnostics.
+Problem: Interceptors are public extensibility points that can alter commands and
+observe save behavior.
 
 Evidence:
 
-- `MaterializerQueryGenerator` emits diagnostics for unsupported return types
-  and missing parameterless constructors.
-- Source-generation docs warn about runtime-only mapping cases.
-- `docs/source-generation.md` defines the v1 materializer support contract and
-  diagnostic IDs.
-- Package-consumer tests verify unsupported mapped properties fail with
-  `nORMSG005` from the packed analyzer.
+- Public command and save interceptors exist.
+- Docs define ordering, suppression, mutation, and failure behavior.
 
-Scope:
+Work:
 
-- Keep analyzer diagnostics for source-visible unsupported materializer shapes.
-- Keep runtime guards for fluent-only renames, `OwnsOne`, and value converters
-  that source generation cannot see at compile time.
-- Keep generated code inside the documented AOT/trimming boundary.
-- Keep package-consumer tests covering generated materializers and compile-time
-  queries.
+- Cover raw SQL, stored procedures, compiled queries, source-generated queries,
+  retries, transactions, cancellation, bulk operations, and suppression.
+- Define which command mutations are supported.
+- Keep sensitive data redacted in interceptor logging paths.
 
-Done when:
+Acceptance gate:
 
-- Source generation either works or explains exactly why it cannot.
+- Interceptor behavior is stable enough for third-party integrations.
 
-### 33. Stress cache and plan memory bounds as release gates
+### 33. Normalize public exception taxonomy
 
-Problem: The project has many caches: query plans, compiled parameter sets,
-materializers, result cache, tenant-scoped cache keys, and command pools. v1
-needs bounded behavior under adversarial dynamic query shapes.
+Problem: Public paths still risk leaking `InvalidOperationException`,
+`NotSupportedException`, `NotImplementedException`, or raw provider exceptions
+where stable nORM exceptions should apply.
 
 Evidence:
 
-- `NormQueryProvider.Compiled.cs` has a bounded compiled parameter-set cache.
-- Cache policy docs exist.
-- Many tests cover cache collision and tenant isolation.
-- The RC release gate now runs a dedicated `cache memory bounds gate`.
-- `CacheMemoryBoundReleaseGateTests` churns bounded cache primitives and the
-  compiled materializer store beyond capacity and asserts counts/evictions.
+- Source still contains public or provider-facing unsupported paths using
+  `NotSupportedException` and `NotImplementedException`.
+- Docs define `NormUnsupportedFeatureException`, `NormUsageException`,
+  `NormConfigurationException`, `NormDatabaseException`, and related types.
 
-Scope:
+Work:
 
-- Keep cache stress tests in RC mode with count-based memory bounds.
-- Keep public diagnostics for source-generated materializer cache
-  size/hits/misses/evictions.
-- Keep tenant and provider cache-key isolation tests in the adversarial suite.
+- Audit every public API for expected failure modes.
+- Map unsupported features, usage errors, configuration errors, timeouts,
+  provider failures, and concurrency conflicts to stable exception types.
+- Preserve raw provider exceptions only where explicitly documented.
 
-Done when:
+Acceptance gate:
 
-- Cache growth is bounded and observable.
+- Users can catch stable nORM exception categories for expected failures.
 
-### 34. Normalize public exception taxonomy
+### 34. Complete logging and redaction coverage
 
-Problem: Docs define nORM exception types, but public paths still throw
-`NotSupportedException`, `InvalidOperationException`, and raw provider
-exceptions in some unsupported-feature cases.
+Problem: Diagnostics touch SQL, parameters, connection strings, CLI output,
+interceptors, benchmark artifacts, and release manifests.
 
 Evidence:
 
-- `docs/linq-support.md` now says constrained Include shapes throw
-  `NormUnsupportedFeatureException`.
-- Query translator paths use `NormUnsupportedFeatureException` in many places.
-- Public bulk CUD, async streaming Include/GroupJoin, and composite-key include
-  paths have regression tests for `NormUnsupportedFeatureException`.
+- Docs and tests exist for redaction.
+- Release scripts and CLI commands handle connection strings and provider
+  configuration.
 
-Scope:
+Work:
 
-- Keep unsupported public query/provider feature failures on
-  `NormUnsupportedFeatureException`.
-- Keep provider exceptions where they are intentionally transparent.
+- Audit every log path for SQL literals, parameter values, connection strings,
+  environment variables, exception messages, benchmark output, and artifacts.
+- Keep sensitive-data logging as an explicit application-owned opt-in.
+- Add redaction tests for new CLI and release-manifest paths.
 
-Done when:
+Acceptance gate:
 
-- Users can catch stable nORM exceptions for expected unsupported features.
+- Normal diagnostics cannot leak secrets.
 
-### 35. Complete logging and redaction coverage
+### 35. Prove ConnectionManager high-availability behavior under load
 
-Problem: Logging touches SQL, parameters, CLI errors, connection strings,
-interceptor output, benchmark output, and release artifacts. Redaction must be
-global and test-backed.
+Problem: `ConnectionManager` is public production infrastructure, not a simple
+helper.
 
 Evidence:
 
-- `ConnectionStringValidator` has redaction support.
-- Logging docs exist.
-- Runtime tests prove `LogQuery` redacts SQL literals and parameter values.
-- Interceptor tests prove the built-in command interceptor redacts command text
-  and does not log scalar result values.
-- CLI tests prove validated execution strings remain separate from redacted
-  diagnostics.
-- Logging docs define the benchmark/release artifact boundary: provider names,
-  versions, commands, and result files only; never `NORM_TEST_*` values.
+- `ConnectionManager` handles topology, primary/write selection, read replicas,
+  health checks, and background disposal.
+- README separately explains provider-native pooling.
 
-Scope:
+Work:
 
-- Keep runtime logging, CLI, interceptor, and release-artifact redaction tests.
-- Keep sensitive-data logging as an explicit application-owned decision.
+- Stress read/write failover, health-check failures, background disposal,
+  replica churn, concurrent callers, logger behavior, and cancellation.
+- Document that it creates provider connections and relies on provider-native
+  pooling.
+- Define operational limits.
 
-Done when:
+Acceptance gate:
 
-- Secrets cannot leak through normal diagnostics.
+- ConnectionManager behavior remains correct under concurrent failover and
+  disposal stress.
 
-### 36. Freeze interceptor semantics
+### 36. Define retry and adaptive timeout production policy
 
-Problem: Interceptors can observe or alter commands around transactions,
-retries, cancellation, raw SQL, compiled queries, generated compile-time queries,
-stored procedures, and bulk operations. This is a public extensibility point.
+Problem: Retries and adaptive timeouts can change transactional semantics if
+misapplied.
 
 Evidence:
 
-- `DbContextOptions.CommandInterceptors` and `SaveChangesInterceptors` are
-  public.
-- Docs describe interceptor ordering and transaction behavior.
-- `InterceptorContractTests` verifies command interceptor registration order,
-  command mutation visibility, suppression notification semantics, and failure
-  propagation.
-- Existing save-interceptor tests verify pre-commit mutation, post-commit
-  visibility, cancellation handling, and post-commit exception logging.
+- Public `RetryPolicy`, execution strategies, and `AdaptiveTimeoutManager`
+  exist.
+- Retry and timeout behavior interacts with transactions, interceptors, raw SQL,
+  stored procedures, and cancellation.
 
-Scope:
+Work:
 
-- Keep command and save interceptor contract tests in the release gate.
-- Keep docs explicit about supported command mutations, unsupported transaction
-  ownership mutations, suppression behavior, and failure semantics.
+- Define which operations are retryable and which are never retried.
+- Ensure retries do not repeat non-idempotent operations inside external
+  transactions.
+- Document timeout budgets and adaptive behavior.
 
-Done when:
+Acceptance gate:
 
-- Interceptors are a stable v1 contract.
+- Retry and timeout policies are safe by default and explicit when risky.
 
-### 37. Rebuild benchmark evidence before any performance launch
+### 37. Rebuild benchmark fairness and dependency parity
 
-Problem: The benchmark harness is real and has improved categories, but v1
-performance claims still require full reproducible artifacts and write-path
-semantic parity. Beating Raw ADO only matters if the Raw ADO category is named
-and comparable.
+Problem: Performance claims are central to nORM, but benchmark evidence must be
+release-grade.
 
 Evidence:
 
-- `docs/benchmark-governance.md` defines Raw ADO convenience/optimized/prepared
-  categories.
-- `BenchmarkFairnessLockTests` checks some benchmark labels and reader paths.
-- `eng/benchmark-evidence.ps1` generates release evidence from raw
-  BenchmarkDotNet CSV reports.
-- `eng/v1-release-gate.ps1` runs the evidence manifest after benchmark steps in
-  `full` and `rc` modes.
+- Benchmark governance docs exist.
+- Benchmarks compare EF Core, Dapper, Raw ADO.NET, and nORM.
+- Benchmark package versions differ from tests/runtime for some dependencies.
 
-Scope:
+Work:
 
-- Run full BenchmarkDotNet provider matrix on release hardware before launch.
-- Publish raw artifacts, SDK/OS, driver packages, provider configuration with
-  secrets redacted, schema/seed notes, and command line/filter.
-- Verify read and write scenarios have equivalent SQL shape and semantics.
-- Separate identity-hydrating inserts from throughput-only inserts.
+- Align benchmark dependency versions with the release support matrix or
+  document why they differ.
+- Verify equivalent SQL, row counts, projections, compiled/prepared modes, and
+  materialization semantics.
+- Separate Raw ADO convenience, optimized, and prepared-optimized baselines.
 
-Done when:
+Acceptance gate:
 
-- Every public performance claim maps to a generated benchmark evidence
-  manifest and its raw BenchmarkDotNet artifacts.
+- Every public performance claim maps to raw BenchmarkDotNet output from the
+  release commit.
 
-### 38. Make benchmark thresholds executable
+### 38. Make benchmark thresholds credible and enforced
 
-Problem: Docs describe benchmark governance, but release gates need enforceable
-budgets. Otherwise benchmark output becomes advisory and marketing can drift.
+Problem: Current benchmark budgets are useful guardrails but not yet release
+evidence.
 
 Evidence:
 
-- `eng/v1-release-gate.ps1` can run benchmarks.
-- CI quick gates skip benchmarks.
-- RC workflow has a `skip_benchmark` input.
-- `eng/benchmark-thresholds.json` now defines versioned v1 latency and
-  allocation ratio budgets for simple, complex, join, and batched insert paths.
-- `eng/check-benchmark-thresholds.ps1` evaluates raw BenchmarkDotNet CSV reports
-  and writes markdown/JSON threshold artifacts.
-- `eng/v1-release-gate.ps1` runs the threshold gate after benchmark evidence; RC
-  mode treats missing provider-matrix rows and threshold violations as failures.
+- `eng/benchmark-thresholds.json` defines ratio budgets.
+- RC gate can run benchmark evidence and threshold scripts.
 
-Scope:
+Work:
 
-- Run the full provider matrix on release hardware and tighten the initial
-  budgets from conservative v1 guardrails into release-candidate baselines.
-- Require explicit override notes when benchmarks are skipped in release
-  automation.
+- Run the full provider matrix on controlled release hardware.
+- Tighten thresholds from provisional budgets to release-candidate baselines.
+- Require explicit override notes for skipped benchmark jobs.
 
-Done when:
+Acceptance gate:
 
-- Performance regressions fail the release gate through the executable
-  threshold checker and its versioned budget file.
+- Performance regressions fail release automation, and skipped benchmarks block
+  performance claims.
 
-### 39. Reduce test-suite entropy before v1
+### 39. Reduce test-suite entropy and prove reliability
 
-Problem: The test suite is large and valuable, but it includes coverage-boost
-files, old TRX artifacts in local search results, async-warning suppressions,
-and many overlapping tests. v1 needs maintainable signal, not just volume.
+Problem: The test suite is large and valuable, but size alone is not release
+confidence.
 
 Evidence:
 
-- Release builds are warning-free and the stale `CS1998` test-project
-  suppression has been removed.
-- Local ignored `tests/TestResults` artifacts were removed from the working
-  tree, and `.gitignore` now also ignores `*.trx` and `*.coverage`.
-- `docs/test-suite-ownership.md` documents the remaining legacy
-  `CoverageBoost*.cs` files and prohibits new catch-all coverage files.
-- `RepositoryHygieneTests` verifies warning-suppression removal, artifact ignore
-  rules, and that generated test artifacts are not tracked.
+- The repo has thousands of test declarations and many specialized regression
+  files.
+- No skipped xUnit tests were found in this audit.
+- A focused contract-test command timed out locally.
 
-Scope:
+Work:
 
-- Continue moving legacy `CoverageBoost*` groups into domain-named regression
-  files whenever those tests are touched for substantive changes.
-- Keep adversarial and regression tests, with ownership clear in docs.
+- Split slow tests from fast gates deliberately.
+- Track flaky, stress, live-provider, benchmark, and package-consumer tests with
+  clear ownership.
+- Keep coverage-boost style tests from becoming the default pattern for new
+  work.
 
-Done when:
+Acceptance gate:
 
-- The test suite is warning-free, generated artifacts stay out of source, and
-  legacy catch-all coverage files have a documented containment policy.
+- CI gates are reliable, understandable, and fast enough to run consistently.
 
-### 40. Run and publish a real RC release gate
+### 40. Run and publish a real RC gate from the release commit
 
-Problem: The repo now has release scripts and workflows, but v1 is not credible
-until a full RC gate has actually run and its artifacts are reviewed.
+Problem: v1 is not credible until release evidence exists.
 
 Evidence:
 
 - `eng/v1-release-gate.ps1` supports `quick`, `live`, `full`, and `rc`.
-- `.github/workflows/v1-rc.yml` exists.
-- `eng/rc-artifact-manifest.ps1` writes `artifacts/v1-rc/rc-artifacts.md` and
-  `.json` with the validated commit, mode, SDK, configured providers, test
-  results, packages, benchmark artifacts, and benchmark evidence.
-- `.github/workflows/v1-rc.yml` uploads the RC artifact manifest alongside TRX,
-  package, and benchmark artifacts.
-- `docs/release-checklist.md` requires reviewing the manifest before tagging.
+- `.github/workflows/v1-rc.yml` exists and can run the RC gate.
+- No successful full RC artifact manifest was produced during this audit.
 
-Scope:
+Work:
 
-- Run `eng/v1-release-gate.ps1 -Mode rc -MinLiveProviders 3`.
-- Upload full test, live provider, package, benchmark, and environment
-  artifacts.
-- Review and link artifacts in the release checklist.
+- Run `eng/v1-release-gate.ps1 -Mode rc -MinLiveProviders 3` from the candidate
+  commit with benchmarks enabled.
+- Upload TRX, packages, benchmark artifacts, provider configuration summary,
+  SDK/OS metadata, and RC manifest.
+- Review the manifest before tagging.
 
-Done when:
+Acceptance gate:
 
-- v1.0 is backed by an auditable RC run from the release commit, and the
-  generated artifact manifest is attached to the release evidence.
+- The v1.0 tag points at the exact commit validated by the RC manifest.
+
+## Execution Order
+
+1. API/package/docs freeze: blockers 1-6.
+2. Query semantics: blockers 7-14.
+3. Security and correctness: blockers 15-24.
+4. Tooling and schema features: blockers 25-31.
+5. Extensibility and operations: blockers 32-36.
+6. Benchmarks, tests, and release evidence: blockers 37-40.
+
+## Closure Rule
+
+Do not mark any item complete from prose alone. Closure requires at least one
+hard artifact:
+
+- code change with tests,
+- generated docs or package output,
+- CI or release-gate run,
+- live-provider evidence,
+- raw benchmark artifacts,
+- or a deliberate "not in v1" decision reflected in public docs and API shape.
