@@ -67,6 +67,10 @@ case or uses an application-level token discipline that makes same-value token
 conflicts impossible, such as monotonically increasing versions. This is a
 deliberate weakened guarantee and should be called out in application review.
 
+## MySQL Same-Value Limitation
+
+> **MySQL same-value limitation**: When a concurrency token column's value is updated to the same value it already has, MySQL `UPDATE` affected-row count can remain 0 regardless of whether the row was concurrently modified. Use `byte[]`/`timestamp` columns that guarantee value changes on every update. The `RequireMatchedRowOccSemantics` option (default `true`) enables fail-fast behavior for this scenario.
+
 ## Delete Semantics
 
 Deletes do not have the same-value update ambiguity. A deleted row is counted as
