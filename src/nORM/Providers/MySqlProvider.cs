@@ -296,11 +296,21 @@ namespace nORM.Providers
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"CHAR_LENGTH({args[0]})",
+                    nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]})",
+                    nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
+                    nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                    // MySQL SUBSTRING is 1-indexed; .NET Substring is 0-indexed, add 1.
+                    nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]}, ({args[1]}) + 1)",
+                    nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]}, ({args[1]}) + 1, {args[2]})",
+                    nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
+                    // LOCATE returns 1-based position or 0 if not found; .NET IndexOf is 0-based
+                    // returning -1, so subtract 1.
+                    nameof(string.IndexOf) when args.Length == 2 => $"(LOCATE({args[1]}, {args[0]}) - 1)",
                     _ => null
                 };
             }
 
-            if (declaringType == typeof(DateTime))
+            if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch
                 {
@@ -310,6 +320,23 @@ namespace nORM.Providers
                     nameof(DateTime.Hour) => $"HOUR({args[0]})",
                     nameof(DateTime.Minute) => $"MINUTE({args[0]})",
                     nameof(DateTime.Second) => $"SECOND({args[0]})",
+                    nameof(DateTime.DayOfYear) => $"DAYOFYEAR({args[0]})",
+                    nameof(DateTime.Date) => $"DATE({args[0]})",
+                    nameof(DateTime.AddDays) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) DAY)",
+                    nameof(DateTime.AddMonths) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MONTH)",
+                    nameof(DateTime.AddYears) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) YEAR)",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateOnly))
+            {
+                return name switch
+                {
+                    nameof(DateOnly.Year) => $"YEAR({args[0]})",
+                    nameof(DateOnly.Month) => $"MONTH({args[0]})",
+                    nameof(DateOnly.Day) => $"DAY({args[0]})",
+                    nameof(DateOnly.DayOfYear) => $"DAYOFYEAR({args[0]})",
                     _ => null
                 };
             }

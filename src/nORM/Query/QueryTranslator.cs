@@ -931,6 +931,17 @@ namespace nORM.Query
             {
                 return translator.Translate(this, node);
             }
+            // Reject unsupported Queryable / Enumerable method calls on a nORM query with a
+            // stable nORM exception. Without this guard, methods like DefaultIfEmpty, OfType,
+            // Cast, TakeWhile, SkipWhile, and SequenceEqual either silently pass through
+            // (returning wrong results) or leak provider-specific exceptions on execution.
+            var declaring = node.Method.DeclaringType;
+            if (declaring == typeof(System.Linq.Queryable) || declaring == typeof(System.Linq.Enumerable))
+            {
+                throw new NormUnsupportedFeatureException(
+                    $"LINQ method '{_methodName}' is not supported by the nORM v1 query translator. " +
+                    "See docs/linq-support.md for the supported operator matrix.");
+            }
             return base.VisitMethodCall(node);
         }
         private Expression HandleSetOperation(MethodCallExpression node)

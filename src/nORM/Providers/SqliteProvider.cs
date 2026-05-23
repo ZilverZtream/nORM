@@ -235,11 +235,21 @@ namespace nORM.Providers
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
+                    nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]})",
+                    nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
+                    nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                    // SQLite SUBSTR is 1-indexed; .NET Substring is 0-indexed, so add 1 to the start.
+                    nameof(string.Substring) when args.Length == 2 => $"SUBSTR({args[0]}, {args[1]} + 1)",
+                    nameof(string.Substring) when args.Length == 3 => $"SUBSTR({args[0]}, {args[1]} + 1, {args[2]})",
+                    nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
+                    // SQLite INSTR returns 1-based position or 0 if not found; .NET IndexOf returns
+                    // 0-based position or -1, so subtract 1 unconditionally.
+                    nameof(string.IndexOf) when args.Length == 2 => $"(INSTR({args[0]}, {args[1]}) - 1)",
                     _ => null
                 };
             }
 
-            if (declaringType == typeof(DateTime))
+            if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch
                 {
@@ -249,6 +259,24 @@ namespace nORM.Providers
                     nameof(DateTime.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
                     nameof(DateTime.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
                     nameof(DateTime.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
+                    nameof(DateTime.Date) => $"date({args[0]})",
+                    // AddDays/AddMonths/AddYears accept a delta in the second argument.
+                    nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' days')",
+                    nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' months')",
+                    nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' years')",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(DateOnly))
+            {
+                return name switch
+                {
+                    nameof(DateOnly.Year) => $"CAST(strftime('%Y', {args[0]}) AS INTEGER)",
+                    nameof(DateOnly.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
+                    nameof(DateOnly.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
+                    nameof(DateOnly.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
                     _ => null
                 };
             }

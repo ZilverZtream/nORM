@@ -42,11 +42,63 @@ namespace nORM.Core
             {
                 return normProvider.ExecuteAsync<List<T>>(source.Expression, ct);
             }
-            
+
             throw new NormUsageException(
                 "ToListAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync().");
+        }
+
+        /// <summary>
+        /// Materializes an nORM query into a dictionary keyed by the supplied selector.
+        /// Server executes the query once; the dictionary is built on the client side, which is
+        /// the only place a CLR-only key selector can run.
+        /// </summary>
+        public static async Task<Dictionary<TKey, T>> ToDictionaryAsync<T, TKey>(
+            this IQueryable<T> source,
+            Func<T, TKey> keySelector,
+            CancellationToken ct = default)
+            where T : class
+            where TKey : notnull
+        {
+            ArgumentNullException.ThrowIfNull(keySelector);
+            var list = await ToListAsync(source, ct).ConfigureAwait(false);
+            var result = new Dictionary<TKey, T>(list.Count);
+            foreach (var item in list)
+                result.Add(keySelector(item), item);
+            return result;
+        }
+
+        /// <summary>
+        /// Materializes an nORM query into a dictionary keyed and valued by the supplied
+        /// selectors. Server executes the query once; client materializes the dictionary.
+        /// </summary>
+        public static async Task<Dictionary<TKey, TValue>> ToDictionaryAsync<T, TKey, TValue>(
+            this IQueryable<T> source,
+            Func<T, TKey> keySelector,
+            Func<T, TValue> valueSelector,
+            CancellationToken ct = default)
+            where T : class
+            where TKey : notnull
+        {
+            ArgumentNullException.ThrowIfNull(keySelector);
+            ArgumentNullException.ThrowIfNull(valueSelector);
+            var list = await ToListAsync(source, ct).ConfigureAwait(false);
+            var result = new Dictionary<TKey, TValue>(list.Count);
+            foreach (var item in list)
+                result.Add(keySelector(item), valueSelector(item));
+            return result;
+        }
+
+        /// <summary>
+        /// Materializes an nORM query into a <see cref="HashSet{T}"/>. Server executes the query
+        /// once; the hash set is built on the client side using the default equality comparer.
+        /// </summary>
+        public static async Task<HashSet<T>> ToHashSetAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            var list = await ToListAsync(source, ct).ConfigureAwait(false);
+            return new HashSet<T>(list);
         }
 
         /// <summary>

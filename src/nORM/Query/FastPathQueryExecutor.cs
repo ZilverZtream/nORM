@@ -250,13 +250,20 @@ namespace nORM.Query
                 return false;
             var body = lambda.Body;
             // Support boolean member access: u => u.IsActive
-            if (body is MemberExpression meBoolean && meBoolean.Type == typeof(bool))
+            if (body is MemberExpression meBoolean && meBoolean.Type == typeof(bool)
+                && meBoolean.Expression is ParameterExpression)
             {
                 info = new WhereInfo(meBoolean.Member.Name, true);
                 return true;
             }
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
+                // Reject nested member access (a.Name.Length) so the slow translator handles
+                // method/function translations like LENGTH(name) instead of the fast path trying
+                // to look up "Length" as a column.
+                if (me.Expression is not ParameterExpression)
+                    return false;
+
                 // Only accept ConstantExpression or simple MemberExpression.
                 // Never compile and execute arbitrary expressions (would be an RCE vulnerability).
                 // Complex expressions fall back to the safe ExpressionToSqlVisitor.
@@ -392,6 +399,13 @@ namespace nORM.Query
                 return false;
 
             if (binary.Left is not MemberExpression member)
+                return false;
+
+            // Reject nested member access (e.g., `a.Name.Length` where the immediate parent is
+            // another MemberExpression, not the entity parameter). Without this guard, the
+            // fast path records "Length" as a property name and later fails the column lookup
+            // with a hard exception instead of falling back to the full translator.
+            if (member.Expression is not ParameterExpression)
                 return false;
 
             if (!TryGetSimpleValue(binary.Right, out var value))

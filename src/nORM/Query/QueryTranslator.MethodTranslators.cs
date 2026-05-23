@@ -31,6 +31,7 @@ namespace nORM.Query
             { "Distinct", new DistinctTranslator() },
             { "Reverse", new ReverseTranslator() },
             { "Union", new SetOperationTranslator() },
+            { "Concat", new SetOperationTranslator() },
             { "Intersect", new SetOperationTranslator() },
             { "Except", new SetOperationTranslator() },
             { "Any", new SetPredicateTranslator() },
@@ -401,6 +402,8 @@ namespace nORM.Query
                 var setOp = node.Method.Name switch
                 {
                     "Union" => "UNION",
+                    // Concat preserves duplicates (LINQ-to-Objects semantics) -> UNION ALL.
+                    "Concat" => "UNION ALL",
                     "Intersect" => "INTERSECT",
                     "Except" => "EXCEPT",
                     _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
