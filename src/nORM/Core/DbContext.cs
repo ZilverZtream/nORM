@@ -905,7 +905,7 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             if (transaction == null)
-                throw new InvalidOperationException("No active transaction.");
+                throw new NormUsageException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
             return _p.CreateSavepointAsync(transaction, name, ct);
@@ -924,7 +924,7 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             if (transaction == null)
-                throw new InvalidOperationException("No active transaction.");
+                throw new NormUsageException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
             return _p.RollbackToSavepointAsync(transaction, name, ct);
@@ -938,19 +938,19 @@ namespace nORM.Core
             if (tenantCol == null) return;
             var tenantId = Options.TenantProvider.GetCurrentTenantId();
             if (tenantId == null)
-                throw new InvalidOperationException("Tenant context required but not available");
+                throw new NormConfigurationException("Tenant context required but not available");
             var entityTenant = tenantCol.Getter(entity);
             // Auto-injecting tenant ID is dangerous � developers might intend null for global records.
             // Requiring explicit tenant ID setting prevents accidental data leakage.
             if (entityTenant == null)
             {
-                throw new InvalidOperationException($"Tenant ID is required for {operation} operation but was null. " +
+                throw new NormConfigurationException($"Tenant ID is required for {operation} operation but was null. " +
                     "Explicitly set the tenant ID on the entity before saving. Auto-injection has been disabled for security.");
             }
             // X1 fix: use coercion-aware comparison matching the query filter path
             else if (!TenantIdsEqual(entityTenant, tenantId))
             {
-                throw new InvalidOperationException("Tenant context mismatch");
+                throw new NormConfigurationException("Tenant context mismatch");
             }
         }
 

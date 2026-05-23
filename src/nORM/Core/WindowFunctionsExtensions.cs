@@ -25,7 +25,7 @@ namespace nORM.Core
                 return provider.CreateQuery<TResult>(call);
             }
 
-            throw new InvalidOperationException("WithRowNumber extension can only be used with nORM queries.");
+            throw new NormUsageException("WithRowNumber extension can only be used with nORM queries.");
         }
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace nORM.Core
                 return provider.CreateQuery<TResult>(call);
             }
 
-            throw new InvalidOperationException("WithRank extension can only be used with nORM queries.");
+            throw new NormUsageException("WithRank extension can only be used with nORM queries.");
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace nORM.Core
                 return provider.CreateQuery<TResult>(call);
             }
 
-            throw new InvalidOperationException("WithDenseRank extension can only be used with nORM queries.");
+            throw new NormUsageException("WithDenseRank extension can only be used with nORM queries.");
         }
 
         /// <summary>
@@ -95,7 +95,7 @@ namespace nORM.Core
                 return provider.CreateQuery<TResult>(call);
             }
 
-            throw new InvalidOperationException("WithLag extension can only be used with nORM queries.");
+            throw new NormUsageException("WithLag extension can only be used with nORM queries.");
         }
 
         /// <summary>
@@ -129,7 +129,7 @@ namespace nORM.Core
                 return provider.CreateQuery<TResult>(call);
             }
 
-            throw new InvalidOperationException("WithLead extension can only be used with nORM queries.");
+            throw new NormUsageException("WithLead extension can only be used with nORM queries.");
         }
     }
 }

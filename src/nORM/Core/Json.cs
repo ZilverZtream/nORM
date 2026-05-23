@@ -15,7 +15,7 @@ namespace nORM.Core
         /// </summary>
         public static T Value<T>(string column, string jsonPath)
         {
-            throw new InvalidOperationException("This method is for use in nORM LINQ queries only.");
+            throw new NormUsageException("This method is for use in nORM LINQ queries only.");
         }
     }
 }
