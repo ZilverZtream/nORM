@@ -63,6 +63,13 @@ they want to operate on to `CreateSavepointAsync` and `RollbackToSavepointAsync`
 Provider support varies; unsupported providers throw a provider-specific
 unsupported-feature exception.
 
+| Provider | Savepoint Support |
+| --- | --- |
+| SQLite | Yes (native `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` syntax) |
+| SQL Server | Yes (`SAVE TRANSACTION` via ADO.NET savepoint API) |
+| PostgreSQL | Yes (native `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` syntax) |
+| MySQL | Yes (native `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` syntax) |
+
 ## Guidance
 
 - Prefer explicit `DbTransaction` for application-level atomicity.
