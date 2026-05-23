@@ -917,24 +917,24 @@ public class CoverageBoost2Tests : TestBase
     }
 
     [Fact]
-    public void MySql_CreateSavepointAsync_throws_not_supported_for_unsupported_transaction()
+    public void MySql_CreateSavepointAsync_throws_NormUnsupportedFeatureException_for_unsupported_transaction()
     {
-        // NoSavepointTransaction has no Save override; base DbTransaction.Save throws NotSupportedException
+        // NoSavepointTransaction has no Save override; falls through to NormUnsupportedFeatureException
         var provider = new MySqlProvider(new SqliteParameterFactory());
         using var cn = OpenMemory();
         using var tx = new NoSavepointTransaction(cn);
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             provider.CreateSavepointAsync(tx, "sp1").GetAwaiter().GetResult());
     }
 
     [Fact]
-    public void MySql_RollbackToSavepointAsync_throws_not_supported_for_unsupported_transaction()
+    public void MySql_RollbackToSavepointAsync_throws_NormUnsupportedFeatureException_for_unsupported_transaction()
     {
-        // NoSavepointTransaction has no Rollback(string) override; base DbTransaction throws
+        // NoSavepointTransaction has no Rollback(string) override; falls through to NormUnsupportedFeatureException
         var provider = new MySqlProvider(new SqliteParameterFactory());
         using var cn = OpenMemory();
         using var tx = new NoSavepointTransaction(cn);
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             provider.RollbackToSavepointAsync(tx, "sp1").GetAwaiter().GetResult());
     }
 
@@ -1021,24 +1021,24 @@ public class CoverageBoost2Tests : TestBase
     }
 
     [Fact]
-    public void Postgres_CreateSavepointAsync_throws_not_supported_for_unsupported_tx()
+    public void Postgres_CreateSavepointAsync_throws_NormUnsupportedFeatureException_for_unsupported_tx()
     {
-        // NoSavepointTransaction has no Save override; base DbTransaction.Save throws NotSupportedException
+        // NoSavepointTransaction has no Save override; falls through to NormUnsupportedFeatureException
         var provider = new PostgresProvider(new SqliteParameterFactory());
         using var cn = OpenMemory();
         using var tx = new NoSavepointTransaction(cn);
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             provider.CreateSavepointAsync(tx, "sp1").GetAwaiter().GetResult());
     }
 
     [Fact]
-    public void Postgres_RollbackToSavepointAsync_throws_not_supported_for_unsupported_tx()
+    public void Postgres_RollbackToSavepointAsync_throws_NormUnsupportedFeatureException_for_unsupported_tx()
     {
-        // NoSavepointTransaction has no Rollback(string) override; base DbTransaction throws
+        // NoSavepointTransaction has no Rollback(string) override; falls through to NormUnsupportedFeatureException
         var provider = new PostgresProvider(new SqliteParameterFactory());
         using var cn = OpenMemory();
         using var tx = new NoSavepointTransaction(cn);
-        Assert.Throws<NotSupportedException>(() =>
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
             provider.RollbackToSavepointAsync(tx, "sp1").GetAwaiter().GetResult());
     }
 

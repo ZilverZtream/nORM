@@ -149,7 +149,7 @@ namespace nORM.Query
             {
                 return typedQuery;
             }
-            throw new InvalidOperationException($"Unable to create IQueryable for type '{typeof(TElement)}'.");
+            throw new NormQueryException($"Unable to create IQueryable for type '{typeof(TElement)}'.");
         }
         private IQueryable CreateQueryInternal(Type elementType, Expression expression)
         {

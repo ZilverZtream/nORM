@@ -94,7 +94,7 @@ namespace nORM.Navigation
             if (navigationProperty == null) throw new ArgumentNullException(nameof(navigationProperty));
 
             if (!_navigationContexts.TryGetValue(entity, out var navContext))
-                throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
+                throw new NormUsageException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
 
             var propertyInfo = GetPropertyInfo(navigationProperty);
             await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
@@ -113,7 +113,7 @@ namespace nORM.Navigation
             if (navigationProperty == null) throw new ArgumentNullException(nameof(navigationProperty));
             
             if (!_navigationContexts.TryGetValue(entity, out var navContext))
-                throw new InvalidOperationException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
+                throw new NormUsageException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
             
             var propertyInfo = GetPropertyInfo(navigationProperty);
             await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
