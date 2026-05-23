@@ -14,6 +14,7 @@ namespace nORM.Tests;
 //Tests that null semantics produce the correct rows when executed against a real SQLite database.
 //Covers IS NULL, IS NOT NULL, column-vs-constant, and column-vs-column comparisons.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class NullSemanticsTests
 {
     [Table("NullRow")]

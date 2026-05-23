@@ -10,6 +10,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CliIntegrationTests
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);

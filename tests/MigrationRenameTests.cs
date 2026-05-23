@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// to emit a RENAME COLUMN operation instead of a destructive DROP + ADD pair.
 /// Provider-specific DDL is validated for SQLite, SQL Server, PostgreSQL, and MySQL.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRenameTests
 {
     // ─── Helpers ──────────────────────────────────────────────────────────

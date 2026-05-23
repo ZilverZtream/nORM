@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// 5. Stored procedures are not automatically tenant-filtered — the raw call
 ///    bypasses global-filter injection.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RawSqlBoundaryTests
 {
     // ── 1. DML is rejected ────────────────────────────────────────────────────

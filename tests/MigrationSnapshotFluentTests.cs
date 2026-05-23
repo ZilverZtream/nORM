@@ -13,9 +13,11 @@ namespace nORM.Tests;
 /// <summary>
 /// SchemaSnapshotBuilder.Build(DbContext) must reflect fluent model configuration.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationSnapshotFluentTests
 {
     // Entity with no attributes — must be configured entirely via fluent API
+    [Xunit.Trait("Category", "Fast")]
     public class AppUser
     {
         public int Id { get; set; }
@@ -25,6 +27,7 @@ public class MigrationSnapshotFluentTests
 
     // Entity with [Table] and [Key] for attribute-only test
     [Table("attr_products")]
+    [Xunit.Trait("Category", "Fast")]
     public class AttrProduct
     {
         [Key]

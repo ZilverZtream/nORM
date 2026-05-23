@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// Fix: liveMap lookup now uses c.Name (DB column name) in all four providers.
 /// DDL and trigger column references also switched from c.PropName → c.Name.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalCustomColumnNameTests
 {
     // ── Test entity with [Column] overrides so PropName ≠ DB column name ────────

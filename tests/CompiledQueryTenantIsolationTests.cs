@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Compiled query plans must NOT be reused across contexts that have
 //different tenant IDs or global filters, as those produce different SQL WHERE clauses.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryTenantIsolationTests
 {
     [Table("CqtiRow")]

@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// protected database names are rejected, system-schema filtering, and dry-run behaviour.
 /// These tests invoke the built CLI binary and assert on stdout/stderr/exit-code.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CliDatabaseDropTests
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);

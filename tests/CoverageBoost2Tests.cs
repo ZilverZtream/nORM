@@ -24,6 +24,7 @@ namespace nORM.Tests;
 // ── Entity types needed for GROUP 77-86 tests ───────────────────────────────
 
 [Table("CB2_OrderItem")]
+[Xunit.Trait("Category", "Fast")]
 public class CB2OrderItem
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -35,6 +36,7 @@ public class CB2OrderItem
 }
 
 [Table("CB2_Order")]
+[Xunit.Trait("Category", "Fast")]
 public class CB2Order
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -44,6 +46,7 @@ public class CB2Order
 }
 
 [Table("CB2_Short")]
+[Xunit.Trait("Category", "Fast")]
 public class CB2ShortEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -53,6 +56,7 @@ public class CB2ShortEntity
 }
 
 [Table("CB2_PrincipalMulti")]
+[Xunit.Trait("Category", "Fast")]
 public class CB2PrincipalMulti
 {
     [Key] public int K1 { get; set; }
@@ -65,6 +69,7 @@ public class CB2PrincipalMulti
 
 /// <summary>Class with parameterless ctor; used as GroupBy result type so the materializer
 /// doesn't crash when projection args are all aggregates (no columns extracted).</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CB2GroupAgg
 {
     public CB2GroupAgg() { }
@@ -94,6 +99,7 @@ public struct CB2GroupFull
 /// <summary>
 /// GROUP 77-86 — boost six classes to ≥80%
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoost2Tests : TestBase
 {
     // ── Shared helpers ───────────────────────────────────────────────────────
@@ -710,7 +716,8 @@ public class CoverageBoost2Tests : TestBase
         // Select with a method not in SQL-translatable list → TrySplitProjection returns true
         // Server projection: fetch Name column; client projection: apply UntranslatableMethod_CB2
         using var cn = OpenMemory();
-        using var ctx = new DbContext(cn, new SqliteProvider());
+        var opts = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
         var query = ctx.Query<CovItem>();
         var param = Expression.Parameter(typeof(CovItem), "p");
         // CustomMethod(p.Name) — custom method not in SQL-translatable set
@@ -756,7 +763,8 @@ public class CoverageBoost2Tests : TestBase
     {
         // Select with InvocationExpression → VisitInvocation sets HasUntranslatableExpression=true
         using var cn = OpenMemory();
-        using var ctx = new DbContext(cn, new SqliteProvider());
+        var opts = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
         var query = ctx.Query<CovItem>();
         Func<string, string> customFn = s => "[" + s + "]";
         var param = Expression.Parameter(typeof(CovItem), "p");
@@ -781,7 +789,8 @@ public class CoverageBoost2Tests : TestBase
         // Select with new ValueTuple<int>(p.Value) inside untranslatable method
         // → VisitNew is called for the value type constructor
         using var cn = OpenMemory();
-        using var ctx = new DbContext(cn, new SqliteProvider());
+        var opts = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
         var query = ctx.Query<CovItem>();
         var param = Expression.Parameter(typeof(CovItem), "p");
         var valueAccess = Expression.Property(param, nameof(CovItem.Value));
@@ -882,7 +891,8 @@ public class CoverageBoost2Tests : TestBase
     [Fact]
     public async Task MySql_ValidateConnection_throws_for_non_mysql_connection()
     {
-        var provider = new MySqlProvider(new SqliteParameterFactory());
+        // Native mode (no foreign factory) → strict connection-type validation
+        var provider = new MySqlProvider();
         using var cn = OpenMemory();
         using var ctx = new DbContext(cn, provider);
         // GetMapping to build the mapping
@@ -890,7 +900,7 @@ public class CoverageBoost2Tests : TestBase
             BindingFlags.NonPublic | BindingFlags.Instance)!;
         var mapping = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(CovItem) })!;
         // BulkInsertAsync calls ValidateConnection internally
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<NormConfigurationException>(async () =>
             await provider.BulkInsertAsync<CovItem>(ctx, mapping,
                 new List<CovItem> { new CovItem { Name = "test", Value = 1 } },
                 CancellationToken.None));
@@ -988,13 +998,14 @@ public class CoverageBoost2Tests : TestBase
     [Fact]
     public async Task Postgres_ValidateConnection_throws_for_non_npgsql_connection()
     {
-        var provider = new PostgresProvider(new SqliteParameterFactory());
+        // Native mode (no foreign factory) → strict connection-type validation
+        var provider = new PostgresProvider();
         using var cn = OpenMemory();
         using var ctx = new DbContext(cn, new SqliteProvider());
         var getMapping = typeof(DbContext).GetMethod("GetMapping",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
         var mapping = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(CovItem) })!;
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<NormConfigurationException>(async () =>
             await provider.BulkInsertAsync<CovItem>(ctx, mapping,
                 new List<CovItem> { new CovItem { Name = "x", Value = 1 } },
                 CancellationToken.None));

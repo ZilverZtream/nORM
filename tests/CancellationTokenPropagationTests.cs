@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// The token must be propagated — not silently swallowed, not treated as default,
 /// and not result in a hung or indefinitely-blocked call.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CancellationTokenPropagationTests
 {
     [Table("CtpEntity")]

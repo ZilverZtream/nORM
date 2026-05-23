@@ -34,6 +34,7 @@ namespace nORM.Tests;
 //   - MySQL OCC gap is explicitly documented at test level.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MySqlOccSemanticEnforcementTests
 {
     // ── Simulated MySQL provider (SQLite engine + affected-row semantics) ──

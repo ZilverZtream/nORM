@@ -32,6 +32,7 @@ namespace nORM.Tests;
 //       most common change kinds: add table, add column, alter column.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class CompiledQueryConcurrencyStressTests
 {
     // ── Shared entity ─────────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ namespace nORM.Tests.SgRename
         public RenamedAddr Location { get; set; } = new();
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class SourceGenRenamedColumnTests
     {
         // ── Helper ────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Uses dynamically-built assemblies to avoid polluting the main test assembly with
 /// conflicting migration types.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationVersionUniqueTests
 {
     // ── Dynamic assembly helpers ─────────────────────────────────────────────

@@ -14,8 +14,10 @@ namespace nORM.Tests;
 /// Validates that all stored procedure overloads use Provider.StoredProcedureCommandType
 /// rather than hardcoding CommandType.StoredProcedure.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class StoredProcedureTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Item
     {
         public int Id { get; set; }

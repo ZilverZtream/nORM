@@ -8,6 +8,7 @@ namespace nORM.Tests;
 /// Verifies that SchemaDiffer.Diff() detects DefaultValue changes and that migration
 /// generators emit the appropriate SQL to apply and roll back those changes.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationDefaultValueDriftTests
 {
     private static TableSchema MakeTable(string tableName, string colName, string? defaultValue)

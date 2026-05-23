@@ -18,6 +18,7 @@ namespace nORM.Tests;
 // Previously, the add path only had the right PK, with no tenant check; a cross-tenant right
 // entity could be attached to a tenant-A owner and the join row would be silently persisted.
 
+[Xunit.Trait("Category", "Fast")]
 public class M2MCrossTenantAddTests
 {
     [Table("Sec1Student")]

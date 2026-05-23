@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// and compiled-query paths. Proves multi-tenant boundaries for ALL navigation/storage shapes
 /// in a single shared SQLite DB with overlapping PKs across tenants.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialTenantNavigationShapeTests
 {
     // ── Entity definitions ────────────────────────────────────────────────────

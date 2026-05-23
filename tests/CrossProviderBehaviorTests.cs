@@ -36,6 +36,7 @@ namespace nORM.Tests;
 //   in CI service-container jobs — see .github/workflows/ci.yml)
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CrossProviderBehaviorTests
 {
     // ── Entities ────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ public class CrossProviderBehaviorTests
         "sqlite"    => new SqliteProvider(),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -513,7 +514,7 @@ public class CrossProviderBehaviorTests
     private static DatabaseProvider MakeProviderFull(string kind) => kind switch
     {
         "sqlite"    => new SqliteProvider(),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -689,7 +690,7 @@ public class CrossProviderBehaviorTests
     private static DatabaseProvider GetProviderPpm(string kind) => kind switch
     {
         "sqlite"    => new SqliteProvider(),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))

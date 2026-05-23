@@ -6,8 +6,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CompositeKeyTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class CompositeEntity
     {
         public int KeyPart1 { get; set; }

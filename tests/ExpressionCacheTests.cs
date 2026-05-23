@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Tests for the compiled-delegate cache in ExpressionCompiler.
 /// Covers cap enforcement, cache-hit correctness, and concurrent access safety.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ExpressionCacheTests
 {
     [Fact]
@@ -134,6 +135,7 @@ public class ExpressionCacheTests
         }
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class CacheTestItem
     {
         public int Id { get; set; }

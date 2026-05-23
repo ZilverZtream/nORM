@@ -22,10 +22,12 @@ namespace nORM.Tests;
 /// binding, interceptor invocation, DbType assignment for fixed parameters, and parity
 /// between compiled and runtime LINQ queries.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryFastPathTests
 {
     // ─── shared entity ────────────────────────────────────────────────────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class Article
     {
         public int    Id       { get; set; }
@@ -34,6 +36,7 @@ public class CompiledQueryFastPathTests
     }
 
     [Table("Article")]
+    [Xunit.Trait("Category", "Fast")]
     public class EnumArticle
     {
         public int Id { get; set; }
@@ -41,6 +44,7 @@ public class CompiledQueryFastPathTests
         public ArticleCategory Category { get; set; }
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class NullableArticle
     {
         public int Id { get; set; }
@@ -48,6 +52,7 @@ public class CompiledQueryFastPathTests
     }
 
     [Table("SpecialParamEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class SpecialParamEntity
     {
         public int Id { get; set; }
@@ -484,6 +489,7 @@ public class CompiledQueryFastPathTests
         Assert.Null(r2[0].Tag);
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class Widget
     {
         public int     Id  { get; set; }

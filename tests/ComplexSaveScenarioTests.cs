@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// e-commerce domain writes: compound inserts across FK-linked tables, order
 /// cancellation, and rollback on partial failure — all in single SaveChanges calls.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ComplexSaveScenarioTests
 {
     // ── Domain model ───────────────────────────────────────────────────────

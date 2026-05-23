@@ -15,8 +15,10 @@ namespace nORM.Tests;
 /// comes from the original snapshot captured at attach time, not from the current (possibly mutated)
 /// entity property value.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConcurrencyTokenTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class VersionedEntity
     {
         [Key]

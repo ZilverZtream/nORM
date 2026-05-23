@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Verifies that SQL translation produces correct SQL fragments for various LINQ operators.
 /// Uses TestBase.TranslateQuery to extract generated SQL without executing it.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlTranslationTests : TestBase
 {
     [Table("TranslationEntity")]

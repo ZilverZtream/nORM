@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// cache invalidation, compiled queries, interceptors, transaction nesting, and lock-step
 /// provider parity. All tests are SQLite-based live tests.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialBulkTenantTests
 {
     // ── Entities ──────────────────────────────────────────────────────────────

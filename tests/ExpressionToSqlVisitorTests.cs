@@ -7,6 +7,7 @@ using nORM.Core;
 
 namespace nORM.Tests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class ExpressionToSqlVisitorTests : TestBase
     {
         private class Product
@@ -18,6 +19,7 @@ namespace nORM.Tests
             public DateTime CreatedAt { get; set; }
         }
 
+        [Xunit.Trait("Category", "Fast")]
         public class NumericTypesEntity
         {
             public int IntValue { get; set; }

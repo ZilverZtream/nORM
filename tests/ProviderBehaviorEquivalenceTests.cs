@@ -48,6 +48,7 @@ namespace nORM.Tests;
 //   J. Security boundaries       → EQUAL (SEC_* tests)
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ProviderBehaviorEquivalenceTests
 {
     // ── Entities (explicit keys — no auto-increment for provider parity) ───────
@@ -696,7 +697,7 @@ public class ProviderBehaviorEquivalenceTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -714,7 +715,7 @@ public class ProviderBehaviorEquivalenceTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -732,7 +733,7 @@ public class ProviderBehaviorEquivalenceTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -1805,7 +1806,7 @@ public class ProviderBehaviorEquivalenceTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -1823,7 +1824,7 @@ public class ProviderBehaviorEquivalenceTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))

@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// Without the fix, an entity whose timestamp column is NULL in both the entity
 /// (OriginalToken == null) and the DB gets 0 rows-affected → spurious DbConcurrencyException.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NullableConcurrencyTokenTests
 {
     [Table("NctEntity")]

@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Verifies that <c>SavedChangesAsync</c> fires AFTER the transaction has been committed,
 /// meaning the interceptor can observe the inserted row in a separate connection.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InterceptorOrderingTests
 {
     [Table("InterceptorOrderPost")]

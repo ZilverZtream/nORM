@@ -14,6 +14,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class InterceptorContractTests
 {
     [Fact]

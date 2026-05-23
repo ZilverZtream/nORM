@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Without the fix, DELETE and SELECT on owned child tables lack a tenant predicate,
 /// allowing cross-tenant data destruction and leakage.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class OwnedCollectionTenantIsolationTests
 {
     // ── Entity definitions ────────────────────────────────────────────────

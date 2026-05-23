@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// across all four providers. Tests use adversarial names containing characters
 /// that would break SQL syntax if left unescaped.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationMetadataEscapingTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)

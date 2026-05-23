@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// Verifies FK constraint awareness in SchemaDiff computation and SQL generation
 /// across all four migration SQL generators.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationFkTests
 {
  // ── Helpers ──────────────────────────────────────────────────────────────

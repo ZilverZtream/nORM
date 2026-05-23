@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// passed ct to BeginTransactionAsync and CommitAsync, but Up() could not check
 /// it and had no way to abort an in-progress DDL step.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationCancellationTests
 {
     // ── Infrastructure ────────────────────────────────────────────────────────

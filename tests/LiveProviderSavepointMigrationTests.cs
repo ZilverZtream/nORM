@@ -446,10 +446,10 @@ public class LiveProviderSavepointMigrationTests
         cn.Open();
         await using var ctx = new DbContext(cn, new SqliteProvider());
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<NormUsageException>(
             () => ctx.CreateSavepointAsync(null!, "sp1"));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<NormUsageException>(
             () => ctx.RollbackToSavepointAsync(null!, "sp1"));
     }
 

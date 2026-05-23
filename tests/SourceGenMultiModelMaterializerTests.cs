@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// New overloads <c>Add&lt;T&gt;(string, Func)</c> and <c>Get&lt;T&gt;(string)</c>
 /// support explicit table name discriminators.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenMultiModelMaterializerTests
 {
     // ── Entity types ─────────────────────────────────────────────────────────

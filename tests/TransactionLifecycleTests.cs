@@ -20,6 +20,7 @@ namespace nORM.Tests;
 //after each write operation (Insert, Update, Delete), even when the operation fails.
 //This prevents connection-level resource leaks (lock memory, log space) under load.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionLifecycleTests
 {
     [Table("TxLifecycleItem")]

@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// Before the fix, OrderBy() was applied before SequenceEqual, making (A,B)
 /// and (B,A) look identical. Now the declared order is preserved.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationIndexOrderTests
 {
     // Shared index name used across tests

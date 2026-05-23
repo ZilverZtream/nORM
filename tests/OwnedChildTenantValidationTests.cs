@@ -17,6 +17,7 @@ namespace nORM.Tests;
 // SAVE1: Owned-collection inserts must validate the child's tenant ID before INSERT.
 // Previously, insert path was not tenant-aware; null or mismatched child tenants were silently persisted.
 
+[Xunit.Trait("Category", "Fast")]
 public class OwnedChildTenantValidationTests
 {
     [Table("OctvOwner")]

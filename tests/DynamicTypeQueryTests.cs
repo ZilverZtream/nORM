@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// provider type and connection string hash so that two contexts pointing to different
 /// databases with the same table name each receive their own distinct CLR type.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DynamicTypeQueryTests
 {
     private static (SqliteConnection cn, DbContext ctx) CreateContextWithSchema(string dbName, string[] columnDefs)

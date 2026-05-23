@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// edge cases (namespace collisions, circular FK detection) are in
 /// <see cref="FkOrderingTests"/> and <see cref="FkOrderingAdvancedTests"/>.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SaveChangesGraphOrderTests
 {
     // ── Schema helpers ────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ namespace nORM.Tests;
 //   ATOM-6  Very long tenant ID string (> 1 000 chars) — round-trips correctly
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialTenantObjectMatrixTests
 {
     // ── Shared entity ─────────────────────────────────────────────────────────

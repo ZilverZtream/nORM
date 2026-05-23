@@ -33,6 +33,7 @@ namespace nORM.Tests;
 //   • Outer explicit transaction: context does not own, does not commit on dispose
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class TransactionRaceTests
 {
     // ── Test entity ───────────────────────────────────────────────────────────

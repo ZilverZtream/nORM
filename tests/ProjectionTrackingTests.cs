@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// Types that are NOT registered via Query&lt;T&gt; must not be tracked, even if they
 /// satisfy the structural trackability conditions (class, parameterless ctor, etc.).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProjectionTrackingTests
 {
     // ── Mapped entity ─────────────────────────────────────────────────────────

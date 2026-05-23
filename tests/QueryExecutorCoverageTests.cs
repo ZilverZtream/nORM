@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Additional coverage tests for the query execution pipeline (QueryExecutor and
 /// related async extension methods). Complements QueryExecutorTests.cs.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryExecutorCoverageTests
 {
     // ── entity type ───────────────────────────────────────────────────────

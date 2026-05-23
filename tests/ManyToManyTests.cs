@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for Many-to-Many relationships via join tables.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ManyToManyTests
 {
     // ── Entity definitions ────────────────────────────────────────────────

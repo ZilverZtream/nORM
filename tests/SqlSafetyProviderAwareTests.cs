@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// dialect-specific statements like SQLite PRAGMA.
 /// Also validates that side-effect commands are blocked for all providers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlSafetyProviderAwareTests
 {
     private static readonly DatabaseProvider Sqlite    = new SqliteProvider();

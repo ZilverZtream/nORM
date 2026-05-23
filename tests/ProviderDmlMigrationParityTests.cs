@@ -25,6 +25,7 @@ namespace nORM.Tests;
 // ── Entity types for Provider DML / Migration Parity tests ────────────────────
 
 [Table("PDM_Item")]
+[Xunit.Trait("Category", "Fast")]
 public class PdmItem
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -34,6 +35,7 @@ public class PdmItem
 }
 
 [Table("PDM_ItemB")]
+[Xunit.Trait("Category", "Fast")]
 public class PdmItemB
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -47,6 +49,7 @@ public class PdmItemB
 /// savepoint behavior, migration failure/retry.
 /// SQLite live; MSSQL/MySQL/PostgreSQL env-gated.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderDmlMigrationParityTests
 {
     // ── Dynamic migration assembly helpers ─────────────────────────────────

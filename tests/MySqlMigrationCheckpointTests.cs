@@ -31,6 +31,7 @@ namespace nORM.Tests;
 /// along with the transaction on failure. Tests that verify Partial-row survival
 /// are adjusted for this SQLite-specific behavior.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MySqlMigrationCheckpointTests
 {
     // ── Shared runner that bypasses MySQL advisory locking ────────────────────

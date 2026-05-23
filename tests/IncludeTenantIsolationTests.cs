@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Verifies that Include eager-loading applies the tenant predicate to child queries
 /// so that cross-tenant FK collisions do not expose data from other tenants.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class IncludeTenantIsolationTests
 {
     [Table("TiParent")]

@@ -27,6 +27,7 @@ namespace nORM.Tests;
 /// via exact name match, prefix-stripped match, then first-column fallback.
 /// The ownerByPk dictionary in LoadOwnedCollectionsAsync is now per-ownedMap.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompositeKeyOwnedCollectionTests
 {
     // ── Entity definitions ────────────────────────────────────────────────────

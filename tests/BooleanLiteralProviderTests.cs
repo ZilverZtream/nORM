@@ -12,8 +12,10 @@ namespace nORM.Tests;
 /// <summary>
 /// Provider-unsafe boolean literal in fast path and NormQueryProvider.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BooleanLiteralProviderTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Item
     {
         [Key]

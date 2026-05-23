@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// SQLite live-execution: selected scenarios execute the generated DDL against an in-memory
 /// SQLite DB to prove syntactic correctness end-to-end.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationProviderMatrixTests
 {
     // ── Provider data ─────────────────────────────────────────────────────────
@@ -373,6 +374,7 @@ public class MigrationProviderMatrixTests
 
 // ── Fault-injection: SQL Server generator ────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerMigrationSqlGeneratorFaultTests
 {
     private static SchemaDiff BuildSimpleDiff(string tableName)
@@ -511,6 +513,7 @@ public class SqlServerMigrationSqlGeneratorFaultTests
 
 // ── Fault-injection: MySQL generator ─────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class MySqlMigrationSqlGeneratorFaultTests
 {
     private static SchemaDiff BuildSimpleDiff(string tableName)
@@ -610,6 +613,7 @@ public class MySqlMigrationSqlGeneratorFaultTests
 
 // ── Fault-injection: PostgreSQL generator ────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class PostgresMigrationSqlGeneratorFaultTests
 {
     private static SchemaDiff BuildSimpleDiff(string tableName)

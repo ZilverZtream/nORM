@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// connection string) so that two contexts pointing to different databases do not share
 /// a cache entry and return data from the wrong database.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ResultCacheDbIdentityTests
 {
     [Table("RcWidget")]

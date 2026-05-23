@@ -24,6 +24,7 @@ namespace nORM.Tests;
 //   - The _compiledParamSets field in NormQueryProvider uses BoundedCache (structural).
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class BoundedParamCacheTests
 {
     // ── BoundedCache unit tests ───────────────────────────────────────────────

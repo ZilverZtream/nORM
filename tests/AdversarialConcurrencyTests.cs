@@ -29,6 +29,7 @@ namespace nORM.Tests;
 ///   - Cancellation boundary: queries cancelled mid-flight do not corrupt caches.
 ///   - Context isolation: independent DbContext instances do not share mutable state.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialConcurrencyTests
 {
     // ── Shared entity types ────────────────────────────────────────────────────

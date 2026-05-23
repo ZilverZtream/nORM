@@ -5,6 +5,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class BenchmarkFairnessLockTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));

@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// enumeration (ValidateBulkOperation) and the provider receives an empty sequence,
 /// silently losing all writes.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkEnumerationTests
 {
     [Table("BulkEnumItem")]

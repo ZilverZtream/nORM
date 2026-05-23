@@ -27,6 +27,7 @@ namespace nORM.Tests;
 ///   - AsOf tag cancellation
 ///   - Full snapshot-to-diff-to-SQL-to-apply-to-insert round-trip
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationDefaultsIdentityTests
 {
     // ═══════════════════════════════════════════════════════════════════════
@@ -323,6 +324,7 @@ public class MigrationDefaultsIdentityTests
     // ═══════════════════════════════════════════════════════════════════════
 
     [Table("MdiAsOfItem")]
+    [Xunit.Trait("Category", "Fast")]
     public class MdiAsOfItem
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -477,6 +479,7 @@ public class MigrationDefaultsIdentityTests
     // ═══════════════════════════════════════════════════════════════════════
 
     [Table("MdiSnapshotEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class MdiSnapshotEntity
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]

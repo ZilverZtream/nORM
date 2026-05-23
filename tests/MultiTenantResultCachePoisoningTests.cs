@@ -41,6 +41,7 @@ namespace nORM.Tests;
 ///   RC-4  InvalidateTag on one tenant does not evict another tenant's entry.
 ///   RC-5  Materializer cache: adversarial parallel load does not return wrong-schema materializer.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MultiTenantResultCachePoisoningTests
 {
     // ── Entity ─────────────────────────────────────────────────────────────────

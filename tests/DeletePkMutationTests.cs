@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// CT-DELETE: Verifies that SaveChanges throws when the primary key of a tracked entity
 /// is mutated before a DELETE, preventing deletion of the wrong row.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DeletePkMutationTests
 {
     [Table("DpmItem")]

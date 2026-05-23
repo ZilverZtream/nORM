@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class SqlComparisonDiagnostic
 {
     private readonly ITestOutputHelper _output;
@@ -22,6 +23,7 @@ public class SqlComparisonDiagnostic
         _output = output;
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class BenchUser
     {
         [Key]

@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// bypass the change tracker by design. Using a fresh context ensures the verification
 /// query hits the DB and materializes new entities.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkCacheInvalidationTests
 {
     [Table("BciRow")]

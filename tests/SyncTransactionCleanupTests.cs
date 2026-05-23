@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// Fix: both sync methods now use try/finally, matching the async versions which
 /// already had try/finally with DisposeAsync.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SyncTransactionCleanupTests
 {
     // ── Fake transaction that throws on Commit/Rollback ──────────────────────

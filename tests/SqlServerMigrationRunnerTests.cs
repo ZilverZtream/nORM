@@ -27,6 +27,7 @@ namespace nORM.Tests;
 /// after the history table is pre-created with standard SQLite-compatible SQL.
 /// </para>
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerMigrationRunnerTests
 {
     // ── Dynamic assembly helpers ─────────────────────────────────────────────

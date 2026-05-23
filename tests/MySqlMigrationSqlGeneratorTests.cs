@@ -8,6 +8,7 @@ namespace nORM.Tests;
 //<summary>
 //Tests for MySqlMigrationSqlGenerator covering and findings.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MySqlMigrationSqlGeneratorTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)

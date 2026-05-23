@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// ignoring constant values. All tests for the same method+property pair must use the SAME
 /// constant so that every test operates against the same cached plan.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SingleOrDefaultTests
 {
     private class Product

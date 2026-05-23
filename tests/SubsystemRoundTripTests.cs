@@ -28,6 +28,7 @@ namespace nORM.Tests;
 // ── Entity types ─────────────────────────────────────────────────────────────
 
 [Table("G35_Product")]
+[Xunit.Trait("Category", "Fast")]
 public class G35Product
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -39,6 +40,7 @@ public class G35Product
 }
 
 [Table("G35_TypedRow")]
+[Xunit.Trait("Category", "Fast")]
 public class G35TypedRow
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -53,6 +55,7 @@ public class G35TypedRow
 }
 
 [Table("G35_Renamed")]
+[Xunit.Trait("Category", "Fast")]
 public class G35RenamedEntity
 {
     [Key]
@@ -66,6 +69,7 @@ public class G35RenamedEntity
 }
 
 [Table("G35_BulkItem")]
+[Xunit.Trait("Category", "Fast")]
 public class G35BulkItem
 {
     [Key]
@@ -75,6 +79,7 @@ public class G35BulkItem
 }
 
 [Table("G35_CacheRow")]
+[Xunit.Trait("Category", "Fast")]
 public class G35CacheRow
 {
     [Key]
@@ -82,6 +87,7 @@ public class G35CacheRow
     public string Data { get; set; } = "";
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class SubsystemRoundTripTests
 {
     // ── Shared helpers ───────────────────────────────────────────────────────

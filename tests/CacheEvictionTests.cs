@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// evict entries when capacity is exceeded, and still serve the most-recently-added
 /// entries correctly after churn.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CacheEvictionTests
 {
     // ── Sequential add/evict/get ──────────────────────────────────────────────

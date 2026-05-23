@@ -71,6 +71,7 @@ file static class BoolLiteralAssertions
 /// values and that WHERE clauses with bool equality predicates embed provider-appropriate
 /// literals rather than hard-coded "0"/"1".
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BoolLiteralSqlShapeTests
 {
     // ── Provider literal property values ──────────────────────────────────────
@@ -304,6 +305,7 @@ public class BoolLiteralSqlShapeTests
 // Expanded bool matrix — null bool, joins/subqueries
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class BoolLiteralExpandedTests
 {
     public static IEnumerable<object[]> AllProviders() =>
@@ -486,6 +488,7 @@ public class BoolLiteralExpandedTests
 // Concurrency/cancellation chaos with bool predicates
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class BoolLiteralChaosTests
 {
     private static SqliteConnection CreateAndSeedBoolDb()
@@ -637,6 +640,7 @@ public class BoolLiteralChaosTests
 // Provider literal correctness + TranslateJsonPathAccess docs
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class BoolLiteralProviderLiteralTests
 {
     [Fact]

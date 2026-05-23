@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// so lowercase or mixed-case ORDER BY clauses were not detected and a duplicate
 /// ORDER BY (SELECT NULL) was appended.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerPagingOrderByTests
 {
     private static SqlServerProvider Provider => new SqlServerProvider();

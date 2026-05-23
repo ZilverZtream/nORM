@@ -10,6 +10,7 @@ namespace nORM.Tests;
 /// Tests DDL round-trips: add table, add column, drop column, drop table, alter nullability,
 /// add/drop index.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationSqlGenerationTests
 {
  // ─── Helpers ──────────────────────────────────────────────────────────

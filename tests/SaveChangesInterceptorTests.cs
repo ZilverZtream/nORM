@@ -16,8 +16,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class SaveChangesInterceptorTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class User
     {
         [Key]

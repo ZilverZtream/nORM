@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// primitive (_batchSemaphore) as LoadNavigationAsync and ProcessBatchAsync,
 /// preventing concurrent Dictionary mutation across different lock domains.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NavigationCleanupRaceTests
 {
     [Table("NcrAuthor")]

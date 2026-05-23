@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// the known behavior and prevent future regressions from being misclassified as
 /// new bugs.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AmbientTransactionBestEffortDocTests
 {
     [Fact]

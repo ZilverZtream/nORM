@@ -32,6 +32,7 @@ namespace nORM.Tests;
 /// uses AddOrUpdate with copy-on-write inner lists, so the query pipeline always
 /// sees a stable snapshot and never races against in-place mutation.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class GlobalFilterConcurrencyTests
 {
     [Table("GfcEntity")]

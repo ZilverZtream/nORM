@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// ElementAt, Any, All, Count, LongCount, Sum, Min, Max, Average on empty,
 /// one-row, two-row, and multi-row sequences, including nullable columns.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TerminalOperatorParityTests
 {
     [Table("TerminalOpRow")]

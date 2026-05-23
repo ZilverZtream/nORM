@@ -12,6 +12,7 @@ namespace nORM.Tests;
 //Verifies that temporal infrastructure bootstrap SQL is correct per provider.
 //Verifies that the existence probe distinguishes schema errors from operational errors.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalProviderBootstrapTests
 {
  // ── Finding C: provider-specific DDL ─────────────────────────────────────

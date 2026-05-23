@@ -21,6 +21,7 @@ namespace nORM.Tests;
 //We also include a passthrough-command wrapper (same pattern as TransactionLifecycleTests)
 //to satisfy SQLite's internal cast of DbTransaction → SqliteTransaction.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationCommitCancellationTests
 {
  // ── Token-observing connection + transaction + command wrappers ───────────

@@ -74,6 +74,7 @@ internal class SgcpPlain
 /// bypassed and the runtime path is used — ensuring converter logic is applied during
 /// materialization (X1/VC fix in MaterializerFactory.CreateMaterializer).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenConverterParityTests
 {
     private static SqliteConnection CreateOpenDb(string ddl)

@@ -14,12 +14,14 @@ using Xunit.Abstractions;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CompiledJoinDiagnosticTest
 {
     private readonly ITestOutputHelper _output;
     public CompiledJoinDiagnosticTest(ITestOutputHelper output) => _output = output;
 
     [Table("DiagUser")]
+    [Xunit.Trait("Category", "Fast")]
     public class DiagUser
     {
         [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -28,6 +30,7 @@ public class CompiledJoinDiagnosticTest
     }
 
     [Table("DiagOrder")]
+    [Xunit.Trait("Category", "Fast")]
     public class DiagOrder
     {
         [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]

@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Verifies that the global query plan cache uses the provider's runtime type as part
 /// of the cache key so that plans built for one provider are never returned for a different provider.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PlanCacheProviderIsolationTests
 {
     [Table("Widget")]

@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// - IsSafeIdentifier / DbContext.IsSafeIdentifier exhaustive cases
 /// - Provider identifier escaping for adversarial inputs
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SecurityBoundaryTests
 {
     // ─── IsSafeRawSql: banned keywords ────────────────────────────────────

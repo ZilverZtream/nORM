@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// The old code rejected queries where items.Count > MaxParameters * 0.8 even when
 /// the actual remaining budget was sufficient. The fix uses exact accounting.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InClauseParameterBudgetTests : TestBase
 {
     [Table("BudgetItem")]

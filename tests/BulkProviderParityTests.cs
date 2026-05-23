@@ -35,6 +35,7 @@ namespace nORM.Tests;
 // Non-SQLite providers that lack env vars are silently skipped (return early).
 // =============================================================================
 
+[Xunit.Trait("Category", "Fast")]
 public class BulkProviderParityTests
 {
     // -- Entities ---------------------------------------------------------------
@@ -750,7 +751,7 @@ public class BulkProviderParityTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -904,7 +905,7 @@ public class BulkProviderParityTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))

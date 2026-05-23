@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Verifies that GetAppliedMigrationsAsync handles the "history table does not exist"
 /// case silently while propagating all other DbException types to the caller.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationHistoryFaultTests
 {
  // ── Minimal migration used across all tests ───────────────────────────────

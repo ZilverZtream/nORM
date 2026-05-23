@@ -27,6 +27,7 @@ public enum PB1Priority
 }
 
 [Table("PB1_DateOnlyEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PB1DateOnlyEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -37,6 +38,7 @@ public class PB1DateOnlyEntity
 }
 
 [Table("PB1_TimeOnlyEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PB1TimeOnlyEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -47,6 +49,7 @@ public class PB1TimeOnlyEntity
 }
 
 [Table("PB1_EnumEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PB1EnumEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -56,6 +59,7 @@ public class PB1EnumEntity
 }
 
 [Table("PB1_CharEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PB1CharEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -70,6 +74,7 @@ public class PB1CharEntity
 /// and char parameter types, both at the ADO.NET level and via round-trip
 /// insert/query through the ORM.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ParameterBindingParityTests
 {
     private static SqliteConnection OpenMemory()

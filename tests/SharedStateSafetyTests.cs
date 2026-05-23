@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// correctly scoped and do not corrupt each other under concurrent or
 /// sequential access across multiple DbContext instances.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SharedStateSafetyTests
 {
     // ── Entities ─────────────────────────────────────────────────────────────

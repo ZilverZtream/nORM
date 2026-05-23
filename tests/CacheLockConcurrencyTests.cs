@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// thread obtained via GetOrAdd but has not yet called Wait on — previously the cleanup code
 /// called semaphore.Dispose() after TryRemove, causing ObjectDisposedException on the waiting thread.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CacheLockConcurrencyTests
 {
     // ── helpers ──────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Verifies that Include on a composite-PK dependent entity throws NormUnsupportedFeatureException
 /// rather than silently corrupting data.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompositeKeyIncludeTests
 {
     private class Blog

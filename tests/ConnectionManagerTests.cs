@@ -10,6 +10,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class ConnectionManagerTests
 {
     private static SqliteProvider Provider => new();

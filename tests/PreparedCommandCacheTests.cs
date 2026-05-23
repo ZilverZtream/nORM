@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// disposed commands to active callers, and no ObjectDisposedException is thrown in any
 /// sequential usage pattern.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PreparedCommandCacheTests
 {
     [Table("PccItem")]

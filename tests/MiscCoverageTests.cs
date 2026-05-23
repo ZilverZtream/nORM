@@ -27,6 +27,7 @@ namespace nORM.Tests;
 // ── Entity types for MiscCoverageTests ──────────────────────────────────────
 
 [Table("MiscBlog")]
+[Xunit.Trait("Category", "Fast")]
 public class MiscBlog
 {
     [Key]
@@ -36,6 +37,7 @@ public class MiscBlog
 }
 
 [Table("MiscPost")]
+[Xunit.Trait("Category", "Fast")]
 public class MiscPost
 {
     [Key]
@@ -46,6 +48,7 @@ public class MiscPost
 }
 
 // A class without a parameterless constructor to exercise NormQueryableImplUnconstrained
+[Xunit.Trait("Category", "Fast")]
 public class RecordLike
 {
     public int Id { get; }
@@ -64,6 +67,7 @@ public class RecordLike
 /// AdaptiveTimeoutManager, BaseDbCommandInterceptor, LockFreeObjectPool,
 /// ShadowPropertyInfo, ChangeTracker, ConnectionManager.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MiscCoverageTests
 {
     private static (DbContext ctx, SqliteConnection cn) CreateCtx(DbContextOptions? opts = null)
@@ -97,7 +101,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     [Fact]
     public void Json_Value_ThrowsOutsideQuery()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => Json.Value<int>("col", "$.id"));
+        var ex = Assert.Throws<NormUsageException>(() => Json.Value<int>("col", "$.id"));
         Assert.Contains("nORM LINQ queries", ex.Message);
     }
 
@@ -1173,7 +1177,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public void WindowFunctions_WithRowNumber_NonNormProvider_Throws()
     {
         var q = new List<MiscBlog>().AsQueryable();
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormUsageException>(() =>
             q.WithRowNumber((b, i) => new { b.Title, Row = i }));
     }
 
@@ -1181,7 +1185,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public void WindowFunctions_WithRank_NonNormProvider_Throws()
     {
         var q = new List<MiscBlog>().AsQueryable();
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormUsageException>(() =>
             q.WithRank((b, i) => new { b.Title, Rank = i }));
     }
 
@@ -1189,7 +1193,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public void WindowFunctions_WithDenseRank_NonNormProvider_Throws()
     {
         var q = new List<MiscBlog>().AsQueryable();
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormUsageException>(() =>
             q.WithDenseRank((b, i) => new { b.Title, Dr = i }));
     }
 
@@ -1197,7 +1201,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public void WindowFunctions_WithLag_NonNormProvider_Throws()
     {
         var q = new List<MiscBlog>().AsQueryable();
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormUsageException>(() =>
             q.WithLag(b => b.Id, 1, (b, prev) => new { b.Title, Prev = prev }));
     }
 
@@ -1205,7 +1209,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public void WindowFunctions_WithLead_NonNormProvider_Throws()
     {
         var q = new List<MiscBlog>().AsQueryable();
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormUsageException>(() =>
             q.WithLead(b => b.Id, 1, (b, next) => new { b.Title, Next = next }));
     }
 
@@ -1533,7 +1537,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
     public async Task NavigationPropertyExtensions_LoadAsync_WithoutContext_Throws()
     {
         var blog = new MiscBlog { Id = 1 };
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<NormUsageException>(
             () => blog.LoadAsync(b => b.Title));
     }
 

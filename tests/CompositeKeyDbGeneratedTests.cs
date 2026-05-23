@@ -15,6 +15,7 @@ namespace nORM.Tests;
 //correctly avoids identity-map aliasing when two entities have the same default key value
 //before SaveChangesAsync assigns the real DB-generated id.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompositeKeyDbGeneratedTests
 {
     private class CompositeOrder2

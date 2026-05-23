@@ -149,6 +149,7 @@ file sealed class AegTenantProvider : ITenantProvider
 
 // -- Test class ---------------------------------------------------------------
 
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialMultiShapeStressTests
 {
     // -- Helpers ---------------------------------------------------------------

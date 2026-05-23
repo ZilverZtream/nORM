@@ -15,6 +15,7 @@ namespace nORM.Tests;
 //so that a cancelled caller token cannot abort a mid-flight commit and leave
 //the database in an ambiguous state.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionCommitCancellationTests
 {
     [Table("TxCommitItem")]

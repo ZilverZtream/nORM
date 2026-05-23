@@ -13,6 +13,7 @@ namespace nORM.Tests;
 //(PK mutation): Verifies that SaveChanges throws when the primary key of a
 //tracked entity is mutated after attach, preventing silent updates to the wrong row.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class PKMutationTests
 {
     [Table("Item")]

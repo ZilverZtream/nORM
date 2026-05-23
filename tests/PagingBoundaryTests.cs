@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// Verifies that negative Skip/Take values throw ArgumentOutOfRangeException
 /// at query translation time, while zero is valid.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PagingBoundaryTests
 {
     private class PagingItem

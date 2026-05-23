@@ -28,6 +28,7 @@ namespace nORM.Tests;
 //   - SQLite runner serialises concurrent calls via BEGIN EXCLUSIVE (live test).
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MigrationAdvisoryLockTests
 {
     // ── SQL Server lock SQL shape ─────────────────────────────────────────────

@@ -19,6 +19,7 @@ namespace nORM.Tests;
 //when they are themselves disposed. The fix adds an _ownsConnection flag to DbContext so
 //that contexts created over externally-supplied connections do not close them on disposal.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRunnerConnectionOwnershipTests
 {
     private static Assembly MigrationsAssembly => typeof(SqliteMigrationRunnerTests).Assembly;

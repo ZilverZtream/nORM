@@ -30,6 +30,7 @@ namespace nORM.Tests;
 ///   TI-3  Compiled query cache does not collapse tenant-specific plans.
 ///   TI-4  Concurrent SaveChanges for different tenants do not corrupt row counts.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class TenantIsolationStressTests
 {
     [Table("TiRow")]

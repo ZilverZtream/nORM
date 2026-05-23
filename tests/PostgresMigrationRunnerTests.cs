@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// SQLite. Only ApplyMigrationsAsync hits pg_advisory_lock and fails on SQLite.
 /// </para>
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PostgresMigrationRunnerTests
 {
     // ── Dynamic assembly helpers ─────────────────────────────────────────────

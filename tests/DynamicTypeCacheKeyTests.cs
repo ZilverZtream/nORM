@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// cache key path) strips sensitive keys and handles key-reordering and quoted semicolons
 /// correctly using DbConnectionStringBuilder.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DynamicTypeCacheKeyTests
 {
  // Access the private static NormalizeConnectionString method via reflection.

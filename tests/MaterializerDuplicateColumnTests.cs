@@ -14,6 +14,7 @@ namespace nORM.Tests;
 //When two result columns share the same name (e.g., two JOINed tables both returning "Id"),
 //the ambiguous columns must not be silently mapped using name lookup to the wrong column.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerDuplicateColumnTests
 {
  //<summary>

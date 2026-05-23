@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Tests materialization against real SQLite databases for edge cases:
 /// primitive types, nullable types, special values, special strings.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializationEdgeCaseTests
 {
     // ─── Primitive types entity ────────────────────────────────────────────

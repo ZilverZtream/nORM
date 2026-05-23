@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// SEC-MT: Verify that UPDATE/DELETE WHERE clauses include the tenant column predicate
 /// so that a batch operation cannot affect rows belonging to a different tenant.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TenantWriteIsolationTests
 {
     [Table("TwItem")]

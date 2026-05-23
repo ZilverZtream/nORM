@@ -40,6 +40,7 @@ namespace nORM.Tests;
 ///   SB-5  Async-first then sync: bootstrap already complete, sync no-ops cleanly.
 ///   SB-6  Sync Count() with temporal disabled: no bootstrap tables created.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SyncTemporalBootstrapTests
 {
     // ── Entity ────────────────────────────────────────────────────────────────

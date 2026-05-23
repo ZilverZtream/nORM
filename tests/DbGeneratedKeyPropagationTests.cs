@@ -52,6 +52,7 @@ file class DbGenIntKey
 /// do not implement <c>IConvertible</c>. SQL Server additionally used SCOPE_IDENTITY() which
 /// only returns numeric identity values, so Guid/string keys could never be read back.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DbGeneratedKeyPropagationTests
 {
     // ── Unit: SetPrimaryKey type-aware conversion ─────────────────────────────

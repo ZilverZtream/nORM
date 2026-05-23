@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// Verifies that scalar aggregate materializers return the correct CLR type and value
 /// instead of always coercing to long.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ScalarAggregateTypeTests
 {
     [Table("AggRow")]

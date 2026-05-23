@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Each test proves: (a) supported shapes execute and return correct results, and
 /// (b) unsupported CLR-method shapes throw NormUnsupportedFeatureException.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class LinqMatrixContractTests
 {
     [Table("LinqMatrixItem")]

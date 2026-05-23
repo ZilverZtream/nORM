@@ -42,6 +42,7 @@ namespace nORM.Tests;
 /// 1 row, so neither path detects the conflict. This is a documented trade-off for all OCC
 /// rowcount approaches and requires application-level versioning to close.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class OptimisticConcurrencyProviderMatrixTests
 {
     // ── Test entity ────────────────────────────────────────────────────────────

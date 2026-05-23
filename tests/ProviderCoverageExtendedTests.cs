@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// and BulkOperationProvider. These tests exercise SQL-shape methods that do not require
 /// a live database connection.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderCoverageExtendedTests
 {
     // ─────────────────────────────────────────────────────────────────────────

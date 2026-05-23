@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// These tests verify provider-specific SQL generation without requiring a live database
 /// connection for non-SQLite providers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AsyncCancellationProviderParityTests
 {
     // ── Test entity ───────────────────────────────────────────────────────────

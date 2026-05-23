@@ -24,11 +24,13 @@ namespace nORM.Tests;
 /// 3. A compiled query with a changed predicate produces a new plan (no plan collision).
 /// 4. Calling a compiled query after DbContext disposal throws gracefully.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryContractTests
 {
     // ── Domain model ──────────────────────────────────────────────────────────
 
     [Table("CQC_Item")]
+    [Xunit.Trait("Category", "Fast")]
     public class CqcItem
     {
         [Key]

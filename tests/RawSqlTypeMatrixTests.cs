@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// support: Guid, DateOnly, TimeOnly, enum. Also verifies parameter binding for DateOnly,
 /// TimeOnly, enum, char, and uint does not throw and returns correct results (P2).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RawSqlTypeMatrixTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ namespace nORM.Tests;
 //   - Lock-free/shared-state safety for long-lived static caches
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class DivergentModelCacheStressTests : IDisposable
 {
     // ── Entity types ────────────────────────────────────────────────────────

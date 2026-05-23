@@ -29,6 +29,7 @@ namespace nORM.Tests;
 // ── Entities for utility tests ─────────────────────────────────────────────
 
 [Table("UCT_Gadget")]
+[Xunit.Trait("Category", "Fast")]
 public class UctGadget
 {
     [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -40,6 +41,7 @@ public class UctGadget
 
 // ── Interceptor helpers ────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class UctLoggingInterceptor : BaseDbCommandInterceptor
 {
     public int NonQueryCount;
@@ -50,6 +52,7 @@ public sealed class UctLoggingInterceptor : BaseDbCommandInterceptor
     public UctLoggingInterceptor(ILogger logger) : base(logger) { }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class UctSuppressingInterceptor : IDbCommandInterceptor
 {
     public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand cmd, DbContext ctx, CancellationToken ct)
@@ -74,6 +77,7 @@ public sealed class UctSuppressingInterceptor : IDbCommandInterceptor
         => Task.CompletedTask;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class UctEmptyReader : DbDataReader
 {
     public override bool Read() => false;
@@ -109,6 +113,7 @@ public sealed class UctEmptyReader : DbDataReader
     public override Type GetFieldType(int ordinal) => typeof(object);
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class UctGateTrackingConnection : DbConnection
 {
     private ConnectionState _state = ConnectionState.Closed;
@@ -168,6 +173,7 @@ public sealed class UctGateTrackingConnection : DbConnection
     }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class UctGateTrackingCommand : DbCommand
 {
     private readonly UctGateTrackingConnection _connection;
@@ -224,6 +230,7 @@ public sealed class UctGateTrackingCommand : DbCommand
 
 /// <summary>Coverage for DbCommandExtensions, FastExpressionVisitorPool, DynamicBatchSizer,
 /// CommandInterceptorExtensions, DbConnectionFactory, BaseDbCommandInterceptor.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class UtilityCoverageTests
 {
     private static SqliteConnection OpenDb()
@@ -1201,13 +1208,16 @@ public class UtilityCoverageTests
 
 // ── Support types ─────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class TestFieldHolder { public int Value; }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class CustomProvider : SqliteProvider
 {
     // Override type check to be non-Sqlite, non-SqlServer, non-Postgres, non-MySql
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class FakeLogger : ILogger
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -1219,6 +1229,7 @@ public sealed class FakeLogger : ILogger
 // RetryPolicy tests
 // ══════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class RetryPolicyTests
 {
     [Fact]
@@ -1309,6 +1320,7 @@ public class RetryPolicyTests
 // NavigationContext and NavigationPropertyInfo tests
 // ══════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationContextTests
 {
     private static SqliteConnection OpenDb()
@@ -1383,6 +1395,7 @@ public class NavigationContextTests
     }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyInfoTests
 {
     [Fact]
@@ -1428,6 +1441,7 @@ public class NavigationPropertyInfoTests
 // ══════════════════════════════════════════════════════════════════════════
 
 [Table("LncOwner")]
+[Xunit.Trait("Category", "Fast")]
 public class LncOwner
 {
     [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -1436,6 +1450,7 @@ public class LncOwner
 }
 
 [Table("LncItem")]
+[Xunit.Trait("Category", "Fast")]
 public class LncItem
 {
     [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -1444,6 +1459,7 @@ public class LncItem
     public string Name { get; set; } = string.Empty;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class LazyNavigationCollectionTests
 {
     private static SqliteConnection OpenDb()
@@ -1648,6 +1664,7 @@ public class LazyNavigationCollectionTests
 // NavigationPropertyExtensions static behaviour tests (no DB needed)
 // ══════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyExtensionsTests
 {
     private static SqliteConnection OpenDb()
@@ -1747,7 +1764,7 @@ public class NavigationPropertyExtensionsTests
     public async Task LoadAsync_EntityWithoutContext_ThrowsInvalidOperation()
     {
         var gadget = new UctGadget { Name = "Test" };
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<NormUsageException>(
             () => gadget.LoadAsync<UctGadget, object>(g => null!));
     }
 

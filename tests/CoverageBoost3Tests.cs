@@ -20,6 +20,7 @@ namespace nORM.Tests;
 // ── Entities for CB3 tests ────────────────────────────────────────────────────
 
 [Table("CB3_Widget")]
+[Xunit.Trait("Category", "Fast")]
 public class CB3Widget
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -34,6 +35,7 @@ public class CB3Widget
 ///   CountTranslator, FirstSingleTranslator, LastTranslator (predicate branches),
 ///   ThenIncludeTranslator, AggregateExpressionTranslator, QueryTranslatorPooledObjectPolicy.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoost3Tests : TestBase
 {
     // ── Shared helpers ───────────────────────────────────────────────────────

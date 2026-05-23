@@ -17,6 +17,7 @@ namespace nORM.Tests;
 //in this environment. SQLite's BulkInsertAsync already uses the ownedTx guard pattern.
 //The UseAffectedRowsSemantics assertion validates the override exists on MySqlProvider.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MysqlBulkTransactionIsolationTests
 {
     [Table("MysqlBulkItem")]

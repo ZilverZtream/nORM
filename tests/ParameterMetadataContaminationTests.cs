@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// text-bound values (DateTime, DateOnly, Guid, decimal, binary): Size=0 produces an empty
 /// string/blob; Size=-1 means "no limit" and binds the full value.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ParameterMetadataContaminationTests
 {
     // ── string → binary ───────────────────────────────────────────────────────

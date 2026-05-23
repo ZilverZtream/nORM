@@ -149,6 +149,7 @@ file sealed class StringTenantProvider : ITenantProvider
 
 // ── Test class ───────────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialTenantExpressionFuzzTests
 {
     // ── Helpers ──────────────────────────────────────────────────────────────

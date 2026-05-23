@@ -44,6 +44,7 @@ namespace nORM.Tests;
 //   string literals / credentials from appearing in log sinks.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class AuditDirectWriteAndInterceptorTests
 {
     // ══════════════════════════════════════════════════════════════════════

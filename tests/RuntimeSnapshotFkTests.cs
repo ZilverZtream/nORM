@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Verifies that SchemaSnapshot.Build(DbContext) populates FK constraints
 /// from configured relations, enabling drift detection between snapshots.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RuntimeSnapshotFkTests
 {
     private class Author

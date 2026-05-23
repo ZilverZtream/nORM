@@ -20,6 +20,7 @@ namespace nORM.Tests;
 // Must be public and at namespace scope (not nested) so nORM reflection works.
 
 [Table("QEX_Item")]
+[Xunit.Trait("Category", "Fast")]
 public class QexItem
 {
     [Key]
@@ -33,6 +34,7 @@ public class QexItem
 }
 
 [Table("QEX_Parent")]
+[Xunit.Trait("Category", "Fast")]
 public class QexParent
 {
     [Key]
@@ -43,6 +45,7 @@ public class QexParent
 }
 
 [Table("QEX_Child")]
+[Xunit.Trait("Category", "Fast")]
 public class QexChild
 {
     [Key]
@@ -53,6 +56,7 @@ public class QexChild
 }
 
 [Table("QEX_ParentGC")]
+[Xunit.Trait("Category", "Fast")]
 public class QexParentGC
 {
     [Key]
@@ -63,6 +67,7 @@ public class QexParentGC
 }
 
 [Table("QEX_ChildGC")]
+[Xunit.Trait("Category", "Fast")]
 public class QexChildGC
 {
     [Key]
@@ -74,6 +79,7 @@ public class QexChildGC
 }
 
 [Table("QEX_GrandChild")]
+[Xunit.Trait("Category", "Fast")]
 public class QexGrandChild
 {
     [Key]
@@ -84,6 +90,7 @@ public class QexGrandChild
 }
 
 [Table("QEX_Team")]
+[Xunit.Trait("Category", "Fast")]
 public class QexTeam
 {
     [Key]
@@ -94,6 +101,7 @@ public class QexTeam
 }
 
 [Table("QEX_Player")]
+[Xunit.Trait("Category", "Fast")]
 public class QexPlayer
 {
     [Key]
@@ -103,6 +111,7 @@ public class QexPlayer
 }
 
 [Table("QEX_Outer")]
+[Xunit.Trait("Category", "Fast")]
 public class QexOuter
 {
     [Key]
@@ -114,6 +123,7 @@ public class QexOuter
 }
 
 [Table("QEX_Inner")]
+[Xunit.Trait("Category", "Fast")]
 public class QexInner
 {
     [Key]
@@ -127,6 +137,7 @@ public class QexInner
 /// Extended coverage tests for QueryExecutor, exercising paths not already covered
 /// by QueryExecutorCoverageTests and QueryExecutorAsyncCoverageTests.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryExecutorExtendedCoverageTests
 {
     // ── Async-forcing provider ──────────────────────────────────────────────────
@@ -1394,6 +1405,7 @@ public class QueryExecutorExtendedCoverageTests
 // ── Additional entity types for M2M tests within QueryExecutorExtendedCoverageTests ─
 
 [Table("QEX_Animal")]
+[Xunit.Trait("Category", "Fast")]
 public class QexAnimal
 {
     [Key]
@@ -1404,6 +1416,7 @@ public class QexAnimal
 }
 
 [Table("QEX_Post")]
+[Xunit.Trait("Category", "Fast")]
 public class QexPost
 {
     [Key]
@@ -1414,6 +1427,7 @@ public class QexPost
 }
 
 [Table("QEX_Tag")]
+[Xunit.Trait("Category", "Fast")]
 public class QexTag
 {
     [Key]

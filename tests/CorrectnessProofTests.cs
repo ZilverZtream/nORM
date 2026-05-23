@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Each test targets a specific root-cause bug and verifies the observable
 /// runtime behaviour is correct. All tests use SQLite in-memory.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CorrectnessProofTests
 {
     // ═══════════════════════════════════════════════════════════════════════════

@@ -23,6 +23,7 @@ namespace nORM.Tests;
 // ── Public entity types (namespace scope, not nested) ──────────────────────
 
 [Table("MAED_Product")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedProduct
 {
     [Key]
@@ -35,6 +36,7 @@ public class MaedProduct
 }
 
 [Table("MAED_NullProp")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedNullProp
 {
     [Key]
@@ -46,6 +48,7 @@ public class MaedNullProp
 }
 
 [Table("MAED_Category")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedCategory
 {
     [Key]
@@ -56,6 +59,7 @@ public class MaedCategory
 }
 
 [Table("MAED_Item")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedItem
 {
     [Key]
@@ -67,6 +71,7 @@ public class MaedItem
 }
 
 [Table("MAED_Event")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedEvent
 {
     [Key]
@@ -78,6 +83,7 @@ public class MaedEvent
 }
 
 [Table("MAED_Score")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedScore
 {
     [Key]
@@ -89,6 +95,7 @@ public class MaedScore
 }
 
 [Table("MAED_Flag")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedFlag
 {
     [Key]
@@ -99,6 +106,7 @@ public class MaedFlag
 }
 
 [Table("MAED_Multi")]
+[Xunit.Trait("Category", "Fast")]
 public class MaedMulti
 {
     [Key]
@@ -118,6 +126,7 @@ public class MaedMulti
 /// Deep coverage tests for MaterializerFactory and QueryExecutor focusing on
 /// paths not yet covered by existing test files.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerAndExecutorDeepCoverageTests
 {
     // ── Async-forcing provider ──────────────────────────────────────────────

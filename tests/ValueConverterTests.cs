@@ -16,10 +16,12 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for the Value Converter feature: bi-directional conversion between model types and provider types.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ValueConverterTests
 {
     // ── Shared entity types ──────────────────────────────────────────────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class Product
     {
         [Key]
@@ -34,6 +36,7 @@ public class ValueConverterTests
     public enum ProductStatus { Active = 1, Inactive = 2, Archived = 3 }
 
     // Converts enum↔int
+    [Xunit.Trait("Category", "Fast")]
     public class EnumToIntConverter : ValueConverter<ProductStatus, int>
     {
         public override object? ConvertToProvider(ProductStatus v) => (int)v;
@@ -41,6 +44,7 @@ public class ValueConverterTests
     }
 
     // Converts int↔string
+    [Xunit.Trait("Category", "Fast")]
     public class IntToStringConverter : ValueConverter<int, string>
     {
         public override object? ConvertToProvider(int v) => v.ToString();
@@ -48,6 +52,7 @@ public class ValueConverterTests
     }
 
     // Converts string↔string (upper-case)
+    [Xunit.Trait("Category", "Fast")]
     public class UpperCaseConverter : ValueConverter<string, string>
     {
         public override object? ConvertToProvider(string v) => v?.ToUpperInvariant();
@@ -55,6 +60,7 @@ public class ValueConverterTests
     }
 
     // Negating int converter (write: negate, read: negate back)
+    [Xunit.Trait("Category", "Fast")]
     public class NegatingConverter : ValueConverter<int, int>
     {
         public override object? ConvertToProvider(int v) => -v;

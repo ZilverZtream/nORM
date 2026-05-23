@@ -315,6 +315,7 @@ M:nORM.Mapping.DiscriminatorValueAttribute.#ctor(System.Object)
 M:nORM.Mapping.IValueConverter.ConvertFromProvider(System.Object):System.Object
 M:nORM.Mapping.IValueConverter.ConvertToProvider(System.Object):System.Object
 M:nORM.Mapping.OwnedAttribute.#ctor()
+M:nORM.Mapping.RenameColumnAttribute.#ctor(System.String)
 M:nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
 M:nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,nORM.Mapping.Column,nORM.Mapping.Column,System.Boolean)
 M:nORM.Mapping.TableMapping.Relation.<Clone>$():nORM.Mapping.TableMapping.Relation
@@ -513,6 +514,7 @@ M:nORM.Providers.PostgresProvider.TranslateFunction(System.String,System.Type,Sy
 M:nORM.Providers.PostgresProvider.TranslateJsonPathAccess(System.String,System.String):System.String
 M:nORM.Providers.ProviderCapabilities.#ctor(System.String,System.Version,System.Int32,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.String)
 M:nORM.Providers.SqlServerProvider.#ctor()
+M:nORM.Providers.SqlServerProvider.#ctor(nORM.Providers.IDbParameterFactory)
 M:nORM.Providers.SqlServerProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
 M:nORM.Providers.SqlServerProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Providers.SqlServerProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -588,6 +590,7 @@ M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Com
 M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String):System.Threading.Tasks.Task{System.Type}
 M:nORM.SourceGeneration.CompileTimeQueryAttribute.#ctor(System.String)
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add(System.Type,System.Func{System.Data.Common.DbDataReader,System.Object}):System.Void
+M:nORM.SourceGeneration.CompiledMaterializerStore.AddPermanent``1(System.String,System.Func{System.Data.Common.DbDataReader,`0}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add``1(System.Func{System.Data.Common.DbDataReader,`0}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add``1(System.String,System.Func{System.Data.Common.DbDataReader,`0}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.Clear():System.Void
@@ -745,6 +748,7 @@ P:nORM.Mapping.OwnedCollectionMapping.KeyColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.OwnedCollectionMapping.NavigationProperty:System.Reflection.PropertyInfo
 P:nORM.Mapping.OwnedCollectionMapping.OwnedType:System.Type
 P:nORM.Mapping.OwnedCollectionMapping.TableName:System.String
+P:nORM.Mapping.RenameColumnAttribute.OldName:System.String
 P:nORM.Mapping.TableMapping.Columns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableMapping.ColumnsByName:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.ConverterFingerprint:System.Int32
@@ -779,6 +783,7 @@ P:nORM.Migration.ColumnSchema.IsNullable:System.Boolean
 P:nORM.Migration.ColumnSchema.IsPrimaryKey:System.Boolean
 P:nORM.Migration.ColumnSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnSchema.Name:System.String
+P:nORM.Migration.ColumnSchema.PreviousName:System.String
 P:nORM.Migration.ForeignKeySchema.ConstraintName:System.String
 P:nORM.Migration.ForeignKeySchema.DependentColumns:System.String[]
 P:nORM.Migration.ForeignKeySchema.OnDelete:System.String
@@ -808,6 +813,7 @@ P:nORM.Migration.SchemaDiff.DroppedIndexes:System.Collections.Generic.List{Syste
 P:nORM.Migration.SchemaDiff.DroppedTables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.SchemaDiff.HasChanges:System.Boolean
 P:nORM.Migration.SchemaDiff.HasDestructiveChanges:System.Boolean
+P:nORM.Migration.SchemaDiff.RenamedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaSnapshot.Tables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.TableSchema.Columns:System.Collections.Generic.List{nORM.Migration.ColumnSchema}
 P:nORM.Migration.TableSchema.ForeignKeys:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
@@ -950,6 +956,7 @@ T:nORM.Mapping.IValueConverter
 T:nORM.Mapping.JoinTableMapping
 T:nORM.Mapping.OwnedAttribute
 T:nORM.Mapping.OwnedCollectionMapping
+T:nORM.Mapping.RenameColumnAttribute
 T:nORM.Mapping.TableMapping
 T:nORM.Mapping.TableMapping.Relation
 T:nORM.Mapping.TableSplitAttribute

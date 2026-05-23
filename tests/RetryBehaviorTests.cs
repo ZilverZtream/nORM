@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Verifies that exceptions thrown during CommitAsync are never retried, even
 /// when <c>ShouldRetry</c> returns true, to prevent duplicate INSERTs.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RetryBehaviorTests
 {
     // Helper: check the private IsRetryableException method via reflection

@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for Raw SQL query APIs must respect the active DbContext transaction.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionIsolationTests
 {
     [Table("TxItem")]

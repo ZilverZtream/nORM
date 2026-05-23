@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace nORM.Tests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class SourceGeneratorIntegrationTests
     {
         [Fact]

@@ -21,6 +21,7 @@ namespace nORM.Tests;
 // ── Entity used across all mapping-hash cache-isolation tests ────────────────
 
 [Table("mhci_items")]
+[Xunit.Trait("Category", "Fast")]
 public class MhciItem
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -92,6 +93,7 @@ internal sealed class MhciSqlCapture : IDbCommandInterceptor
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class MappingHashCacheIsolationTests
 {
     // ── Helpers ──────────────────────────────────────────────────────────────

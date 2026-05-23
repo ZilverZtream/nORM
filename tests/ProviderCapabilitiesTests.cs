@@ -12,6 +12,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class ProviderCapabilitiesTests
 {
     [Fact]
@@ -27,7 +28,7 @@ public sealed class ProviderCapabilitiesTests
         AssertProvider(
             new PostgresProvider(new SqliteParameterFactory()),
             "PostgreSQL",
-            new Version(9, 5),
+            new Version(12, 0),
             maxParameters: 32_767,
             nativeBulk: true);
 
@@ -41,7 +42,7 @@ public sealed class ProviderCapabilitiesTests
         AssertProvider(
             new SqliteProvider(),
             "SQLite",
-            new Version(3, 9),
+            new Version(3, 25),
             maxParameters: 999,
             nativeBulk: false);
     }

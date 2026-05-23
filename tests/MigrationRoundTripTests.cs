@@ -15,6 +15,7 @@ namespace nORM.Tests;
 ///
 /// These tests use SqliteMigrationSqlGenerator directly (no live DB connection required).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRoundTripTests
 {
     // ─── Helper: build a snapshot with specific schema ────────────────────

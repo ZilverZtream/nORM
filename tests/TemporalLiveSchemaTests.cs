@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// Verifies that IntrospectTableColumnsAsync returns live column info,
 /// and that GenerateCreateHistoryTableSql uses live types when available.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalLiveSchemaTests
 {
     [Table("TlsProduct")]

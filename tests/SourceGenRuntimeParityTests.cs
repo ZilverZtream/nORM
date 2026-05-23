@@ -21,10 +21,12 @@ namespace nORM.Tests;
 /// Verifies that Norm.CompileQuery (precompiled path) and runtime LINQ produce identical
 /// results for the same input data, using SQLite in-memory databases.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenRuntimeParityTests
 {
     // ── Entity ────────────────────────────────────────────────────────────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class ParityItem
     {
         public int Id { get; set; }
@@ -552,6 +554,7 @@ internal static class SgEqHelpers
 /// Verifies compiled vs runtime result equivalence for a basic entity across
 /// all lock-step providers (SQLite, MySQL lock-step, PostgreSQL lock-step).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenBasicEquivalenceTests
 {
     private const string Ddl =
@@ -650,6 +653,7 @@ public class SourceGenBasicEquivalenceTests
 /// Verifies that compiled and runtime paths produce identical results for enum-typed
 /// columns across all lock-step providers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenEnumEquivalenceTests
 {
     private const string Ddl =
@@ -716,6 +720,7 @@ public class SourceGenEnumEquivalenceTests
 /// Verifies that compiled and runtime paths produce identical results for
 /// DateOnly/TimeOnly columns across all lock-step providers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenDateTimeEquivalenceTests
 {
     private const string Ddl =
@@ -756,6 +761,7 @@ public class SourceGenDateTimeEquivalenceTests
 /// Verifies that ValueConverter entities bypass the compiled materializer and use
 /// the runtime path, producing identical results to runtime queries.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenConverterEquivalenceTests
 {
     private const string Ddl =
@@ -824,6 +830,7 @@ public class SourceGenConverterEquivalenceTests
 /// Verifies that [Column] attribute-renamed columns are materialized identically
 /// by the compiled and runtime paths across all lock-step providers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenRenamedColumnEquivalenceTests
 {
     private const string Ddl =
@@ -889,6 +896,7 @@ public class SourceGenRenamedColumnEquivalenceTests
 /// Verifies that two contexts with different providers accessing the same entity
 /// type do not share cached query plans (cross-context plan isolation).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenCrossContextPlanIsolationTests
 {
     private const string Ddl =

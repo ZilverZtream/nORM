@@ -544,7 +544,7 @@ public class LiveCrossProviderTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -562,7 +562,7 @@ public class LiveCrossProviderTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -580,7 +580,7 @@ public class LiveCrossProviderTests
         DatabaseProvider p = kind switch
         {
             "sqlite"    => new SqliteProvider(),
-            "sqlserver" => new SqlServerProvider(),
+            "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
             "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
             "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
             _           => throw new ArgumentOutOfRangeException(nameof(kind))

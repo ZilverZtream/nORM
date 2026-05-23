@@ -15,6 +15,7 @@ namespace nORM.Tests;
 // ConcurrentLruCache<K,V> — public API coverage
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ConcurrentLruCachePublicApiTests
 {
     // ── GetOrAdd ──────────────────────────────────────────────────────────────
@@ -250,6 +251,7 @@ public class ConcurrentLruCachePublicApiTests
 // ParameterOptimizer — public API coverage
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ParameterOptimizerPublicApiTests
 {
     private static SqliteConnection OpenMemory()

@@ -34,6 +34,7 @@ namespace nORM.Tests;
 /// Migration types are built in a dynamic assembly so they don't appear in the test
 /// assembly scan used by SqliteMigrationRunnerTests (which would cause spurious failures).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MySqlMigrationPerStepTests
 {
     // ── No-advisory-lock test runner ─────────────────────────────────────────

@@ -16,6 +16,7 @@ namespace nORM.Tests;
 //<see cref="CancellationToken.None"/> internally, so that a canceled caller token
 //cannot abort a rollback and leave the transaction in an ambiguous state.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionRollbackTests
 {
     private static Type TransactionManagerType =>

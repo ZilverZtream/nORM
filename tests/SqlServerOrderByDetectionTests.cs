@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Q1 fix: add comment-token lexing to HasTopLevelOrderBy.
 /// S1 fix: add literal/identifier lexing (prior fix).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerOrderByDetectionTests
 {
     // Invoke the private static HasTopLevelOrderBy via reflection.

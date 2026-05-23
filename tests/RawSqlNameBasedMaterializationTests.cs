@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// Fix: QueryUnchangedAsync now builds a name→ordinal dictionary from reader.GetName()
 /// and populates each property from its correctly named column regardless of SQL order.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RawSqlNameBasedMaterializationTests
 {
     [Table("NamedCol")]

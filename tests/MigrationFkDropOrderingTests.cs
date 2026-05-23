@@ -24,6 +24,7 @@ namespace nORM.Tests;
 ///
 /// Also validates SQLite concurrent migration serialization (CCD-1).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationFkDropOrderingTests
 {
     // ── Shared diff builders ───────────────────────────────────────────────────

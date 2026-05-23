@@ -15,6 +15,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class SaveChangesBatchingTests
 {
     private sealed class FallbackSqliteProvider : DatabaseProvider

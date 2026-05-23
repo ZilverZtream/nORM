@@ -24,6 +24,7 @@ namespace nORM.Tests;
 ///    nORM requires AsSplitQuery() as an explicit opt-in; omitting it must never silently
 ///    return partial data that looks correct on a small dataset and breaks under load.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class IncludeContractTests
 {
     // ── Domain model ──────────────────────────────────────────────────────────

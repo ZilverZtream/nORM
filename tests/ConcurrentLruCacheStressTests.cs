@@ -32,6 +32,7 @@ namespace nORM.Tests;
 ///   <item>Factory functions run at most once per key under concurrent misses.</item>
 /// </list>
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class ConcurrentLruCacheStressTests
 {
     private const int Threads      = 16;

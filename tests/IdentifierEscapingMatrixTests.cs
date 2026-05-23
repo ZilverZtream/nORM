@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// - Schema-qualified names
 /// - Adversarial inputs
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class IdentifierEscapingMatrixTests
 {
     // ─── SQLite ────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ namespace nORM.Tests
     public record Person(int Id, string Name);
 
     [DiscriminatorColumn(nameof(Type))]
+    [Xunit.Trait("Category", "Fast")]
     public class Animal
     {
         public int Id { get; set; }
@@ -17,17 +18,20 @@ namespace nORM.Tests
     }
 
     [DiscriminatorValue("Cat")]
+    [Xunit.Trait("Category", "Fast")]
     public class Cat : Animal
     {
         public int Lives { get; set; }
     }
 
     [DiscriminatorValue("Dog")]
+    [Xunit.Trait("Category", "Fast")]
     public class Dog : Animal
     {
         public bool GoodBoy { get; set; }
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class AdvancedMappingTests
     {
         [Fact]

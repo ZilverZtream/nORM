@@ -23,6 +23,7 @@ namespace nORM.Tests;
 //Fix: ChangeTracker.Remove() now converts OriginalKey through ToLookupKey() to the
 //dictionary-compatible shape before TryRemove.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompositeKeyRemoveCleanupTests
 {
     [Table("CompoundItem")]

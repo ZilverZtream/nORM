@@ -7,6 +7,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Verify migration runner throws when a version's name drifts.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationDriftTests
 {
     [Fact]

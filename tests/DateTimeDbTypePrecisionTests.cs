@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// ParameterOptimizer (AddOptimizedParam) and ParameterAssign (AssignValue) pipelines
 /// so that compiled/pooled and non-pooled execution paths produce identical parameter metadata.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DateTimeDbTypePrecisionTests
 {
     [Fact]

@@ -18,6 +18,7 @@ namespace nORM.Tests;
 // ── Entity types at namespace scope to avoid private-class IL materializer issues ──
 
 [Table("MFC_NullableInt")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcNullableInt
 {
     [Key]
@@ -27,6 +28,7 @@ public class MfcNullableInt
 }
 
 [Table("MFC_NullableBool")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcNullableBool
 {
     [Key]
@@ -36,6 +38,7 @@ public class MfcNullableBool
 }
 
 [Table("MFC_NullableDecimal")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcNullableDecimal
 {
     [Key]
@@ -47,6 +50,7 @@ public class MfcNullableDecimal
 public enum MfcStatus { Pending = 0, Active = 1, Inactive = 2 }
 
 [Table("MFC_Enum")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcEnumEntity
 {
     [Key]
@@ -56,6 +60,7 @@ public class MfcEnumEntity
 }
 
 [Table("MFC_NullableEnum")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcNullableEnumEntity
 {
     [Key]
@@ -65,6 +70,7 @@ public class MfcNullableEnumEntity
 }
 
 [Table("MFC_Wide")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcWide
 {
     [Key]
@@ -80,6 +86,7 @@ public class MfcWide
 }
 
 [Table("MFC_Join_B")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcJoinB
 {
     [Key]
@@ -88,6 +95,7 @@ public class MfcJoinB
 }
 
 [Table("MFC_Widget")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcWidget
 {
     [Key]
@@ -99,6 +107,7 @@ public class MfcWidget
 }
 
 [Table("MFC_Thing")]
+[Xunit.Trait("Category", "Fast")]
 public class MfcThing
 {
     [Key]
@@ -116,6 +125,7 @@ public class MfcThing
 ///   - Async materializer path via non-projection queries on AsyncSqliteProvider
 ///   - Schema-aware materializer (projection) direct instantiation
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerFactoryCoverageTests
 {
     // ── Async-forcing provider ─────────────────────────────────────────────

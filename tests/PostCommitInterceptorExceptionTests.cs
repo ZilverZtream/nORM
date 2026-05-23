@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Verifies that post-commit interceptor exceptions are swallowed (logged, not propagated)
 /// so that a successful database commit never surfaces as a false SaveChanges failure.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PostCommitInterceptorExceptionTests
 {
     [Table("PceItem")]

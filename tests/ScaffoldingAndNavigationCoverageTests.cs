@@ -25,6 +25,7 @@ namespace nORM.Tests;
 // ── Entity types for LazyNavigationCollection / LazyNavigationReference tests ──
 
 [Table("SAN_Parent")]
+[Xunit.Trait("Category", "Fast")]
 public class SanParent
 {
     [Key]
@@ -34,6 +35,7 @@ public class SanParent
 }
 
 [Table("SAN_Child")]
+[Xunit.Trait("Category", "Fast")]
 public class SanChild
 {
     [Key]
@@ -45,6 +47,7 @@ public class SanChild
 // ── Entity types for ThenInclude tests ────────────────────────────────────────
 
 [Table("SAN_TIParent")]
+[Xunit.Trait("Category", "Fast")]
 public class SanTIParent
 {
     [Key]
@@ -55,6 +58,7 @@ public class SanTIParent
 }
 
 [Table("SAN_TIChild")]
+[Xunit.Trait("Category", "Fast")]
 public class SanTIChild
 {
     [Key]
@@ -66,6 +70,7 @@ public class SanTIChild
 }
 
 [Table("SAN_TIGrandchild")]
+[Xunit.Trait("Category", "Fast")]
 public class SanTIGrandchild
 {
     [Key]
@@ -76,6 +81,7 @@ public class SanTIGrandchild
 
 // ── DatabaseScaffolder private-method helpers via reflection ──────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderPrivateMethodTests
 {
     // ── Reflection helpers ──────────────────────────────────────────────────
@@ -532,6 +538,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
 // ── NavigationContext tests ───────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class SanNavigationContextTests
 {
     private static DbContext CreateCtx()
@@ -618,6 +625,7 @@ public class SanNavigationContextTests
 
 // ── NavigationPropertyInfo record tests ──────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class SanNavigationPropertyInfoTests
 {
     [Fact]
@@ -671,6 +679,7 @@ public class SanNavigationPropertyInfoTests
 // lazy loading can resolve. They exercise collection methods AFTER the
 // collection has been loaded by the navigation infrastructure.
 
+[Xunit.Trait("Category", "Fast")]
 public class SanLazyNavigationCollectionTests : IDisposable
 {
     private readonly SqliteConnection _cn;
@@ -872,6 +881,7 @@ public class SanLazyNavigationCollectionTests : IDisposable
 
 // ── LazyNavigationReference<T> tests ─────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class LazyNavigationReferenceTests
 {
     private static (DbContext Ctx, SanParent Parent, PropertyInfo Prop, NavigationContext NavCtx) CreateSetup()
@@ -944,6 +954,7 @@ public class LazyNavigationReferenceTests
 
 // ── EnableLazyLoading extension tests ────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class EnableLazyLoadingTests
 {
     [Fact]
@@ -989,6 +1000,7 @@ public class EnableLazyLoadingTests
 
 // ── INormIncludableQueryable / ThenInclude extension tests ────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class NormIncludableQueryableTests
 {
     private static DbContext CreateCtx()

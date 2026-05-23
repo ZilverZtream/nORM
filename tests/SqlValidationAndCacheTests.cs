@@ -44,6 +44,7 @@ file class CustomFallbackType
 /// Verifies that AssignValue always resets DbType when called with a new value type,
 /// preventing stale metadata from a previous call from corrupting subsequent parameter bindings.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class StaleDbTypeTests
 {
     // ── Direct unit tests of AssignValue metadata reset ───────────────────────
@@ -215,6 +216,7 @@ public class StaleDbTypeTests
 /// double-dispose and concurrent commit/dispose races from throwing or leaving the
 /// context in a poisoned state.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionAtomicCompletionTests
 {
     private static SqliteConnection OpenConnection()
@@ -357,6 +359,7 @@ public class TransactionAtomicCompletionTests
 /// legitimate queries without false-positive rejections, while still blocking
 /// real injection patterns.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlCommentValidatorTests
 {
     // ── Legitimate inline comments must be accepted ───────────────────────────

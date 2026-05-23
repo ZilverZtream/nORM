@@ -11,6 +11,7 @@ namespace nORM.Tests;
 //<summary>
 //Tests for QueryTranslator recursion depth limiting and the configurable MaxRecursionDepth.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryTranslatorRecursionTests : TestBase
 {
     private class Item

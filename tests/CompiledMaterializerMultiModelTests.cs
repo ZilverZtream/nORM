@@ -32,6 +32,7 @@ namespace nORM.Tests;
 /// <c>MaterializerFactory</c> passes <c>mapping.TableName</c> to avoid using a
 /// compiled materializer registered for a different table layout.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledMaterializerMultiModelTests
 {
     // ── Entity types used by these tests ──────────────────────────────────────

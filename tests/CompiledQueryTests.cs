@@ -8,14 +8,17 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Person
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class PersonInfo
     {
         public int Id { get; set; }
@@ -24,6 +27,7 @@ public class CompiledQueryTests
         public string City { get; set; } = string.Empty;
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class PagedPerson
     {
         public int Id { get; set; }
@@ -94,6 +98,7 @@ public class CompiledQueryTests
  /// A compiled query whose plan has multiple SQL parameters can bind each member
  /// from a typed parameter object without reusing the whole object for every SQL parameter.
  /// </summary>
+    [Xunit.Trait("Category", "Fast")]
     public class TwoParamQuery
     {
         public int MinAge { get; set; }

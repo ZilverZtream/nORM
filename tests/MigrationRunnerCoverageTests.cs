@@ -38,6 +38,7 @@ namespace nORM.Tests;
 // compatible quoting style so the SELECT/INSERT queries succeed on SQLite.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRunnerCoverageTests
 {
     // ── Shared dynamic-assembly builder ──────────────────────────────────────
@@ -1365,6 +1366,7 @@ public class MigrationRunnerCoverageTests
 
 // ── Support types for MigrationRunnerCoverageTests ────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class FakeMigrationLogger : ILogger
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -1372,6 +1374,7 @@ public sealed class FakeMigrationLogger : ILogger
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public sealed class NoOpInterceptor : IDbCommandInterceptor
 {
     public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand cmd, DbContext ctx, CancellationToken ct) => Task.FromResult(InterceptionResult<int>.Continue());

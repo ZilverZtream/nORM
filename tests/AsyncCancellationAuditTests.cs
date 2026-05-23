@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// the call throws OperationCanceledException (or a compatible exception) without
 /// executing any writes and without leaking resources.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AsyncCancellationAuditTests
 {
     [Table("AuditEntity")]
@@ -353,6 +354,7 @@ file class GClChild
 /// <summary>
 /// Proves no DbDataReader or DbCommand is leaked after a cancelled query.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryCancellationLeakTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()
@@ -466,6 +468,7 @@ public class QueryCancellationLeakTests
 /// <summary>
 /// Proves no DbTransaction is leaked after a cancelled SaveChangesAsync.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SaveChangeCancellationLeakTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()
@@ -559,6 +562,7 @@ public class SaveChangeCancellationLeakTests
 /// <summary>
 /// Proves no resource leak in navigation loading after cancellation.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NavigationCancellationLeakTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()

@@ -10,6 +10,7 @@ namespace nORM.Tests;
 /// GetHashCode() for constant values so that distinct constants always produce
 /// distinct fingerprints (no 32-bit truncation collisions for strings/longs/doubles).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FingerprintCollisionResistanceTests
 {
     // ExpressionFingerprint is internal — access via reflection.

@@ -34,6 +34,7 @@ file class GateSimple
     public string? Name { get; set; }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class QueryTranslatorProviderSmokeTests
 {
     // ── Malformed expression fuzz ──────────────────────────────────────────────
@@ -166,6 +167,7 @@ file class GateSE
     public string? Name { get; set; }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class SqliteLiveCrudTests
 {
     private static SqliteConnection OpenDb()
@@ -320,6 +322,7 @@ public class SqliteLiveCrudTests
 /// Tests for null parameter metadata reset, COUNT pooled command transaction rebinding,
 /// and pooled command disposal on provider dispose.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryCountAndPoolTests
 {
     // ── Null-after-nonNull on reused compiled-query parameter resets DbType/Size ──
@@ -498,6 +501,7 @@ file class C2Entity
 
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryTimeoutAndSecurityTests
 {
     // ── ConcurrentLruCache.GetOrAdd factory called at most once per key ───
@@ -883,6 +887,7 @@ public class CompiledQueryTimeoutAndSecurityTests
 /// Tests for compiled-query pooled command correctness and shared arg-array safety under
 /// sequential and concurrent access patterns.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class LruCacheMigrationRetryTests
 {
     // ── Sequential calls with different params must never return stale results ──────────────
@@ -1038,6 +1043,7 @@ file class GateCQ
 /// <summary>
 /// Tests for fast-path timeout consistency and provider matrix under contention.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQuerySequentialParamTests
 {
     // ── Count fast path uses CommandTimeout consistently ─────────────────────────────────
@@ -1113,6 +1119,7 @@ public class CompiledQuerySequentialParamTests
     }
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class CacheAndMultiTenantIsolationTests
 {
     // ── Cache poisoning: hostile value does not corrupt other keys ────────────
@@ -1331,6 +1338,7 @@ file class Gate38CQ
 /// Verifies that compile timeout is caller-cooperative and background workers are bounded
 /// via semaphore, with the semaphore count returning to capacity after each compile.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryConcurrencyLimitTests
 {
     // ── Caller receives TimeoutException; compile semaphore returns to capacity ──
@@ -1449,6 +1457,7 @@ file class Gate40Dec
 /// Tests for decimal precision/scale metadata reset on null and on reassignment, and for
 /// ConnectionManager Dispose safety when a slow health check overlaps with disposal.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ParameterDecimalAndConnectionTests
 {
     // ── Decimal precision/scale not carried over between reused parameters ───────
@@ -1589,6 +1598,7 @@ file sealed class FixedTenantProvider : nORM.Enterprise.ITenantProvider
 /// and that GetFilterKey produces distinct cache keys for same-shape filters with different
 /// closure-captured values.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ParameterStringSizeAndFilterKeyTests
 {
     // ── String Size is always set correctly on every string branch ───────────────────────
@@ -1724,6 +1734,7 @@ public class ParameterStringSizeAndFilterKeyTests
 /// (no global filters needed — TenantProvider ID is included in the ctxKey string but does
 /// not add a WHERE clause unless an entity-level tenant column is configured).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TenantContextChurnTests
 {
     // ── 300 distinct tenant IDs → 300 distinct ctxKeys, LRU cap=256 → ~44 evicted ──────
@@ -1818,6 +1829,7 @@ public class TenantContextChurnTests
 /// <summary>
 /// Adversarial closure-capture key tests with deterministic regression coverage.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ClosureCaptureFilterKeyTests
 {
     // ── Adversarial: rapid cycling of closure values → always-distinct keys ──────────────────

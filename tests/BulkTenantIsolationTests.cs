@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// tenant predicates in the database-side WHERE/JOIN so cross-tenant rows cannot
 /// be modified even if the caller supplies a foreign-tenant primary key.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkTenantIsolationTests
 {
     [Table("BtiItem")]

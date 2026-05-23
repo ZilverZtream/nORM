@@ -25,6 +25,7 @@ namespace nORM.Tests;
 //   • Clear() during active reads/writes is safe
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CacheContentionTests
 {
     // ══════════════════════════════════════════════════════════════════════════

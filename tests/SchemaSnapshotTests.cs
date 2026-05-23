@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// from the <c>[Key]</c> attribute or convention, and that <see cref="SchemaDiffer.Diff"/>
 /// returns <c>AddedIndexes</c> when a newly indexed column appears between snapshots.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SchemaSnapshotTests
 {
  // Entity with explicit [Key]

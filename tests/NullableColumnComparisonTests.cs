@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// Verifies that nullable column-vs-column comparisons expand to three-valued SQL logic
 /// (IS NULL guards), while non-nullable column comparisons use a plain operator.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NullableColumnComparisonTests : TestBase
 {
     private class NullableEntity
