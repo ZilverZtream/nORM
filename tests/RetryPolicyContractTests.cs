@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// - TimeoutException is not retried (unknown write outcome).
 /// - Non-DbException types are not retried by the default policy.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RetryPolicyContractTests
 {
     // ── helpers ────────────────────────────────────────────────────────────────

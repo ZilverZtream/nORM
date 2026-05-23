@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// Fix: extended to <c>N?'(?:[^']|'')*'</c> for single/N-prefixed strings, plus
 /// <c>\$\$.*?\$\$</c> for dollar-quoted blocks.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlRedactionDialectTests
 {
     // ── Reflection accessor for private static RedactSqlForLogging ────────────

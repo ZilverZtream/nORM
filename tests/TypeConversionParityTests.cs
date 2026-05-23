@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// columns, and IS NULL / IS NOT NULL predicate forms.
 /// All tests use SQLite in-memory DB.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TypeConversionParityTests
 {
     // ══════════════════════════════════════════════════════════════════════

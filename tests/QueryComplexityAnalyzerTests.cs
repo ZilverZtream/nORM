@@ -10,6 +10,7 @@ using nORM.Core;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class QueryComplexityAnalyzerTests : TestBase
 {
     private class Product

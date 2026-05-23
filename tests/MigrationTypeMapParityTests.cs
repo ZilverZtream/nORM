@@ -11,6 +11,7 @@ namespace nORM.Tests;
 /// (byte[], DateOnly, TimeOnly, DateTimeOffset, TimeSpan, char, sbyte, ushort, uint, ulong)
 /// and that enum types are resolved via their underlying integral type.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationTypeMapParityTests
 {
     // X2: enums must be internal (not private) so migration generators can resolve them

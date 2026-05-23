@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Composite key tracking: <see cref="CompositeKeyTests"/>.
 /// Constructor-bound entities: <see cref="ConstructorBoundEntityTrackingTests"/>.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ChangeTrackingSemanticsTests
 {
     [Table("TrackedNode")]
@@ -225,7 +226,7 @@ public class ChangeTrackingSemanticsTests
                 ctx.Remove(e);
         }
 
-        // After removing everything added, tracker must not have leaked entries.
-        Assert.Empty(ctx.ChangeTracker.Entries);
+        // After attach → remove, all entries are Deleted (pending DB delete), none Unchanged/Added.
+        Assert.All(ctx.ChangeTracker.Entries, e => Assert.Equal(EntityState.Deleted, e.State));
     }
 }

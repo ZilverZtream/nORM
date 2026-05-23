@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// Verifies NormalizeConnectionStringForCacheKey correctly handles quoted semicolons,
 /// key ordering, credential stripping, malformed strings, and distinct databases.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CacheKeyNormalizationTests
 {
     private static string Normalize(string? cs)

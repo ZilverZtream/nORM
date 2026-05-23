@@ -23,6 +23,7 @@ namespace nORM.Tests;
 ///
 /// True injection chars (still rejected): ' " ; \
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class JsonPathValidationTests : TestBase
 {
     // ── Entity for translation tests ──────────────────────────────────────────
@@ -218,6 +219,7 @@ public class JsonPathValidationTests : TestBase
 /// single-quotes, semicolons, backslashes, and control characters to be embedded
 /// directly into the generated SQL, enabling SQL injection.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderJsonPathInjectionTests
 {
     // ── SQLite ────────────────────────────────────────────────────────────────

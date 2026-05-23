@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// Verifies that ExecuteInsertBatch validates the number of generated keys returned
 /// by the database equals the number of entities in the batch.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InsertKeyCardinalityTests
 {
     [Table("IkcItem")]

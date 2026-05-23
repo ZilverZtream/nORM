@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// when one is already open (T2), and that CommitAsync uses CancellationToken.None so a cancelled
 /// caller token after a successful DB commit does not cause a spurious OperationCanceledException (T1).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkTransactionOwnershipTests
 {
     [Table("BtoItems")]

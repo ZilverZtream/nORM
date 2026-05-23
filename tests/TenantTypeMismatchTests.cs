@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// Expression.Constant. Without coercion, a type mismatch (e.g. long vs int) throws
 /// ArgumentException before any SQL is generated, crashing all tenant-scoped queries.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TenantTypeMismatchTests
 {
     // ── Entities with different tenant column CLR types ───────────────────────

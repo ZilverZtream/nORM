@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Verifies that bulk operations participate in an ambient transaction
 /// rather than creating their own independent transaction.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkTransactionAtomicityTests
 {
     private class Item

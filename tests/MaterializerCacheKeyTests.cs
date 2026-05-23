@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// Verifies that <c>ProjectionHash</c> is a 64-bit value, reducing hash collision risk
 /// compared to the previous 32-bit representation.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerCacheKeyTests
 {
     // Two entity types with the same column layout (Id + Name).

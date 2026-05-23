@@ -29,6 +29,7 @@ namespace nORM.Tests;
 // MySqlMigrationRunner tests use the NoLock subclass to bypass GET_LOCK.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class MigrationStressTests
 {
     // ── Dynamic assembly builder ──────────────────────────────────────────────

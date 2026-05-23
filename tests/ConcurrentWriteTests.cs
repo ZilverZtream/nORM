@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// Adversarial concurrent-write tests. These simulate production race conditions
 /// that a naive ORM loses without proper locking or optimistic concurrency.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class ConcurrentWriteTests
 {
     // ── Shared schema helpers ──────────────────────────────────────────────

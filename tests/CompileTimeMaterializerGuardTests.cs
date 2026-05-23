@@ -77,6 +77,7 @@ internal sealed class CtmgUpperCasePayloadConverter : ValueConverter<string, str
     public override object? ConvertFromProvider(string value) => (value as string)?.ToUpperInvariant() ?? value;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class CompileTimeMaterializerGuardTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

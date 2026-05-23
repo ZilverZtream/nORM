@@ -17,6 +17,7 @@ namespace nORM.Tests;
 // ─── Entity types for NormQueryProvider tests ──────────────────────────────
 
 [Table("NqpItem")]
+[Xunit.Trait("Category", "Fast")]
 public class NqpItem
 {
     [Key]
@@ -29,6 +30,7 @@ public class NqpItem
 }
 
 [Table("NqpTag")]
+[Xunit.Trait("Category", "Fast")]
 public class NqpTag
 {
     [Key]
@@ -49,6 +51,7 @@ public class NqpTag
 /// - ConvertScalarResult for various types
 /// - ExecuteCompiledAsync overloads
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NormQueryProviderCoverageTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) CreateContext()
@@ -1872,6 +1875,7 @@ public class NormQueryProviderCoverageTests
     // ─── SelectClauseVisitor — VisitMemberInit path ────────────────────────
 
     [Table("NqpSelectItem")]
+    [Xunit.Trait("Category", "Fast")]
     public class NqpSelectItem
     {
         [Key]

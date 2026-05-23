@@ -17,6 +17,7 @@ namespace nORM.Tests;
 //- SQLite: columns must use INTEGER/REAL/BLOB/TEXT (not TEXT for everything).
 //- SQL Server: columns must use the same GetSqlType mapping as the main table.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalSchemaTests
 {
  // ── Entity used for DDL generation tests ─────────────────────────────────

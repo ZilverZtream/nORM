@@ -16,6 +16,7 @@ namespace nORM.Tests;
 //null-in-set to return true when null exists in the source set.
 //Fix: emit (val IN (subq) OR (val IS NULL AND EXISTS(SELECT 1 FROM src WHERE col IS NULL))).
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class ContainsNullSemanticsTests
 {
     [Table("NullSetItem")]

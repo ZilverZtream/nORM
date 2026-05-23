@@ -38,6 +38,7 @@ namespace nORM.Tests;
 ///   FR-6  SaveChangesAsync batch: pre-cancelled token on commit boundary → row committed
 ///          (CommitAsync uses None, so a post-write cancel does not abort the commit).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FaultInjectedCancellationRaceTests
 {
     // ── Entity used for Save/Commit tests ─────────────────────────────────────

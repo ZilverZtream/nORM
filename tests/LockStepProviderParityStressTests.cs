@@ -37,6 +37,7 @@ namespace nORM.Tests;
 //       Data Source={guid};Mode=Memory;Cache=Shared
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class LockStepProviderParityStressTests
 {
     // ── Entities ─────────────────────────────────────────────────────────────
@@ -1123,6 +1124,7 @@ file sealed class FzTenantProvider : ITenantProvider
 /// across SQLite, MySQL, and PostgreSQL providers. Seed 0xCAFEBABE is fixed for
 /// deterministic, repeatable fuzz runs.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class ProviderFuzzTranslationTests
 {
     private const string FzItemDdl =
@@ -1319,6 +1321,7 @@ public class ProviderFuzzTranslationTests
 /// SQL injection in tenant ID, concurrent contexts, plan cache poisoning,
 /// and compiled query tenant isolation.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialMultiTenantTests
 {
     private const string TenantDdl =

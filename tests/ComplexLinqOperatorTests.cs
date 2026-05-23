@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// 5. Streaming IGrouping (materialising an IGrouping without projection) throws
 ///    NormUnsupportedFeatureException.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ComplexLinqOperatorTests
 {
     // ── Domain model ──────────────────────────────────────────────────────────

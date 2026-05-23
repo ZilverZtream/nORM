@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// Verifies that SQLite paging SQL is generated correctly for Skip/Take combinations.
 /// SQLite requires LIMIT when OFFSET is used; emitting OFFSET without LIMIT is invalid syntax.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlitePagingTests : TestBase
 {
     [Table("PagingEntity")]

@@ -7,6 +7,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class ChangeTrackerNotificationTests
 {
     private class NotifyingEntity : INotifyPropertyChanged

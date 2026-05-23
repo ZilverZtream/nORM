@@ -21,6 +21,7 @@ namespace nORM.Tests;
 //Root cause: DetectAllChanges() was not re-run after SavingChangesAsync interceptors,
 //so interceptor-induced property changes on Unchanged entities were silently dropped.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class InterceptorMutationTests
 {
     [Table("ImuItem")]

@@ -23,6 +23,7 @@ namespace nORM.Tests;
 // BUG 3: ConcurrentLruCache.Dispose() resource leak
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class AuditBugFixTests
 {
     // ── BUG 1: VerifyUpdateOccAsync tenant predicate ────────────────────────

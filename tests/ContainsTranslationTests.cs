@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Fix 4: Verifies that BuildContainsClause uses per-value parameters for ALL providers
 /// (no STRING_SPLIT), handles empty collections correctly, and is type-safe.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ContainsTranslationTests
 {
     // Helper: create a command on an in-memory SQLite connection so we can inspect parameters.

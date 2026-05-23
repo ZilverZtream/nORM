@@ -58,6 +58,7 @@ file sealed class FixedTenantProvider(string id) : ITenantProvider
 /// Covers compiled queries, eager-loaded Includes, high-contention parallel contexts,
 /// adversarial SQL-injection tenant IDs, and sequential reuse of a shared plan cache.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MultiTenantPlanCacheTests
 {
     private static DbContextOptions TenantOpts(string tenantId, Action<ModelBuilder>? model = null) => new()

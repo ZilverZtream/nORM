@@ -18,6 +18,7 @@ namespace nORM.Tests;
 //routed to the ILogger as warnings rather than being silently swallowed (Debug.WriteLine)
 //or rethrown (violates .NET Dispose contract).
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class TransactionDisposeLoggingTests
 {
  // ── Fake ILogger ─────────────────────────────────────────────────────────

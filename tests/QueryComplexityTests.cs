@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// 3. The derived complexity score causes the command timeout to increase relative
 ///    to a simpler query.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryComplexityTests : TestBase
 {
     // ── entity types ──────────────────────────────────────────────────────────

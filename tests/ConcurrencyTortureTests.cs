@@ -28,6 +28,7 @@ namespace nORM.Tests;
 /// exception when multiple readers and writers share the same SQLite database but use
 /// separate contexts (the nORM-correct ownership model for concurrency).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConcurrencyTortureTests
 {
     [Table("TortureItem")]

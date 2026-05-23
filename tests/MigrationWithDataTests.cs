@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// connection) rather than using the assembly scanner to avoid conflicting with
 /// the v1/v2/v100 migrations registered in the test assembly.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationWithDataTests
 {
     // ── Test 1: Add NOT NULL column with DEFAULT to populated table ─────────
@@ -405,6 +406,7 @@ public class MigrationWithDataTests
 
     // NOTE: This class is public so the SqliteMigrationRunner assembly scanner
     // can discover it. Version 200 is unique in this test assembly.
+    [Xunit.Trait("Category", "Fast")]
     public class MwdMigration200 : nORM.Migration.Migration
     {
         public MwdMigration200() : base(200, "CreateMwdTable") { }

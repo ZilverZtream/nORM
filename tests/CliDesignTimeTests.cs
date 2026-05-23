@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// - Clear error when --assembly points to a missing file.
 /// - Clear error when --project points to a missing file.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CliDesignTimeTests
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);

@@ -10,6 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>DetectChanges must throw AggregateException when a property getter fails.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class ChangeTrackerAggregateExceptionTests
 {
     private class FaultyEntity

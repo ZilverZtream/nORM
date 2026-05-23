@@ -31,6 +31,7 @@ file class PiclItem
 /// was not <c>volatile</c>, allowing stale reads under concurrent access and causing
 /// <c>ObjectDisposedException</c> when the cache entry was reused after a rollback.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PreparedInsertCommandLifecycleTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()
@@ -132,6 +133,7 @@ public class PreparedInsertCommandLifecycleTests
 /// Verifies that a pre-cancelled token on a query does not leave the connection broken,
 /// and that nested savepoint rollbacks leave the outer transaction unaffected.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SavepointFaultInjectionTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()

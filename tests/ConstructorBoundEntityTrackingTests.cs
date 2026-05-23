@@ -43,6 +43,7 @@ file class CtorBoundItem
 /// in all six trackability checks. The materializer already supports parameterized-constructor
 /// entities via <c>GetCachedConstructor</c>, so the guard was incorrect.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConstructorBoundEntityTrackingTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) CreateContext()

@@ -36,6 +36,7 @@ namespace nORM.Tests;
 ///   <item>Migration DDL (CREATE TABLE, ADD COLUMN, DROP FK) correct per provider.</item>
 /// </list>
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderParityQueryPagingTests
 {
     // ── Provider factory ─────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ public class ProviderParityQueryPagingTests
     private static DatabaseProvider MakeProvider(string kind) => kind switch
     {
         "sqlite"    => new SqliteProvider(),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))

@@ -98,6 +98,7 @@ internal class PlainItem
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenFluentRenameTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

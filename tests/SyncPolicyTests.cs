@@ -9,6 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class SyncPolicyTests
 {
     private sealed class SyncUser

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class SelectManyTests : TestBase
 {
     private class Blog

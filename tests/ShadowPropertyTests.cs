@@ -20,10 +20,12 @@ namespace nORM.Tests;
 /// Tests for shadow property infrastructure: ShadowPropertyStore, ShadowPropertyInfo,
 /// Column.IsShadow, materialization, write paths, and change tracking.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ShadowPropertyTests
 {
     // ── Entities ─────────────────────────────────────────────────────────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class Article
     {
         [Key]
@@ -32,6 +34,7 @@ public class ShadowPropertyTests
         public string Title { get; set; } = "";
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class Post
     {
         [Key]
@@ -40,6 +43,7 @@ public class ShadowPropertyTests
         public string Content { get; set; } = "";
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class Widget
     {
         [Key]

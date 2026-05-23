@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// Uses SqliteParameterFactory and in-memory SQLite connections where a live
 /// database connection is required by the method under test.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderImplementationCoverageTests
 {
     // ═══════════════════════════════════════════════════════════════════════

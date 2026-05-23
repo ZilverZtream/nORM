@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// before writing to log sinks, preventing sensitive literal values from leaking into
 /// log output while preserving SQL structure, parameters, and identifiers.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlLogRedactionTests
 {
     // ── Access the private static method under test via reflection ────────────

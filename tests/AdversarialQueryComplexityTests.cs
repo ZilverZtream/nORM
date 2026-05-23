@@ -31,6 +31,7 @@ namespace nORM.Tests;
 /// AQ-5  MaxRecursionDepth boundary: 1 and 200 are valid; 0 and 201 throw.
 /// AQ-6  MaxGroupJoinSize boundary: positive valid; 0 throws.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialQueryComplexityTests
 {
     [Table("AqEntity")]

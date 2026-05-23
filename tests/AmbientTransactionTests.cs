@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// ambient TransactionScope enlistment ensures that when a scope is disposed without
 /// Complete(), the connection is rolled back correctly.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AmbientTransactionTests
 {
     [Table("AmbientItem")]

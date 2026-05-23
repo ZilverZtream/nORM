@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Verifies that every LINQ operator produces correct results with 0, 1, 2, and N rows
 /// against a real SQLite in-memory database.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class LinqOperatorCardinalityTests
 {
     [Table("CardItem")]

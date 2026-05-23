@@ -17,6 +17,7 @@ namespace nORM.Tests;
 // (0 rows because the tenant WHERE clause filtered it out) to be misclassified as a same-value
 // update (because the verifier found a matching foreign-tenant row).
 
+[Xunit.Trait("Category", "Fast")]
 public class DirectUpdateOccTenantVerifierTests
 {
     [Table("Sp1Entity")]

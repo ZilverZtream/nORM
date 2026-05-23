@@ -38,6 +38,7 @@ namespace nORM.Tests;
 //   - All policies with no ambient scope: baseline behaviour preserved.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class AmbientTransactionPolicyDurabilityTests : IDisposable
 {
     // ── Entities ────────────────────────────────────────────────────────────

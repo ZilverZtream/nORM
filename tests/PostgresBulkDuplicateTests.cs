@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// Live tests are env-gated (require NORM_TEST_POSTGRES or NORM_TEST_POSTGRES_CS env var).
 /// Shape tests verify ON CONFLICT DO NOTHING is absent from generated SQL.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PostgresBulkDuplicateTests
 {
     [Table("PgBdiRow")]

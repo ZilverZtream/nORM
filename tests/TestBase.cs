@@ -28,7 +28,7 @@ public abstract class TestBase
         return kind switch
         {
             ProviderKind.Sqlite => (CreateOpenConnection(), new SqliteProvider()),
-            ProviderKind.SqlServer => (CreateOpenConnection(), new SqlServerProvider()),
+            ProviderKind.SqlServer => (CreateOpenConnection(), new SqlServerProvider(new SqliteParameterFactory())),
             ProviderKind.MySql => (CreateOpenConnection(), new MySqlProvider(new SqliteParameterFactory())),
             ProviderKind.Postgres => (CreateOpenConnection(), new PostgresProvider(new SqliteParameterFactory())),
             _ => throw new NotSupportedException()

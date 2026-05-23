@@ -11,6 +11,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class TransactionScopingTests
 {
     private class Item

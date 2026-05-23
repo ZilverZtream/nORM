@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// Root cause: AppendStableValue used Convert.ToInt32 for all enums, which overflows for
 /// long/ulong-backed enums with values outside Int32 range.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class EnumFingerprintTests
 {
  // ── Wide-underlying-type enums ────────────────────────────────────────────

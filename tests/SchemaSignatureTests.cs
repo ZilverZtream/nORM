@@ -12,6 +12,7 @@ namespace nORM.Tests;
 /// Verifies that ComputeSchemaSignature uses a 128-bit (32-char hex) SHA-256 fingerprint
 /// and that the signature changes with column type, nullability, and PK changes.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SchemaSignatureTests
 {
     private static SqliteConnection OpenMemory()

@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Tests for aggregate LINQ operators: Min, Max, Sum, Average, Count
 /// with 0, 1, and multiple rows, verifying correct empty-set behavior.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AggregateOperatorTests
 {
     [Table("NumericRow")]

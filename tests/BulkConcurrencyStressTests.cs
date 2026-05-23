@@ -25,6 +25,7 @@ namespace nORM.Tests;
 // cancellation races, compiled-query thread safety, BoundedCache correctness
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class BulkConcurrencyStressTests : IDisposable
 {
     // ── Shared entity types ──────────────────────────────────────────────────

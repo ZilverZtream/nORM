@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// The first query to execute primes the cache; subsequent queries with the opposite
 /// null-shape would reuse the wrong SQL and return incorrect counts.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CountFastPathNullTests
 {
     [Table("CountNullItem")]

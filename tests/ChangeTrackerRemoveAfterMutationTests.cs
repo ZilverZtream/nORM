@@ -10,6 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Identity-map must not be corrupted when Remove() is called after PK mutation.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class ChangeTrackerRemoveAfterMutationTests
 {
     private class MutableKeyEntity

@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// Validates that SqlServerMigrationSqlGenerator emits PRIMARY KEY, UNIQUE,
 /// and CREATE INDEX DDL statements when table creation includes such columns.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerMigrationSqlGeneratorTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)

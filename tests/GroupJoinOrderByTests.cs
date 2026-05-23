@@ -12,6 +12,7 @@ namespace nORM.Tests;
 //<summary>
 //Tests for GroupJoin double ORDER BY fix and grouping correctness.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class GroupJoinOrderByTests : TestBase
 {
     private class Person

@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Verifies that BatchedNavigationLoader resolves all queued TaskCompletionSources
 /// on every exit path and that cancellation tokens are propagated to async DB operations.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BatchedNavigationBatchTests
 {
     [Table("NavBatch_Item")]

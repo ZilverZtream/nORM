@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// Verifies that enum and Nullable&lt;TEnum&gt; properties are correctly materialized
 /// from integer DB values via the reflection fallback path.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerNullHandlingTests
 {
     [Table("NullTestEntity")]

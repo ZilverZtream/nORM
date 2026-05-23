@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// 4. Migration history state is consistent after a failed apply (no ghost history entry).
 /// 5. Retry after a failed apply succeeds when the underlying issue is resolved.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class MigrationFaultInjectionTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

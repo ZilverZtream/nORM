@@ -13,8 +13,10 @@ namespace nORM.Tests;
 /// lambda parameters and IQueryable sources do not contaminate the extracted
 /// parameter values.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledParameterBindingTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Widget
     {
         public int Id { get; set; }

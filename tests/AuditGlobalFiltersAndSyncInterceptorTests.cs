@@ -46,6 +46,7 @@ namespace nORM.Tests;
 //   Fix: calls now route through ExecuteScalarWithInterceptionAsync.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class AuditGlobalFiltersAndSyncInterceptorTests
 {
     // ══════════════════════════════════════════════════════════════════════════

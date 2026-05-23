@@ -11,8 +11,10 @@ namespace nORM.Tests;
 /// Verifies that same-shape queries with different literal constant values produce
 /// distinct cache entries and return correct rows instead of reusing stale parameter values.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PlanCacheLiteralVarianceTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class User
     {
         public int Id { get; set; }

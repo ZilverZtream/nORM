@@ -6,6 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Verify AppendStableValue fallback produces collision-resistant fingerprints.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class FingerprintFallbackTests
 {
     // Helper: compute fingerprint for a constant expression containing the given value.

@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// For SQLite, temp tables are already cleaned up (not affected by X4).
 /// Shape tests document the fix; live tests are env-gated.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkTempTableLeakTests
 {
     [Table("BttItem")]

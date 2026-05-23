@@ -13,6 +13,7 @@ namespace nORM.Tests;
 //<summary>
 //Tests for Bulk insert must handle entities where all columns are DB-generated.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkInsertAllGeneratedTests
 {
  //<summary>

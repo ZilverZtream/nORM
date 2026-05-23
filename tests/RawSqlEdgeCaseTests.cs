@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// 50 adversarial patterns, verify all-type parameter binding, test transaction
 /// visibility of raw reads, and exercise stored procedure simulation on SQLite.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RawSqlEdgeCaseTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

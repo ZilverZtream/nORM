@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// (not the current possibly-mutated property value) for the optimistic-concurrency WHERE predicate,
 /// matching the parity of the batched SaveChangesAsync path.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConcurrencyTokenSnapshotTests
 {
     [Table("CtsItem")]

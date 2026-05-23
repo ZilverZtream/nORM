@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for NormValidator — parameter marker counting and raw SQL injection detection.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class NormValidatorTests
 {
     // CountParameterMarkers is internal; use reflection to reach it.

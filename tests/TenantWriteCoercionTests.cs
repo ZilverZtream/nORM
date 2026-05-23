@@ -20,6 +20,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("TWC_Item")]
+[Xunit.Trait("Category", "Fast")]
 public class TWCItem
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -30,6 +31,7 @@ public class TWCItem
     public string Name { get; set; } = string.Empty;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class TenantWriteCoercionTests
 {
     private sealed class FixedTenantProvider : ITenantProvider

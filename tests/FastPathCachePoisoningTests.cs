@@ -14,8 +14,10 @@ namespace nORM.Tests;
 /// Fast-path SQL template cache must be per-context, not static.
 /// Cross-context or cross-model use of the same CLR type must not poison each other's SQL.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FastPathCachePoisoningTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Product
     {
         [Key]

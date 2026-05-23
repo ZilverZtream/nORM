@@ -27,6 +27,7 @@ namespace nORM.Tests;
 /// Fix: remove TimeoutException from the RetryingExecutionStrategy catch clause so both
 /// paths consistently skip timeout retries.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class RetryTimeoutDivergenceTests
 {
     private static DbContext BuildContext()

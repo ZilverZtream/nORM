@@ -30,6 +30,7 @@ namespace nORM.Tests;
 // ── Entity types at namespace scope (required for materializer IL) ─────────────
 
 [Table("CovBoost_Item")]
+[Xunit.Trait("Category", "Fast")]
 public class CovItem
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -40,6 +41,7 @@ public class CovItem
 }
 
 [Table("CovBoost_Author")]
+[Xunit.Trait("Category", "Fast")]
 public class CovAuthor
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -49,6 +51,7 @@ public class CovAuthor
 }
 
 [Table("CovBoost_Book")]
+[Xunit.Trait("Category", "Fast")]
 public class CovBook
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -58,6 +61,7 @@ public class CovBook
 }
 
 [Table("CovBoost_Types")]
+[Xunit.Trait("Category", "Fast")]
 public class CovTypes
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -68,6 +72,7 @@ public class CovTypes
 }
 
 [Table("CovBoost_MultiKey")]
+[Xunit.Trait("Category", "Fast")]
 public class CovMultiKey
 {
     [Key] public int K1 { get; set; }
@@ -81,6 +86,7 @@ public class CovMultiKey
 /// No parameterless constructor → ctx.Query uses NormQueryableImplUnconstrained.
 /// </summary>
 [Table("CovBoost_NoCtor")]
+[Xunit.Trait("Category", "Fast")]
 public class CovNoCtorEntity
 {
     public CovNoCtorEntity(int id, string name) { Id = id; Name = name; }
@@ -94,6 +100,7 @@ public class CovNoCtorEntity
 /// creation in NavigationPropertyExtensions.InitializeNavigationProperties (lines 181-187).
 /// </summary>
 [Table("CovBoost_RefEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class CovRefEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -108,6 +115,7 @@ public class CovRefEntity
 /// NormException, DbConnectionFactory, Methods.GetReaderMethod, LazyNavigationCollection,
 /// and CompositeKey.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostTests : TestBase
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -751,7 +759,9 @@ public class CoverageBoostTests : TestBase
     public void SelectTranslator_UntranslatableMethod_SplitsProjection()
     {
         using var cn = CreateItemDb();
-        using var ctx = MakeCtx(cn);
+        // Explicit Allow policy so TrySplitProjection runs instead of throwing
+        var opts = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
         // A projection that calls a custom static method — not translatable to SQL
         // This triggers TrySplitProjection → MemberAccessExtractor code path
@@ -2692,6 +2702,7 @@ file sealed class MinimalTestProvider : DatabaseProvider
 //           303-308, 322-329 (Reader)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CommandInterceptorExtensionsSyncTests
 {
     private static (Microsoft.Data.Sqlite.SqliteConnection cn, DbContext ctx) OpenDb()
@@ -2837,6 +2848,7 @@ public class CommandInterceptorExtensionsSyncTests
 //           275-278 (GetPropertyInfo member access)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyExtensionsProxyTests
 {
     private static Microsoft.Data.Sqlite.SqliteConnection OpenDb()
@@ -2944,6 +2956,7 @@ public class NavigationPropertyExtensionsProxyTests
 // Covers lines 79-85 (SelectAll fallback when ExtractNeededColumns returns empty)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class JoinBuilderFallbackTests
 {
     [Fact]
@@ -3021,6 +3034,7 @@ public class JoinBuilderFallbackTests
 //           403, 421-424, 432-436, 448+
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseProviderBaseVirtualMethodTests
 {
     // MinimalTestProvider doesn't override any virtual methods → base implementations run
@@ -3192,6 +3206,7 @@ public class DatabaseProviderBaseVirtualMethodTests
 //         BuildContainsClause (448-462)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseProviderBaseBulkTests
 {
     private static readonly DatabaseProvider _p = new MinimalTestProvider();
@@ -3370,6 +3385,7 @@ public class DatabaseProviderBaseBulkTests
 //         CompileWithFallback(LambdaExpression) non-generic overload (89-108)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ExpressionUtilsAdditionalTests
 {
     [Fact]
@@ -3441,6 +3457,7 @@ public class ExpressionUtilsAdditionalTests
 //         plus NormQueryableImplUnconstrained Include/AsNoTracking/AsSplitQuery.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NormIncludableQueryableCovBoostTests
 {
     private static (SqliteConnection cn, DbContext ctx) MakeAuthorBookDb()
@@ -3675,6 +3692,7 @@ public class NormIncludableQueryableCovBoostTests
 // Covers: RedactConnectionString normal path (334-351) and malformed catch path (346-350)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ConnectionManagerRedactTests
 {
     [Fact]
@@ -3721,6 +3739,7 @@ public class ConnectionManagerRedactTests
 //         RelatedNavPropertyName != null / WithMany(r => r.Lefts) configured)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class JoinTableMappingBidirTests
 {
     private class BidirLeft
@@ -3850,6 +3869,7 @@ public class JoinTableMappingBidirTests
 //         line 60 (NotSupportedException for unknown provider type)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DbConnectionFactoryCoverageTests
 {
     [Fact]
@@ -3879,6 +3899,7 @@ public class DbConnectionFactoryCoverageTests
 //         the unconstrained path through MaterializerFactory's parameterized-ctor IL emitter.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NormQueryableImplUnconstrainedAsyncTests
 {
     // Re-uses the namespace-scope CovNoCtorEntity ([Table("CovBoost_NoCtor")], ctor(int,string))
@@ -4063,6 +4084,7 @@ public class NormQueryableImplUnconstrainedAsyncTests
 //         NormIncludableQueryableUnconstrained<CovNoCtorEntity, ICollection<CovItem>>.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NormIncludableQueryableUnconstrainedAsyncTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) MakeDb()
@@ -4226,6 +4248,7 @@ public class NormIncludableQueryableUnconstrainedAsyncTests
 //       bulk of the lines reachable without a real DB server.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderCoverageTests
 {
     private static readonly Type _scaffolderType = typeof(nORM.Scaffolding.DatabaseScaffolder);
@@ -4495,6 +4518,7 @@ public class DatabaseScaffolderCoverageTests
 // Covers: ExecuteBulkOperationAsync (owned tx, reuse tx, rollback, non-List IList)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class BulkOperationProviderCoverageTests
 {
     // Concrete test subclass that delegates all abstract methods to SqliteProvider
@@ -4673,6 +4697,7 @@ public class BulkOperationProviderCoverageTests
 //         LoadInferredRelationshipAsync, ExecuteSingleQueryAsync
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyExtensionsLoadAsyncTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) MakeNavDb()
@@ -4713,8 +4738,8 @@ public class NavigationPropertyExtensionsLoadAsyncTests
         using var _cn = cn; using var _ctx = ctx;
 
         var author = new CovAuthor { Id = 1, Name = "Test" };
-        // No EnableLazyLoading → no nav context → should throw InvalidOperationException
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        // No EnableLazyLoading → no nav context → should throw NormUsageException
+        await Assert.ThrowsAsync<NormUsageException>(() =>
             author.LoadAsync(a => a.Books));
     }
 
@@ -4788,7 +4813,7 @@ public class NavigationPropertyExtensionsLoadAsyncTests
 
         var entity = new CovRefEntity { Id = 1, Name = "Test" };
         // No nav context
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAsync<NormUsageException>(() =>
             entity.LoadAsync(e => e.LazyRef));
     }
 
@@ -4831,6 +4856,7 @@ public class NavigationPropertyExtensionsLoadAsyncTests
 //         enum IL path, CreateSyncMaterializer generic overload, fast materializer
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerFactoryILPathTests
 {
     [Fact]
@@ -4962,6 +4988,7 @@ public class MaterializerFactoryILPathTests
 //         AddGlobalFilter<TEntity>(Expression<Func<TEntity,bool>>) overload
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DbContextOptionsCoverageTests
 {
     [Fact]
@@ -5094,6 +5121,7 @@ public class DbContextOptionsCoverageTests
 //         NavigationPropertyExtensions.IsLoaded false-when-no-context
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyExtensionsCleanupAndCollectionTests
 {
     // Helper: build a pre-loaded LazyNavigationCollection backed by a real List<CovBook>
@@ -5286,6 +5314,7 @@ public class NavigationPropertyExtensionsCleanupAndCollectionTests
 //         implicit Task<T?> operator, NavigationContext.MarkAsUnloaded
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class LazyNavReferenceBoostTests
 {
     private static (LazyNavigationReference<CovItem> Ref, CovRefEntity Entity, NavigationContext NavCtx) MakeRef()
@@ -5376,6 +5405,7 @@ public class LazyNavReferenceBoostTests
 //         CreateSchemaAwareMaterializer, ConvertDbValue null/nullable/enum paths
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MatFactoryBoostTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) MakeDb()
@@ -5525,6 +5555,7 @@ public class MatFactoryBoostTests
 //             HasSocketExceptionInChain, TriggerFailoverAsync no-healthy-nodes path
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ConnectionManagerPrivateMethodTests
 {
     private static bool InvokeHasSocketChain(Exception ex)
@@ -5620,9 +5651,9 @@ public class ConnectionManagerPrivateMethodTests
             Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
             TimeSpan.FromHours(1));
 
-        // Must throw InvalidOperationException("No primary node available.")
+        // Must throw NormConnectionException("No healthy primary node available.")
         // TriggerFailoverAsync runs internally and logs the "no healthy nodes" error
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<NormConnectionException>(() =>
             mgr.GetWriteConnectionAsync().GetAwaiter().GetResult());
     }
 
@@ -5638,6 +5669,7 @@ public class ConnectionManagerPrivateMethodTests
 //         both create provider connections when drivers are present or throw when absent.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class DbConnectionFactoryProviderPathTests
 {
     [Fact]
@@ -5679,6 +5711,7 @@ public class DbConnectionFactoryProviderPathTests
 //         ExecuteNonQueryAsync/ExecuteReaderAsync when _context != null
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRunnerWithContextDisposeTests
 {
     private static SqliteConnection OpenSqlite()
@@ -5786,6 +5819,7 @@ public class MigrationRunnerWithContextDisposeTests
 //         <byte>, <float>, <DateTime>, fallback ChangeType path
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NormQueryProviderSyncAndScalarTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) MakeDb()
@@ -5928,6 +5962,7 @@ public class NormQueryProviderSyncAndScalarTests
 //         internal static method, CreateListForType, IsReadOnlyQuery
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class QueryExecutorSyncPathTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) MakeDb()
@@ -6087,6 +6122,7 @@ internal sealed class FakeSchemaDbConnection : System.Data.Common.DbConnection
         => System.Threading.Tasks.Task.FromResult(GetSchema(collectionName));
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderIntegrationTests
 {
     private static readonly Type _scaffolderType = typeof(DatabaseScaffolder);
@@ -6266,6 +6302,7 @@ public class DatabaseScaffolderIntegrationTests
 //             and coverage of async materialization path via fake non-sync provider
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class NormQueryProviderDisposeCoverageTests
 {
     // Fake provider that forces async path (PrefersSyncExecution = false) but uses SQLite
@@ -6394,6 +6431,7 @@ public class NormQueryProviderDisposeCoverageTests
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Entity with a [NotMapped] navigation property (to cover GetNavigationProperties branch)
+[Xunit.Trait("Category", "Fast")]
 public class NavEntityWithNotMapped
 {
     [System.ComponentModel.DataAnnotations.Key]
@@ -6407,6 +6445,7 @@ public class NavEntityWithNotMapped
 
 // Entity with a direct class reference property (non-LazyNavigationReference, non-collection)
 // to cover the else branch in GetNavigationProperties
+[Xunit.Trait("Category", "Fast")]
 public class NavEntityWithDirectRef
 {
     [System.ComponentModel.DataAnnotations.Key]
@@ -6414,6 +6453,7 @@ public class NavEntityWithDirectRef
     public string Name { get; set; } = "";
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationPropertyExtensionsExtraCoverageTests
 {
     [Fact]
@@ -6498,6 +6538,7 @@ public class NavigationPropertyExtensionsExtraCoverageTests
 /// <summary>Has a direct class reference nav property (not ICollection / not LazyNavigationReference).
 /// DiscoverRelations does NOT auto-register this → exercises LoadInferredRelationshipAsync.</summary>
 [Table("CovG63_RefParent")]
+[Xunit.Trait("Category", "Fast")]
 public class NavRefParent
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -6508,6 +6549,7 @@ public class NavRefParent
 }
 
 [Table("CovG63_RefChild")]
+[Xunit.Trait("Category", "Fast")]
 public class NavRefChild
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -6523,6 +6565,7 @@ public class NavRefChild
 // Also covers: CreateSyncMaterializer with explicit startOffset > 0
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MaterializerFactorySchemaAwareTests
 {
     [Fact]
@@ -6746,6 +6789,7 @@ internal sealed class FakeMigrationDbConnection : DbConnection
 
 // ── Test class ────────────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup63Tests
 {
     // Fake async provider (PrefersSyncExecution = false) for ExecuteObjectListPlanAsync path
@@ -7110,6 +7154,7 @@ public class CoverageBoostGroup63Tests
 //   · DbConnectionFactory lines 66-74  — CreateConnectionFactory (reflection path)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup64Tests
 {
     private static SqliteConnection CreateItemDb()
@@ -7188,6 +7233,7 @@ public class CoverageBoostGroup64Tests
 //     an async-provider variant to cover the async GroupJoin path.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup65Tests
 {
     // Fake async provider: SQLite connection but PrefersSyncExecution=false
@@ -7272,6 +7318,7 @@ public class CoverageBoostGroup65Tests
 
 // ── GROUP 66 — QueryExecutor: isReadOnly path + GroupJoin safety limit ─────────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup66Tests
 {
     private sealed class AsyncFakeSqliteProvider66 : SqliteProvider
@@ -7379,6 +7426,7 @@ public class CoverageBoostGroup66Tests
 
 // ── GROUP 67 — NormQueryProvider: AsAsyncEnumerable + cache paths ─────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup67Tests
 {
     private static SqliteConnection CreateItemDb67()
@@ -7549,6 +7597,7 @@ public class CoverageBoostGroup67Tests
 
 // ── GROUP 68 — MaterializerFactory: direct calls ──────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup68Tests
 {
     private static SqliteConnection CreateItemDb68()
@@ -7647,6 +7696,7 @@ public class CoverageBoostGroup68Tests
 }
 
 [Table("CovBoost_NullableInt")]
+[Xunit.Trait("Category", "Fast")]
 public class CovNullableInt
 {
     [Key]
@@ -7656,6 +7706,7 @@ public class CovNullableInt
 
 // ── GROUP 69 — QueryTranslator: navigation property error + various paths ─────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup69Tests
 {
     // Local async helpers using expression-tree approach (same pattern as QueryTranslatorCoverageTests).
@@ -7875,6 +7926,7 @@ public class CoverageBoostGroup69Tests
 }
 
 [Table("CovBoost_ShortTest")]
+[Xunit.Trait("Category", "Fast")]
 public class CovShortTest
 {
     [Key]
@@ -7883,6 +7935,7 @@ public class CovShortTest
 }
 
 [Table("CovBoost_FloatTest")]
+[Xunit.Trait("Category", "Fast")]
 public class CovFloatTest
 {
     [Key]
@@ -7892,6 +7945,7 @@ public class CovFloatTest
 
 // ── GROUP 70 — NormQueryProvider: compiled query pooled path + more ──────────
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup70Tests
 {
     private static SqliteConnection CreateItemDb70()
@@ -8047,6 +8101,7 @@ internal sealed class AsyncSqliteProvider71 : SqliteProvider
     public override bool PrefersSyncExecution => false;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup71Tests
 {
     private static DbContextOptions MakeOpts71() => new DbContextOptions
@@ -8200,6 +8255,7 @@ public class CoverageBoostGroup71Tests
 
 // ── GROUP 72 — NormQueryProvider: ExecuteCompiledMaterializeAsync + compiled dict path ──
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup72Tests
 {
     private static SqliteConnection CreateDb72()
@@ -8332,6 +8388,7 @@ public class CoverageBoostGroup72Tests
 
 // ── GROUP 73 — QueryTranslator + NormQueryProvider: more aggregate + query paths ──
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup73Tests
 {
     private static SqliteConnection CreateDb73()
@@ -8472,6 +8529,7 @@ public class CoverageBoostGroup73Tests
 //   MaterializerFactory: PrecompileCommonPatterns<T> → CreateILMaterializer<T>
 //                        (parameterless-ctor IL path lines 214-306, parameterized-ctor path lines 309-377)
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup74Tests
 {
     private static SqliteConnection CreateDb74()
@@ -8713,6 +8771,7 @@ public class CoverageBoostGroup74Tests
 
 /// <summary>Entity with nullable value type properties for MaterializerFactory IL coverage.</summary>
 [Table("CovBoost_Nullable")]
+[Xunit.Trait("Category", "Fast")]
 public class CovNullable
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -8728,6 +8787,7 @@ public enum CovStatus75 { Active = 1, Inactive = 2 }
 
 /// <summary>Entity with enum properties (nullable and non-nullable) for MaterializerFactory enum IL coverage.</summary>
 [Table("CovBoost_EnumEnt")]
+[Xunit.Trait("Category", "Fast")]
 public class CovEnumEnt
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -8738,6 +8798,7 @@ public class CovEnumEnt
 
 /// <summary>Entity with DateOnly (falls through to GetValue) for nullable-GetValue IL path coverage.</summary>
 [Table("CovBoost_DateOnly")]
+[Xunit.Trait("Category", "Fast")]
 public class CovDateOnlyEnt
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -8748,6 +8809,7 @@ public class CovDateOnlyEnt
 
 /// <summary>Entity with byte[] for reference-type GetValue IL path coverage.</summary>
 [Table("CovBoost_Bytes")]
+[Xunit.Trait("Category", "Fast")]
 public class CovBytesEnt
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -8765,6 +8827,7 @@ internal sealed class AsyncSqliteProvider75 : SqliteProvider
 // ════════════════════════════════════════════════════════════════════════════
 // GROUP 75 – Push NormQueryProvider, QueryTranslator, MaterializerFactory ≥ 80%
 // ════════════════════════════════════════════════════════════════════════════
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup75Tests
 {
     // DTO used by WithRowNumber MemberInitExpression test
@@ -9080,6 +9143,7 @@ public class CoverageBoostGroup75Tests
 // ── GROUP 76 entity types ──────────────────────────────────────────────────────
 
 /// <summary>Base class for canOptimize coverage — Id property declared here, not on derived type.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CovDerived76Base
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -9092,6 +9156,7 @@ public class CovDerived76Base
 /// the canOptimize fallback (lines 947-958) + GetOptimizedSetters (1446-1473) to execute.
 /// </summary>
 [Table("CovBoost_Derived76")]
+[Xunit.Trait("Category", "Fast")]
 public class CovDerived76 : CovDerived76Base
 {
     public string Name { get; set; } = "";
@@ -9103,6 +9168,7 @@ public class CovDerived76 : CovDerived76Base
 /// Must not appear in any other test so _syncCache misses on first call.
 /// </summary>
 [Table("CovBoost_FastMat76")]
+[Xunit.Trait("Category", "Fast")]
 public class CovFastMat76
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -9115,6 +9181,7 @@ public class CovFastMat76
 /// Must not appear in any other test so _syncCache misses on first call.
 /// </summary>
 [Table("CovBoost_FastMat76b")]
+[Xunit.Trait("Category", "Fast")]
 public class CovFastMat76b
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -9122,6 +9189,7 @@ public class CovFastMat76b
     public string Code { get; set; } = "";
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class CoverageBoostGroup76Tests
 {
     private static SqliteConnection OpenDb76(string ddl = "")

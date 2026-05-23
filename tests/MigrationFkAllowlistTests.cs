@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// FK action strings must be rejected; table/column/constraint names with injection characters
 /// must be escaped (not rejected) by the Esc() mechanism.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationFkAllowlistTests
 {
     // ── Provider data ─────────────────────────────────────────────────────────

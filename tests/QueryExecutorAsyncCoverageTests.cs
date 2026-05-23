@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// SQLite normally uses the sync path; overriding that flag routes through
 /// all the async materializer code.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryExecutorAsyncCoverageTests
 {
     // ── Async-forcing provider ─────────────────────────────────────────────

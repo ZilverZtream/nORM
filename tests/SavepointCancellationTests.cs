@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// Pre-cancelled tokens must throw OperationCanceledException rather than silently proceeding.
 /// Also covers the normal savepoint flow (create → work → rollback → commit).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SavepointCancellationTests
 {
     private static async Task<SqliteConnection> CreateSchemaAsync()

@@ -8,6 +8,7 @@ namespace nORM.Tests;
 //<summary>
 //Tests for PostgresMigrationSqlGenerator covering , , and findings.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class PostgresMigrationSqlGeneratorTests
 {
     private static TableSchema BuildTable(string name, params ColumnSchema[] columns)

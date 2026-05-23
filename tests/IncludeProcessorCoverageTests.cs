@@ -20,6 +20,7 @@ namespace nORM.Tests;
 // ── Public entity types at namespace scope for IncludeProcessor coverage ─────
 
 [Table("IPC_Author")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcAuthor
 {
     [Key]
@@ -31,6 +32,7 @@ public class IpcAuthor
 }
 
 [Table("IPC_Book")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcBook
 {
     [Key]
@@ -42,6 +44,7 @@ public class IpcBook
 }
 
 [Table("IPC_Review")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcReview
 {
     [Key]
@@ -52,6 +55,7 @@ public class IpcReview
 }
 
 [Table("IPC_Course")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcCourse
 {
     [Key]
@@ -62,6 +66,7 @@ public class IpcCourse
 }
 
 [Table("IPC_Student")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcStudent
 {
     [Key]
@@ -71,6 +76,7 @@ public class IpcStudent
 }
 
 [Table("IPC_Dept")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcDept
 {
     [Key]
@@ -81,6 +87,7 @@ public class IpcDept
 }
 
 [Table("IPC_Employee")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcEmployee
 {
     [Key]
@@ -91,6 +98,7 @@ public class IpcEmployee
 }
 
 [Table("IPC_Order")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcOrder
 {
     [Key]
@@ -101,6 +109,7 @@ public class IpcOrder
 }
 
 [Table("IPC_Line")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcLine
 {
     [Key]
@@ -111,6 +120,7 @@ public class IpcLine
 }
 
 [Table("IPC_Project")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcProject
 {
     [Key]
@@ -121,6 +131,7 @@ public class IpcProject
 }
 
 [Table("IPC_Task")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcTask
 {
     [Key]
@@ -131,6 +142,7 @@ public class IpcTask
 }
 
 [Table("IPC_Category")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcCategory
 {
     [Key]
@@ -141,6 +153,7 @@ public class IpcCategory
 }
 
 [Table("IPC_Product")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcProduct
 {
     [Key]
@@ -155,6 +168,7 @@ public class IpcProduct
 /// multi-level paths, empty collections, noTracking variants, and composite-PK guard.
 /// Also tests <see cref="JoinBuilder"/> column extraction.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class IncludeProcessorCoverageTests
 {
     // ── Async-forcing provider ─────────────────────────────────────────────────
@@ -1131,6 +1145,7 @@ public class IncludeProcessorCoverageTests
 // ── Extra entity types needed by composite key tests ──────────────────────────
 
 [Table("IPC_CompositeParent")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcCompositeParent
 {
     [Key]
@@ -1141,6 +1156,7 @@ public class IpcCompositeParent
 }
 
 [Table("IPC_CompositeChild")]
+[Xunit.Trait("Category", "Fast")]
 public class IpcCompositeChild
 {
     public int ParentId { get; set; }

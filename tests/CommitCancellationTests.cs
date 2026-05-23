@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// uses CancellationToken.None so that a cancelled caller token does not abort an already-applied
 /// write or produce spurious exceptions.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CommitCancellationTests
 {
     [Table("CcItem")]

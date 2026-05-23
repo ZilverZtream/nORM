@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// so that different providers, namespace-colliding type names, and divergent fluent
 /// mappings each produce independent, correct cache entries.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FastPathCacheCollisionTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) CreateCtx<T>(
@@ -267,10 +268,15 @@ public class FastPathCacheCollisionTests
 
     // ── Entity types ──────────────────────────────────────────────────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class CacheProduct   { public int Id { get; set; } public string Name { get; set; } = ""; public bool Active { get; set; } }
+    [Xunit.Trait("Category", "Fast")]
     public class MappedEntity   { public int Id { get; set; } public string Label { get; set; } = ""; }
+    [Xunit.Trait("Category", "Fast")]
     public class OrderedEntity  { public int Id { get; set; } public string Name { get; set; } = ""; public int Score { get; set; } }
+    [Xunit.Trait("Category", "Fast")]
     public class TakeItem       { public int Id { get; set; } public string Val { get; set; } = ""; }
+    [Xunit.Trait("Category", "Fast")]
     public class ConcItem       { public int Id { get; set; } public string Name { get; set; } = ""; }
 
     // ── Provider stubs ────────────────────────────────────────────────────

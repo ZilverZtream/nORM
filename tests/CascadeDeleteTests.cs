@@ -14,6 +14,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CascadeDeleteTests
 {
     private class Blog
@@ -84,23 +85,23 @@ public class CascadeDeleteTests
         var fk = new Column(typeof(Node).GetProperty(nameof(Node.ParentId))!, provider, null);
         var mapping = (TableMapping)RuntimeHelpers.GetUninitializedObject(typeof(TableMapping));
 
-        typeof(TableMapping).GetField(nameof(TableMapping.Type))!.SetValue(mapping, typeof(Node));
-        typeof(TableMapping).GetField(nameof(TableMapping.Provider))!.SetValue(mapping, provider);
-        typeof(TableMapping).GetField(nameof(TableMapping.EscTable))!.SetValue(mapping, "");
-        typeof(TableMapping).GetField(nameof(TableMapping.Columns))!.SetValue(mapping, new[] { pk, fk });
-        typeof(TableMapping).GetField(nameof(TableMapping.ColumnsByName))!
+        // Auto-properties have private backing fields named <PropertyName>k__BackingField
+        const BindingFlags bf = BindingFlags.NonPublic | BindingFlags.Instance;
+        typeof(TableMapping).GetField("<Type>k__BackingField", bf)!.SetValue(mapping, typeof(Node));
+        typeof(TableMapping).GetField("<Provider>k__BackingField", bf)!.SetValue(mapping, provider);
+        typeof(TableMapping).GetField("<Columns>k__BackingField", bf)!.SetValue(mapping, new[] { pk, fk });
+        typeof(TableMapping).GetField("<ColumnsByName>k__BackingField", bf)!
             .SetValue(mapping, new Dictionary<string, Column> { [nameof(Node.Id)] = pk, [nameof(Node.ParentId)] = fk });
-        typeof(TableMapping).GetField(nameof(TableMapping.KeyColumns))!.SetValue(mapping, new[] { pk });
-        typeof(TableMapping).GetField(nameof(TableMapping.Relations))!
+        typeof(TableMapping).GetField("<KeyColumns>k__BackingField", bf)!.SetValue(mapping, new[] { pk });
+        typeof(TableMapping).GetField("<Relations>k__BackingField", bf)!
             .SetValue(mapping, new Dictionary<string, TableMapping.Relation>());
-        typeof(TableMapping).GetField(nameof(TableMapping.TphMappings))!
+        typeof(TableMapping).GetField("<TphMappings>k__BackingField", bf)!
             .SetValue(mapping, new Dictionary<object, TableMapping>());
+        // EscTable has { get; set; } so we can set it directly
+        mapping.EscTable = "\"Nodes\"";
 
-        var relations = (Dictionary<string, TableMapping.Relation>)typeof(TableMapping)
-            .GetField(nameof(TableMapping.Relations))!
-            .GetValue(mapping)!;
         var navProp = typeof(Node).GetProperty(nameof(Node.Children))!;
-        relations[nameof(Node.Children)] = new TableMapping.Relation(navProp, typeof(Node), pk, fk, true);
+        mapping.Relations[nameof(Node.Children)] = new TableMapping.Relation(navProp, typeof(Node), pk, fk, true);
         return mapping;
     }
 

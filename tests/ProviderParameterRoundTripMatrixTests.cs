@@ -45,6 +45,7 @@ namespace nORM.Tests;
 //   RTP-12 enum WHERE filter
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ProviderParameterRoundTripMatrixTests
 {
     // ── Entity ────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ public class ProviderParameterRoundTripMatrixTests
     public enum RtpStatus { Draft = 0, Active = 1, Archived = 2 }
 
     [Table("RtpRow")]
+    [Xunit.Trait("Category", "Fast")]
     public class RtpRow
     {
         // Explicit key — no AUTOINCREMENT — so INSERT SQL is provider-agnostic.
@@ -85,7 +87,7 @@ public class ProviderParameterRoundTripMatrixTests
         "sqlite"    => new SqliteProvider(),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 

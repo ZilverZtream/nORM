@@ -9,6 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Verify LIKE helpers emit provider-specific concat.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class StringFunctionTests : TestBase
 {
     private class Product

@@ -38,6 +38,7 @@ public enum CTQ_Flags : long
 }
 
 [Table("CTQ_Events")]
+[Xunit.Trait("Category", "Fast")]
 public class CTQ_Event
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -52,6 +53,7 @@ public class CTQ_Event
 /// is public and handles all special types (DateOnly, TimeOnly, enum, char) identically
 /// to what a source-generated query method would emit.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompileTimeQueryParameterParityTests
 {
     private static SqliteConnection OpenMemory()

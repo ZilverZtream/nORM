@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// standard SQL no-argument functions) and throws <see cref="ArgumentException"/> on
 /// anything else. All 9 interpolation points across the 4 generators now call it.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DefaultValueValidatorTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

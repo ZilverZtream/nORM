@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// DateTimeOffset, and TimeSpan per provider. Verifies that snapshot → diff → SQL generation
 /// produces correct DDL types for each scalar type on each provider.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationScalarRoundTripTests
 {
     // ── Test entities ────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ public class MigrationScalarRoundTripTests
     internal enum Priority { Low, Medium, High }
 
     [Table("ByteArrayEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class ByteArrayEntity
     {
         [Key] public int Id { get; set; }
@@ -29,6 +31,7 @@ public class MigrationScalarRoundTripTests
     }
 
     [Table("DateOnlyEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class DateOnlyEntity
     {
         [Key] public int Id { get; set; }
@@ -36,6 +39,7 @@ public class MigrationScalarRoundTripTests
     }
 
     [Table("TimeOnlyEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class TimeOnlyEntity
     {
         [Key] public int Id { get; set; }
@@ -43,6 +47,7 @@ public class MigrationScalarRoundTripTests
     }
 
     [Table("DateTimeOffsetEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class DateTimeOffsetEntity
     {
         [Key] public int Id { get; set; }
@@ -50,6 +55,7 @@ public class MigrationScalarRoundTripTests
     }
 
     [Table("TimeSpanEntity")]
+    [Xunit.Trait("Category", "Fast")]
     public class TimeSpanEntity
     {
         [Key] public int Id { get; set; }

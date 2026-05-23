@@ -22,6 +22,7 @@ namespace nORM.Tests;
 //still extracted from the new expression, so a query like WHERE Id = 'Alice'
 //executes — returning zero rows instead of the expected match.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class SimpleSqlCacheCollisionTests
 {
     [Table("CacheItem")]

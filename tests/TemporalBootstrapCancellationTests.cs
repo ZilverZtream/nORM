@@ -33,6 +33,7 @@ namespace nORM.Tests;
 /// (_temporalInitTask / _temporalInitLock) so that ct is plumbed from
 /// EnsureConnectionAsync → TemporalManager.InitializeAsync → every DDL call.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalBootstrapCancellationTests
 {
     // ── Entity for temporal-enabled contexts ─────────────────────────────────

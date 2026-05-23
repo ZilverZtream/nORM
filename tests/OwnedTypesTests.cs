@@ -8,18 +8,21 @@ using Xunit;
 namespace nORM.Tests
 {
     [Owned]
+    [Xunit.Trait("Category", "Fast")]
     public class Address
     {
         public string Street { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class User
     {
         public int Id { get; set; }
         public Address Address { get; set; } = new();
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class OwnedTypesTests
     {
         [Fact]

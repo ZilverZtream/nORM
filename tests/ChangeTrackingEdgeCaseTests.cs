@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Comprehensive change tracking edge cases: single field updates, no-op saves,
 /// PK mutation, identity PK assignment, multiple entities, AcceptChanges.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ChangeTrackingEdgeCaseTests
 {
     [Table("TrackedItem")]

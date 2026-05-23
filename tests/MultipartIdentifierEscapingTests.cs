@@ -16,6 +16,7 @@ namespace nORM.Tests;
 // Fix: all four providers now split on '.' and escape each segment independently.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class MultipartIdentifierEscapingTests
 {
     // ── Simple single-part identifiers (regression: must not regress) ─────────
@@ -156,7 +157,7 @@ public class MultipartIdentifierEscapingTests
     private static DatabaseProvider MakeProvider(string kind) => kind switch
     {
         "sqlite"    => new SqliteProvider(),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))

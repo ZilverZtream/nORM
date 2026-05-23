@@ -8,6 +8,7 @@ namespace nORM.Tests;
 //Verifies that each provider correctly escapes embedded delimiter characters
 //in table/column names to prevent SQL injection through identifiers.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class IdentifierEscapingTests
 {
     [Fact]

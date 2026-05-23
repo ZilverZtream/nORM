@@ -8,8 +8,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class BatchCudTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class User
     {
         public int Id { get; set; }

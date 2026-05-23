@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Validates that the method correctly distinguishes "no such table" errors (code 1 + message)
 /// from other SQLITE_ERROR cases and falls back to message-only for non-SqliteException types.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqliteMigrationFaultDetectionTests
 {
  // ── Helper to invoke private static IsTableNotFoundError ─────────────────

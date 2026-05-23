@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// Verifies that migration runners implement IAsyncDisposable/IDisposable
 /// and that disposal completes without exception and releases the internal context.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationRunnerLifecycleTests
 {
     private static Assembly MigrationsAssembly => typeof(SqliteMigrationRunnerTests).Assembly;

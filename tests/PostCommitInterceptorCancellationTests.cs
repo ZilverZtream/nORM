@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// A post-commit notification must always complete to avoid false-failure reports and
 /// retry side effects when the DB commit already succeeded.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PostCommitInterceptorCancellationTests
 {
     [Table("PciItem")]

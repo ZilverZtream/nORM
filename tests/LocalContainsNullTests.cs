@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// SQL `col IN (NULL, @p1)` never matches null rows; only `col IS NULL` does.
 /// Fix: emit (col IN (...) OR col IS NULL) when the local collection contains nulls.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class LocalContainsNullTests : TestBase
 {
     [Table("LcnItem")]

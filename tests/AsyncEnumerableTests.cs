@@ -8,8 +8,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class AsyncEnumerableTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Person
     {
         public int Id { get; set; }

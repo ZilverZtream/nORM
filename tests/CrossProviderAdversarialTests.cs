@@ -39,6 +39,7 @@ namespace nORM.Tests;
 //          migration partial failure leaves Partial checkpoint)
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class CrossProviderAdversarialTests
 {
     // ── Entities ──────────────────────────────────────────────────────────────

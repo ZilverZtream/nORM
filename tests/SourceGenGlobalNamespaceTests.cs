@@ -10,6 +10,7 @@ using Xunit;
 // producing the invalid declaration "namespace ;" and causing a build failure.
 
 [GenerateMaterializer]
+[Xunit.Trait("Category", "Fast")]
 public class SgGlobalNsEntity
 {
     public int Id { get; set; }
@@ -24,6 +25,7 @@ namespace nORM.Tests
     /// global namespace (no namespace declaration). The source generator must emit valid
     /// C# (no "namespace ;" statement) and register the materializer at module init.
     /// </summary>
+    [Xunit.Trait("Category", "Fast")]
     public class SourceGenGlobalNamespaceTests
     {
         [Fact]

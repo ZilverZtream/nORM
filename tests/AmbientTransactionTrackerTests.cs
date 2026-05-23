@@ -31,6 +31,7 @@ namespace nORM.Tests;
 /// should still defer AcceptChanges to the caller. For SQLite this path always
 /// fails enlistment, so we test FailFast by observing the NormConfigurationException.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class AmbientTransactionTrackerTests
 {
     [Table("TrackerAmbient")]

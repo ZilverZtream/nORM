@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// so that a pre-cancelled caller token does not abort the rollback and leave
 /// the transaction in an uncertain state.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkOperationCancellationTests
 {
     [Table("BocItems")]

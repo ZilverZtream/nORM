@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// Generates 80+ cases across CLR types × query operations × SQL shapes.
 /// All execution tests use SQLite :memory: for correctness verification.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class TranslationFuzzTests
 {
     // ── Entity with representative column types ───────────────────────────────

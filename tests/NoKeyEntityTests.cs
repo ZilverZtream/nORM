@@ -8,6 +8,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Ensures SaveChanges throws when modifying/deleting a keyless entity.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class NoKeyEntityTests
 {
     [Table("NoKeyTable")]

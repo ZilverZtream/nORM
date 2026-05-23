@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// - Non-existent row returns 0 affected rows
 /// - Precise change tracking with modified column detection
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class UpdateEdgeCaseTests
 {
     [Table("UpdItem")]

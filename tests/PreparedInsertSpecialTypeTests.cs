@@ -64,6 +64,7 @@ file class PistNullableItem
 /// new DbParameter) truncates the text representation to an empty string, producing
 /// corrupt stored values.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PreparedInsertSpecialTypeTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) CreatePistDb()
@@ -285,7 +286,7 @@ CREATE TABLE PistNullableItem (
         "sqlite"    => new SqliteProvider(),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class QueryPlanValidatorTests
 {
     private static QueryPlan CreatePlan(string sql, Dictionary<string, object> parameters)

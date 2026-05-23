@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// and FK-ordering logic under heavy realistic workloads. Tests assert data OUTCOMES,
 /// not internal implementation details.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class ChangeTrackerStressTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

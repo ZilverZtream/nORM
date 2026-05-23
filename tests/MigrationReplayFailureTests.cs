@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// MySQL/Postgres/SqlServer tests are either shape tests (verifying internal behavior
 /// via reflection or subclass bypass) or env-gated for live provider availability.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationReplayFailureTests
 {
     // ── Dynamic assembly builder ────────────────────────────────────────────

@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// - Adds CREATE/ALTER/DROP for temporal-sensitive objects.
 /// - Adds provider-escaping round-trip assertions for all three providers.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialSqlSafetyMatrixTests
 {
     // ── DDL: CREATE variants ──────────────────────────────────────────────────

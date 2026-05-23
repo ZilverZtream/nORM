@@ -9,6 +9,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Translation-only cross-provider tests for compiled queries and SQL generation.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryProviderMatrixTests : TestBase
 {
     private class Product

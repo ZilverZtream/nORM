@@ -9,6 +9,10 @@ using Xunit;
 
 namespace nORM.Tests;
 
+// Package-consumer tests all run `dotnet pack` on the runtime project, which touches the same
+// nupkg outputs. The xUnit collection serializes them so parallel test execution cannot race
+// the pack outputs and corrupt each other.
+[Collection("PackageConsumerSerial")]
 [Trait("Category", TestCategory.PackageConsumer)]
 public class PackageConsumerIntegrationTests
 {
@@ -79,7 +83,7 @@ public class PackageConsumerIntegrationTests
 
             var generatedFiles = Directory.EnumerateFiles(Path.Combine(tempRoot, "Generated"), "*.g.cs", SearchOption.AllDirectories).ToList();
             var generatedSources = generatedFiles.Select(File.ReadAllText).ToList();
-            Assert.Contains(generatedSources, source => source.Contains("CompiledMaterializerStore.Add<global::PackageUser>", StringComparison.Ordinal));
+            Assert.Contains(generatedSources, source => source.Contains("CompiledMaterializerStore.AddPermanent<global::PackageUser>", StringComparison.Ordinal));
             Assert.Contains(generatedSources, source => source.Contains("GetUsers(", StringComparison.Ordinal));
         }
         finally
@@ -270,9 +274,34 @@ public class PackageConsumerIntegrationTests
         if (!Directory.Exists(directory))
             return;
 
+        // A previous test or an interrupted gate run can leave another process holding an open
+        // handle to the .nupkg (NuGet restore cache, parallel pack, or a stale testhost). Retry
+        // the delete with exponential backoff before failing the test so a transient lock does
+        // not poison the suite.
         foreach (var package in Directory.EnumerateFiles(directory, $"{packageId}.*.nupkg")
-                     .Concat(Directory.EnumerateFiles(directory, $"{packageId}.*.snupkg")))
-            File.Delete(package);
+                     .Concat(Directory.EnumerateFiles(directory, $"{packageId}.*.snupkg"))
+                     .ToList())
+        {
+            var attempts = 0;
+            while (true)
+            {
+                try
+                {
+                    File.Delete(package);
+                    break;
+                }
+                catch (IOException) when (attempts < 8)
+                {
+                    System.Threading.Thread.Sleep(250 * (attempts + 1));
+                    attempts++;
+                }
+                catch (UnauthorizedAccessException) when (attempts < 8)
+                {
+                    System.Threading.Thread.Sleep(250 * (attempts + 1));
+                    attempts++;
+                }
+            }
+        }
     }
 
     private static void AssertCurrentPackagesOnly(string directory, string packageId, string version)

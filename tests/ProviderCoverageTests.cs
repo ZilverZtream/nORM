@@ -31,6 +31,7 @@ file sealed class TestParameterFactory : IDbParameterFactory
 
 // ── DatabaseProvider (base) via SqliteProvider ───────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseProviderBaseTests
 {
     private readonly SqliteProvider _sqlite = new();
@@ -229,6 +230,7 @@ public class DatabaseProviderBaseTests
 
 // ── MySqlProvider ─────────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class MySqlProviderCovTests
 {
     private readonly MySqlProvider _provider = new(new TestParameterFactory());
@@ -435,6 +437,7 @@ public class MySqlProviderCovTests
 
 // ── PostgresProvider ──────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class PostgresProviderTests
 {
     private readonly PostgresProvider _provider = new(new TestParameterFactory());
@@ -660,6 +663,7 @@ public class PostgresProviderTests
 
 // ── SqlServerProvider ─────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class SqlServerProviderTests
 {
     private readonly SqlServerProvider _provider = new();
@@ -978,6 +982,7 @@ public class SqlServerProviderTests
 
 // ── DbConcurrencyException ────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class DbConcurrencyExceptionTests
 {
     [Fact]
@@ -1021,6 +1026,7 @@ public class DbConcurrencyExceptionTests
 
 // ── NavigationContext ─────────────────────────────────────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class NavigationContextCovTests : IDisposable
 {
     private readonly SqliteConnection _cn;
@@ -1085,6 +1091,7 @@ public class NavigationContextCovTests : IDisposable
 
 // ── DatabaseScaffolder private helpers via reflection ─────────────────────────
 
+[Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderHelperTests
 {
     private static MethodInfo GetPrivateStatic(string name, int paramCount = 1)

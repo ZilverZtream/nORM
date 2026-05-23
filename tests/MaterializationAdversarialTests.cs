@@ -36,6 +36,7 @@ namespace nORM.Tests;
 ///   <item>Retry robustness — transient fault injection via custom execution strategy.</item>
 /// </list>
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class MaterializationAdversarialTests
 {
     // ── M1 — Owned-collection setter exception propagation ───────────────────

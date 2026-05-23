@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// ProviderCoverageExtendedTests.cs. Focus: MySqlProvider, SqlServerProvider,
 /// PostgresProvider, and DatabaseProvider base class.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderAdditionalCoverageTests
 {
     // ─────────────────────────────────────────────────────────────────────────

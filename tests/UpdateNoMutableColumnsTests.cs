@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// NormConfigurationException for entities that have no mutable columns (key-only, or
 /// key + concurrency-token-only). Also ensures a normal entity with one mutable column works.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class UpdateNoMutableColumnsTests
 {
     // PK-only entity — no mutable columns at all.

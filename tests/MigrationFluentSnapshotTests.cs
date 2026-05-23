@@ -18,10 +18,12 @@ namespace nORM.Tests;
 /// correctly reflects fluent ToTable, HasColumnName, and HasKey overrides, whereas
 /// <see cref="SchemaSnapshotBuilder.Build(System.Reflection.Assembly)"/> only sees attributes.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationFluentSnapshotTests
 {
     // ── Entity with NO mapping attributes — fluent-only configuration ────────
 
+    [Xunit.Trait("Category", "Fast")]
     public class FluentUser
     {
         public int Id { get; set; }
@@ -32,6 +34,7 @@ public class MigrationFluentSnapshotTests
     // ── Entity with [Table]+[Key] for attribute baseline ─────────────────────
 
     [Table("attr_widgets")]
+    [Xunit.Trait("Category", "Fast")]
     public class AttrWidget
     {
         [Key]

@@ -33,6 +33,7 @@ namespace nORM.Tests;
 ///    concurrently to the same logical data set.
 /// </summary>
 [Collection(ConcurrencyStressCollection.Name)]
+[Xunit.Trait("Category", "Fast")]
 public class DynamicQueryRootConcurrencyTests
 {
     // ── shared SQLite helpers ─────────────────────────────────────────────────

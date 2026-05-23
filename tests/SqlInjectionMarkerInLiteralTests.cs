@@ -14,6 +14,7 @@ namespace nORM.Tests;
 //the Pattern 4 injection check entirely.
 //After the fix: '@' inside literals/comments is not counted; real @param markers are.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class SqlInjectionMarkerInLiteralTests
 {
  // ─── '@' inside email literal must NOT suppress injection check ─────

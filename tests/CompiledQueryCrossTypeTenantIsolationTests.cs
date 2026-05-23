@@ -34,6 +34,7 @@ internal sealed class X1CRow
     public string Value { get; set; } = "";
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryCrossTypeTenantIsolationTests
 {
     // A tenant provider that returns a non-string object (int) so ToString() = "42"

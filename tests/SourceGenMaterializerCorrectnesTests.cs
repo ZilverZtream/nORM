@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// 2. FromSqlRawAsync uses the compiled materializer and inherits the same name-based fix.
 /// 3. Owned-type column names (Owner_Prop) are resolved correctly regardless of position.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenMaterializerCorrectnessTests
 {
     // ── reordered columns do not swap property values ─────────────────

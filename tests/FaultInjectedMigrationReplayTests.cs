@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// migration types do NOT pollute the main test assembly and interfere with the
 /// SqliteMigrationRunnerTests assembly-scan tests.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FaultInjectedMigrationReplayTests
 {
     // ── Dynamic assembly builder ──────────────────────────────────────────────

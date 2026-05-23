@@ -13,6 +13,7 @@ namespace nORM.Tests;
 //Verifies that UseAffectedRowsSemantics is correct per provider, and that
 //concurrency checks are skipped for providers reporting affected (not matched) rows.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConcurrencyRowcountSemanticsTests
 {
  // ─── Provider property assertions ─────────────────────────────────────

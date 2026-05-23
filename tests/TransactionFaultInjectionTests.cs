@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// All tests use SQLite with a ThrowingTransaction wrapper injected via reflection
 /// (same pattern as SyncTransactionCleanupTests) so no live MySQL/SQL Server is needed.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class TransactionFaultInjectionTests
 {
     // ── ThrowingTransaction — injectable mock ────────────────────────────────

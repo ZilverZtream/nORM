@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Verifies explicit transaction semantics for begin/commit and begin/rollback
 /// using SQLite in-memory databases.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ExplicitTransactionTests
 {
     [Table("TxItem")]
@@ -144,7 +145,7 @@ public class ExplicitTransactionTests
 
         await using var tx = await ctx.Database.BeginTransactionAsync();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        await Assert.ThrowsAsync<NormUsageException>(() =>
             ctx.Database.BeginTransactionAsync());
 
         await tx.RollbackAsync();

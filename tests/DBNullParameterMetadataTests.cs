@@ -34,6 +34,7 @@ namespace nORM.Tests;
 /// Fix: added <c>if (value is DBNull) value = null;</c> at the top of <c>AddOptimizedParam</c>,
 /// routing <c>DBNull.Value</c> to the same null path as <c>null</c>.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class DBNullParameterMetadataTests
 {
     // ── Unit tests for AddOptimizedParam DBNull.Value normalisation ───────────

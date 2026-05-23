@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// nORM's query translator on edge cases: deep filter chains, large IN clauses,
 /// null handling, multi-column ordering, pagination, and grouping.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class LinqQueryStressTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

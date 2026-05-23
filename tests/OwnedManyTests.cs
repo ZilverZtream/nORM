@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for OwnsMany - owned collection navigation stored in a separate child table.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class OwnedManyTests
 {
     // ── Entity definitions ────────────────────────────────────────────────

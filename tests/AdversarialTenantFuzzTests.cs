@@ -32,6 +32,7 @@ namespace nORM.Tests;
 /// Each test uses a "differential oracle": the nORM result is compared against
 /// a ground-truth direct-ADO.NET query to detect data leakage.
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class AdversarialTenantFuzzTests
 {
     [Table("FuzzRow")]
@@ -378,7 +379,7 @@ public class AdversarialTenantFuzzTests
 
     private static DatabaseProvider AmtProvider(string kind) => kind switch
     {
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _           => new SqliteProvider()

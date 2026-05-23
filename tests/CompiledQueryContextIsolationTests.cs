@@ -14,9 +14,11 @@ namespace nORM.Tests;
 /// Verifies that a compiled query delegate recomputes the plan for a new context
 /// rather than permanently reusing the first context's plan.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQueryContextIsolationTests
 {
     [Table("Person")]
+    [Xunit.Trait("Category", "Fast")]
     public class PersonSG
     {
         [Key]

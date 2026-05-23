@@ -7,18 +7,21 @@ using Xunit;
 
 namespace nORM.Tests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class CollidingValue
     {
         public string Value { get; set; } = string.Empty;
         public override int GetHashCode() => 1;
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class CollisionEntity
     {
         public int Id { get; set; }
         public CollidingValue Data { get; set; } = new();
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class PreciseChangeTrackingTests
     {
         [Fact]

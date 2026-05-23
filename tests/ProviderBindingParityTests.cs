@@ -38,6 +38,7 @@ namespace nORM.Tests;
 // -- Entities -----------------------------------------------------------------
 
 [Table("PPG40_Entity")]
+[Xunit.Trait("Category", "Fast")]
 public class PPG40Entity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -57,6 +58,7 @@ public enum PPG40Category
 }
 
 [Table("PPG40_EnumEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PPG40EnumEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -66,6 +68,7 @@ public class PPG40EnumEntity
 }
 
 [Table("PPG40_DateEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class PPG40DateEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -76,6 +79,7 @@ public class PPG40DateEntity
 }
 
 [Table("PPG40_Parent")]
+[Xunit.Trait("Category", "Fast")]
 public class PPG40Parent
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -85,6 +89,7 @@ public class PPG40Parent
 }
 
 [Table("PPG40_Child")]
+[Xunit.Trait("Category", "Fast")]
 public class PPG40Child
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -93,6 +98,7 @@ public class PPG40Child
     public string Tag { get; set; } = string.Empty;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class ProviderBindingParityTests
 {
     // -- Helpers ----------------------------------------------------------------
@@ -1015,6 +1021,7 @@ file sealed class G40NegatingConv : ValueConverter<int, int>
 /// so they create SQLite-compatible parameter objects while exercising their own
 /// dialect-level SQL generation paths.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ProviderDateTimeEnumParityTests
 {
     private static DatabaseProvider MakeProvider(string kind) => kind switch

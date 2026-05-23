@@ -30,6 +30,7 @@ namespace nORM.Tests;
 /// <c>CompiledMaterializerStore.TryGet</c>, matching the approach already used in
 /// <see cref="nORM.Query.MaterializerFactory"/>.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class GroupJoinCompiledMaterializerTests
 {
     // ── Entity types ──────────────────────────────────────────────────────────

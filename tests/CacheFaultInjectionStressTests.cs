@@ -33,6 +33,7 @@ namespace nORM.Tests;
 // across all four providers.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Stress")]
 public class CacheFaultInjectionStressTests : IDisposable
 {
     // ── Entity types ────────────────────────────────────────────────────────

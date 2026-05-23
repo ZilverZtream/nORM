@@ -14,6 +14,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class PreparedInsertOptimizationTests
 {
     [Table("PreparedInsertItem")]
@@ -57,8 +58,8 @@ public class PreparedInsertOptimizationTests
         await context.InsertAsync(second);
 
         Assert.Equal(0, connection.BeginTransactionCallCount);
-        // One command is spent on provider initialization; the prepared insert command is reused.
-        Assert.Equal(2, connection.CreateCommandCallCount);
+        // Two commands are spent on provider initialization (version check + WAL pragma); the prepared insert command is reused.
+        Assert.Equal(3, connection.CreateCommandCallCount);
         Assert.Equal(1, connection.PrepareCallCount);
         Assert.True(first.Id > 0);
         Assert.True(second.Id > 0);
@@ -86,8 +87,8 @@ public class PreparedInsertOptimizationTests
         await context.InsertAsync(new PreparedInsertItem { Name = "autocommit-2" });
 
         Assert.Equal(1, connection.BeginTransactionCallCount);
-        // Provider initialization adds one command on top of the three transaction-bound insert shapes.
-        Assert.Equal(4, connection.CreateCommandCallCount);
+        // Provider initialization adds two commands (version check + WAL pragma) on top of the three transaction-bound insert shapes.
+        Assert.Equal(5, connection.CreateCommandCallCount);
         Assert.Equal(3, connection.PrepareCallCount);
         Assert.Equal(3L, CountRows(connection));
     }

@@ -34,6 +34,7 @@ namespace nORM.Tests;
 ///   <item>Composite-key entities generate correct multi-column SELECT predicates.</item>
 /// </list>
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class OccConflictMatrixAffectedRowsTests
 {
     // ── Provider shims ────────────────────────────────────────────────────────

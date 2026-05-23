@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// two executions of the same query object, the re-execution must use the appropriate SQL
 /// shape (IS NULL expansion vs. plain =) rather than returning a stale cached plan.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class PlanCacheNullSemanticsTests
 {
     [Table("NullSemRow")]

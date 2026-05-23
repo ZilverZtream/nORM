@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// Verifies that a pre-canceled CancellationToken causes OperationCanceledException across
 /// all major query types on both sync-execution (SQLite) and async-execution provider variants.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryCancellationMatrixTests
 {
     [Table("QcmItem")]

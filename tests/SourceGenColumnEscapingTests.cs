@@ -40,6 +40,7 @@ namespace nORM.Tests.SgEscape
         public int Id { get; set; }
     }
 
+    [Xunit.Trait("Category", "Fast")]
     public class SourceGenColumnEscapingTests
     {
         // ── SG2-1: materializers compile and register ────────────────────────

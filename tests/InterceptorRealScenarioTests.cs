@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// work — writing audit rows, implementing soft-delete, blocking saves, and
 /// confirming post-commit visibility — not just recording that they fired.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InterceptorRealScenarioTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

@@ -32,6 +32,7 @@ namespace nORM.Tests;
 //   matrix across all providers, concurrency stress under cancellation/failure races.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ProviderParityDepthTests
 {
     // ── Shared entities ───────────────────────────────────────────────────────
@@ -687,7 +688,7 @@ public class ProviderParityDepthTests
     private static DatabaseProvider MakeProvider(string kind) => kind switch
     {
         "sqlite"    => new SqliteProvider(),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))

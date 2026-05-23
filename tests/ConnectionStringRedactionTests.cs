@@ -28,6 +28,7 @@ namespace nORM.Tests;
 /// Fix: RedactConnectionString() replaces sensitive key values with "***" using
 /// DbConnectionStringBuilder before any log call.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class ConnectionStringRedactionTests
 {
     // ── Minimal capturing ILogger ─────────────────────────────────────────────

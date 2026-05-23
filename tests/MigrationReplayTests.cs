@@ -14,6 +14,7 @@ namespace nORM.Tests;
 /// Constructs SchemaDiff objects directly, calls generators, inspects SQL tokens.
 /// SQLite sequences also execute DDL against a live :memory: DB for syntax correctness.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationReplayTests
 {
     // ── Provider data ────────────────────────────────────────────────────────

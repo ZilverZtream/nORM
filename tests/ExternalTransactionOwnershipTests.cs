@@ -25,6 +25,7 @@ namespace nORM.Tests;
 //failure inside an external transaction would invoke ShouldRetry and replay the write
 //batch inside the same (un-rolled-back) transaction, risking duplicate effects.
 //</summary>
+[Xunit.Trait("Category", "Fast")]
 public class ExternalTransactionOwnershipTests
 {
  // entity: AUTOINCREMENT key, used for update/delete tests.

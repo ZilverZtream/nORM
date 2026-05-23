@@ -15,6 +15,7 @@ namespace nORM.Tests;
 // ─── Shared entity types (namespace scope, not nested) ────────────────────────
 
 [Table("QtProduct")]
+[Xunit.Trait("Category", "Fast")]
 public class QtProduct
 {
     [Key]
@@ -28,6 +29,7 @@ public class QtProduct
 }
 
 [Table("QtCategory")]
+[Xunit.Trait("Category", "Fast")]
 public class QtCategory
 {
     [Key]
@@ -43,6 +45,7 @@ public class QtCategory
 /// Sum/Min/Max/Average, All, Any, Union/Intersect/Except, ElementAt,
 /// Select projections, GroupBy, error paths.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryTranslatorCoverageTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) CreateProductContext()
@@ -2205,6 +2208,7 @@ public class QueryTranslatorCoverageTests
 // ─── Additional entity for null-check tests ─────────────────────────────
 
 [Table("QtNullTest")]
+[Xunit.Trait("Category", "Fast")]
 public class QtNullTest
 {
     [Key]

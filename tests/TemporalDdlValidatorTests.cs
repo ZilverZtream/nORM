@@ -9,6 +9,7 @@ namespace nORM.Tests;
 /// Verifies that the TemporalManager DDL validator accepts SQL Server IF OBJECT_ID
 /// bootstrap SQL in addition to the existing CREATE/ALTER/DROP allowlist.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TemporalDdlValidatorTests
 {
     private static bool CallIsValidDdl(string ddl)

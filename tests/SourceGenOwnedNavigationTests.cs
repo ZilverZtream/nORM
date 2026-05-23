@@ -94,6 +94,7 @@ internal sealed class SgonPlain
 /// materializer, which correctly populates the owned navigation object from inlined
 /// columns. (SG1 fix in MaterializerFactory.HasOwnedNavigationColumns.)
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class SourceGenOwnedNavigationTests
 {
     private static SqliteConnection CreateOpenDb(string ddl)

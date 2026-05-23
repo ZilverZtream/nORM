@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// not just inserts and deletes. FK constraints fire on UPDATE too — if a dependent row
 /// is updated before its principal, FK validation fails on databases with FK enforcement.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FkUpdateOrderingTests
 {
     // ─── Schema: Category (principal) → Product (dependent via CategoryId FK) ──

@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// respect tenant predicates, preventing cross-tenant data leakage when different
 /// tenants share the same PK space.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class M2MTenantIsolationTests
 {
     // ── Entity definitions ────────────────────────────────────────────────

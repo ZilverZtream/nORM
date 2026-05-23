@@ -36,6 +36,7 @@ namespace nORM.Tests;
 //       own plan even though the coerced SQL value is identical.
 // ══════════════════════════════════════════════════════════════════════════════
 
+[Xunit.Trait("Category", "Fast")]
 public class ProviderSecurityMatrixTests
 {
     // ── Entity ────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ public class ProviderSecurityMatrixTests
         "sqlite"    => new SqliteProvider(),
         "mysql"     => new MySqlProvider(new SqliteParameterFactory()),
         "postgres"  => new PostgresProvider(new SqliteParameterFactory()),
-        "sqlserver" => new SqlServerProvider(),
+        "sqlserver" => new SqlServerProvider(new SqliteParameterFactory()),
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 

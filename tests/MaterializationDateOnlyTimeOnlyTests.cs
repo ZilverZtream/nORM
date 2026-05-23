@@ -18,6 +18,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Table("MM1_DateTimeEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class MM1DateTimeEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -31,6 +32,7 @@ public class MM1DateTimeEntity
 }
 
 [Table("MM1_NullableDateTimeEntity")]
+[Xunit.Trait("Category", "Fast")]
 public class MM1NullableDateTimeEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -43,6 +45,7 @@ public class MM1NullableDateTimeEntity
     public string Name { get; set; } = string.Empty;
 }
 
+[Xunit.Trait("Category", "Fast")]
 public class MaterializationDateOnlyTimeOnlyTests
 {
     private static (SqliteConnection cn, DbContext ctx) Build()

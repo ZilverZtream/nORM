@@ -16,9 +16,11 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CompiledQuerySqlShapeParityTests
 {
     [Table("SqlShapeUser")]
+    [Xunit.Trait("Category", "Fast")]
     public class SqlShapeUser
     {
         [Key]
@@ -30,6 +32,7 @@ public class CompiledQuerySqlShapeParityTests
     }
 
     [Table("SqlShapeOrder")]
+    [Xunit.Trait("Category", "Fast")]
     public class SqlShapeOrder
     {
         [Key]

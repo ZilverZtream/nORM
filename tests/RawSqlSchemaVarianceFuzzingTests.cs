@@ -22,6 +22,7 @@ namespace nORM.Tests;
 ///   - Column type coercion (SQLite INTEGER → C# int; REAL → double)
 ///   - All ordinal permutations for a 4-property entity (parametric)
 /// </summary>
+[Xunit.Trait("Category", "Stress")]
 public class RawSqlSchemaVarianceFuzzingTests
 {
     [Table("FuzzEntity")]

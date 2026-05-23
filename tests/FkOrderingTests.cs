@@ -10,6 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>Topological sort ensures principals are inserted before dependents.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class FkOrderingTests
 {
     private class Category
@@ -103,6 +104,7 @@ public class FkOrderingTests
 }
 
 /// <summary>Tests for namespace collision handling and cycle detection in topological sort.</summary>
+[Xunit.Trait("Category", "Fast")]
 public class FkOrderingAdvancedTests
 {
     // Two entities in different namespaces with the same simple type name.

@@ -3,6 +3,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "LiveProvider")]
 public class LiveProviderEnvironmentTests
 {
     [Fact]

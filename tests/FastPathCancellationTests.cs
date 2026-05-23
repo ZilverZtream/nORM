@@ -14,8 +14,10 @@ namespace nORM.Tests;
 /// <summary>
 /// Fast path must forward CancellationToken to all DB calls.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class FastPathCancellationTests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class Widget
     {
         [Key]

@@ -28,6 +28,7 @@ namespace nORM.Tests;
 ///    of the compiled assembly (or by absence of Task-returning delegates being
 ///    invoked synchronously).
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class QueryExecutorTests
 {
     // ── entity types ──────────────────────────────────────────────────────────

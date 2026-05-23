@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace nORM.Tests
 {
+    [Xunit.Trait("Category", "Fast")]
     public class MaterializerCancellationTests
     {
         private class Uncompiled
@@ -17,10 +18,14 @@ namespace nORM.Tests
             public int Id { get; set; }
         }
 
+        // Separate type so we never collide with source-gen registrations for Materialized.
+        private sealed class CancellationTarget { public int Id { get; set; } }
+
         [Fact]
         public async Task Compiled_materializer_honors_cancellation()
         {
-            Assert.True(CompiledMaterializerStore.TryGet(typeof(Materialized), out var mat));
+            CompiledMaterializerStore.Add(typeof(CancellationTarget), _ => new CancellationTarget());
+            Assert.True(CompiledMaterializerStore.TryGet(typeof(CancellationTarget), out var mat));
 
             using var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();

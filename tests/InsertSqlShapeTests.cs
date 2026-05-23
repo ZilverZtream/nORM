@@ -13,6 +13,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Tests for INSERT SQL conditionally appends identity retrieval.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InsertSqlShapeTests
 {
     /// <summary>Entity with a DB-generated (auto-increment) primary key.</summary>
@@ -161,6 +162,7 @@ file class ShapeNoGenKey
 /// PostgreSQL: <c>RETURNING [col]</c> postfix.
 /// SQLite:     <c>RETURNING [col]</c> postfix.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class InsertIdentityRetrievalShapeTests
 {
     [Fact]

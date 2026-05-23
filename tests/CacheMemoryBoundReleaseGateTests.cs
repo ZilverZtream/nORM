@@ -5,6 +5,7 @@ using Xunit;
 
 namespace nORM.Tests;
 
+[Xunit.Trait("Category", "Fast")]
 public class CacheMemoryBoundReleaseGateTests
 {
     [Fact]
@@ -46,26 +47,22 @@ public class CacheMemoryBoundReleaseGateTests
     [Fact]
     public void CompiledMaterializerStore_TableNameChurn_StaysBoundedAndObservable()
     {
-        CompiledMaterializerStore.Clear();
-        try
+        // Do NOT call Clear() — it wipes source-generator registrations that ModuleInitializers
+        // emit once. Adding 650 unique entries already forces eviction past the 500-entry bound,
+        // so the assertions hold regardless of pre-existing entries.
+        var evictionsBefore = CompiledMaterializerStore.Evictions;
+        for (var i = 0; i < 650; i++)
         {
-            for (var i = 0; i < 650; i++)
-            {
-                var tableName = "CacheBound_" + i.ToString("D4");
-                CompiledMaterializerStore.Add<CacheBoundEntity>(tableName, static _ => new CacheBoundEntity());
-            }
+            var tableName = "CacheBound_" + i.ToString("D4");
+            CompiledMaterializerStore.Add<CacheBoundEntity>(tableName, static _ => new CacheBoundEntity());
+        }
 
-            Assert.True(CompiledMaterializerStore.Count <= 500,
-                $"Compiled materializer store grew to {CompiledMaterializerStore.Count} entries.");
-            Assert.True(CompiledMaterializerStore.Evictions > 0,
-                "Compiled materializer store should evict when table/model churn exceeds its v1 bound.");
-            Assert.False(CompiledMaterializerStore.TryGet(typeof(CacheBoundEntity), "CacheBound_0000", out _));
-            Assert.True(CompiledMaterializerStore.TryGet(typeof(CacheBoundEntity), "CacheBound_0649", out _));
-        }
-        finally
-        {
-            CompiledMaterializerStore.Clear();
-        }
+        Assert.True(CompiledMaterializerStore.Count <= 500,
+            $"Compiled materializer store grew to {CompiledMaterializerStore.Count} entries.");
+        Assert.True(CompiledMaterializerStore.Evictions > evictionsBefore,
+            "Compiled materializer store should evict when table/model churn exceeds its v1 bound.");
+        Assert.False(CompiledMaterializerStore.TryGet(typeof(CacheBoundEntity), "CacheBound_0000", out _));
+        Assert.True(CompiledMaterializerStore.TryGet(typeof(CacheBoundEntity), "CacheBound_0649", out _));
     }
 
     private sealed class CacheBoundEntity

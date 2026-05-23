@@ -20,6 +20,7 @@ namespace nORM.Tests;
 /// the update must silently skip that row (0 rows affected) rather than performing
 /// a silent lost update.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class BulkOccParityTests
 {
     // Table with a simple timestamp (string) concurrency token for SQLite tests.

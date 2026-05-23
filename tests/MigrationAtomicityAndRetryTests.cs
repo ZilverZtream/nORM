@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// Also verifies that a failed batch leaves the database in a state where a corrected
 /// retry can succeed.
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class MigrationAtomicityAndRetryTests
 {
     // ── Dynamic assembly helpers ──────────────────────────────────────────

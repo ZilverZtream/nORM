@@ -25,6 +25,7 @@ namespace nORM.Tests;
 /// - Null + non-nullable column → deterministic NormConfigurationException
 /// - Null + nullable column (int?, string) → query emits WHERE col IS NULL
 /// </summary>
+[Xunit.Trait("Category", "Fast")]
 public class TenantNullHandlingTests
 {
     // ── Entities ──────────────────────────────────────────────────────────────
