@@ -5,12 +5,12 @@ validation, diagnostics, and release documentation. `IsAvailableAsync` remains
 the runtime probe that checks whether the driver can be loaded and a compatible
 server can be reached.
 
-| Provider | Minimum Version | JSON | Temporal | Native Bulk Insert | Savepoints | Driver |
-| --- | --- | --- | --- | --- | --- | --- |
-| SQL Server | 13.0 / SQL Server 2016 | Yes | Yes | Yes | Yes | `Microsoft.Data.SqlClient` |
-| PostgreSQL | 9.5 | Yes | Yes | Yes | Yes | `Npgsql` |
-| MySQL | 8.0 | Yes | Yes | Yes | Yes | `MySqlConnector` or `MySql.Data` |
-| SQLite | 3.9 | JSON1-dependent | Yes | No | Yes | `Microsoft.Data.Sqlite` |
+| Provider | Minimum Version | Notes | JSON | Temporal | Native Bulk Insert | Savepoints | Driver |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SQL Server | 13.0 / SQL Server 2016 | JSON support requires 2016 | Yes | Yes | Yes | Yes | `Microsoft.Data.SqlClient` |
+| PostgreSQL | 12+ | | Yes | Yes | Yes | Yes | `Npgsql` |
+| MySQL | 8.0+ | RENAME COLUMN requires 8.0 | Yes | Yes | Yes | Yes | `MySqlConnector` or `MySql.Data` |
+| SQLite | 3.25+ | RENAME COLUMN requires 3.25 | JSON1-dependent | Yes | No | Yes | `Microsoft.Data.Sqlite` |
 
 ## Startup Validation
 

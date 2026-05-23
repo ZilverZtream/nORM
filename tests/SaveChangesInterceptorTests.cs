@@ -262,6 +262,75 @@ public class SaveChangesInterceptorTests
         Assert.Equal(3, count);
     }
 
+    // ── Save suppression (cancellation from a pre-save interceptor) ──────────
+
+    private class ThrowingPreSaveInterceptor : ISaveChangesInterceptor
+    {
+        private readonly Exception _ex;
+
+        public ThrowingPreSaveInterceptor(Exception ex) { _ex = ex; }
+
+        public Task SavingChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, CancellationToken cancellationToken)
+            => Task.FromException(_ex);
+
+        public Task SavedChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, int result, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// An exception thrown from SavingChangesAsync must abort the save without
+    /// writing any data to the database. The exception propagates to the caller.
+    /// </summary>
+    [Fact]
+    public async Task SavingChanges_InterceptorThrows_SaveIsAborted()
+    {
+        var suppressor = new ThrowingPreSaveInterceptor(new InvalidOperationException("save-cancelled-by-interceptor"));
+        var (cn, ctx) = CreateContextWithSchema(interceptor: suppressor);
+        await using var _ = ctx;
+
+        var user = new User { Name = "should-not-persist", CreatedAt = DateTime.UtcNow };
+        ctx.Add(user);
+
+        var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
+
+        Assert.NotNull(ex);
+        var ioex = Assert.IsType<InvalidOperationException>(ex);
+        Assert.Equal("save-cancelled-by-interceptor", ioex.Message);
+
+        // No row must have been written.
+        using var checkCmd = cn.CreateCommand();
+        checkCmd.CommandText = "SELECT COUNT(*) FROM User";
+        var count = Convert.ToInt64(checkCmd.ExecuteScalar()!);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// After an aborted save the underlying connection must still be open
+    /// and a direct SQL query against it must succeed.
+    /// </summary>
+    [Fact]
+    public async Task SavingChanges_AfterAbortedSave_ConnectionRemainsOpen()
+    {
+        var suppressor = new ThrowingPreSaveInterceptor(new InvalidOperationException("abort-once"));
+        var (cn, ctx) = CreateContextWithSchema(interceptor: suppressor);
+        await using var _ = ctx;
+
+        var user = new User { Name = "first-attempt", CreatedAt = DateTime.UtcNow };
+        ctx.Add(user);
+
+        try { await ctx.SaveChangesAsync(); }
+        catch (InvalidOperationException) { }
+
+        // The underlying SQLite connection must still be Open.
+        Assert.Equal(System.Data.ConnectionState.Open, cn.State);
+
+        // A direct query against the connection must succeed.
+        using var checkCmd = cn.CreateCommand();
+        checkCmd.CommandText = "SELECT COUNT(*) FROM User";
+        var count = Convert.ToInt64(await checkCmd.ExecuteScalarAsync());
+        Assert.Equal(0L, count); // nothing was persisted (save was aborted)
+    }
+
     [Fact]
     public async Task Interceptor_runs_before_and_after_saving()
     {
