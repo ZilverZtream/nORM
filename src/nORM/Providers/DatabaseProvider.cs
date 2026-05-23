@@ -809,7 +809,9 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedUpdateAsync(ctx, m, e, ct);
-            throw new NotImplementedException("This provider does not have a native bulk update implementation.");
+            throw new NormUnsupportedFeatureException(
+                $"Bulk update is not supported by provider {Capabilities.ProviderName}. " +
+                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.");
         }
 
         /// <summary>
@@ -821,7 +823,9 @@ namespace nORM.Providers
             ValidateConnection(ctx.Connection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedDeleteAsync(ctx, m, e, ct);
-            throw new NotImplementedException("This provider does not have a native bulk delete implementation.");
+            throw new NormUnsupportedFeatureException(
+                $"Bulk delete is not supported by provider {Capabilities.ProviderName}. " +
+                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.");
         }
 
         /// <summary>
