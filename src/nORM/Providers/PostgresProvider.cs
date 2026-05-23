@@ -252,6 +252,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddDays) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 day')",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 month')",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 year')",
+                    nameof(DateTime.AddHours) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 hour')",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 minute')",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 second')",
+                    // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
+                    nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
                     _ => null
                 };
             }
@@ -275,8 +280,15 @@ namespace nORM.Providers
                     nameof(Math.Abs) => $"ABS({args[0]})",
                     nameof(Math.Ceiling) => $"CEILING({args[0]})",
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
-                    nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
+                    nameof(Math.Round) when args.Length > 1 => $"ROUND(({args[0]})::numeric, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
+                    nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
+                    nameof(Math.Log) when args.Length == 1 => $"LN({args[0]})",
+                    nameof(Math.Log) when args.Length == 2 => $"LOG({args[1]}, {args[0]})",
+                    nameof(Math.Log10) when args.Length == 1 => $"LOG({args[0]})",
+                    nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
                     _ => null
                 };
             }

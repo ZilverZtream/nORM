@@ -479,7 +479,14 @@ namespace nORM.Query
                 if (_t._sql.Length == 0)
                 {
                     var fromClause = _t._mapping.EscTable;
-                    var alias = _t._correlatedParams.Count > 0 ? _t._correlatedParams.Values.FirstOrDefault().Alias : null;
+                    // Pick the alias bound to THIS translator's mapping (not the first correlated
+                    // entry blindly). When this translator runs as a subquery that inherits outer
+                    // correlated parameters, the outer entry is listed first; falling back to it
+                    // would alias the FROM clause to the outer table's alias and break the join.
+                    var alias = _t._correlatedParams.Count > 0
+                        ? _t._correlatedParams.FirstOrDefault(kvp => kvp.Value.Mapping == _t._mapping).Value.Alias
+                          ?? _t._correlatedParams.Values.FirstOrDefault().Alias
+                        : null;
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= _t.EscapeAlias("T0");

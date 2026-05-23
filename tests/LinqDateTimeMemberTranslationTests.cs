@@ -100,6 +100,41 @@ public class LinqDateTimeMemberTranslationTests : IAsyncLifetime
         Assert.Equal(4, hits[0].Id);
     }
 
+    [Fact]
+    public async Task DayOfWeek_filters_by_weekday()
+    {
+        // 2020-01-15 = Wednesday(3), 2021-06-30 = Wednesday(3), 2022-12-31 = Saturday(6), 2020-02-29 = Saturday(6).
+        var hits = await _ctx.Query<DtRow>().Where(r => r.Stamp.DayOfWeek == DayOfWeek.Saturday).OrderBy(r => r.Id).ToListAsync();
+        Assert.Equal(new[] { 3, 4 }, hits.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task AddHours_shifts_into_next_day_so_hour_comparison_matches()
+    {
+        // 2022-12-31 23:59:59 + 1 hour -> 2023-01-01 00:59:59, so the resulting hour is 0.
+        var hits = await _ctx.Query<DtRow>().Where(r => r.Stamp.AddHours(1).Hour == 0).ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(3, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task AddMinutes_can_isolate_a_specific_row()
+    {
+        // 2020-01-15 09:30:45 + 30 minutes -> 10:00:45, hour 10.
+        var hits = await _ctx.Query<DtRow>().Where(r => r.Stamp.AddMinutes(30).Hour == 10).ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(1, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task AddSeconds_increments_minute_when_crossing_boundary()
+    {
+        // 2020-01-15 09:30:45 + 20s -> 09:31:05, so minute becomes 31.
+        var hits = await _ctx.Query<DtRow>().Where(r => r.Stamp.AddSeconds(20).Minute == 31).ToListAsync();
+        Assert.Single(hits);
+        Assert.Equal(1, hits[0].Id);
+    }
+
     [Table("DtRow")]
     public sealed class DtRow
     {

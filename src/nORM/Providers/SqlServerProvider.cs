@@ -370,6 +370,12 @@ namespace nORM.Providers
                     nameof(DateTime.AddDays) when args.Length == 2 => $"DATEADD(day, {args[1]}, {args[0]})",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"DATEADD(month, {args[1]}, {args[0]})",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"DATEADD(year, {args[1]}, {args[0]})",
+                    nameof(DateTime.AddHours) when args.Length == 2 => $"DATEADD(hour, {args[1]}, {args[0]})",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATEADD(minute, {args[1]}, {args[0]})",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATEADD(second, {args[1]}, {args[0]})",
+                    // T-SQL DATEPART(weekday) depends on @@DATEFIRST; subtract @@DATEFIRST so that
+                    // Sunday=0..Saturday=6 always, matching System.DayOfWeek.
+                    nameof(DateTime.DayOfWeek) => $"((DATEPART(weekday, {args[0]}) + @@DATEFIRST - 1) % 7)",
                     _ => null
                 };
             }
@@ -395,6 +401,13 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]}, 0)",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
+                    nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
+                    nameof(Math.Log) when args.Length == 1 => $"LOG({args[0]})",
+                    nameof(Math.Log) when args.Length == 2 => $"LOG({args[0]}, {args[1]})",
+                    nameof(Math.Log10) when args.Length == 1 => $"LOG10({args[0]})",
+                    nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
                     _ => null
                 };
             }
