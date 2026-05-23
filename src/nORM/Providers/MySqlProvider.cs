@@ -115,7 +115,13 @@ namespace nORM.Providers
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
             _useAffectedRowsSemantics = useAffectedRowsSemantics;
+            // Dialect-only mode: when a non-native parameter factory is supplied, the caller is using
+            // this provider purely for its SQL dialect against a foreign engine (e.g., SQLite). Native
+            // connection-type and server-version validation must be skipped in that scenario.
+            _isDialectOnly = parameterFactory is not ReflectionMySqlParameterFactory;
         }
+
+        private readonly bool _isDialectOnly;
 
         private sealed class ReflectionMySqlParameterFactory : IDbParameterFactory
         {
@@ -471,9 +477,10 @@ END;";
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
+            if (_isDialectOnly) return; // foreign parameter factory → dialect-only mode, foreign connection is intentional
             var name = connection.GetType().FullName;
             if (name != "MySqlConnector.MySqlConnection" && name != "MySql.Data.MySqlClient.MySqlConnection")
-                throw new InvalidOperationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
+                throw new NormConfigurationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
         }
 
         /// <summary>
@@ -686,6 +693,7 @@ END;";
         /// <inheritdoc />
         protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT VERSION()";
             return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
@@ -694,6 +702,7 @@ END;";
         /// <inheritdoc />
         protected override string? GetServerVersionString(DbConnection connection)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT VERSION()";
             return cmd.ExecuteScalar() as string;

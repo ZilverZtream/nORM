@@ -55,6 +55,30 @@ namespace nORM.Providers
 
         internal override bool PrefersSyncQueryPlanExecution => true;
 
+        private readonly IDbParameterFactory? _parameterFactory;
+        private readonly bool _isDialectOnly;
+
+        /// <summary>Default constructor using the built-in Microsoft.Data.SqlClient parameter factory.</summary>
+        public SqlServerProvider()
+        {
+            _parameterFactory = null;
+            _isDialectOnly = false;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SqlServerProvider"/> class with an injected
+        /// parameter factory. Pass a non-SqlClient factory to run the provider in dialect-only mode -
+        /// useful for cross-provider parity tests where SQL Server dialect is exercised against a
+        /// foreign engine such as SQLite. Native connection-type and server-version validation is
+        /// skipped in dialect-only mode.
+        /// </summary>
+        /// <param name="parameterFactory">Factory responsible for creating database parameters.</param>
+        public SqlServerProvider(IDbParameterFactory parameterFactory)
+        {
+            _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+            _isDialectOnly = true;
+        }
+
         /// <summary>
         /// Maximum length of a single SQL statement supported by SQL Server.
         /// </summary>
@@ -247,12 +271,12 @@ namespace nORM.Providers
         /// <see cref="GetIdentityRetrievalPrefix"/> returns the OUTPUT clause; this method returns empty.
         /// </summary>
         /// <param name="m">The table mapping for the insert.</param>
-        /// <returns>An empty string â€” retrieval is handled by <see cref="GetIdentityRetrievalPrefix"/>.</returns>
+        /// <returns>An empty string — retrieval is handled by <see cref="GetIdentityRetrievalPrefix"/>.</returns>
         public override string GetIdentityRetrievalString(TableMapping m) => string.Empty;
 
         /// <summary>
         /// Returns an <c>OUTPUT INSERTED.[keyCol]</c> clause placed between the column list and VALUES.
-        /// This works for any column type (int, bigint, uniqueidentifier, varchar, â€¦) unlike SCOPE_IDENTITY()
+        /// This works for any column type (int, bigint, uniqueidentifier, varchar, …) unlike SCOPE_IDENTITY()
         /// which is restricted to numeric auto-increment columns.
         /// </summary>
         /// <param name="m">The table mapping for the insert.</param>
@@ -268,13 +292,16 @@ namespace nORM.Providers
             => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
 
         /// <summary>
-        /// Creates a SQL Server specific <see cref="DbParameter"/> instance.
+        /// Creates a SQL Server specific <see cref="DbParameter"/> instance, or delegates to an
+        /// injected <see cref="IDbParameterFactory"/> when the provider is in dialect-only mode.
         /// </summary>
         /// <param name="name">Parameter name including prefix.</param>
         /// <param name="value">Value to assign to the parameter; <c>null</c> becomes <see cref="DBNull.Value"/>.</param>
-        /// <returns>A configured <see cref="SqlParameter"/>.</returns>
+        /// <returns>A configured <see cref="DbParameter"/>.</returns>
         public override DbParameter CreateParameter(string name, object? value)
-            => new SqlParameter(name, value ?? DBNull.Value);
+            => _parameterFactory is not null
+                ? _parameterFactory.CreateParameter(name, value)
+                : new SqlParameter(name, value ?? DBNull.Value);
 
         /// <summary>
         /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
@@ -555,6 +582,7 @@ END;";
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
+            if (_isDialectOnly) return; // foreign parameter factory => dialect-only mode, foreign connection is intentional
             if (connection is not SqlConnection)
                 throw new InvalidOperationException("A SqlConnection is required for SqlServerProvider.");
         }
@@ -597,6 +625,7 @@ END;";
         /// <inheritdoc />
         protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
             return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
@@ -605,6 +634,7 @@ END;";
         /// <inheritdoc />
         protected override string? GetServerVersionString(DbConnection connection)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR(20))";
             return cmd.ExecuteScalar() as string;

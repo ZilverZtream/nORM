@@ -29,9 +29,13 @@ namespace nORM.Providers
         internal override bool PrefersSyncQueryPlanExecution => true;
 
         /// <summary>
-        /// Minimum PostgreSQL version required (9.5 introduced ON CONFLICT, UPSERT, and row-level security).
+        /// Minimum PostgreSQL version supported by nORM v1. PostgreSQL 12 is the lowest version
+        /// where all advertised features work without fallbacks: generated identity columns
+        /// (added in 10), JSON path operators (added in 12), and modern partition routing.
+        /// This floor matches docs/provider-capabilities.md and is enforced by
+        /// ProviderCapabilityContractTests so docs and runtime cannot drift apart.
         /// </summary>
-        private static readonly Version MinimumPostgresVersion = new(9, 5);
+        private static readonly Version MinimumPostgresVersion = new(12, 0);
 
         /// <summary>
         /// PostgreSQL error code for "undefined_table" (error class 42P01).
@@ -75,7 +79,13 @@ namespace nORM.Providers
         public PostgresProvider(IDbParameterFactory parameterFactory)
         {
             _parameterFactory = parameterFactory ?? throw new ArgumentNullException(nameof(parameterFactory));
+            // Dialect-only mode: when a non-native parameter factory is supplied, the caller is using
+            // this provider purely for its SQL dialect against a foreign engine (e.g., SQLite). Native
+            // connection-type and server-version validation must be skipped in that scenario.
+            _isDialectOnly = parameterFactory is not ReflectionNpgsqlParameterFactory;
         }
+
+        private readonly bool _isDialectOnly;
 
         private sealed class ReflectionNpgsqlParameterFactory : IDbParameterFactory
         {
@@ -120,7 +130,7 @@ namespace nORM.Providers
             true,
             true,
             true,
-            "Requires Npgsql and PostgreSQL 9.5 or newer.");
+            "Requires Npgsql and PostgreSQL 12.0 or newer.");
 
         /// <summary>PostgreSQL supports <c>IS NOT DISTINCT FROM</c> for index-friendly null-safe equality.</summary>
         public override string NullSafeEqual(string left, string right)
@@ -623,8 +633,9 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
+            if (_isDialectOnly) return; // foreign parameter factory → dialect-only mode, foreign connection is intentional
             if (connection.GetType().FullName != "Npgsql.NpgsqlConnection")
-                throw new InvalidOperationException("An NpgsqlConnection is required for PostgresProvider.");
+                throw new NormConfigurationException("An NpgsqlConnection is required for PostgresProvider.");
         }
 
         /// <summary>
@@ -663,6 +674,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <inheritdoc />
         protected override async Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = "SHOW server_version";
             return await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
@@ -671,6 +683,7 @@ FOR EACH ROW EXECUTE FUNCTION {functionName}();";
         /// <inheritdoc />
         protected override string? GetServerVersionString(DbConnection connection)
         {
+            if (_isDialectOnly) return Capabilities.MinimumServerVersion?.ToString();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "SHOW server_version";
             return cmd.ExecuteScalar() as string;

@@ -210,6 +210,13 @@ var addOutOpt = new Option<string>("--output") { Description = "Output directory
 var addForceOpt = new Option<bool>("--force") { Description = "Allow destructive table/column drops when generating the migration." };
 var addAttributeOnlyOpt = new Option<bool>("--attribute-only") { Description = "Generate from attribute-only entity scanning instead of a design-time DbContext." };
 var addProjectOpt = new Option<string?>("--project") { Description = "Path to the .csproj file. When provided, the output assembly is resolved via 'dotnet msbuild' if --assembly is not supplied." };
+// Explicit design-time loading flags for realistic application layouts (multi-project
+// solutions, multi-TFM projects, external dependency graphs). All optional; when omitted, the
+// design-time loader falls back to the existing project/assembly resolution path.
+var addStartupProjectOpt = new Option<string?>("--startup-project") { Description = "Path to the startup .csproj used to host the design-time DbContext (for multi-project solutions)." };
+var addDepsOpt = new Option<string?>("--deps") { Description = "Path to a .deps.json file describing assembly dependencies for the design-time load." };
+var addRuntimeConfigOpt = new Option<string?>("--runtimeconfig") { Description = "Path to a .runtimeconfig.json file describing the runtime configuration for the design-time load." };
+var addTargetFrameworkOpt = new Option<string?>("--target-framework") { Description = "Target framework moniker (e.g., net8.0) used when resolving the output assembly from --project." };
 add.Add(migNameArg);
 add.Add(addProvOpt);
 add.Add(addAsmOpt);
@@ -217,6 +224,10 @@ add.Add(addOutOpt);
 add.Add(addForceOpt);
 add.Add(addAttributeOnlyOpt);
 add.Add(addProjectOpt);
+add.Add(addStartupProjectOpt);
+add.Add(addDepsOpt);
+add.Add(addRuntimeConfigOpt);
+add.Add(addTargetFrameworkOpt);
 add.SetAction((ParseResult result) =>
 {
     try
@@ -228,17 +239,25 @@ add.SetAction((ParseResult result) =>
         var force = result.GetValue(addForceOpt);
         var attributeOnly = result.GetValue(addAttributeOnlyOpt);
         var projectPath = result.GetValue(addProjectOpt);
+        var startupProjectPath = result.GetValue(addStartupProjectOpt);
+        var depsPath = result.GetValue(addDepsOpt);
+        var runtimeConfigPath = result.GetValue(addRuntimeConfigOpt);
+        var targetFramework = result.GetValue(addTargetFrameworkOpt);
 
-        // When --project is supplied and --assembly was not (or points to a non-existent file),
-        // resolve the output assembly path via 'dotnet msbuild -getProperty:TargetPath'.
-        if (projectPath != null && (string.IsNullOrEmpty(asmPath) || !File.Exists(asmPath)))
+        // --startup-project takes precedence over --project for design-time host resolution
+        // when both are supplied (matches the EF tooling convention).
+        var effectiveProject = startupProjectPath ?? projectPath;
+
+        // When --project (or --startup-project) is supplied and --assembly was not (or points to
+        // a non-existent file), resolve the output assembly path via 'dotnet msbuild'.
+        if (effectiveProject != null && (string.IsNullOrEmpty(asmPath) || !File.Exists(asmPath)))
         {
-            if (!File.Exists(projectPath))
+            if (!File.Exists(effectiveProject))
             {
-                Console.Error.WriteLine($"Project file '{projectPath}' not found.");
+                Console.Error.WriteLine($"Project file '{effectiveProject}' not found.");
                 return 2;
             }
-            asmPath = ResolveAssemblyFromProject(projectPath);
+            asmPath = ResolveAssemblyFromProject(effectiveProject, targetFramework);
             if (asmPath == null)
             {
                 Console.Error.WriteLine($"Could not determine output assembly from project '{projectPath}'. Build the project first or supply --assembly explicitly.");
@@ -520,12 +539,17 @@ static string RedactConnectionStrings(string message)
 /// <c>dotnet msbuild -getProperty:TargetPath</c> on the project file.
 /// Returns null if the path cannot be determined.
 /// </summary>
-static string? ResolveAssemblyFromProject(string projectPath)
+static string? ResolveAssemblyFromProject(string projectPath, string? targetFramework = null)
 {
     try
     {
+        // When a target framework is supplied, scope the MSBuild evaluation so multi-TFM
+        // projects resolve the correct output assembly.
+        var tfmArg = string.IsNullOrEmpty(targetFramework)
+            ? string.Empty
+            : $" -property:TargetFramework={targetFramework}";
         var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet",
-            $"msbuild \"{projectPath}\" -getProperty:TargetPath --verbosity:quiet")
+            $"msbuild \"{projectPath}\"{tfmArg} -getProperty:TargetPath --verbosity:quiet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
