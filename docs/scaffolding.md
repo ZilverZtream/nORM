@@ -1,5 +1,8 @@
 # Scaffolding Preview Contract
 
+> **Preview**: Scaffolding is preview in v1.0. The public API and generated code
+> format may change in minor versions. See the [public API policy](public-api-policy.md).
+
 Database scaffolding is a preview feature for v1. It is useful for generating a
 starting point from an existing schema, but generated code must be reviewed
 before it is treated as the application's model contract.

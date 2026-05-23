@@ -13,7 +13,7 @@ nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being 
 - **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
 - **Connection Management**: context-level connection ownership plus database-driver pooling
 - **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
-- **Smart Relationship Handling**: Automatic relationship discovery and lazy loading
+- **Smart Relationship Handling**: Automatic relationship discovery and lazy loading (see [docs/linq-support.md](docs/linq-support.md) for relationship loading constraints)
 - **Flexible Configuration**: Fluent API and attribute-based configuration
 - **Developer Tools**: Preview database scaffolding and reverse engineering
 - **Modern Features**: JSON querying, window functions, temporal queries
@@ -211,7 +211,7 @@ for the stable v1 contract.
 
 ## Database Providers
 
-Full support for major database engines:
+Supported database engines (see [Provider Capabilities](docs/provider-capabilities.md) for version requirements and feature-level differences):
 
 ```csharp
 // SQL Server
@@ -354,7 +354,7 @@ Transaction ownership, ambient `TransactionScope` policy, savepoints, and
 commit/rollback cancellation behavior are documented in
 [Transaction Contract](docs/transactions.md).
 
-## Production-Ready Features
+## v1 Features
 
 ### Thread Safety
 
@@ -529,7 +529,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with performance lessons learned from Entity Framework Core and Dapper
 - Optimized for the modern .NET ecosystem
-- Designed for enterprise production workloads
+- Designed for production workloads; see [benchmark governance](docs/benchmark-governance.md) for performance evidence requirements
 
 ## Support
 
