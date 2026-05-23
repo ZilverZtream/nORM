@@ -44,7 +44,16 @@
 	</ItemGroup>
 	
   <ItemGroup>
-    <ProjectReference Include="nORM.SourceGenerators/nORM.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <!-- Source generator is netstandard2.0; isolate it from PublishAot/RID/SelfContained
+         propagation so `dotnet publish -p:PublishAot=true` on the runtime project does not
+         attempt to AOT-publish the analyzer. SkipGetTargetFrameworkProperties prevents
+         target-framework resolution from re-evaluating the analyzer under the publisher's TFM. -->
+    <ProjectReference Include="nORM.SourceGenerators/nORM.SourceGenerators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all"
+                      SkipGetTargetFrameworkProperties="true"
+                      UndefineProperties="PublishAot;RuntimeIdentifier;SelfContained;PublishTrimmed;PublishReadyToRun" />
   </ItemGroup>
 
   <ItemGroup>
