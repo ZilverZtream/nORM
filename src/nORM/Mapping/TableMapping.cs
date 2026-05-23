@@ -19,6 +19,8 @@ namespace nORM.Mapping
     /// <summary>
     /// Describes how a CLR type maps to a database table including column and relationship metadata.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("TableMapping reflects over entity properties; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("TableMapping reflects over entity properties; trimming may remove the required members.")]
     public sealed class TableMapping
     {
         /// <summary>Gets the CLR type represented by this mapping.</summary>

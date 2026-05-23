@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -13,6 +14,8 @@ namespace nORM.Core
     /// <summary>
     /// Provides the entry point to query the database using LINQ.
     /// </summary>
+    [RequiresDynamicCode("nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [RequiresUnreferencedCode("nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members. Annotate consumer call sites accordingly.")]
     public static class NormQueryable
     {
         /// <summary>
@@ -124,6 +127,8 @@ namespace nORM.Core
         // No async methods here to avoid constraint conflicts
     }
 
+    [RequiresDynamicCode("nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible.")]
+    [RequiresUnreferencedCode("nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members.")]
     internal sealed class NormQueryableImpl<T> : NormQueryableBase<T>, INormQueryable<T> where T : class
     {
         public NormQueryableImpl(DbContext ctx) : base(ctx)
@@ -199,6 +204,8 @@ namespace nORM.Core
     /// like Join that produce anonymous types or other types without parameterless constructors.
     /// Now fully supports async LINQ methods for all entity types.
     /// </summary>
+    [RequiresDynamicCode("nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible.")]
+    [RequiresUnreferencedCode("nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members.")]
     internal sealed class NormQueryableImplUnconstrained<T> : NormQueryableBase<T>, INormQueryable<T>
     {
         public NormQueryableImplUnconstrained(DbContext ctx) : base(ctx)
@@ -251,6 +258,8 @@ namespace nORM.Core
             => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
+    [RequiresDynamicCode("nORM Include uses Expression<T>.MakeGenericMethod to compose navigation includes; not NativeAOT-compatible.")]
+    [RequiresUnreferencedCode("nORM Include reflects over navigation property metadata; trimming may remove the required members.")]
     internal sealed class NormIncludableQueryableUnconstrained<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty>
     {
         public NormIncludableQueryableUnconstrained(IQueryProvider provider, Expression expression) : base(provider, expression)
@@ -306,6 +315,8 @@ namespace nORM.Core
             => ((NormQueryProvider)Provider).ExecuteUpdateAsync(Expression, set, ct);
     }
 
+    [RequiresDynamicCode("nORM Include uses Expression<T>.MakeGenericMethod to compose navigation includes; not NativeAOT-compatible.")]
+    [RequiresUnreferencedCode("nORM Include reflects over navigation property metadata; trimming may remove the required members.")]
     internal sealed class NormIncludableQueryable<T, TProperty> : NormQueryableBase<T>, INormIncludableQueryable<T, TProperty> where T : class
     {
         public NormIncludableQueryable(IQueryProvider provider, Expression expression) : base(provider, expression)
@@ -378,6 +389,8 @@ namespace nORM.Core
     /// Extension methods for chaining <c>Include</c> calls on queryables that already include
     /// a navigation property.
     /// </summary>
+    [RequiresDynamicCode("nORM Include extension methods emit MakeGenericMethod expressions; not NativeAOT-compatible.")]
+    [RequiresUnreferencedCode("nORM Include extension methods reflect over navigation property metadata; trimming may remove the required members.")]
     public static class NormIncludableQueryableExtensions
     {
         /// <summary>

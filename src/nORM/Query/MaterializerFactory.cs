@@ -40,6 +40,8 @@ namespace nORM.Query
     /// - `CreateMaterializer()` returns async wrapper that delegates to sync materializer
     /// - Both share the same underlying CreateMaterializerInternal logic
     /// </remarks>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("MaterializerFactory builds Expression-based materializers via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("MaterializerFactory reflects over entity types to build column-bound materializers; trimming may remove the required members.")]
     internal sealed partial class MaterializerFactory
     {
         /// <summary>Maximum entries in each materializer LRU cache (sync, async, schema).</summary>
@@ -102,7 +104,7 @@ namespace nORM.Query
             {
                 // Column.Name is the runtime column name (from fluent config or attribute).
                 // Column.PropName is the C# property name (default if no [Column] attribute).
-                // The source generator uses [Column] attribute â†’ if present, Name == attribute value.
+                // The source generator uses [Column] attribute → if present, Name == attribute value.
                 // If Name != PropName AND there's no [Column] attribute on the property, it's a fluent rename.
                 var prop = targetType.GetProperty(col.PropName);
                 if (prop == null) continue;
@@ -181,17 +183,17 @@ namespace nORM.Query
                         {
                             if (underlying.IsEnum)
                             {
-                                // MM-2: Nullable<TEnum> â€” convert via enum helper to avoid InvalidCastException
+                                // MM-2: Nullable<TEnum> — convert via enum helper to avoid InvalidCastException
                                 il.Emit(OpCodes.Call, _convertToEnumOpenMethod.MakeGenericMethod(underlying));
                             }
                             else if (underlying == typeof(DateOnly))
                             {
-                                // MM1 fix: Nullable<DateOnly> â€” Convert.ChangeType doesn't support DateOnly
+                                // MM1 fix: Nullable<DateOnly> — Convert.ChangeType doesn't support DateOnly
                                 il.Emit(OpCodes.Call, _convertToDateOnlyMethod);
                             }
                             else if (underlying == typeof(TimeOnly))
                             {
-                                // MM1 fix: Nullable<TimeOnly> â€” Convert.ChangeType doesn't support TimeOnly
+                                // MM1 fix: Nullable<TimeOnly> — Convert.ChangeType doesn't support TimeOnly
                                 il.Emit(OpCodes.Call, _convertToTimeOnlyMethod);
                             }
                             else
@@ -211,13 +213,13 @@ namespace nORM.Query
                     }
                     else if (pType.IsEnum)
                     {
-                        // MM-2: Enum types â€” call our helper which handles Int64â†’intâ†’enum conversion
+                        // MM-2: Enum types — call our helper which handles Int64→int→enum conversion
                         // that Convert.ChangeType cannot do directly (throws InvalidCastException).
                         il.Emit(OpCodes.Call, _convertToEnumOpenMethod.MakeGenericMethod(pType));
                     }
                     else if (pType == typeof(DateOnly))
                     {
-                        // MM1 fix: DateOnly â€” Convert.ChangeType doesn't support DateOnly
+                        // MM1 fix: DateOnly — Convert.ChangeType doesn't support DateOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
                             il.Emit(OpCodes.Call, _convertToDateOnlyMethod);
@@ -225,7 +227,7 @@ namespace nORM.Query
                     }
                     else if (pType == typeof(TimeOnly))
                     {
-                        // MM1 fix: TimeOnly â€” Convert.ChangeType doesn't support TimeOnly
+                        // MM1 fix: TimeOnly — Convert.ChangeType doesn't support TimeOnly
                         if (readerMethod.ReturnType == typeof(object))
                         {
                             il.Emit(OpCodes.Call, _convertToTimeOnlyMethod);
@@ -242,7 +244,7 @@ namespace nORM.Query
                             il.Emit(OpCodes.Unbox_Any, pType);
                         }
                         // If the typed getter (GetInt32, GetBoolean, etc.) already returned the
-                        // exact value type, it is already on the stack â€” no unboxing needed.
+                        // exact value type, it is already on the stack — no unboxing needed.
                     }
                     else if (readerMethod.ReturnType != pType)
                     {
@@ -438,15 +440,15 @@ namespace nORM.Query
 
             var targetType = typeof(T);
 
-            // CHECK FOR COMPILED MATERIALIZER FIRST â€” use mapping.TableName to discriminate
+            // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
             // between the same CLR type registered under different model mappings.
             // X1 fix: skip compiled materializer if the runtime mapping has fluent-only column
             // renames that the source generator couldn't see at compile time. The generator uses
             // [Column] attributes only; fluent HasColumnName overrides are invisible to it.
-            // X1/VC fix: skip compiled materializer when ValueConverters are registered â€” the
+            // X1/VC fix: skip compiled materializer when ValueConverters are registered — the
             // source-generated delegate reads raw provider values without applying converters.
             // SG1 fix: skip compiled materializer when owned scalar navigations (OwnsOne) are
-            // present â€” the generator cannot reconstruct the nested property assignment.
+            // present — the generator cannot reconstruct the nested property assignment.
             if (projection == null && CompiledMaterializerStore.TryGet(targetType, mapping.TableName, out var compiled)
                 && !HasFluentColumnRenames(targetType, mapping)
                 && mapping.ConverterFingerprint == 0
@@ -484,7 +486,7 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
 
-            // CHECK FOR COMPILED MATERIALIZER FIRST â€” use mapping.TableName to discriminate
+            // CHECK FOR COMPILED MATERIALIZER FIRST — use mapping.TableName to discriminate
             // between the same CLR type registered under different model mappings.
             // X1 fix: skip compiled materializer when fluent-only column renames are present.
             // X1/VC fix: skip when ValueConverters are registered.
@@ -664,7 +666,7 @@ namespace nORM.Query
                 var name = reader.GetName(i);
                 if (nameCount[name] > 1)
                 {
-                    // Ambiguous â€” do not add to name map, ordinal-based binding must be used.
+                    // Ambiguous — do not add to name map, ordinal-based binding must be used.
                     ambiguous.Add(name);
                 }
                 else
@@ -979,8 +981,8 @@ namespace nORM.Query
                             if (reader.IsDBNull(ord)) continue;
                             var rawVal = reader.GetValue(ord);
                             try { col.Setter(entity, ConvertDbValue(rawVal, col.Prop.PropertyType)); }
-                            catch (InvalidCastException) { /* shadow column type mismatch â€” skip silently */ }
-                            catch (FormatException) { /* shadow column format mismatch â€” skip silently */ }
+                            catch (InvalidCastException) { /* shadow column type mismatch — skip silently */ }
+                            catch (FormatException) { /* shadow column format mismatch — skip silently */ }
                         }
                         else
                         {
@@ -1276,7 +1278,7 @@ namespace nORM.Query
                 {
                     // Skip IsDBNull check for non-nullable types.
                     // The DB schema should have NOT NULL constraint matching the C# type.
-                    // If the DB unexpectedly returns NULL, the typed accessor will throw â€”
+                    // If the DB unexpectedly returns NULL, the typed accessor will throw —
                     // which is correct for a schema violation.
                     expressions.Add(setProperty);
                 }
@@ -1302,7 +1304,7 @@ namespace nORM.Query
             catch (Exception ex) when (
                 ex is InvalidOperationException or InvalidCastException or FormatException or IndexOutOfRangeException)
             {
-                // MAP-4: Expected during validation â€” the validation reader purposely sends DBNull to
+                // MAP-4: Expected during validation — the validation reader purposely sends DBNull to
                 // every column to test the structural correctness of the materializer. A NULL-for-non-nullable
                 // exception here means the materializer code path was reached and will throw appropriately
                 // during real execution. FormatException/IndexOutOfRangeException can occur when the
@@ -1333,7 +1335,7 @@ namespace nORM.Query
 
             if (underlyingType.IsEnum)
             {
-                // MM-2: Enum types â€” use ConvertToEnum<TEnum> helper to safely convert from Int64/Int32/etc.
+                // MM-2: Enum types — use ConvertToEnum<TEnum> helper to safely convert from Int64/Int32/etc.
                 // Expression.Convert(object, EnumType) throws InvalidCastException at runtime for boxed integers.
                 var enumConvertMethod = _convertToEnumOpenMethod.MakeGenericMethod(underlyingType);
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
@@ -1341,13 +1343,13 @@ namespace nORM.Query
             }
             else if (underlyingType == typeof(DateOnly))
             {
-                // MM1 fix: DateOnly â€” Convert.ChangeType and Expression.Convert don't support DateOnly
+                // MM1 fix: DateOnly — Convert.ChangeType and Expression.Convert don't support DateOnly
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(_convertToDateOnlyMethod, getRawValue);
             }
             else if (underlyingType == typeof(TimeOnly))
             {
-                // MM1 fix: TimeOnly â€” Convert.ChangeType and Expression.Convert don't support TimeOnly
+                // MM1 fix: TimeOnly — Convert.ChangeType and Expression.Convert don't support TimeOnly
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(_convertToTimeOnlyMethod, getRawValue);
             }

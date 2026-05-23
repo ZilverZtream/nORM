@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;IsAotCompatible;RuntimeIdentifier;SelfContained;PublishTrimmed;PublishReadyToRun">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
@@ -8,6 +8,13 @@
     <AnalyzerLanguage>cs</AnalyzerLanguage>
     <OutputItemType>Analyzer</OutputItemType>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Roslyn source generators must target netstandard2.0; they never run under AOT.
+         If a consumer invokes `dotnet publish -p:PublishAot=true` on the runtime project,
+         MSBuild propagates PublishAot to this referenced project during restore, which
+         then trips NETSDK1207 because netstandard2.0 is not an AOT-capable TFM.
+         Explicitly turn AOT off here so propagation cannot drag the generator into the check. -->
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />

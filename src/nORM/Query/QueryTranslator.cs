@@ -406,7 +406,7 @@ namespace nORM.Query
                 {
                     var aggMethod = (_expression as MethodCallExpression)?.Method;
                     var aggMethodName = aggMethod?.Name ?? string.Empty;
-                    // Count/LongCount always return non-null integer â€” keep the fast path.
+                    // Count/LongCount always return non-null integer — keep the fast path.
                     if (aggMethodName is "Count" or "LongCount")
                     {
                         syncMaterializer = static (DbDataReader r) =>

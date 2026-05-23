@@ -19,6 +19,8 @@ namespace nORM.Migration
     /// <summary>
     /// Executes migrations against a SQLite database using a supplied connection and migrations assembly.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SqliteMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SqliteMigrationRunner reflects over Migration types; trimming may remove the required members.")]
     public class SqliteMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;

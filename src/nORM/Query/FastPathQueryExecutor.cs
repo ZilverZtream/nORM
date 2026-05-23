@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 #nullable enable
 namespace nORM.Query
 {
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("FastPathQueryExecutor builds materializers via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("FastPathQueryExecutor reflects over entity types; trimming may remove the required members.")]
     internal static class FastPathQueryExecutor
     {
         private readonly record struct WhereInfo(string Property, object? Value);

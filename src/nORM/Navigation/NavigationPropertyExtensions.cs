@@ -23,6 +23,8 @@ namespace nORM.Navigation
     /// Provides extension methods for lazy loading and explicit loading of navigation properties.
     /// Delivers an EF Core-like experience without sacrificing nORM's performance characteristics.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Lazy navigation loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Lazy navigation loading uses reflection over entity properties; trimming may remove the required members.")]
     public static class NavigationPropertyExtensions
     {
         internal static readonly ConditionalWeakTable<object, NavigationContext> _navigationContexts = new();

@@ -21,6 +21,8 @@ namespace nORM.Migration
     /// an assembly for migration classes and applies them in order while maintaining
     /// a history table to track applied versions.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SqlServerMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SqlServerMigrationRunner reflects over Migration types; trimming may remove the required members.")]
     public class SqlServerMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
     {
         private readonly DbConnection _connection;

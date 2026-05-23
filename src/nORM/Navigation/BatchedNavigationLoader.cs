@@ -19,6 +19,8 @@ namespace nORM.Navigation
     /// requests into a single query. This reduces database round trips when many
     /// entities require the same navigation data.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("BatchedNavigationLoader reflects over navigation properties to batch related entity loads; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("BatchedNavigationLoader reflects over navigation property metadata; trimming may remove the required members.")]
     public sealed class BatchedNavigationLoader : IDisposable
     {
         private readonly DbContext _context;

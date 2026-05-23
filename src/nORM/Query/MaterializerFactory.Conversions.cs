@@ -123,7 +123,7 @@ namespace nORM.Query
                     return null;
                 }
 
-                // MAP-4: Throw for non-nullable value types â€” DB NULL into a non-nullable member
+                // MAP-4: Throw for non-nullable value types — DB NULL into a non-nullable member
                 // silently defaults to 0/false/etc., hiding data integrity issues.
                 if (targetType.IsValueType)
                     throw new InvalidOperationException(

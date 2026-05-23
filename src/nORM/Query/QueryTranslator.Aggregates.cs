@@ -205,8 +205,8 @@ namespace nORM.Query
                     return "COUNT(*)";
                 case "Sum":
                     {
-                        // Extension method form: Enumerable.Sum(source, selector) â€” selector at [1]
-                        // Instance method form: g.Sum(selector) â€” selector at [0]
+                        // Extension method form: Enumerable.Sum(source, selector) — selector at [1]
+                        // Instance method form: g.Sum(selector) — selector at [0]
                         var sumSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
                             ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
                         var sumSelector = sumSelectorArg != null ? StripQuotes(sumSelectorArg) as LambdaExpression : null;
@@ -227,8 +227,8 @@ namespace nORM.Query
                         "SUM requires a selector expression (e.g., g.Sum(x => x.Amount)). SUM(*) is not valid SQL."));
                 case "Average":
                     {
-                        // Extension method form: Enumerable.Average(source, selector) â€” selector at [1]
-                        // Instance method form: g.Average(selector) â€” selector at [0]
+                        // Extension method form: Enumerable.Average(source, selector) — selector at [1]
+                        // Instance method form: g.Average(selector) — selector at [0]
                         var avgSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
                             ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
                         var avgSelector = avgSelectorArg != null ? StripQuotes(avgSelectorArg) as LambdaExpression : null;
@@ -249,8 +249,8 @@ namespace nORM.Query
                         "AVG requires a selector expression (e.g., g.Average(x => x.Amount)). AVG(*) is not valid SQL."));
                 case "Min":
                     {
-                        // Extension method form: Enumerable.Min(source, selector) â€” selector at [1]
-                        // Instance method form (hypothetical): g.Min(selector) â€” selector at [0]
+                        // Extension method form: Enumerable.Min(source, selector) — selector at [1]
+                        // Instance method form (hypothetical): g.Min(selector) — selector at [0]
                         var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
                             ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
                         var minSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
@@ -270,8 +270,8 @@ namespace nORM.Query
                     return null;
                 case "Max":
                     {
-                        // Extension method form: Enumerable.Max(source, selector) â€” selector at [1]
-                        // Instance method form (hypothetical): g.Max(selector) â€” selector at [0]
+                        // Extension method form: Enumerable.Max(source, selector) — selector at [1]
+                        // Instance method form (hypothetical): g.Max(selector) — selector at [0]
                         var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
                             ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
                         var maxSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
@@ -331,7 +331,7 @@ namespace nORM.Query
         {
             // ALL is translated as:
             // SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM table alias WHERE NOT (pred)) THEN 1 ELSE 0 END
-            // The predicate MUST be embedded inside the subquery â€” do NOT use _where, which
+            // The predicate MUST be embedded inside the subquery — do NOT use _where, which
             // Build() would append AFTER the closing parenthesis, breaking the EXISTS syntax.
             var sourceQuery = node.Arguments[0];
             var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
