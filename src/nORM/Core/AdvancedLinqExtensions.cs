@@ -272,7 +272,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<TResult>(aggregateExpression, ct);
             }
 
-            throw new InvalidOperationException($"{aggregateFunction}Async can only be used with nORM queries. Make sure you started with context.Query<T>().");
+            throw new NormUsageException($"{aggregateFunction}Async can only be used with nORM queries. Make sure you started with context.Query<T>().");
         }
 
         private static Task<TResult> ExecuteQueryableAggregateAsync<TSource, TResult>(IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, string aggregateFunction, CancellationToken ct)
@@ -286,7 +286,7 @@ namespace nORM.Core
                 return normProvider.ExecuteAsync<TResult>(aggregateExpression, ct);
             }
 
-            throw new InvalidOperationException(
+            throw new NormUsageException(
                 $"{aggregateFunction}Async extension can only be used with nORM queries. Make sure you started with context.Query<T>(). " +
                 $"For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.{aggregateFunction}Async().");
         }

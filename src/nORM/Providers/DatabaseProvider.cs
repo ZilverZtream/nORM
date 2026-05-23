@@ -473,7 +473,7 @@ namespace nORM.Providers
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public virtual Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
         /// <summary>
@@ -485,7 +485,7 @@ namespace nORM.Providers
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public virtual Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
         /// <summary>

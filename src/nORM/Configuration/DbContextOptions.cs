@@ -361,30 +361,30 @@ namespace nORM.Configuration
             if (RetryPolicy != null)
             {
                 if (RetryPolicy.MaxRetries < 0 || RetryPolicy.MaxRetries > MaxRetryAttempts)
-                    throw new InvalidOperationException($"MaxRetries must be between 0 and {MaxRetryAttempts}.");
+                    throw new NormConfigurationException($"MaxRetries must be between 0 and {MaxRetryAttempts}.");
                 if (RetryPolicy.BaseDelay <= TimeSpan.Zero)
-                    throw new InvalidOperationException("BaseDelay must be positive.");
+                    throw new NormConfigurationException("BaseDelay must be positive.");
             }
 
             if (TimeoutConfiguration.BaseTimeout <= TimeSpan.Zero || TimeoutConfiguration.BaseTimeout > MaxBaseTimeout)
-                throw new InvalidOperationException($"BaseTimeout must be positive and at most {MaxBaseTimeout.TotalHours} hour(s).");
+                throw new NormConfigurationException($"BaseTimeout must be positive and at most {MaxBaseTimeout.TotalHours} hour(s).");
 
             if (string.IsNullOrWhiteSpace(TenantColumnName))
-                throw new InvalidOperationException("TenantColumnName cannot be null or empty.");
+                throw new NormConfigurationException("TenantColumnName cannot be null or empty.");
 
             if (CacheExpiration <= TimeSpan.Zero)
-                throw new InvalidOperationException("CacheExpiration must be positive.");
+                throw new NormConfigurationException("CacheExpiration must be positive.");
 
             // Avoid LINQ allocation: iterate the list directly for null checks.
             foreach (var interceptor in CommandInterceptors)
             {
                 if (interceptor == null)
-                    throw new InvalidOperationException("CommandInterceptors cannot contain null entries.");
+                    throw new NormConfigurationException("CommandInterceptors cannot contain null entries.");
             }
             foreach (var interceptor in SaveChangesInterceptors)
             {
                 if (interceptor == null)
-                    throw new InvalidOperationException("SaveChangesInterceptors cannot contain null entries.");
+                    throw new NormConfigurationException("SaveChangesInterceptors cannot contain null entries.");
             }
         }
     }

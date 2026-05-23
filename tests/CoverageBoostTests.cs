@@ -3058,21 +3058,21 @@ public class DatabaseProviderBaseVirtualMethodTests
         => Assert.True(await _p.IsAvailableAsync());
 
     [Fact]
-    public async Task CreateSavepointAsync_BaseImpl_ThrowsNotSupported()
+    public async Task CreateSavepointAsync_BaseImpl_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var tx = cn.BeginTransaction();
-        await Assert.ThrowsAsync<NotSupportedException>(() => _p.CreateSavepointAsync(tx, "sp"));
+        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => _p.CreateSavepointAsync(tx, "sp"));
     }
 
     [Fact]
-    public async Task RollbackToSavepointAsync_BaseImpl_ThrowsNotSupported()
+    public async Task RollbackToSavepointAsync_BaseImpl_ThrowsNormUnsupportedFeatureException()
     {
         using var cn = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var tx = cn.BeginTransaction();
-        await Assert.ThrowsAsync<NotSupportedException>(() => _p.RollbackToSavepointAsync(tx, "sp"));
+        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => _p.RollbackToSavepointAsync(tx, "sp"));
     }
 
     [Fact]
@@ -3272,7 +3272,7 @@ public class DatabaseProviderBaseBulkTests
     // ── BulkUpdateAsync / BulkDeleteAsync base throws ────────────────────────
 
     [Fact]
-    public async Task BulkUpdateAsync_NotBatched_ThrowsNotImplementedException()
+    public async Task BulkUpdateAsync_NotBatched_ThrowsNormUnsupportedFeatureException()
     {
         var (cn, ctx) = MakeBulkCtx(batchedOps: false);
         using (cn) using (ctx)
@@ -3281,12 +3281,12 @@ public class DatabaseProviderBaseBulkTests
             ins.CommandText = "INSERT INTO CovBoost_Item VALUES (1, 'old', 1, 1)";
             ins.ExecuteNonQuery();
             var items = new[] { new CovItem { Id = 1, Name = "new", Value = 99, IsActive = false } };
-            await Assert.ThrowsAsync<NotImplementedException>(() => ctx.BulkUpdateAsync(items));
+            await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => ctx.BulkUpdateAsync(items));
         }
     }
 
     [Fact]
-    public async Task BulkDeleteAsync_NotBatched_ThrowsNotImplementedException()
+    public async Task BulkDeleteAsync_NotBatched_ThrowsNormUnsupportedFeatureException()
     {
         var (cn, ctx) = MakeBulkCtx(batchedOps: false);
         using (cn) using (ctx)
@@ -3295,7 +3295,7 @@ public class DatabaseProviderBaseBulkTests
             ins.CommandText = "INSERT INTO CovBoost_Item VALUES (1, 'old', 1, 1)";
             ins.ExecuteNonQuery();
             var items = new[] { new CovItem { Id = 1, Name = "old", Value = 1, IsActive = true } };
-            await Assert.ThrowsAsync<NotImplementedException>(() => ctx.BulkDeleteAsync(items));
+            await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => ctx.BulkDeleteAsync(items));
         }
     }
 
@@ -5025,7 +5025,7 @@ public class DbContextOptionsCoverageTests
     public void Validate_InvalidRetryMaxRetries_Throws()
     {
         var opts = new DbContextOptions { RetryPolicy = new nORM.Enterprise.RetryPolicy { MaxRetries = 11 } };
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
@@ -5035,7 +5035,7 @@ public class DbContextOptionsCoverageTests
         {
             RetryPolicy = new nORM.Enterprise.RetryPolicy { MaxRetries = 3, BaseDelay = TimeSpan.Zero }
         };
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
@@ -5043,21 +5043,21 @@ public class DbContextOptionsCoverageTests
     {
         var opts = new DbContextOptions();
         opts.TimeoutConfiguration.BaseTimeout = TimeSpan.Zero;
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
     public void Validate_EmptyTenantColumnName_Throws()
     {
         var opts = new DbContextOptions { TenantColumnName = "" };
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
     public void Validate_NegativeCacheExpiration_Throws()
     {
         var opts = new DbContextOptions { CacheExpiration = TimeSpan.Zero };
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
@@ -5065,7 +5065,7 @@ public class DbContextOptionsCoverageTests
     {
         var opts = new DbContextOptions();
         opts.CommandInterceptors.Add(null!);
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
@@ -5073,7 +5073,7 @@ public class DbContextOptionsCoverageTests
     {
         var opts = new DbContextOptions();
         opts.SaveChangesInterceptors.Add(null!);
-        Assert.Throws<InvalidOperationException>(() => opts.Validate());
+        Assert.Throws<NormConfigurationException>(() => opts.Validate());
     }
 
     [Fact]
