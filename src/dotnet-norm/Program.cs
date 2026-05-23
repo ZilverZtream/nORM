@@ -169,6 +169,9 @@ drop.SetAction(async (ParseResult result, CancellationToken _) =>
             var tableSchema = row["TABLE_SCHEMA"]?.ToString();
             var tableName = row["TABLE_NAME"]?.ToString();
             if (string.IsNullOrEmpty(tableName)) continue;
+            // Exclude system schemas to avoid accidentally dropping provider-internal objects.
+            if (IsSystemSchema(prov, tableSchema))
+                continue;
             var full = string.IsNullOrEmpty(tableSchema)
                 ? provider.Escape(tableName)
                 : $"{provider.Escape(tableSchema!)}.{provider.Escape(tableName!)}";
@@ -201,32 +204,54 @@ var migrations = new Command("migrations", "Migration management commands");
 var add = new Command("add", "Add a new migration based on model changes.\nExample:\n  norm migrations add InitialCreate --provider sqlserver --assembly App.dll");
 var migNameArg = new Argument<string>("name") { Description = "Migration name" };
 var addProvOpt = new Option<string>("--provider") { Description = "Database provider (sqlserver, sqlite, postgres, mysql)", Required = true };
-var addAsmOpt = new Option<string>("--assembly") { Description = "Path to assembly containing DbContext and entities", Required = true };
+// --assembly is optional when --project is supplied; the CLI resolves the output assembly from the project automatically.
+var addAsmOpt = new Option<string?>("--assembly") { Description = "Path to assembly containing DbContext and entities. Optional when --project is supplied." };
 var addOutOpt = new Option<string>("--output") { Description = "Output directory for migrations", DefaultValueFactory = _ => "Migrations" };
 var addForceOpt = new Option<bool>("--force") { Description = "Allow destructive table/column drops when generating the migration." };
 var addAttributeOnlyOpt = new Option<bool>("--attribute-only") { Description = "Generate from attribute-only entity scanning instead of a design-time DbContext." };
+var addProjectOpt = new Option<string?>("--project") { Description = "Path to the .csproj file. When provided, the output assembly is resolved via 'dotnet msbuild' if --assembly is not supplied." };
 add.Add(migNameArg);
 add.Add(addProvOpt);
 add.Add(addAsmOpt);
 add.Add(addOutOpt);
 add.Add(addForceOpt);
 add.Add(addAttributeOnlyOpt);
+add.Add(addProjectOpt);
 add.SetAction((ParseResult result) =>
 {
     try
     {
         var name = result.GetValue(migNameArg)!;
         var prov = result.GetValue(addProvOpt)!;
-        var asmPath = result.GetValue(addAsmOpt)!;
+        var asmPath = result.GetValue(addAsmOpt);
         var output = result.GetValue(addOutOpt)!;
         var force = result.GetValue(addForceOpt);
         var attributeOnly = result.GetValue(addAttributeOnlyOpt);
-        if (!File.Exists(asmPath))
+        var projectPath = result.GetValue(addProjectOpt);
+
+        // When --project is supplied and --assembly was not (or points to a non-existent file),
+        // resolve the output assembly path via 'dotnet msbuild -getProperty:TargetPath'.
+        if (projectPath != null && (string.IsNullOrEmpty(asmPath) || !File.Exists(asmPath)))
+        {
+            if (!File.Exists(projectPath))
+            {
+                Console.Error.WriteLine($"Project file '{projectPath}' not found.");
+                return 2;
+            }
+            asmPath = ResolveAssemblyFromProject(projectPath);
+            if (asmPath == null)
+            {
+                Console.Error.WriteLine($"Could not determine output assembly from project '{projectPath}'. Build the project first or supply --assembly explicitly.");
+                return 2;
+            }
+        }
+
+        if (string.IsNullOrEmpty(asmPath) || !File.Exists(asmPath))
         {
             Console.Error.WriteLine($"Assembly '{asmPath}' not found.");
             return 2;
         }
-        var assembly = LoadDesignTimeAssembly(asmPath);
+        var assembly = LoadDesignTimeAssembly(asmPath!);
 
         var snapshotPath = Path.Combine(output, "schema.snapshot.json");
         SchemaSnapshot oldSnap = File.Exists(snapshotPath)
@@ -404,6 +429,30 @@ static DatabaseProvider CreateProvider(string provider) =>
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
 
+static bool IsSystemSchema(string provider, string? schemaName)
+{
+    if (string.IsNullOrWhiteSpace(schemaName))
+        return false;
+
+    var s = schemaName.Trim();
+    // Universal system schemas present in multiple providers.
+    if (s.Equals("sys", StringComparison.OrdinalIgnoreCase)
+        || s.Equals("information_schema", StringComparison.OrdinalIgnoreCase))
+        return true;
+
+    return provider.ToLowerInvariant() switch
+    {
+        // PostgreSQL system schemas: pg_catalog, pg_toast, pg_temp_*, pg_toast_temp_*, pg_*.
+        "postgres" or "postgresql" =>
+            s.StartsWith("pg_", StringComparison.OrdinalIgnoreCase),
+        // MySQL: the mysql system database tables appear under the "mysql" schema.
+        "mysql" =>
+            s.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+        _ => false
+    };
+}
+
 static bool IsProtectedDatabaseName(string provider, string databaseName)
 {
     if (string.IsNullOrWhiteSpace(databaseName))
@@ -429,8 +478,71 @@ static bool IsProtectedDatabaseName(string provider, string databaseName)
 
 static int Fail(Exception ex, int exitCode = 1)
 {
-    Console.Error.WriteLine($"Error: {ex.Message}");
+    Console.Error.WriteLine($"Error: {RedactConnectionStrings(ex.Message)}");
     return exitCode;
+}
+
+/// <summary>
+/// Replaces any recognizable connection string segments containing sensitive key=value pairs
+/// with [REDACTED] so that passwords and secrets are not printed to stderr on error.
+/// </summary>
+static string RedactConnectionStrings(string message)
+{
+    if (string.IsNullOrEmpty(message))
+        return message;
+
+    // Sensitive keys whose values must be redacted (case-insensitive).
+    var sensitiveKeys = new[] { "password", "pwd", "user password", "access token", "accesstoken", "token", "secret" };
+
+    // Replace patterns of the form  key=somevalue;  or  key=somevalue (end of string).
+    // Use a simple approach: for each sensitive key, replace the value portion.
+    var result = message;
+    foreach (var key in sensitiveKeys)
+    {
+        var pattern = key + "=";
+        int idx = 0;
+        while (true)
+        {
+            var pos = result.IndexOf(pattern, idx, StringComparison.OrdinalIgnoreCase);
+            if (pos < 0) break;
+            var valStart = pos + pattern.Length;
+            var valEnd = result.IndexOf(';', valStart);
+            if (valEnd < 0) valEnd = result.Length;
+            result = result.Substring(0, valStart) + "[REDACTED]" + result.Substring(valEnd);
+            idx = valStart + "[REDACTED]".Length;
+        }
+    }
+    return result;
+}
+
+/// <summary>
+/// Resolves the build output assembly path for a project by running
+/// <c>dotnet msbuild -getProperty:TargetPath</c> on the project file.
+/// Returns null if the path cannot be determined.
+/// </summary>
+static string? ResolveAssemblyFromProject(string projectPath)
+{
+    try
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet",
+            $"msbuild \"{projectPath}\" -getProperty:TargetPath --verbosity:quiet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        using var proc = System.Diagnostics.Process.Start(startInfo);
+        if (proc == null) return null;
+        var output = proc.StandardOutput.ReadToEnd().Trim();
+        proc.WaitForExit();
+        if (proc.ExitCode == 0 && !string.IsNullOrWhiteSpace(output) && File.Exists(output))
+            return output;
+        return null;
+    }
+    catch
+    {
+        return null;
+    }
 }
 
 static string ToCSharpIdentifier(string value)

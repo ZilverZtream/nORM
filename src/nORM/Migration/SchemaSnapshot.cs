@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using nORM.Core;
 using nORM.Mapping;
+using RenameColumnAttr = nORM.Mapping.RenameColumnAttribute;
 
 namespace nORM.Migration
 {
@@ -68,6 +69,13 @@ namespace nORM.Migration
     {
         /// <summary>Name of the column.</summary>
         public string Name { get; set; } = string.Empty;
+        /// <summary>
+        /// When non-null, indicates that this column was previously named <see cref="PreviousName"/>
+        /// and the schema differ should emit a RENAME COLUMN operation instead of DROP + ADD.
+        /// Populated by <see cref="SchemaSnapshotBuilder"/> when a property carries
+        /// <c>[RenameColumn("oldName")]</c>.
+        /// </summary>
+        public string? PreviousName { get; set; }
         /// <summary>
         /// Full CLR type name of the column (e.g. <c>System.Int32</c>).
         /// An empty string is a recognizable placeholder meaning "unknown/unresolved type";
@@ -190,6 +198,7 @@ namespace nORM.Migration
                         continue;
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
+                    var renameAttr = prop.GetCustomAttribute<RenameColumnAttr>();
                     var column = new ColumnSchema
                     {
                         Name = colAttr?.Name ?? prop.Name,
@@ -208,7 +217,9 @@ namespace nORM.Migration
                         // purposes: both are excluded from INSERT/UPDATE, and both require the
                         // migration generator to omit a NOT NULL constraint without a DEFAULT.
                         IsIdentity = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity
-                                  || dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Computed
+                                  || dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Computed,
+                        // [RenameColumn("OldName")] signals the differ that this is a rename, not drop+add.
+                        PreviousName = renameAttr?.OldName,
                     };
                     table.Columns.Add(column);
                 }
@@ -455,12 +466,19 @@ namespace nORM.Migration
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> AddedForeignKeys { get; } = new();
         /// <summary>FK constraints present in the old snapshot but not the new for an existing table.</summary>
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> DroppedForeignKeys { get; } = new();
+        /// <summary>
+        /// Column renames detected via <c>[RenameColumn("oldName")]</c>. Each entry carries the table,
+        /// the old column name, and the new <see cref="ColumnSchema"/> (with its new name). The differ
+        /// populates this list instead of adding to <see cref="DroppedColumns"/> / <see cref="AddedColumns"/>.
+        /// </summary>
+        public List<(TableSchema Table, string OldColumnName, ColumnSchema NewColumn)> RenamedColumns { get; } = new();
 
         /// <summary>Indicates whether the diff contains any schema changes.</summary>
         public bool HasChanges => AddedTables.Count > 0 || AddedColumns.Count > 0 || AlteredColumns.Count > 0
             || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0
             || DroppedTables.Count > 0 || DroppedColumns.Count > 0
-            || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0;
+            || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0
+            || RenamedColumns.Count > 0;
 
         /// <summary>
         /// Indicates whether the diff contains table or column drops that can destroy data.
@@ -549,8 +567,22 @@ namespace nORM.Migration
                 // Build O(1) column lookup for the old table.
                 var oldColByName = oldTable.Columns.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
 
+                // Collect the set of old column names that are consumed by a [RenameColumn] declaration
+                // so that the dropped-column loop skips them (they are not truly dropped).
+                var renamedOldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var col in newTable.Columns)
                 {
+                    // Check for [RenameColumn("OldName")] — prefer rename over drop+add when the
+                    // referenced old column exists in the old snapshot.
+                    if (col.PreviousName != null && oldColByName.ContainsKey(col.PreviousName))
+                    {
+                        diff.RenamedColumns.Add((newTable, col.PreviousName, col));
+                        renamedOldNames.Add(col.PreviousName);
+                        // The new column name is now "in use"; skip add/alter detection for it.
+                        continue;
+                    }
+
                     if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
                     else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
@@ -568,9 +600,10 @@ namespace nORM.Migration
 
                 // Detect dropped columns — columns present in old but not in new.
                 // Use oldTable (not newTable) because the column existed in the OLD schema.
+                // Skip old columns that were renamed via [RenameColumn] (they are not truly dropped).
                 foreach (var oldCol in oldTable.Columns)
                 {
-                    if (!newColByName.ContainsKey(oldCol.Name))
+                    if (!newColByName.ContainsKey(oldCol.Name) && !renamedOldNames.Contains(oldCol.Name))
                         diff.DroppedColumns.Add((oldTable, oldCol));
                 }
 
