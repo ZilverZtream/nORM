@@ -63,8 +63,13 @@ function Invoke-TestStep {
             $testResultsPath
         )
 
+        # In quick mode, exclude live-provider tests when no explicit filter is given.
+        # This ensures the quick gate never blocks on missing provider connection strings.
         if ($Filter) {
             $arguments += @('--filter', $Filter)
+        }
+        elseif ($Mode -eq 'quick') {
+            $arguments += @('--filter', 'Category!=LiveProvider')
         }
 
         dotnet @arguments
