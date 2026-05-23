@@ -102,7 +102,7 @@ public class TenantWriteCoercionTests
         var (cn, ctx) = Build((long)999);
         await using var _ = ctx; using var __ = cn;
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(
             () => ctx.InsertAsync(new TWCItem { TenantId = 1, Name = "wrong-tenant" }));
         Assert.Contains("Tenant context mismatch", ex.Message);
     }
@@ -261,7 +261,7 @@ public class TenantWriteCoercionTests
 
         var entity = new TWCItem { Id = 1, TenantId = 1, Name = "seed" };
         // Use UpdateAsync which calls ValidateTenantContext directly
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(
             () => ctx.UpdateAsync(new TWCItem { Id = 1, TenantId = 1, Name = "tampered" }));
         Assert.Contains("Tenant context mismatch", ex.Message);
     }

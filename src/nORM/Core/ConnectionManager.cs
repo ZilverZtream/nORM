@@ -160,7 +160,7 @@ namespace nORM.Core
                 await TriggerFailoverAsync(ct).ConfigureAwait(false);
                 primary = _currentPrimary;
                 if (primary == null || !primary.IsHealthy)
-                    throw new InvalidOperationException("No healthy primary node available.");
+                    throw new NormConnectionException("No healthy primary node available.");
             }
 
             DbConnection? cn = null;

@@ -32,7 +32,7 @@ namespace nORM.Core
         public async Task<DbContextTransaction> BeginTransactionAsync(CancellationToken ct = default)
         {
             if (_context.CurrentTransaction != null)
-                throw new InvalidOperationException("A transaction is already active.");
+                throw new NormUsageException("A transaction is already active.");
             await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             var transaction = await _context.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
             _context.CurrentTransaction = transaction;

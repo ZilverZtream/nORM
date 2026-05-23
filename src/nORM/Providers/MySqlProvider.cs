@@ -542,12 +542,17 @@ END;";
                 {
                     // Unwrap and rethrow the inner exception from reflection invoke.
                     // TargetInvocationException wraps the actual database exception, making it harder to handle.
+                    // NotSupportedException from a base DbTransaction.Save indicates the transaction type
+                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
+                    if (ex.InnerException is NotSupportedException)
+                        throw new NormUnsupportedFeatureException(
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
                 }
             }
-            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
         /// <summary>
@@ -579,13 +584,17 @@ END;";
                 catch (System.Reflection.TargetInvocationException ex)
                 {
                     // Unwrap and rethrow the inner exception from reflection invoke.
-                    // TargetInvocationException wraps the actual database exception, making it harder to handle.
+                    // NotSupportedException from a base DbTransaction.Rollback indicates the transaction type
+                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
+                    if (ex.InnerException is NotSupportedException)
+                        throw new NormUnsupportedFeatureException(
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
                 }
             }
-            throw new NotSupportedException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
 
         /// <summary>
