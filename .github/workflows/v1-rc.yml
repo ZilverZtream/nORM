@@ -140,6 +140,35 @@ jobs:
             benchmarks/BenchmarkDotNet.Artifacts/**
           retention-days: 14
 
+      - name: Validate RC package outputs
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content 'Directory.Build.props'
+          $version = $props.Project.PropertyGroup.NormVersion
+          if (-not $version) { throw 'Could not read NormVersion from Directory.Build.props.' }
+
+          $expectedPackages = @(
+            "src/bin/Release/nORM.$version.nupkg",
+            "src/dotnet-norm/bin/Release/dotnet-norm.$version.nupkg"
+          )
+
+          $missing = @()
+          foreach ($pkg in $expectedPackages) {
+            if (-not (Test-Path $pkg)) {
+              $missing += $pkg
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            throw "Expected RC package(s) not found:`n$($missing -join "`n")"
+          }
+
+          Write-Host "RC package validation passed (version $version):"
+          foreach ($pkg in $expectedPackages) {
+            $hash = (Get-FileHash $pkg -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Host "  $pkg  sha256:$hash"
+          }
+
       - name: Upload RC artifact manifest
         if: always()
         uses: actions/upload-artifact@v4

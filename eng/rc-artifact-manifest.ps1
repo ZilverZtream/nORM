@@ -44,6 +44,8 @@ $commit = (& git -C $root rev-parse HEAD).Trim()
 $statusOutput = & git -C $root status --short
 $status = if ($null -eq $statusOutput) { '' } else { ($statusOutput -join [Environment]::NewLine).Trim() }
 $sdkVersion = (& dotnet --version).Trim()
+$os = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+$processArch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
 $generatedUtc = [DateTime]::UtcNow.ToString('O')
 
 $providers = @(
@@ -54,10 +56,30 @@ $providers = @(
 )
 
 $testResults = Get-RelativeFiles @('tests/TestResults')
-$packages = Get-RelativeFiles @(
+$packageRelativePaths = Get-RelativeFiles @(
     "src/bin/$Configuration",
     "src/dotnet-norm/bin/$Configuration"
 ) | Where-Object { $_ -match '\.s?nupkg$' }
+
+# Compute SHA-256 hashes for each package file to support integrity verification.
+$packages = New-Object System.Collections.Generic.List[object]
+foreach ($rel in $packageRelativePaths) {
+    $fullPath = Join-Path $root $rel
+    if (Test-Path $fullPath) {
+        $hash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $packages.Add([pscustomobject]@{
+            File = $rel.Replace('\', '/')
+            Sha256 = $hash
+        })
+    }
+    else {
+        $packages.Add([pscustomobject]@{
+            File = $rel.Replace('\', '/')
+            Sha256 = $null
+        })
+    }
+}
+
 if ($BenchmarkSkipped) {
     $benchmarkArtifacts = @()
     $releaseEvidence = @()
@@ -69,6 +91,7 @@ else {
 
 $manifest = [ordered]@{
     GeneratedUtc = $generatedUtc
+    gitCommit = $commit
     Commit = $commit
     WorkingTreeClean = [string]::IsNullOrWhiteSpace($status)
     Mode = $Mode
@@ -76,9 +99,11 @@ $manifest = [ordered]@{
     StressIterations = $StressIterations
     BenchmarkSkipped = $BenchmarkSkipped
     SdkVersion = $sdkVersion
+    OS = $os
+    ProcessArchitecture = $processArch
     Providers = [object]$providers
     TestResults = [object]$testResults
-    Packages = [object]$packages
+    Packages = [object]$packages.ToArray()
     BenchmarkArtifacts = [object]$benchmarkArtifacts
     ReleaseEvidence = [object]$releaseEvidence
 }
@@ -91,12 +116,13 @@ $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('# RC Artifact Manifest')
 $lines.Add('')
 $lines.Add("- Generated UTC: $generatedUtc")
-$lines.Add("- Commit: $commit")
+$lines.Add("- Git commit: $commit")
 $lines.Add("- Mode: $Mode")
 $lines.Add("- Configuration: $Configuration")
 $lines.Add("- Stress iterations: $StressIterations")
 $lines.Add("- Benchmark skipped: $BenchmarkSkipped")
 $lines.Add("- SDK: $sdkVersion")
+$lines.Add("- OS: $os ($processArch)")
 $lines.Add("- Working tree clean: $([string]::IsNullOrWhiteSpace($status))")
 $lines.Add('')
 $lines.Add('## Providers')
@@ -107,9 +133,24 @@ foreach ($provider in $providers) {
     $lines.Add("| $($provider.Name) | $($provider.Configured) |")
 }
 
+# Packages — rendered separately with hash column
+$lines.Add('')
+$lines.Add('## Packages')
+$lines.Add('')
+if ($packages.Count -eq 0) {
+    $lines.Add('- none')
+}
+else {
+    $lines.Add('| File | SHA-256 |')
+    $lines.Add('| --- | --- |')
+    foreach ($pkg in $packages) {
+        $hashDisplay = if ($pkg.Sha256) { $pkg.Sha256 } else { 'n/a' }
+        $lines.Add(('| `{0}` | `{1}` |' -f $pkg.File, $hashDisplay))
+    }
+}
+
 $sections = @(
     @{ Title = 'Test Results'; Values = $testResults },
-    @{ Title = 'Packages'; Values = $packages },
     @{ Title = 'Benchmark Artifacts'; Values = $benchmarkArtifacts },
     @{ Title = 'Release Evidence'; Values = $releaseEvidence }
 )

@@ -9,7 +9,8 @@
       "baselineMethods": [ "Query_Simple_Dapper", "Query_Simple_RawAdo_Optimized" ],
       "maxMeanRatio": 1.5,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "nORM runtime simple queries use expression-tree translation and a pooled materializer. A 1.5x mean overhead vs Dapper/Raw is acceptable given the LINQ expressiveness and change-tracking overhead; this matches EF Core's typical 1.4-1.6x ratio for comparable workloads."
     },
     {
       "name": "Simple compiled stays within prepared Raw ADO range",
@@ -18,7 +19,8 @@
       "baselineMethods": [ "Query_Simple_RawAdo_PreparedOptimized", "Query_Simple_Dapper" ],
       "maxMeanRatio": 1.35,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "Compiled queries cache the full query plan (SQL + materializer delegate). The 1.35x ceiling vs prepared Raw ADO accounts for the mandatory parameter-binding and reader-wrapping overhead that cannot be eliminated without going below the DbDataReader abstraction."
     },
     {
       "name": "Complex runtime stays within Dapper or optimized Raw ADO range",
@@ -27,7 +29,8 @@
       "baselineMethods": [ "Query_Complex_Dapper", "Query_Complex_RawAdo_Optimized" ],
       "maxMeanRatio": 1.6,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "Complex queries involve JOIN translation, multi-column projection, and anonymous-type materialization. The 1.6x ceiling is slightly looser than simple queries because the expression-tree visitor and projection compiler add proportionally more overhead for multi-table shapes."
     },
     {
       "name": "Complex compiled stays within prepared Raw ADO range",
@@ -36,7 +39,8 @@
       "baselineMethods": [ "Query_Complex_RawAdo_PreparedOptimized", "Query_Complex_Dapper" ],
       "maxMeanRatio": 1.4,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "Compiled complex queries pre-build the multi-table projection delegate. The 1.4x ceiling reflects that column-index mapping and entity graph assembly require more bookkeeping than a simple row materializer even when the SQL itself is fully pre-compiled."
     },
     {
       "name": "Compiled join stays competitive with typed Dapper and optimized Raw ADO",
@@ -45,7 +49,8 @@
       "baselineMethods": [ "Query_Join_Dapper", "Query_Join_RawAdo_Optimized" ],
       "maxMeanRatio": 1.25,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "The compiled join benchmark is the primary evidence that nORM's source-generated, pre-compiled path reaches near-raw-ADO performance. The tight 1.25x budget signals to reviewers that the compiled path eliminates most of the interpretation overhead from the hot path."
     },
     {
       "name": "Batched insert stays within EF or Dapper range",
@@ -54,7 +59,18 @@
       "baselineMethods": [ "BulkInsert_Batched_EfCore", "BulkInsert_Batched_Dapper" ],
       "maxMeanRatio": 1.5,
       "maxAllocatedRatio": 3.0,
-      "required": true
+      "required": true,
+      "rationale": "Batched inserts are the most write-heavy benchmark. The 1.5x ceiling vs EF/Dapper batch inserts is reasonable because nORM reuses prepared statement handles and applies FK-ordering logic that EF and Dapper skip in raw batch mode."
+    },
+    {
+      "name": "Native bulk insert is not slower than batched when available",
+      "provider": "*",
+      "targetMethods": [ "BulkInsert_Native_nORM" ],
+      "baselineMethods": [ "BulkInsert_Batched_nORM" ],
+      "maxMeanRatio": 1.0,
+      "maxAllocatedRatio": 2.0,
+      "required": false,
+      "rationale": "Providers that implement native bulk insert (e.g., SQL Server BULK INSERT, PostgreSQL COPY) must not regress below the batched fallback path. A ratio > 1.0 would indicate the native path is slower than batched, which would be a correctness concern for the bulk provider abstraction. This rule is optional because not all providers implement a native bulk path."
     }
   ]
 }
