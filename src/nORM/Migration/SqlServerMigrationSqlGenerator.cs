@@ -259,6 +259,15 @@ namespace nORM.Migration
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
 
+            // Rename columns — SQL Server uses sp_rename.
+            // Format: EXEC sp_rename 'table.old', 'new', 'COLUMN'
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+            {
+                up.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(oldColName)}', '{EscLiteral(newCol.Name)}', 'COLUMN'");
+                // Down: rename back
+                down.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(newCol.Name)}', '{EscLiteral(oldColName)}', 'COLUMN'");
+            }
+
             return new MigrationSqlStatements(up, down);
         }
 

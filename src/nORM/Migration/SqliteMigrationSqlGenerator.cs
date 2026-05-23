@@ -256,6 +256,14 @@ namespace nORM.Migration
                 needsDownFkPragma = true;
             }
 
+            // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+            {
+                up.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                // Down: rename back
+                down.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+            }
+
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can
             // execute them outside the migration transaction (required by SQLite documentation).
             var preUp    = needsUpFkPragma   ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=off" } : null;
