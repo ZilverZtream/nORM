@@ -179,6 +179,19 @@ Invoke-Step 'clean package outputs before build' {
 }
 Invoke-Step 'restore' { dotnet restore $solutionPath }
 Invoke-Step 'build' { dotnet build $solutionPath --no-restore -c $Configuration --nologo }
+Invoke-Step 'AOT publish warning scan' {
+    $aotOutput = dotnet publish $runtimeProjectPath -c $Configuration -r linux-x64 --self-contained `
+        -p:PublishAot=true --nologo 2>&1 | Out-String
+    $unexpectedWarnings = $aotOutput | Select-String -Pattern 'warning IL\d{4}' |
+        Where-Object { $_ -notmatch 'IL2104' }  # IL2104 = assembly produced trim warnings (summary)
+    if ($unexpectedWarnings) {
+        $count = @($unexpectedWarnings).Count
+        Write-Host "AOT publish IL warnings ($count):"
+        $unexpectedWarnings | ForEach-Object { Write-Host "  $_" }
+        throw "AOT publish produced $count unexpected IL warning(s). Review and add accepted warning IDs to the exclusion list in eng/v1-release-gate.ps1."
+    }
+    Write-Host "AOT publish warning scan: no unexpected IL warnings."
+}
 Invoke-TestStep 'public API snapshot' 'FullyQualifiedName~PublicApiSnapshotTests'
 Invoke-TestStep 'package consumer smoke tests' 'FullyQualifiedName~PackageConsumerIntegrationTests'
 Invoke-TestStep 'CLI smoke tests' 'FullyQualifiedName~CliIntegrationTests'
