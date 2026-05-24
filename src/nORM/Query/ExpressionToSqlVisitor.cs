@@ -496,6 +496,39 @@ namespace nORM.Query
                 return node;
             }
 
+            // DateTime + TimeSpan / DateTime - TimeSpan shift with constant
+            // TimeSpan -- mirror SelectClauseVisitor's projection emission so
+            // Where predicates filtering on a shifted column produce the same
+            // SQL form (strftime + RTRIM trim matching FFFFFFF binding).
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && node.Right is MemberExpression rhsMember
+                && TryGetConstantValue(rhsMember, out var rhsTs)
+                && rhsTs is TimeSpan span)
+            {
+                // ParameterValueExtractor walks EVERY closure-captured
+                // MemberExpression in the predicate and appends a value to its
+                // value-list in document order. Compiled-param names (@cp0,
+                // @cp1, ...) are assigned in the order ETSV emits them. If we
+                // fold the rhs TimeSpan inline without adding a placeholder
+                // compiled-param, the extractor still produces a value for it
+                // -- shifting every subsequent @cpN's value by one slot. The
+                // anchor RHS of an outer relop would then receive the shift
+                // value, returning silently wrong rows. Reserve a placeholder
+                // slot so the extractor's index aligns with ETSV's @cpN names.
+                var placeholderParam = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                _params[placeholderParam] = DBNull.Value;
+                _compiledParams.Add(placeholderParam);
+                var leftSql = GetSql(node.Left);
+                var seconds = span.TotalSeconds;
+                if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
+                var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                _sql.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
+                    .Append(", '").Append(secondsLiteral).Append(" seconds'), '0'), '.')");
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
