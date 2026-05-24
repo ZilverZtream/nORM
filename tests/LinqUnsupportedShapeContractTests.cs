@@ -64,9 +64,13 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
     [Fact]
     public async Task OfType_throws_deterministically_for_unsupported_TPH_filter()
     {
+        // OfType<UnrelatedRow>() against IQueryable<UnRow> can't collapse to an identity
+        // pass-through — the runtime cast would never succeed. nORM doesn't wire TPH
+        // discriminator filtering yet, so this must surface a clear exception rather
+        // than silently emit SQL that returns zero rows.
         var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await _ctx.Query<UnRow>().OfType<UnRow>().ToListAsync();
+            await _ctx.Query<UnRow>().OfType<UnrelatedRow>().ToListAsync();
         });
         Assert.NotNull(ex);
     }
@@ -74,9 +78,13 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
     [Fact]
     public async Task Cast_throws_deterministically_for_unsupported_runtime_conversion()
     {
+        // Cast<UnrelatedRow>() against IQueryable<UnRow> targets an unrelated reference
+        // type — there's no identity pass-through that satisfies the runtime cast, so
+        // the translator must throw rather than emit SQL whose materialization would
+        // crash with InvalidCastException.
         var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await _ctx.Query<UnRow>().Cast<object>().ToListAsync();
+            await _ctx.Query<UnRow>().Cast<UnrelatedRow>().ToListAsync();
         });
         Assert.NotNull(ex);
     }
@@ -98,5 +106,12 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
     {
         [Key] public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+    }
+
+    // Distinct CLR type with no inheritance relationship to UnRow — used to drive the
+    // OfType TPH unsupported-throw test without needing actual TPH metadata wiring.
+    public sealed class UnrelatedRow
+    {
+        public int Id { get; set; }
     }
 }
