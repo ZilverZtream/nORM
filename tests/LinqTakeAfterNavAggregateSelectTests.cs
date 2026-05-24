@@ -93,25 +93,24 @@ public class LinqTakeAfterNavAggregateSelectTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Orderby_descending_by_projected_nav_aggregate_throws_actionable_error()
+    public async Task Orderby_descending_by_projected_nav_aggregate_uses_correlated_subquery_in_order_by()
     {
-        // Known gap: OrderBy by a projected nav-aggregate ExpandProjection-inlines
-        // the original `p.Items.Sum(...)` into the OrderBy keySelector, but the
-        // OrderBy translator can't currently re-route a nav-collection access in
-        // that position -- ExpressionToSqlVisitor.VisitMember throws "Member
-        // 'Items' is not supported in this context". Pin the throw so the error
-        // surface is locked; the fix is a separate iteration (OrderByTranslator
-        // needs to recognise the inlined nav-aggregate shape, same way SCV does).
-        // Workaround: project to a sub-shape first, then OrderBy on the loaded
-        // shape client-side.
-        await Assert.ThrowsAsync<nORM.Core.NormUnsupportedFeatureException>(async () =>
-        {
-            await _ctx.Query<TanParent>()
-                .Select(p => new { p.Id, Total = p.Items!.Sum(i => i.Amount) })
-                .OrderByDescending(r => r.Total)
-                .Take(2)
-                .ToListAsync();
-        });
+        // OrderBy by Total DESC where Total = p.Items.Sum(i => i.Amount).
+        // ExpandProjection inlines `r.Total` -> `p.Items.Sum(...)`; the OrderBy
+        // translator now routes that shape through SCV so the ORDER BY clause
+        // gets the same correlated subquery the projection emits, instead of
+        // throwing "Member 'Items' is not supported".
+        //
+        // Per-parent totals: 1->60, 2->5, 3->0, 4->100, 5->0.
+        // DESC -> 4(100), 1(60), 2(5). Take(2) -> {4, 1}.
+        var rows = (await _ctx.Query<TanParent>()
+            .Select(p => new { p.Id, Total = p.Items!.Sum(i => i.Amount) })
+            .OrderByDescending(r => r.Total)
+            .Take(2)
+            .ToListAsync())
+            .Select(r => (r.Id, r.Total))
+            .ToArray();
+        Assert.Equal(new[] { (4, 100), (1, 60) }, rows);
     }
 
     [Table("TanParent")]

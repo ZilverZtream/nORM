@@ -457,6 +457,34 @@ namespace nORM.Query
                         FastExpressionVisitorPool.Return(visitor);
                         return source;
                     }
+                    // Navigation-collection aggregate as the OrderBy key, after
+                    // ExpandProjection inlines `r.Total` -> `p.Items.Sum(i => i.Amount)`.
+                    // ExpressionToSqlVisitor doesn't recognise nav.Sum/Min/Max/Average in this
+                    // position (only the Any/All/Count rewrite hits the predicate side), so a
+                    // bare visitor.Translate would throw "Member 'Items' is not supported".
+                    // SCV already has the full nav-aggregate emit path (commits efba58f / 5d1da71
+                    // for Sum/Min/Max/Average; 0977c64 / 665e16d / c3c044b for Count/LongCount;
+                    // EmitNavigationCountSubquery covers Any/All); use it directly with the
+                    // outer alias the FROM clause will end up rendering.
+                    if (keySelector.Body is MethodCallExpression navAggCall
+                        && (navAggCall.Method.DeclaringType == typeof(Enumerable)
+                            || navAggCall.Method.DeclaringType == typeof(Queryable))
+                        && navAggCall.Method.Name is nameof(Enumerable.Sum) or nameof(Enumerable.Min)
+                                                  or nameof(Enumerable.Max) or nameof(Enumerable.Average)
+                                                  or nameof(Enumerable.Count) or nameof(Enumerable.LongCount)
+                                                  or nameof(Enumerable.Any) or nameof(Enumerable.All)
+                        && navAggCall.Arguments.Count >= 1
+                        && QueryTranslator.UnwrapNavMember(navAggCall.Arguments[0]) is MemberExpression navMember
+                        && navMember.Expression is ParameterExpression
+                        && t._mapping.Relations.ContainsKey(navMember.Member.Name))
+                    {
+                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias);
+                        var navSql = scv.Translate(navAggCall);
+                        t._orderBy.Add((navSql, ascending));
+                        FastExpressionVisitorPool.Return(visitor);
+                        return source;
+                    }
+
                     // Composite anonymous-type key (e.g. `OrderBy(r => new { r.A, r.B })`) —
                     // emit one ORDER BY entry per member so the SQL becomes
                     // `ORDER BY "T0"."A", "T0"."B"` rather than the comma-joined single
