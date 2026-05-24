@@ -163,6 +163,51 @@ namespace nORM.Query
             var sourceQuery = node.Arguments[0];
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
                                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Collection selector must be a lambda expression"));
+
+            // Detect the query-syntax left join shape: `from p in P join c in C on p.K equals
+            // c.K into grp from c in grp.DefaultIfEmpty() select projection(p, c)` lowers to
+            // GroupJoin().SelectMany(t => t.grp.DefaultIfEmpty(), (t, c) => proj). Rewrite as
+            // an explicit LEFT JOIN with the GroupJoin's keys, skipping MaterializeGroupJoin.
+            var smResultSelector = node.Arguments.Count > 2
+                ? StripQuotes(node.Arguments[2]) as LambdaExpression
+                : null;
+            if (smResultSelector != null
+                && smResultSelector.Parameters.Count == 2
+                && sourceQuery is MethodCallExpression gj
+                && gj.Method.Name == nameof(Queryable.GroupJoin)
+                && gj.Arguments.Count >= 5
+                && collectionSelector.Body is MethodCallExpression dfe
+                && dfe.Method.Name == nameof(Queryable.DefaultIfEmpty)
+                && dfe.Arguments.Count >= 1
+                && dfe.Arguments[0] is MemberExpression grpMember
+                && grpMember.Expression == collectionSelector.Parameters[0]
+                && StripQuotes(gj.Arguments[4]) is LambdaExpression gjResultSel
+                && gjResultSel.Body is NewExpression gjNew
+                && gjNew.Members != null)
+            {
+                // Find which member of the GroupJoin's anonymous result holds the outer entity:
+                // it's the one whose name is NOT the grp member referenced by DefaultIfEmpty.
+                string? outerMemberName = null;
+                for (int i = 0; i < gjNew.Members.Count; i++)
+                {
+                    if (gjNew.Members[i].Name != grpMember.Member.Name)
+                    {
+                        outerMemberName = gjNew.Members[i].Name;
+                        break;
+                    }
+                }
+                if (outerMemberName != null
+                    && StripQuotes(gj.Arguments[2]) is LambdaExpression gjOuterKeySel
+                    && StripQuotes(gj.Arguments[3]) is LambdaExpression gjInnerKeySel)
+                {
+                    HandleQuerySyntaxLeftJoin(
+                        gj.Arguments[0], gj.Arguments[1],
+                        gjOuterKeySel, gjInnerKeySel,
+                        smResultSelector, outerMemberName);
+                    return node;
+                }
+            }
+
             // Visit the source query first to establish base mapping
             Visit(sourceQuery);
             var outerMapping = _mapping;
@@ -409,6 +454,98 @@ namespace nORM.Query
                 _mapping = crossMapping;
             }
             return node;
+        }
+
+        /// <summary>
+        /// Translates the query-syntax left-join shape (GroupJoin + SelectMany + DefaultIfEmpty)
+        /// directly to a LEFT JOIN, bypassing MaterializeGroupJoin. The SelectMany result
+        /// selector's parameters get rewritten so its body references the outer / inner
+        /// entities directly via the join's aliases.
+        /// </summary>
+        private void HandleQuerySyntaxLeftJoin(
+            Expression outerQuery,
+            Expression innerQuery,
+            LambdaExpression outerKeySel,
+            LambdaExpression innerKeySel,
+            LambdaExpression smResultSelector,
+            string outerMemberName)
+        {
+            Visit(outerQuery);
+            var outerMapping = _mapping;
+            var outerAlias = EscapeAlias("T0");
+            var innerElementType = GetElementType(innerQuery);
+            var innerMapping = TrackMapping(innerElementType);
+            var innerAlias = EscapeAlias("T" + (++_joinCounter));
+
+            if (!_correlatedParams.ContainsKey(outerKeySel.Parameters[0]))
+                _correlatedParams[outerKeySel.Parameters[0]] = (outerMapping, outerAlias);
+            var vctxOuter = new VisitorContext(_ctx, outerMapping, _provider, outerKeySel.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
+            var outerKeySql = outerKeyVisitor.Translate(outerKeySel.Body);
+            foreach (var kvp in outerKeyVisitor.GetParameters())
+                AddParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(outerKeyVisitor);
+
+            if (!_correlatedParams.ContainsKey(innerKeySel.Parameters[0]))
+                _correlatedParams[innerKeySel.Parameters[0]] = (innerMapping, innerAlias);
+            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySel.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
+            var innerKeySql = innerKeyVisitor.Translate(innerKeySel.Body);
+            foreach (var kvp in innerKeyVisitor.GetParameters())
+                AddParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(innerKeyVisitor);
+
+            // Rewrite the SelectMany result selector so its body uses fresh outer/inner entity
+            // parameters that JoinBuilder can substitute for the join aliases.
+            var outerEntityType = outerMapping.Type;
+            var freshOuter = Expression.Parameter(outerEntityType, "__lj_outer");
+            var freshInner = Expression.Parameter(innerElementType, "__lj_inner");
+            var rewriter = new QuerySyntaxLeftJoinRewriter(
+                smResultSelector.Parameters[0], smResultSelector.Parameters[1],
+                outerMemberName, freshOuter, freshInner);
+            var newBody = rewriter.Visit(smResultSelector.Body)!;
+            var rewrittenResultSel = Expression.Lambda(newBody, freshOuter, freshInner);
+
+            JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+
+            _sql.Clear();
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql);
+        }
+
+        private sealed class QuerySyntaxLeftJoinRewriter : ExpressionVisitor
+        {
+            private readonly ParameterExpression _oldTransparent;
+            private readonly ParameterExpression _oldInner;
+            private readonly string _outerMemberName;
+            private readonly ParameterExpression _newOuter;
+            private readonly ParameterExpression _newInner;
+
+            public QuerySyntaxLeftJoinRewriter(
+                ParameterExpression oldTransparent,
+                ParameterExpression oldInner,
+                string outerMemberName,
+                ParameterExpression newOuter,
+                ParameterExpression newInner)
+            {
+                _oldTransparent = oldTransparent;
+                _oldInner = oldInner;
+                _outerMemberName = outerMemberName;
+                _newOuter = newOuter;
+                _newInner = newInner;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (node.Expression == _oldTransparent && node.Member.Name == _outerMemberName)
+                    return _newOuter;
+                return base.VisitMember(node);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                if (node == _oldInner) return _newInner;
+                return base.VisitParameter(node);
+            }
         }
     }
 }
