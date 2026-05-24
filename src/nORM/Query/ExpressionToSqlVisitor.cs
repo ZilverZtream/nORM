@@ -889,6 +889,21 @@ namespace nORM.Query
                 }
             }
 
+            // int.Parse(s) / long.Parse(s) — lower to a per-provider integer CAST. Single-arg
+            // overload only; the IFormatProvider / NumberStyles overloads add culture / format
+            // semantics that SQL casts can't faithfully reproduce, so those still fall to the
+            // unsupported-method throw.
+            if (node.Object == null
+                && node.Arguments.Count == 1
+                && node.Method.Name == "Parse"
+                && (node.Method.DeclaringType == typeof(int) || node.Method.DeclaringType == typeof(long))
+                && node.Arguments[0].Type == typeof(string))
+            {
+                var inner = GetSql(node.Arguments[0]);
+                _sql.Append(_provider.GetIntCastSql(inner, asLong: node.Method.DeclaringType == typeof(long)));
+                return node;
+            }
+
             // enum.HasFlag(other) — lower to `(col & other) = other`. Preserves .NET semantics
             // (true only when every bit of `other` is set in receiver). The receiver must be
             // an enum instance; we don't filter by [Flags] attribute because the runtime

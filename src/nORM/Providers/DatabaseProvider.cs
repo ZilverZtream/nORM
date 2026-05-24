@@ -416,6 +416,15 @@ namespace nORM.Providers
         public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
 
         /// <summary>
+        /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
+        /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
+        /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
+        /// MySQL requires <c>CAST(x AS SIGNED)</c> instead — override on the MySQL provider.
+        /// </summary>
+        public virtual string GetIntCastSql(string innerSql, bool asLong = false)
+            => $"CAST({innerSql} AS {(asLong ? "BIGINT" : "INTEGER")})";
+
+        /// <summary>
         /// Returns an INSERT statement for a join table row that does nothing (ignores) on duplicate key.
         /// Providers override this for their native upsert/ignore syntax.
         /// </summary>
