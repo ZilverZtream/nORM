@@ -548,9 +548,10 @@ namespace nORM.Query
         private Expression HandleAllOperation(MethodCallExpression node)
         {
             // ALL is translated as:
-            // SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM table alias WHERE NOT (pred)) THEN 1 ELSE 0 END
-            // The predicate MUST be embedded inside the subquery — do NOT use _where, which
-            // Build() would append AFTER the closing parenthesis, breaking the EXISTS syntax.
+            // SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM table alias WHERE NOT (pred) [AND outer_where]) THEN 1 ELSE 0 END
+            // The predicate MUST be embedded inside the subquery -- do NOT use _where, which
+            // Build() would append AFTER the closing parenthesis, against an outer SELECT
+            // that has no FROM clause.
             var sourceQuery = node.Arguments[0];
             var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
 
@@ -558,11 +559,27 @@ namespace nORM.Query
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "All operation requires a predicate"));
             Visit(sourceQuery);
 
+            // If the source had an outer Where, its predicates are now sitting in _where
+            // and would otherwise be appended by Build() against an outer SELECT with no
+            // FROM clause -- producing "no such column: T0.x". Snapshot them so we can
+            // AND them into the EXISTS subquery's own WHERE clause, then clear _where so
+            // Build() doesn't double-emit them.
+            string? outerWhereSql = null;
+            if (_where.Length > 0)
+            {
+                outerWhereSql = _where.ToSqlString();
+                _where.Clear();
+            }
+
             var param = predicate.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+            // paramIndexStart=_params.Count so the All predicate's parameters do not
+            // collide with @p0/@p1 already allocated by the outer Where. Pooled visitors
+            // reset _paramIndex to ParamIndexStart, so without this offset both predicates
+            // would emit @p0 and the inner value would overwrite the outer in _params.
+            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
             // All() predicate parameters are fixed constants (not closure captures),
@@ -573,8 +590,14 @@ namespace nORM.Query
             FastExpressionVisitorPool.Return(visitor);
 
             // Build the complete SQL inline so the predicate is inside the EXISTS subquery.
+            // When an outer Where was present, AND it into the subquery's WHERE so the
+            // semantics match Where(outer).All(p) -> NOT EXISTS(rows matching outer that
+            // violate p).
+            var subqueryWhere = outerWhereSql is null
+                ? $"NOT ({predicateSql})"
+                : $"NOT ({predicateSql}) AND ({outerWhereSql})";
             _sql.Insert(0,
-                $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {_mapping.EscTable} {alias} WHERE NOT ({predicateSql})) THEN 1 ELSE 0 END");
+                $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {_mapping.EscTable} {alias} WHERE {subqueryWhere}) THEN 1 ELSE 0 END");
 
             // Signal to Build() that this is a scalar query so it uses the scalar materializer
             // path (reads position 0, converts via Convert.ChangeType to bool).
