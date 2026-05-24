@@ -413,6 +413,28 @@ namespace nORM.Query
                         throw new NormUnsupportedFeatureException(
                             $"Cannot resolve '{captured.Member.Name}' in a SetProperty value expression.");
 
+                    case MethodCallExpression navAgg
+                        when (navAgg.Method.DeclaringType == typeof(Enumerable) || navAgg.Method.DeclaringType == typeof(Queryable))
+                          && navAgg.Method.Name is nameof(Enumerable.Sum) or nameof(Enumerable.Count) or nameof(Enumerable.LongCount)
+                                                or nameof(Enumerable.Min) or nameof(Enumerable.Max) or nameof(Enumerable.Average)
+                          && navAgg.Arguments.Count >= 1
+                          && navAgg.Arguments[0] is MemberExpression navAggMember
+                          && navAggMember.Expression == rowParam
+                          && mapping.Relations.TryGetValue(navAggMember.Member.Name, out _):
+                        // Navigation-collection aggregate inside a SET clause (e.g.
+                        // `SetProperty(r => r.Total, r => r.Items.Sum(i => i.Amount))`) needs
+                        // a correlated subquery against the dependent table inside the UPDATE,
+                        // which the current builder doesn't yet emit. Point users at the two
+                        // working paths so they don't grep the codebase looking for why the
+                        // throw fires.
+                        throw new NormUnsupportedFeatureException(
+                            $"Navigation-collection aggregate '{navAggMember.Member.Name}.{navAgg.Method.Name}(...)' " +
+                            "in a SetProperty value expression requires a correlated subquery in the UPDATE SET " +
+                            "clause, which is not yet supported. Workarounds: (1) project the parent rows with " +
+                            "Select(p => new {{ p.Id, Total = p.Items.Sum(i => i.Amount) }}), then loop and " +
+                            "Update each entity individually; or (2) execute the UPDATE via raw SQL with a " +
+                            "correlated subquery in the SET clause.");
+
                     default:
                         throw new NormUnsupportedFeatureException(
                             $"Expression node {e.NodeType} is not supported inside a SetProperty value expression.");
