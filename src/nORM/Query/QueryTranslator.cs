@@ -1012,6 +1012,30 @@ namespace nORM.Query
                     string.Format(ErrorMessages.QueryTranslationFailed,
                     $"Expected a generic IQueryable<T> source type but found '{source.Type.Name}'."));
             var elementType = genericArgs[0];
+            // Same post-Take/Skip silent-wrongness family as bca0523 / 47acc83 / 54c16ae /
+            // 4fcd795 / c2cce55, but a different failure mode: HandleSetOperation translates
+            // the source in a sub-context (which bakes Take/Skip into the sub-plan SQL as
+            // LIMIT 2 / OFFSET m), then unconditionally appends " LIMIT 1" via ApplyPaging.
+            // The result is " … LIMIT 2 LIMIT 1" — SQLite rejects with "near 'LIMIT': syntax
+            // error". Detect Take/Skip in the source expression tree and throw with
+            // explanation rather than letting the malformed SQL escape.
+            if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All) or nameof(Queryable.Contains)
+                && SourceHasTakeOrSkip(source))
+            {
+                var op = node.Method.Name;
+                throw new NormUnsupportedFeatureException(
+                    op + " applied after Take or Skip currently emits invalid SQL — the predicate is " +
+                    "translated in a sub-context that bakes the LIMIT/OFFSET into the inner query, " +
+                    "and then the EXISTS wrapper appends another LIMIT 1 — SQLite rejects the " +
+                    "stacked LIMITs (`near \"LIMIT\": syntax error`). LINQ semantics for " +
+                    "`q.Take(N)." + op + "(...)` simplify: for N>=1 this is equivalent to " +
+                    "`q." + op + "(...)` (Take(N) followed by Any/All only changes when N=0), so " +
+                    "the cleanest fix is usually to drop the Take. " +
+                    "Workarounds: " +
+                    "(1) Drop the Take: `q." + op + "(...)`. " +
+                    "(2) Materialize the windowed set first and check client-side: " +
+                    "`var top = await q.Take(N).ToListAsync(); var hit = top." + op + "(...);`");
+            }
             if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression anyPred)
             {
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(anyPred));
@@ -1062,6 +1086,19 @@ namespace nORM.Query
             }
             return node;
         }
+        private static bool SourceHasTakeOrSkip(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                if (mce.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                    return true;
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return false;
+        }
+
         internal static bool TryGetConstantValue(Expression e, out object? value)
         {
             switch (e)
