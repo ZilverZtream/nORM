@@ -340,6 +340,23 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(TimeSpan))
+            {
+                // Microsoft.Data.Sqlite binds TimeSpan as canonical 'HH:mm:ss'
+                // text (TimeSpan.ToString 'c' format) for sub-day spans. The
+                // component getters are fixed-position string slices into that
+                // text. Multi-day spans bind with a 'd.' prefix and would shift
+                // these offsets -- documented as out-of-scope for v1; a future
+                // iteration can detect/handle the prefix via INSTR.
+                return name switch
+                {
+                    nameof(TimeSpan.Hours) => $"CAST(substr({args[0]}, 1, 2) AS INTEGER)",
+                    nameof(TimeSpan.Minutes) => $"CAST(substr({args[0]}, 4, 2) AS INTEGER)",
+                    nameof(TimeSpan.Seconds) => $"CAST(substr({args[0]}, 7, 2) AS INTEGER)",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(TimeOnly))
             {
                 return name switch

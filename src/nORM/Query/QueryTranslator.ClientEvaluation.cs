@@ -64,6 +64,13 @@ namespace nORM.Query
                 nameof(DateTime.TimeOfDay),
                 nameof(DateTime.Millisecond),
 
+                // TimeSpan component properties -- sub-day spans only; see
+                // SqliteProvider.TranslateFunction(TimeSpan) for the SUBSTR
+                // string-slice emission.
+                nameof(TimeSpan.Hours),
+                nameof(TimeSpan.Minutes),
+                nameof(TimeSpan.Seconds),
+
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
                 nameof(Enumerable.LongCount),
