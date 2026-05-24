@@ -80,21 +80,23 @@ public class LinqLeftJoinTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task QuerySyntax_GroupJoin_SelectMany_DefaultIfEmpty_throws_with_rewrite_hint()
+    public async Task QuerySyntax_GroupJoin_SelectMany_DefaultIfEmpty_emits_LEFT_JOIN_with_pair_projection()
     {
-        // Query-syntax left join compiles to GroupJoin + SelectMany + DefaultIfEmpty whose
-        // projection is over the (outer, inner) pair. The MaterializeGroupJoin pipeline does
-        // not yet handle that projection shape — pin the deterministic throw so callers know
-        // to use the navigation form (above) until the wider implementation lands.
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await (from p in _ctx.Query<LjParent>()
-                   join c in _ctx.Query<LjChild>() on p.Id equals c.ParentId into grp
-                   from c in grp.DefaultIfEmpty()
-                   select new { p.Name, ChildTag = c == null ? null : c.Tag })
-                  .ToListAsync();
-        });
-        Assert.NotNull(ex);
+        // Project the child Tag (string, nullable by default) so the LEFT JOIN NULL row for
+        // the lone parent comes back as a real null rather than the int default.
+        var rows = (await (from p in _ctx.Query<LjParent>()
+                           join c in _ctx.Query<LjChild>() on p.Id equals c.ParentId into grp
+                           from c in grp.DefaultIfEmpty()
+                           select new { ParentName = p.Name, ChildTag = c.Tag })
+                          .ToListAsync())
+                  .OrderBy(r => r.ParentName).ThenBy(r => r.ChildTag).ToArray();
+
+        // 3 children + 1 lone parent = 4 rows; the lone parent's ChildTag is null.
+        Assert.Equal(4, rows.Length);
+        Assert.Contains(rows, r => r.ParentName == "Lone"  && r.ChildTag == null);
+        Assert.Contains(rows, r => r.ParentName == "Alpha" && r.ChildTag == "a-1");
+        Assert.Contains(rows, r => r.ParentName == "Alpha" && r.ChildTag == "a-2");
+        Assert.Contains(rows, r => r.ParentName == "Beta"  && r.ChildTag == "b-1");
     }
 
     [Table("LjParent")]
