@@ -273,6 +273,31 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns whether every element of a nORM query satisfies the predicate. EF Core parity:
+        /// <c>q.AllAsync(p =&gt; p.IsActive)</c>. Vacuously true on an empty source (matches
+        /// LINQ semantics).
+        ///
+        /// Lowered to <c>!AnyAsync(!predicate)</c> -- the standard EF identity
+        /// <c>All(p) ≡ !Any(!p)</c>. The translator's direct <c>All</c> path emits the
+        /// predicate inside an EXISTS subquery but does not currently fold an outer
+        /// <c>Where</c>'s predicate into the same subquery, leaving the outer
+        /// predicate dangling against an outer SELECT that has no FROM clause and
+        /// crashing with "no such column" on composed <c>.Where(p1).AllAsync(p2)</c>
+        /// chains. The Any rewrite sidesteps the issue by reusing the well-tested
+        /// Where+Any pipeline; the same-shape sync <c>All</c> bug remains open.
+        /// </summary>
+        public static async Task<bool> AllAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            var negated = Expression.Lambda<Func<T, bool>>(
+                Expression.Not(predicate.Body),
+                predicate.Parameters);
+            return !await AnyAsync(source.Where(negated), ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Gets first result from nORM query asynchronously - only works with nORM queries
         /// </summary>
         public static Task<T> FirstAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
