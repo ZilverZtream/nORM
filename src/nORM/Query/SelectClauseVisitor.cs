@@ -138,6 +138,20 @@ namespace nORM.Query
                 }
             }
 
+            // Closure-captured local (compiler-generated DisplayClass member) -- evaluate
+            // to a constant and emit as a literal. ExpressionToSqlVisitor binds these as
+            // parameters via CreateSafeParameter, but SCV writes SQL fragments without
+            // parameter-manager access, so inline as a literal. Mirrors the constant-fold
+            // ETSV path so projection accepts the same captured-local shapes Where does
+            // -- without this, `var prefix = "x"; .Select(p => p.Name.StartsWith(prefix))`
+            // throws the misleading "not mapped to a column" error pointing at the
+            // DisplayClass field.
+            if (QueryTranslator.TryGetConstantValue(node, out var capturedValue))
+            {
+                sb.Append(FormatLiteral(capturedValue));
+                return node;
+            }
+
             throw new InvalidOperationException(
                 $"Member '{node.Member.Name}' on type '{node.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
                 $"Ensure the property is read/write and not a navigation collection.");
@@ -499,6 +513,12 @@ namespace nORM.Query
 
         private static string FormatLiteral(object? value)
         {
+            // Enums lower to their underlying integer so HasFlag / equality
+            // projections work with closure-captured flag locals -- without this
+            // the closure-fold path emits the enum boxed and FormatLiteral
+            // threw "type '<EnumName>' isn't supported".
+            if (value is Enum e)
+                value = Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), System.Globalization.CultureInfo.InvariantCulture);
             return value switch
             {
                 null => "NULL",
