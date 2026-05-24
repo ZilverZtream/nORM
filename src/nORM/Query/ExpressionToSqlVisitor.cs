@@ -1640,6 +1640,21 @@ namespace nORM.Query
                 }
                 if (collectionExpr != null && valueExpr != null && TryGetConstantValue(collectionExpr, out var colVal) && colVal is IEnumerable en && colVal is not string)
                 {
+                    // Reserve a placeholder compiled-param slot when the IN-list
+                    // collection is a closure-captured MemberExpression. The
+                    // ParameterValueExtractor walks every closure MemberExpression
+                    // in document order and appends a value to its list; without
+                    // a placeholder the array reference shifts subsequent @cp
+                    // bindings by one slot (or worse, gets bound directly to a
+                    // @cp slot and crashes with "no mapping from System.Int32[]
+                    // to a known managed provider native type"). Same fix shape
+                    // as 407e03d / eeff6e7 / cf39b61.
+                    if (collectionExpr is MemberExpression)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
                     var items = new List<object?>();
                     System.Collections.IEnumerable itemSource = en;
                     if (isDictContains && colVal is System.Collections.IDictionary dict)
