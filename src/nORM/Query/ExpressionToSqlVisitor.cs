@@ -635,6 +635,30 @@ namespace nORM.Query
                     _sql.Append('(').Append(inner).Append(" IS NULL OR ").Append(target).Append(" = '')");
                     return node;
                 }
+                // static string.Compare(a, b) and instance a.CompareTo(b) -> CASE WHEN a<b THEN -1 WHEN a>b THEN 1 ELSE 0 END
+                if (node.Method.Name == nameof(string.Compare) || node.Method.Name == nameof(string.CompareTo))
+                {
+                    string lhs, rhs;
+                    if (node.Object == null && node.Arguments.Count == 2)
+                    {
+                        lhs = GetSql(node.Arguments[0]);
+                        rhs = GetSql(node.Arguments[1]);
+                    }
+                    else if (node.Object != null && node.Arguments.Count == 1)
+                    {
+                        lhs = GetSql(node.Object);
+                        rhs = GetSql(node.Arguments[0]);
+                    }
+                    else
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            $"Overload of {node.Method.Name} with {node.Arguments.Count} arguments is not supported.");
+                    }
+                    _sql.Append("(CASE WHEN ").Append(lhs).Append(" < ").Append(rhs)
+                        .Append(" THEN -1 WHEN ").Append(lhs).Append(" > ").Append(rhs)
+                        .Append(" THEN 1 ELSE 0 END)");
+                    return node;
+                }
                 // static string.Concat(a, b, ...) -> provider-specific concat
                 if (node.Object == null && node.Method.Name == nameof(string.Concat) && node.Arguments.Count >= 1)
                 {
@@ -669,6 +693,25 @@ namespace nORM.Query
                     return node;
                 }
                 throw new NormUnsupportedFeatureException($"String method '{node.Method.Name}' is not supported.");
+            }
+            if (node.Method.DeclaringType == typeof(Convert) && node.Arguments.Count == 1)
+            {
+                var inner = GetSql(node.Arguments[0]);
+                var sqlType = node.Method.Name switch
+                {
+                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => "INTEGER",
+                    nameof(Convert.ToInt64) => "BIGINT",
+                    nameof(Convert.ToString) => "TEXT",
+                    nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => "REAL",
+                    nameof(Convert.ToDecimal) => "DECIMAL",
+                    nameof(Convert.ToBoolean) => "BOOLEAN",
+                    _ => null
+                };
+                if (sqlType != null)
+                {
+                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(sqlType).Append(')');
+                    return node;
+                }
             }
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
             {
@@ -1168,6 +1211,10 @@ namespace nORM.Query
                 return true;
             if (method.DeclaringType == null || !s_safeDeclaringTypes.Contains(method.DeclaringType))
                 return false;
+            // System.Convert.ToString is intentionally translatable as CAST(... AS TEXT);
+            // it's only the default object.ToString that has no SQL equivalent.
+            if (method.DeclaringType == typeof(Convert) && method.Name == nameof(Convert.ToString))
+                return true;
             return !s_untranslatableMethods.Contains(method.Name);
         }
         private Expression TranslateWithNullCheck(MethodCallExpression node)
