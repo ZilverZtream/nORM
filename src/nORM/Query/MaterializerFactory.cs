@@ -1187,6 +1187,25 @@ namespace nORM.Query
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, mce.Type, mapping.Type, mapping.Provider, memberName));
                     }
+                    else if (arg is ConditionalExpression ce)
+                    {
+                        // (cond ? a : b) translates to CASE WHEN ... END server-side.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, ce.Type, mapping.Type, mapping.Provider, memberName));
+                    }
+                    else if (arg is BinaryExpression be)
+                    {
+                        // Arithmetic / string concat / etc.: project the computed value.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, be.Type, mapping.Type, mapping.Provider, memberName));
+                    }
+                    else if (arg is UnaryExpression ue
+                             && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                    {
+                        // Primitive/enum cast: collapses to the operand at SQL level.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, ue.Type, mapping.Type, mapping.Provider, memberName));
+                    }
                 }
                 return cols.ToArray();
             }

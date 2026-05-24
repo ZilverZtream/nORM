@@ -151,6 +151,83 @@ namespace nORM.Query
             return node;
         }
 
+        protected override Expression VisitConditional(ConditionalExpression node)
+        {
+            var sb = EnsureBuilder();
+            sb.Append("(CASE WHEN ");
+            Visit(node.Test);
+            sb.Append(" THEN ");
+            Visit(node.IfTrue);
+            sb.Append(" ELSE ");
+            Visit(node.IfFalse);
+            sb.Append(" END)");
+            return node;
+        }
+
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            var sb = EnsureBuilder();
+            if (node.Value is null)
+            {
+                sb.Append("NULL");
+                return node;
+            }
+            switch (node.Value)
+            {
+                case string s:
+                    sb.Append('\'').Append(s.Replace("'", "''")).Append('\'');
+                    break;
+                case bool b:
+                    sb.Append(b ? _provider.BooleanTrueLiteral : "0");
+                    break;
+                case System.Enum e:
+                    sb.Append(Convert.ToInt64(e, System.Globalization.CultureInfo.InvariantCulture));
+                    break;
+                default:
+                    sb.Append(System.Convert.ToString(node.Value, System.Globalization.CultureInfo.InvariantCulture));
+                    break;
+            }
+            return node;
+        }
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            var sb = EnsureBuilder();
+            sb.Append('(');
+            Visit(node.Left);
+            sb.Append(' ').Append(node.NodeType switch
+            {
+                ExpressionType.Equal => "=",
+                ExpressionType.NotEqual => "<>",
+                ExpressionType.LessThan => "<",
+                ExpressionType.LessThanOrEqual => "<=",
+                ExpressionType.GreaterThan => ">",
+                ExpressionType.GreaterThanOrEqual => ">=",
+                ExpressionType.AndAlso or ExpressionType.And => "AND",
+                ExpressionType.OrElse or ExpressionType.Or => "OR",
+                ExpressionType.Add => "+",
+                ExpressionType.Subtract => "-",
+                ExpressionType.Multiply => "*",
+                ExpressionType.Divide => "/",
+                ExpressionType.Modulo => "%",
+                _ => throw new InvalidOperationException($"Binary operator {node.NodeType} is not supported in projections."),
+            }).Append(' ');
+            Visit(node.Right);
+            sb.Append(')');
+            return node;
+        }
+
+        protected override Expression VisitUnary(UnaryExpression node)
+        {
+            // Numeric / enum / primitive Convert: the SQL value is the operand itself.
+            if (node.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+            {
+                Visit(node.Operand);
+                return node;
+            }
+            return base.VisitUnary(node);
+        }
+
         protected override Expression VisitMemberInit(MemberInitExpression node)
         {
             var sb = EnsureBuilder();
