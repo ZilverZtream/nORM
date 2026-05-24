@@ -27,6 +27,7 @@ namespace nORM.Query
         // Parameter sink (can be redirected to a shared dictionary)
         private Dictionary<string, object> _paramSink = null!;
         private int _paramIndex = 0;
+        internal int ParamIndex => _paramIndex;
         private readonly List<string> _ownedCompiledParams = new();
         private readonly Dictionary<ParameterExpression, string> _ownedParamMap = new();
         private List<string> _compiledParams = null!;
@@ -1182,6 +1183,29 @@ namespace nORM.Query
                     Visit(rewritten);
                     return node;
                 }
+
+                // `parent.Children.Select(c => c.Value).Sum/Min/Max/Average()` — the Select
+                // projection sits between the navigation and the aggregate. Emit as a
+                // correlated scalar subquery directly:
+                //   `(SELECT AGG(selector_sql) FROM ChildTable T1 WHERE T1.FK = parent.PK)`
+                if (node.Arguments.Count == 1
+                    && node.Method.Name is nameof(Queryable.Sum)
+                                       or nameof(Queryable.Min)
+                                       or nameof(Queryable.Max)
+                                       or nameof(Queryable.Average)
+                    && node.Arguments[0] is MethodCallExpression selectCall
+                    && selectCall.Method.Name == nameof(Queryable.Select)
+                    && selectCall.Arguments.Count == 2
+                    && selectCall.Arguments[0] is MemberExpression selNav
+                    && selNav.Expression is ParameterExpression selNavParent
+                    && _parameterMappings.TryGetValue(selNavParent, out var selNavInfo)
+                    && selNavInfo.Mapping.Relations.TryGetValue(selNav.Member.Name, out var selRel)
+                    && StripQuotes(selectCall.Arguments[1]) is LambdaExpression selectorLambda)
+                {
+                    EmitNavigationScalarAggregateSubquery(
+                        node.Method.Name, selNavParent, selNavInfo, selRel, selectorLambda);
+                    return node;
+                }
                 switch (node.Method.Name)
                 {
                     case nameof(Queryable.GroupBy):
@@ -1422,6 +1446,55 @@ namespace nORM.Query
         /// The outer parameter reference inside the FK join condition is preserved so the
         /// translator emits a correlated subquery instead of an independent SELECT.
         /// </summary>
+        /// <summary>
+        /// Emits a correlated scalar subquery for the
+        /// `parent.Children.Select(c =&gt; c.Value).Sum/Min/Max/Average()` shape:
+        /// <code>(SELECT AGG(selector_sql) FROM ChildTable T_n WHERE T_n.FK = T_outer.PK)</code>
+        /// The selector lambda is translated against the child mapping in a sub-visitor so
+        /// arbitrary projection expressions (computed selectors, COALESCE chains, etc.) flow
+        /// through naturally.
+        /// </summary>
+        private void EmitNavigationScalarAggregateSubquery(
+            string aggregateName,
+            ParameterExpression parentParam,
+            (TableMapping Mapping, string Alias) parentInfo,
+            TableMapping.Relation relation,
+            LambdaExpression selectorLambda)
+        {
+            var sqlAgg = aggregateName switch
+            {
+                nameof(Queryable.Sum)     => "SUM",
+                nameof(Queryable.Min)     => "MIN",
+                nameof(Queryable.Max)     => "MAX",
+                nameof(Queryable.Average) => "AVG",
+                _ => throw new NormQueryException($"Unexpected navigation aggregate '{aggregateName}'.")
+            };
+
+            var childMapping = _ctx.GetMapping(relation.DependentType);
+            var subAlias = $"T_nav_{Guid.NewGuid().ToString("N").Substring(0, 8)}";
+
+            // Translate the selector lambda against the child mapping. Routing through a
+            // dedicated child-parameter binding lets nested member access / arithmetic /
+            // COALESCE all flow through the regular expression-to-SQL pipeline.
+            using var subVisitor = new ExpressionToSqlVisitor();
+            var subCtx = new VisitorContext(
+                _ctx, childMapping, _provider,
+                selectorLambda.Parameters[0], subAlias,
+                _parameterMappings, _compiledParams, _paramMap, _recursionDepth + 1, _paramIndex);
+            subVisitor.Initialize(in subCtx);
+            subVisitor.UseSharedParameterDictionary(_paramSink);
+            var selectorSql = subVisitor.Translate(selectorLambda.Body);
+            _paramIndex = subVisitor.ParamIndex;
+
+            var fkCol = relation.ForeignKey.EscCol;
+            var pkCol = relation.PrincipalKey.EscCol;
+            _sql.Append("(SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
+                .Append(" FROM ").Append(childMapping.EscTable).Append(' ').Append(_provider.Escape(subAlias))
+                .Append(" WHERE ").Append(_provider.Escape(subAlias)).Append('.').Append(fkCol)
+                .Append(" = ").Append(parentInfo.Alias).Append('.').Append(pkCol)
+                .Append(')');
+        }
+
         private MethodCallExpression RewriteNavigationAggregate(
             MethodCallExpression originalCall,
             ParameterExpression parentParam,
