@@ -734,6 +734,20 @@ namespace nORM.Query
         }
         protected override Expression VisitParameter(ParameterExpression node)
         {
+            // SelectTranslator rewrites `GroupBy(k).Select(g => proj)` into a 3-arg
+            // `GroupBy(k, (k, gs) => proj)`, so the projection's key parameter `k`
+            // stands in directly for the group key (not via `g.Key`). When a downstream
+            // Where / OrderBy references `k` as a standalone parameter
+            // (`.Where(x => x.Category.StartsWith("A"))` → expands to `k.StartsWith(…)`)
+            // we must emit the group-by SQL here rather than letting the parameter
+            // fall through to the entity-column path (which emits nothing and produces
+            // SQL like ` LIKE 'A%'` → SQLite syntax error) or the closure-binding path
+            // (which would bind it as `@p0 LIKE 'A%'` and never set the value).
+            if (_groupingKeys.TryGetValue(node, out var groupKeySql))
+            {
+                _sql.Append(groupKeySql);
+                return node;
+            }
             if (_parameterMappings.ContainsKey(node))
                 return base.VisitParameter(node);
             if (_paramMap.TryGetValue(node, out var existing))
