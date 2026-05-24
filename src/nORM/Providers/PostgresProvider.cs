@@ -192,6 +192,9 @@ namespace nORM.Providers
             return keyCol != null ? $" RETURNING {keyCol.EscCol}" : string.Empty;
         }
 
+        /// <summary>PostgreSQL TEXT is the natural target for numeric/Guid/DateTime ToString().</summary>
+        public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
+
         /// <summary>PostgreSQL supports ON CONFLICT DO NOTHING for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2}) ON CONFLICT DO NOTHING";

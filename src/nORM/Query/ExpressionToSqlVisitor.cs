@@ -691,6 +691,18 @@ namespace nORM.Query
                 }
                 return node;
             }
+            // No-arg ToString() on a column/expression — lower to provider-specific CAST.
+            // Receiver type must NOT already be string (string.ToString is identity but
+            // hitting this branch would emit a redundant CAST).
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 0
+                && node.Object != null
+                && node.Object.Type != typeof(string))
+            {
+                var inner = GetSql(node.Object);
+                _sql.Append(_provider.GetToStringSql(inner));
+                return node;
+            }
             if (!IsTranslatableMethod(node.Method))
                 // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
                 // The {0} argument below is a detail message, not a duplicate prefix.

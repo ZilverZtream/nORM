@@ -287,6 +287,9 @@ namespace nORM.Providers
             return keyCol != null ? $" OUTPUT INSERTED.{keyCol.EscCol}" : string.Empty;
         }
 
+        /// <summary>SQL Server uses NVARCHAR(MAX) for unbounded textual conversion.</summary>
+        public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS NVARCHAR(MAX))";
+
         /// <summary>SQL Server uses IF NOT EXISTS for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";

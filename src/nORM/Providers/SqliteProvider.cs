@@ -116,6 +116,9 @@ namespace nORM.Providers
         /// </summary>
         public override string GetConcatSql(string left, string right) => $"({left} || {right})";
 
+        /// <summary>SQLite TEXT affinity is the natural target for numeric/Guid/DateTime ToString().</summary>
+        public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
+
         /// <summary>SQLite supports INSERT OR IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT OR IGNORE INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
