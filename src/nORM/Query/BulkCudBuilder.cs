@@ -266,6 +266,20 @@ namespace nORM.Query
                         return Render(ue.Operand);
 
                     case BinaryExpression be:
+                        // String concat: `+` between two strings lowers to a BinaryExpression
+                        // with both operand types == string. Use the provider's concat dialect
+                        // (`||` on SQLite/PG, `+` on SQL Server, CONCAT on MySQL).
+                        if (be.NodeType == ExpressionType.Add
+                            && be.Left.Type == typeof(string)
+                            && be.Right.Type == typeof(string))
+                        {
+                            return _ctx.Provider.GetConcatSql(Render(be.Left), Render(be.Right));
+                        }
+                        // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE.
+                        if (be.NodeType == ExpressionType.Coalesce)
+                        {
+                            return $"COALESCE({Render(be.Left)}, {Render(be.Right)})";
+                        }
                         var op = be.NodeType switch
                         {
                             ExpressionType.Add => "+",
