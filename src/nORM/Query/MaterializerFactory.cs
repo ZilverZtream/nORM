@@ -1186,15 +1186,36 @@ namespace nORM.Query
                             continue;
                         }
 
+                        // IGrouping<TK, TE>.Key — read-only, no setter. Project as a shadow
+                        // column named after the anonymous-type member so the materializer
+                        // reads the group-key column without trying to bind a setter to the
+                        // IGrouping.Key property (which has none).
+                        if (m.Expression is ParameterExpression pep
+                            && pep.Type.IsGenericType
+                            && pep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>)
+                            && m.Member.Name == "Key")
+                        {
+                            var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                            cols.Add(new Column(memberName, m.Type, mapping.Type, mapping.Provider, memberName));
+                            continue;
+                        }
+
                         // Try to resolve against the current mapping first
                         if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
                         {
                             cols.Add(col);
                         }
-                        else if (m.Member is PropertyInfo pi)
+                        else if (m.Member is PropertyInfo pi && pi.GetSetMethod() != null)
                         {
-                            // Create a lightweight column for properties from other mappings
+                            // Create a lightweight column for writable properties from other
+                            // mappings. Read-only properties cannot be bound by the setter-based
+                            // materializer; project them as shadow columns instead.
                             cols.Add(new Column(pi, mapping.Provider, null));
+                        }
+                        else if (m.Member is PropertyInfo pi2)
+                        {
+                            var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                            cols.Add(new Column(memberName, pi2.PropertyType, mapping.Type, mapping.Provider, memberName));
                         }
                     }
                     else if (arg is ParameterExpression p)

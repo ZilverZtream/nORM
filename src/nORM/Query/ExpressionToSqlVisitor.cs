@@ -821,11 +821,15 @@ namespace nORM.Query
                         return node;
                     case "Count":
                     case "LongCount":
-                        if (node.Arguments.Count >= 1 && node.Arguments[0] is ParameterExpression cp && _parameterMappings.ContainsKey(cp))
+                        if (node.Arguments.Count >= 1
+                            && node.Arguments[0] is ParameterExpression cp
+                            && (_parameterMappings.ContainsKey(cp) || _groupingKeys.ContainsKey(cp)))
                         {
                             if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression countSelector)
                             {
-                                var info = _parameterMappings[cp];
+                                (TableMapping Mapping, string Alias) info = _parameterMappings.TryGetValue(cp, out var existing)
+                                    ? existing
+                                    : (_mapping, _tableAlias);
                                 var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var predSql = visitor.Translate(countSelector.Body);
@@ -853,12 +857,21 @@ namespace nORM.Query
                     case "Average":
                     case "Min":
                     case "Max":
-                        if (node.Arguments.Count >= 2 && node.Arguments[0] is ParameterExpression gp && _parameterMappings.ContainsKey(gp))
+                        if (node.Arguments.Count >= 2
+                            && node.Arguments[0] is ParameterExpression gp
+                            && (_parameterMappings.ContainsKey(gp) || _groupingKeys.ContainsKey(gp)))
                         {
                             var selector = StripQuotes(node.Arguments[1]) as LambdaExpression;
                             if (selector != null)
                             {
-                                var info = _parameterMappings[gp];
+                                // GroupBy aggregate inside HAVING: the IGrouping parameter is in
+                                // _groupingKeys, not _parameterMappings. The selector's element
+                                // parameter belongs to the same row source as the outer query
+                                // (the GroupBy hasn't introduced a new table), so reuse this
+                                // visitor's mapping + alias.
+                                (TableMapping Mapping, string Alias) info = _parameterMappings.TryGetValue(gp, out var existing)
+                                    ? existing
+                                    : (_mapping, _tableAlias);
                                 var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var colSql = visitor.Translate(selector.Body);
