@@ -1179,6 +1179,14 @@ namespace nORM.Query
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName));
                     }
+                    else if (arg is MethodCallExpression mce)
+                    {
+                        // Grouping aggregates (g.Count(), g.Sum(...), etc.) and other server-side
+                        // computed expressions: project as a shadow column named after the
+                        // anonymous-type member, typed as the call's return type.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, mce.Type, mapping.Type, mapping.Provider, memberName));
+                    }
                 }
                 return cols.ToArray();
             }

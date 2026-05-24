@@ -189,6 +189,22 @@ namespace nORM.Query
             {
                 var originalProjection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
 
+                // Rewrite `Select(GroupBy(s, k), g => proj)` (2-arg GroupBy + Select-over-IGrouping)
+                // as `GroupBy(s, k, (key, group) => proj')` so the existing 3-arg HandleGroupBy
+                // path can build the SELECT — otherwise the projection sees an IGrouping parameter
+                // with no table mapping and leaks ArgumentNullException out of the visitor.
+                if (originalProjection != null
+                    && node.Arguments[0] is MethodCallExpression gb
+                    && gb.Method.Name == nameof(Queryable.GroupBy)
+                    && gb.Arguments.Count == 2
+                    && originalProjection.Parameters.Count == 1
+                    && originalProjection.Parameters[0].Type.IsGenericType
+                    && originalProjection.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>))
+                {
+                    var rewritten = RewriteGroupByThenSelect(gb, originalProjection);
+                    return t.Visit(rewritten);
+                }
+
                 if (originalProjection != null)
                 {
                     // Try to split the projection into server and client parts
@@ -221,6 +237,63 @@ namespace nORM.Query
                 }
 
                 return t.Visit(node.Arguments[0]);
+            }
+
+            private static MethodCallExpression RewriteGroupByThenSelect(
+                MethodCallExpression groupByCall,
+                LambdaExpression selectLambda)
+            {
+                var groupingType = selectLambda.Parameters[0].Type;
+                var keyType = groupingType.GetGenericArguments()[0];
+                var sourceType = groupingType.GetGenericArguments()[1];
+                var resultType = selectLambda.Body.Type;
+
+                var keyParam = Expression.Parameter(keyType, "k");
+                var groupParam = Expression.Parameter(typeof(IEnumerable<>).MakeGenericType(sourceType), "g");
+
+                var rewriter = new GroupingProjectionRewriter(selectLambda.Parameters[0], keyParam, groupParam);
+                var newBody = rewriter.Visit(selectLambda.Body)!;
+                var resultSelector = Expression.Lambda(newBody, keyParam, groupParam);
+
+                // GroupBy<TSource, TKey, TResult>(source, keySelector, resultSelector) — disambiguate
+                // from the per-element overload by looking for a 2-arg inner Func on the result selector.
+                var groupByMethod = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == nameof(Queryable.GroupBy)
+                                && m.IsGenericMethodDefinition
+                                && m.GetGenericArguments().Length == 3
+                                && m.GetParameters().Length == 3
+                                && m.GetParameters()[2].ParameterType.IsGenericType
+                                && m.GetParameters()[2].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 3)
+                    .MakeGenericMethod(sourceType, keyType, resultType);
+
+                return Expression.Call(groupByMethod,
+                    groupByCall.Arguments[0],
+                    groupByCall.Arguments[1],
+                    Expression.Quote(resultSelector));
+            }
+
+            private sealed class GroupingProjectionRewriter : ExpressionVisitor
+            {
+                private readonly ParameterExpression _oldGrouping;
+                private readonly ParameterExpression _newKey;
+                private readonly ParameterExpression _newGroup;
+
+                public GroupingProjectionRewriter(ParameterExpression oldGrouping, ParameterExpression newKey, ParameterExpression newGroup)
+                {
+                    _oldGrouping = oldGrouping;
+                    _newKey = newKey;
+                    _newGroup = newGroup;
+                }
+
+                protected override Expression VisitMember(MemberExpression node)
+                {
+                    if (node.Expression == _oldGrouping && node.Member.Name == "Key")
+                        return _newKey;
+                    return base.VisitMember(node);
+                }
+
+                protected override Expression VisitParameter(ParameterExpression node)
+                    => node == _oldGrouping ? _newGroup : base.VisitParameter(node);
             }
         }
 

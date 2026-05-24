@@ -103,89 +103,98 @@ namespace nORM.Query
             var selectItems = _selectItemsPool.Get();
             try
             {
-                // Handle direct Key access: g => g.Key
-                if (resultSelector.Body is MemberExpression memberExpr && memberExpr.Member.Name == "Key")
+                // Direct Key projection. Covers:
+                //  - g => g.Key             (inline 3-arg GroupBy with IGrouping projection)
+                //  - (k, g) => k            (rewritten from 2-arg GroupBy + Select(g => g.Key))
+                bool bodyIsKey = (resultSelector.Body is MemberExpression me && me.Member.Name == "Key")
+                    || (resultSelector.Body is ParameterExpression pe
+                        && resultSelector.Parameters.Count >= 1
+                        && pe == resultSelector.Parameters[0]);
+                if (bodyIsKey)
                 {
                     var keyBuilder = PooledStringBuilder.Rent();
                     keyBuilder.Append(groupBySql).Append(" AS ").Append(_provider.Escape("Key"));
                     selectItems.Add(keyBuilder.ToString());
                     PooledStringBuilder.Return(keyBuilder);
-                    _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    _sql.AppendJoin(", ", selectItems);
-                    return;
                 }
-
-                // Handle direct aggregate: g => g.Count()
-                if (resultSelector.Body is MethodCallExpression methodCall)
+                else if (resultSelector.Body is MethodCallExpression methodCall
+                         && TranslateGroupAggregateMethod(methodCall, alias) is { } aggregateSql)
                 {
-                    var aggregateSql = TranslateGroupAggregateMethod(methodCall, alias);
-                    if (aggregateSql != null)
-                    {
-                        var aggregateBuilder = PooledStringBuilder.Rent();
-                        // Include the group key for proper grouping
-                        aggregateBuilder.Append(groupBySql).Append(" AS GroupKey");
-                        selectItems.Add(aggregateBuilder.ToString());
-                        PooledStringBuilder.Return(aggregateBuilder);
+                    var groupBuilder = PooledStringBuilder.Rent();
+                    groupBuilder.Append(groupBySql).Append(" AS GroupKey");
+                    selectItems.Add(groupBuilder.ToString());
+                    PooledStringBuilder.Return(groupBuilder);
 
-                        aggregateBuilder = PooledStringBuilder.Rent();
-                        aggregateBuilder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
-                        selectItems.Add(aggregateBuilder.ToString());
-                        PooledStringBuilder.Return(aggregateBuilder);
-
-                        _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                        _sql.AppendJoin(", ", selectItems);
-                        return;
-                    }
+                    var valueBuilder = PooledStringBuilder.Rent();
+                    valueBuilder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
+                    selectItems.Add(valueBuilder.ToString());
+                    PooledStringBuilder.Return(valueBuilder);
                 }
-
-                var builderForKey = PooledStringBuilder.Rent();
-                builderForKey.Append(groupBySql).Append(" AS GroupKey");
-                selectItems.Add(builderForKey.ToString());
-                PooledStringBuilder.Return(builderForKey);
-                var builder = (System.Text.StringBuilder?)null;
-                // Analyze the result selector body to find aggregates
-                if (resultSelector.Body is NewExpression newExpr)
+                else
                 {
-                    for (int i = 0; i < newExpr.Arguments.Count; i++)
+                    var builder = (System.Text.StringBuilder?)null;
+                    if (resultSelector.Body is NewExpression newExpr)
                     {
-                        var arg = newExpr.Arguments[i];
-                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                        if (arg is MethodCallExpression aggregateCall)
+                        for (int i = 0; i < newExpr.Arguments.Count; i++)
                         {
-                            var aggregateSql = TranslateGroupAggregateMethod(aggregateCall, alias);
-                            if (aggregateSql != null)
+                            var arg = newExpr.Arguments[i];
+                            var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                            // g.Key inside a NewExpression projects the group key column.
+                            if (arg is MemberExpression keyMember && keyMember.Member.Name == "Key")
                             {
                                 builder = PooledStringBuilder.Rent();
-                                builder.Append(aggregateSql).Append(" AS ").Append(memberName);
+                                builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
                                 PooledStringBuilder.Return(builder);
+                                continue;
                             }
-                        }
-                        else if (arg is ParameterExpression param && param == resultSelector.Parameters[0])
-                        {
-                            // This is the key parameter, already added
-                            continue;
-                        }
-                        else
-                        {
-                            // Try to translate as regular expression
-                            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                            var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
-                            var visitor = FastExpressionVisitorPool.Get(in vctx);
-                            var sql = visitor.Translate(arg);
-                            builder = PooledStringBuilder.Rent();
-                            builder.Append(sql).Append(" AS ").Append(memberName);
-                            selectItems.Add(builder.ToString());
-                            PooledStringBuilder.Return(builder);
-                            foreach (var kvp in visitor.GetParameters())
-                                AddParameter(kvp.Key, kvp.Value);
-                            FastExpressionVisitorPool.Return(visitor);
+                            // Bare key parameter inside a 3-arg result selector: (k, g) => new { k, ... }.
+                            if (arg is ParameterExpression keyParam
+                                && resultSelector.Parameters.Count >= 1
+                                && keyParam == resultSelector.Parameters[0])
+                            {
+                                builder = PooledStringBuilder.Rent();
+                                builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape(memberName));
+                                selectItems.Add(builder.ToString());
+                                PooledStringBuilder.Return(builder);
+                                continue;
+                            }
+                            if (arg is MethodCallExpression aggregateCall)
+                            {
+                                var innerAggregate = TranslateGroupAggregateMethod(aggregateCall, alias);
+                                if (innerAggregate != null)
+                                {
+                                    builder = PooledStringBuilder.Rent();
+                                    builder.Append(innerAggregate).Append(" AS ").Append(_provider.Escape(memberName));
+                                    selectItems.Add(builder.ToString());
+                                    PooledStringBuilder.Return(builder);
+                                }
+                            }
+                            else
+                            {
+                                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                                    _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
+                                var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                                var visitor = FastExpressionVisitorPool.Get(in vctx);
+                                var sql = visitor.Translate(arg);
+                                builder = PooledStringBuilder.Rent();
+                                builder.Append(sql).Append(" AS ").Append(_provider.Escape(memberName));
+                                selectItems.Add(builder.ToString());
+                                PooledStringBuilder.Return(builder);
+                                foreach (var kvp in visitor.GetParameters())
+                                    AddParameter(kvp.Key, kvp.Value);
+                                FastExpressionVisitorPool.Return(visitor);
+                            }
                         }
                     }
                 }
+
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 _sql.AppendJoin(", ", selectItems);
+                // Build() skips its SELECT/FROM-prefix block when _sql.Length > 0, so we must
+                // emit FROM ourselves. Subsequent clauses (WHERE/GROUP BY/ORDER BY) are appended
+                // by the Build() pipeline as usual.
+                _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
             }
             finally
             {
