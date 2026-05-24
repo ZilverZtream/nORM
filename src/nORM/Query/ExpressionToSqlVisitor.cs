@@ -1315,7 +1315,8 @@ namespace nORM.Query
         private static readonly FrozenSet<Type> s_safeDeclaringTypes = new HashSet<Type>
         {
             typeof(string), typeof(Math), typeof(DateTime), typeof(Convert),
-            typeof(Enumerable), typeof(Queryable), typeof(Json)
+            typeof(Enumerable), typeof(Queryable), typeof(Json),
+            typeof(NormFunctions)
         }.ToFrozenSet();
 
         /// <summary>

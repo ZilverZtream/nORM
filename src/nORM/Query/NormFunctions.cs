@@ -19,5 +19,14 @@ namespace nORM.Query
         public static bool Like(string value, string pattern)
             => throw new InvalidOperationException(
                 $"{nameof(NormFunctions)}.{nameof(Like)} can only be used inside a LINQ query translated to SQL.");
+
+        /// <summary>
+        /// Case-insensitive pattern match. PostgreSQL emits native ILIKE; SQL Server, SQLite,
+        /// and MySQL emit `LOWER(value) LIKE LOWER(pattern)`. As with Like, no automatic
+        /// LIKE-pattern escaping is performed — the caller controls `%` and `_`.
+        /// </summary>
+        public static bool ILike(string value, string pattern)
+            => throw new InvalidOperationException(
+                $"{nameof(NormFunctions)}.{nameof(ILike)} can only be used inside a LINQ query translated to SQL.");
     }
 }

@@ -403,6 +403,15 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(NormFunctions))
+            {
+                return name switch
+                {
+                    nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch

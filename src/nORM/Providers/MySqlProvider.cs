@@ -357,6 +357,19 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(NormFunctions))
+            {
+                return name switch
+                {
+                    // MySQL LIKE is case-insensitive on case-insensitive collations (the
+                    // default for utf8mb4_general_ci) but case-sensitive on _bin / _cs
+                    // collations. Forcing LOWER on both sides guarantees consistent
+                    // ILIKE semantics regardless of column collation.
+                    nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch
