@@ -223,11 +223,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(sumSelector.Parameters[0]))
                                 _correlatedParams[sumSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, sumSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, sumSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(sumSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                AddParameter(kvp.Key, kvp.Value);
+                                AddLiteralParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"SUM({columnSql})";
                         }
@@ -245,11 +245,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(avgSelector.Parameters[0]))
                                 _correlatedParams[avgSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, avgSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, avgSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(avgSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                AddParameter(kvp.Key, kvp.Value);
+                                AddLiteralParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"AVG({columnSql})";
                         }
@@ -267,11 +267,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(minSelector.Parameters[0]))
                                 _correlatedParams[minSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, minSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, minSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(minSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                AddParameter(kvp.Key, kvp.Value);
+                                AddLiteralParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"MIN({columnSql})";
                         }
@@ -288,11 +288,11 @@ namespace nORM.Query
                         {
                             if (!_correlatedParams.ContainsKey(maxSelector.Parameters[0]))
                                 _correlatedParams[maxSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, maxSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, maxSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
                             var columnSql = visitor.Translate(maxSelector.Body);
                             foreach (var kvp in visitor.GetParameters())
-                                AddParameter(kvp.Key, kvp.Value);
+                                AddLiteralParameter(kvp.Key, kvp.Value);
                             FastExpressionVisitorPool.Return(visitor);
                             return $"MAX({columnSql})";
                         }
