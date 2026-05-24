@@ -37,6 +37,7 @@ namespace nORM.Query
                 nameof(string.CompareTo),
                 nameof(string.IsNullOrEmpty),
                 nameof(string.IsNullOrWhiteSpace),
+                nameof(string.Equals),
                 nameof(string.Replace),
                 nameof(string.IndexOf),
                 nameof(string.PadLeft),
