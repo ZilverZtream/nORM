@@ -160,6 +160,18 @@ namespace nORM.Query
                                      or nameof(Queryable.Any)
                                      or nameof(Queryable.All)))
             {
+                // Two equivalent surface forms:
+                //   p.Children.Where(predicate).Count()         — unwrapped above (navFilter)
+                //   p.Children.Count(predicate)                 — predicate on the Count itself
+                // Both must AND the predicate into the subquery WHERE. Without this, the
+                // 2-arg overload silently drops the predicate and returns the total count.
+                // All(predicate) only has the 2-arg form — its predicate must arrive here too.
+                if (navFilter == null
+                    && node.Arguments.Count == 2
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression directPred)
+                {
+                    navFilter = directPred;
+                }
                 EmitNavigationCountSubquery(sb, node, relation, navFilter);
                 return node;
             }
