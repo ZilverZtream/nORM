@@ -285,6 +285,15 @@ namespace nORM.Providers
             _parameterFactory.CreateParameter(name, value);
 
         /// <summary>
+        /// MySQL TIMESTAMPDIFF(SECOND) is integer seconds. Wrap in CAST to DOUBLE so the
+        /// subsequent division for TotalHours / TotalDays etc. stays fractional.
+        /// </summary>
+        /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
+        /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
+        public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
+            => $"CAST(TIMESTAMPDIFF(SECOND, {startSql}, {endSql}) AS DOUBLE)";
+
+        /// <summary>
         /// Translates selected .NET methods to their MySQL SQL equivalents.
         /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)

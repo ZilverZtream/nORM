@@ -220,6 +220,15 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// SQLite has no native interval type. Convert both timestamps to Julian-day numbers
+        /// (a fractional REAL) and multiply by 86400 to get seconds.
+        /// </summary>
+        /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
+        /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
+        public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
+            => $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
+
+        /// <summary>
         /// Attempts to translate a .NET method into its SQLite SQL equivalent.
         /// </summary>
         /// <param name="name">Name of the method being translated.</param>
