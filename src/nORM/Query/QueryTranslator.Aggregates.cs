@@ -259,6 +259,39 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// When an aggregate's source is a chain of `Enumerable.Where(...)` calls
+        /// (`g.Where(p1).Where(p2).Sum(s)`), strip the wrappers and return the combined
+        /// AND-of-predicates. Returns null when the source is just the IGrouping parameter.
+        /// </summary>
+        private LambdaExpression? ExtractAggregateSourceFilter(MethodCallExpression methodCall)
+        {
+            if (methodCall.Arguments.Count == 0) return null;
+            var source = methodCall.Arguments[0];
+            LambdaExpression? combined = null;
+            // Peel each Where(...) wrapper, AND-combining their predicates against a
+            // single parameter so the emitted SQL gets one CASE-WHEN guard expression.
+            while (source is MethodCallExpression mce
+                && mce.Method.Name == nameof(Queryable.Where)
+                && mce.Method.DeclaringType is { } dt
+                && (dt == typeof(Queryable) || dt == typeof(Enumerable))
+                && mce.Arguments.Count == 2
+                && StripQuotes(mce.Arguments[1]) is LambdaExpression pred)
+            {
+                if (combined == null)
+                {
+                    combined = pred;
+                }
+                else
+                {
+                    var rebound = new nORM.Internal.ParameterReplacer(pred.Parameters[0], combined.Parameters[0]).Visit(pred.Body)!;
+                    combined = Expression.Lambda(Expression.AndAlso(combined.Body, rebound), combined.Parameters[0]);
+                }
+                source = mce.Arguments[0];
+            }
+            return combined;
+        }
+
+        /// <summary>
         /// Translates a predicate / selector lambda body against the group's element alias,
         /// merging any literal constants as compiled-literal parameters. Shared by every
         /// IGrouping aggregate path that needs the CASE-WHEN-emitter pattern.
@@ -319,94 +352,71 @@ namespace nORM.Query
                         return $"(MIN(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
                     }
                 case "Sum":
-                    {
-                        // Extension method form: Enumerable.Sum(source, selector) — selector at [1]
-                        // Instance method form: g.Sum(selector) — selector at [0]
-                        var sumSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
-                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
-                        var sumSelector = sumSelectorArg != null ? StripQuotes(sumSelectorArg) as LambdaExpression : null;
-                        if (sumSelector != null)
-                        {
-                            if (!_correlatedParams.ContainsKey(sumSelector.Parameters[0]))
-                                _correlatedParams[sumSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, sumSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                            var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(sumSelector.Body);
-                            foreach (var kvp in visitor.GetParameters())
-                                AddLiteralParameter(kvp.Key, kvp.Value);
-                            FastExpressionVisitorPool.Return(visitor);
-                            return $"SUM({columnSql})";
-                        }
-                    }
-                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
-                        "SUM requires a selector expression (e.g., g.Sum(x => x.Amount)). SUM(*) is not valid SQL."));
+                    return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "SUM", "0",
+                        "SUM requires a selector expression (e.g., g.Sum(x => x.Amount)). SUM(*) is not valid SQL.");
                 case "Average":
-                    {
-                        // Extension method form: Enumerable.Average(source, selector) — selector at [1]
-                        // Instance method form: g.Average(selector) — selector at [0]
-                        var avgSelectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
-                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
-                        var avgSelector = avgSelectorArg != null ? StripQuotes(avgSelectorArg) as LambdaExpression : null;
-                        if (avgSelector != null)
-                        {
-                            if (!_correlatedParams.ContainsKey(avgSelector.Parameters[0]))
-                                _correlatedParams[avgSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, avgSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                            var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(avgSelector.Body);
-                            foreach (var kvp in visitor.GetParameters())
-                                AddLiteralParameter(kvp.Key, kvp.Value);
-                            FastExpressionVisitorPool.Return(visitor);
-                            return $"AVG({columnSql})";
-                        }
-                    }
-                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
-                        "AVG requires a selector expression (e.g., g.Average(x => x.Amount)). AVG(*) is not valid SQL."));
+                    // For AVG with a Where filter the SQL idiom is `AVG(CASE WHEN p THEN sel END)`
+                    // (no ELSE — NULL excludes the row from the average). Use `NULL` as the
+                    // unmatched-row branch so the average only counts matching rows.
+                    return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "AVG", "NULL",
+                        "AVG requires a selector expression (e.g., g.Average(x => x.Amount)). AVG(*) is not valid SQL.");
                 case "Min":
-                    {
-                        // Extension method form: Enumerable.Min(source, selector) — selector at [1]
-                        // Instance method form (hypothetical): g.Min(selector) — selector at [0]
-                        var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
-                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
-                        var minSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
-                        if (minSelector != null)
-                        {
-                            if (!_correlatedParams.ContainsKey(minSelector.Parameters[0]))
-                                _correlatedParams[minSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, minSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                            var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(minSelector.Body);
-                            foreach (var kvp in visitor.GetParameters())
-                                AddLiteralParameter(kvp.Key, kvp.Value);
-                            FastExpressionVisitorPool.Return(visitor);
-                            return $"MIN({columnSql})";
-                        }
-                    }
-                    return null;
+                    // Like AVG, MIN with a filter uses NULL for unmatched rows so the MIN only
+                    // considers matching rows. Returning null when no selector lets the existing
+                    // null-fallback path continue (matching pre-fix behaviour).
+                    return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "MIN", "NULL", errorMessage: null);
                 case "Max":
-                    {
-                        // Extension method form: Enumerable.Max(source, selector) — selector at [1]
-                        // Instance method form (hypothetical): g.Max(selector) — selector at [0]
-                        var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
-                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
-                        var maxSelector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
-                        if (maxSelector != null)
-                        {
-                            if (!_correlatedParams.ContainsKey(maxSelector.Parameters[0]))
-                                _correlatedParams[maxSelector.Parameters[0]] = (_mapping, alias);
-                            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, maxSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                            var visitor = FastExpressionVisitorPool.Get(in vctxSel);
-                            var columnSql = visitor.Translate(maxSelector.Body);
-                            foreach (var kvp in visitor.GetParameters())
-                                AddLiteralParameter(kvp.Key, kvp.Value);
-                            FastExpressionVisitorPool.Return(visitor);
-                            return $"MAX({columnSql})";
-                        }
-                    }
-                    return null;
+                    return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "MAX", "NULL", errorMessage: null);
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        /// Emits a SQL aggregate (SUM / AVG / MIN / MAX) over a group, honouring any
+        /// `Where(...)` filters that wrap the IGrouping source. The unmatched-row branch
+        /// is the caller's choice: `0` for SUM (additive identity) or `NULL` for
+        /// AVG / MIN / MAX (excluded by the aggregate semantics).
+        /// </summary>
+        private string? EmitGroupAggregateWithOptionalFilter(
+            MethodCallExpression methodCall,
+            string alias,
+            string sqlAgg,
+            string unmatchedBranchSql,
+            string? errorMessage)
+        {
+            var selectorArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                ? methodCall.Arguments[1]
+                : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+            var selector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
+            if (selector == null)
+            {
+                if (errorMessage != null)
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, errorMessage));
+                return null;
+            }
+
+            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
+                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
+
+            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctxSel);
+            var columnSql = visitor.Translate(selector.Body);
+            foreach (var kvp in visitor.GetParameters())
+                AddLiteralParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(visitor);
+
+            var whereFilter = ExtractAggregateSourceFilter(methodCall);
+            if (whereFilter == null) return $"{sqlAgg}({columnSql})";
+
+            // Rebind the filter lambda's parameter onto the selector's parameter so both
+            // expressions reference the same group-element alias, then translate the
+            // predicate against that alias and emit `AGG(CASE WHEN pred THEN sel ELSE
+            // <unmatched> END)`.
+            var reboundBody = new nORM.Internal.ParameterReplacer(whereFilter.Parameters[0], selector.Parameters[0]).Visit(whereFilter.Body)!;
+            var reboundFilter = Expression.Lambda(reboundBody, selector.Parameters[0]);
+            var predSql = TranslateGroupPredicateBody(reboundFilter, alias);
+            return $"{sqlAgg}(CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END)";
         }
         private Expression HandleDirectAggregate(MethodCallExpression node)
         {
