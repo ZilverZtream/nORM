@@ -396,11 +396,14 @@ public class DocumentationContractTests
 
         Assert.Contains("ValidateCudPlan(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
         Assert.Contains("GetWhereClause(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
+        Assert.Contains("GetWhereClauseWithOuterQualifier(BulkCudQueryShape? shape", builder, StringComparison.Ordinal);
         Assert.DoesNotContain("ValidateCudPlan(string sql)", builder, StringComparison.Ordinal);
         Assert.DoesNotContain("ExtractWhereClause(string sql", builder, StringComparison.Ordinal);
         Assert.DoesNotContain("IndexOf(\" WHERE\"", builder, StringComparison.Ordinal);
         Assert.Contains("ValidateCudPlan(plan.BulkCudShape)", provider, StringComparison.Ordinal);
-        Assert.Contains("GetWhereClause(plan.BulkCudShape)", provider, StringComparison.Ordinal);
+        // ExecuteUpdate/Delete use the qualifier variant so correlated subqueries keep
+        // their outer scoping when the T0 alias is rewritten.
+        Assert.Contains("GetWhereClauseWithOuterQualifier(plan.BulkCudShape", provider, StringComparison.Ordinal);
     }
 
     [Fact]

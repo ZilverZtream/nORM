@@ -47,7 +47,70 @@ namespace nORM.Query
             if (shape == null || string.IsNullOrEmpty(shape.WhereClause))
                 return string.Empty;
 
-            return RemoveAliasFromWhereClause(shape.WhereClause, alias: null);
+            // DELETE/UPDATE statements have no FROM alias for the target table — but bare
+            // `Id` inside a correlated subquery resolves to the INNER table's Id, breaking
+            // the correlation. Solution: REWRITE the outer alias T0 to the target table
+            // name so `T0.Id` becomes `<EscTable>.Id` which is unambiguous in both the
+            // outer and inner scopes. Inner aliases (T1, T2, ...) stay untouched.
+            // The replacement string is filled in by ExecuteUpdate/ExecuteDelete after
+            // they know the target table; default behavior (no replacement) strips the
+            // outer alias entirely for queries with no correlated subquery.
+            return RemoveAliasFromWhereClause(shape.WhereClause, alias: "T0");
+        }
+
+        /// <summary>
+        /// Variant that REPLACES the outer alias with the supplied qualifier (typically the
+        /// target table's escaped name) rather than stripping it. Required when the WHERE
+        /// clause references the outer alias from within a correlated subquery — bare
+        /// column names would otherwise rebind to the inner table.
+        /// </summary>
+        public string GetWhereClauseWithOuterQualifier(BulkCudQueryShape? shape, string outerQualifier)
+        {
+            if (shape == null || string.IsNullOrEmpty(shape.WhereClause))
+                return string.Empty;
+            return ReplaceAliasWithQualifier(shape.WhereClause, alias: "T0", qualifier: outerQualifier);
+        }
+
+        private static string ReplaceAliasWithQualifier(string where, string alias, string qualifier)
+        {
+            var sb = _stringBuilderPool.Get();
+            sb.EnsureCapacity(where.Length);
+            bool inString = false;
+            bool inBracket = false;
+            for (int i = 0; i < where.Length; i++)
+            {
+                char c = where[i];
+                if (!inString && !inBracket)
+                {
+                    // Match delimited form `"T0".`, `` `T0`. ``, or `[T0].`.
+                    int dot;
+                    if (TrySkipSpecificDelimitedAlias(where, i, '"', alias, out dot) ||
+                        TrySkipSpecificDelimitedAlias(where, i, '`', alias, out dot) ||
+                        TrySkipSpecificBracketedAlias(where, i, alias, out dot))
+                    {
+                        sb.Append(qualifier).Append('.');
+                        i = dot; // i was at opening delim, dot is at the '.', loop's i++ moves past it
+                        continue;
+                    }
+                    // Bare `T0.`
+                    if (where.AsSpan(i).StartsWith(alias, StringComparison.OrdinalIgnoreCase) &&
+                        i + alias.Length < where.Length && where[i + alias.Length] == '.' &&
+                        (i == 0 || !IsIdentifierChar(where[i - 1])))
+                    {
+                        sb.Append(qualifier).Append('.');
+                        i += alias.Length;
+                        continue;
+                    }
+                }
+                if (!inString && c == '[') inBracket = true;
+                else if (inBracket && c == ']') inBracket = false;
+                else if (!inBracket && c == '\'') inString = !inString;
+                sb.Append(c);
+            }
+            var result = sb.ToString();
+            sb.Clear();
+            _stringBuilderPool.Return(sb);
+            return result;
         }
 
         /// <summary>
@@ -64,11 +127,13 @@ namespace nORM.Query
             {
                 char c = where[i];
 
-                if (!inString && !inBracket)
+                if (!inString && !inBracket && !string.IsNullOrEmpty(alias))
                 {
-                    if (TrySkipDelimitedAlias(where, i, '"', out var quotedAliasEnd) ||
-                        TrySkipDelimitedAlias(where, i, '`', out quotedAliasEnd) ||
-                        TrySkipBracketedAlias(where, i, out quotedAliasEnd))
+                    // Strip ONLY the specified outer alias, in delimited or bare form. Inner
+                    // aliases (T1, T2, ...) in correlated subqueries stay intact.
+                    if (TrySkipSpecificDelimitedAlias(where, i, '"', alias, out var quotedAliasEnd) ||
+                        TrySkipSpecificDelimitedAlias(where, i, '`', alias, out quotedAliasEnd) ||
+                        TrySkipSpecificBracketedAlias(where, i, alias, out quotedAliasEnd))
                     {
                         i = quotedAliasEnd;
                         continue;
@@ -88,26 +153,14 @@ namespace nORM.Query
                     inString = !inString;
                 }
 
-                if (!inString && !inBracket)
+                if (!inString && !inBracket && !string.IsNullOrEmpty(alias))
                 {
-                    if (!string.IsNullOrEmpty(alias) &&
-                        where.AsSpan(i).StartsWith(alias, StringComparison.OrdinalIgnoreCase) &&
+                    if (where.AsSpan(i).StartsWith(alias, StringComparison.OrdinalIgnoreCase) &&
                         i + alias.Length < where.Length && where[i + alias.Length] == '.' &&
                         (i == 0 || !IsIdentifierChar(where[i - 1])))
                     {
                         i += alias.Length; // skip alias and dot
                         continue;
-                    }
-
-                    if (c == 'T' && (i == 0 || !IsIdentifierChar(where[i - 1])))
-                    {
-                        int j = i + 1;
-                        while (j < where.Length && char.IsDigit(where[j])) j++;
-                        if (j > i + 1 && j < where.Length && where[j] == '.')
-                        {
-                            i = j; // skip alias and dot
-                            continue;
-                        }
                     }
                 }
 
@@ -121,6 +174,43 @@ namespace nORM.Query
         }
 
         private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
+
+        /// <summary>
+        /// Matches a delimited alias of EXACTLY the given name followed by '.', e.g. `"T0".`
+        /// or `\`T0\`.`. Returns the index of the '.' on match.
+        /// </summary>
+        private static bool TrySkipSpecificDelimitedAlias(string where, int start, char delimiter, string alias, out int dotIndex)
+        {
+            dotIndex = -1;
+            if (start >= where.Length || where[start] != delimiter) return false;
+            var aliasStart = start + 1;
+            if (aliasStart + alias.Length > where.Length) return false;
+            if (string.Compare(where, aliasStart, alias, 0, alias.Length, StringComparison.OrdinalIgnoreCase) != 0)
+                return false;
+            var aliasEnd = aliasStart + alias.Length;
+            if (aliasEnd >= where.Length || where[aliasEnd] != delimiter) return false;
+            if (aliasEnd + 1 >= where.Length || where[aliasEnd + 1] != '.') return false;
+            dotIndex = aliasEnd + 1;
+            return true;
+        }
+
+        /// <summary>
+        /// Matches a bracketed alias of EXACTLY the given name followed by '.', e.g. `[T0].`.
+        /// </summary>
+        private static bool TrySkipSpecificBracketedAlias(string where, int start, string alias, out int dotIndex)
+        {
+            dotIndex = -1;
+            if (start >= where.Length || where[start] != '[') return false;
+            var aliasStart = start + 1;
+            if (aliasStart + alias.Length > where.Length) return false;
+            if (string.Compare(where, aliasStart, alias, 0, alias.Length, StringComparison.OrdinalIgnoreCase) != 0)
+                return false;
+            var aliasEnd = aliasStart + alias.Length;
+            if (aliasEnd >= where.Length || where[aliasEnd] != ']') return false;
+            if (aliasEnd + 1 >= where.Length || where[aliasEnd + 1] != '.') return false;
+            dotIndex = aliasEnd + 1;
+            return true;
+        }
 
         private static bool TrySkipDelimitedAlias(string where, int start, char delimiter, out int dotIndex)
         {

@@ -1168,7 +1168,7 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClause(plan.BulkCudShape);
+            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -1190,7 +1190,7 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClause(plan.BulkCudShape);
+            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
             var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
