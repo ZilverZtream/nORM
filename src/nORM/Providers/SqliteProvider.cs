@@ -353,6 +353,12 @@ namespace nORM.Providers
                     nameof(TimeSpan.Hours) => $"CAST(substr({args[0]}, 1, 2) AS INTEGER)",
                     nameof(TimeSpan.Minutes) => $"CAST(substr({args[0]}, 4, 2) AS INTEGER)",
                     nameof(TimeSpan.Seconds) => $"CAST(substr({args[0]}, 7, 2) AS INTEGER)",
+                    // Total* return double, so divide by a REAL literal (60.0 / 3600.0)
+                    // rather than INTEGER to force fractional arithmetic. Sum is integer
+                    // seconds: H*3600 + M*60 + S.
+                    nameof(TimeSpan.TotalSeconds) => $"(CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER))",
+                    nameof(TimeSpan.TotalMinutes) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 60.0)",
+                    nameof(TimeSpan.TotalHours) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 3600.0)",
                     _ => null
                 };
             }
