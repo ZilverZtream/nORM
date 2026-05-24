@@ -441,6 +441,10 @@ namespace nORM.Providers
                     nameof(char.IsDigit) when args.Length == 1 => $"({args[0]} BETWEEN '0' AND '9')",
                     nameof(char.IsLetter) when args.Length == 1 => $"(({args[0]} BETWEEN 'A' AND 'Z') OR ({args[0]} BETWEEN 'a' AND 'z'))",
                     nameof(char.IsWhiteSpace) when args.Length == 1 => $"({args[0]} = ' ' OR {args[0]} = CHAR(9) OR {args[0]} = CHAR(10) OR {args[0]} = CHAR(13))",
+                    // SQLite UPPER / LOWER work on single-char text the same way
+                    // they work on strings, so the static char form maps cleanly.
+                    nameof(char.ToUpper) when args.Length == 1 => $"UPPER({args[0]})",
+                    nameof(char.ToLower) when args.Length == 1 => $"LOWER({args[0]})",
                     _ => null
                 };
             }
