@@ -199,6 +199,17 @@ namespace nORM.Query
         protected override Expression VisitBinary(BinaryExpression node)
         {
             var sb = EnsureBuilder();
+            // `a ?? b` in a projection lowers to COALESCE(a, b) — emit as a function call so
+            // it composes inside `new { Name = r.Name ?? "anon" }` projections.
+            if (node.NodeType == ExpressionType.Coalesce)
+            {
+                sb.Append("COALESCE(");
+                Visit(node.Left);
+                sb.Append(", ");
+                Visit(node.Right);
+                sb.Append(')');
+                return node;
+            }
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch
