@@ -1149,6 +1149,21 @@ namespace nORM.Query
         /// </remarks>
         private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
         {
+            // MemberInit: `new TDto { A = r.A, B = r.B, ... }`. The MemberAssignment targets are
+            // properties on the DTO; build a Column per assignment whose Setter binds to the DTO
+            // property and whose Name matches the column we expect in the result row.
+            if (projection.Body is MemberInitExpression memberInit)
+            {
+                var cols = new List<Column>(memberInit.Bindings.Count);
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is MemberAssignment ma && ma.Member is PropertyInfo dtoProp)
+                    {
+                        cols.Add(new Column(dtoProp, mapping.Provider, null));
+                    }
+                }
+                return cols.ToArray();
+            }
             if (projection.Body is NewExpression newExpr)
             {
                 var cols = new List<Column>(newExpr.Arguments.Count);
