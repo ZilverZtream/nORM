@@ -577,12 +577,65 @@ namespace nORM.Query
                 smResultSelector.Parameters[0], smResultSelector.Parameters[1],
                 outerMemberName, freshOuter, freshInner);
             var newBody = rewriter.Visit(smResultSelector.Body)!;
+            // Detect `inner == null` / `inner != null` defensive null-checks inside the
+            // projection. SQL LEFT JOIN naturally NULLs unmatched right-side columns, so
+            // the conditional is semantically redundant — but nORM's visitor doesn't yet
+            // recognise the entity-parameter-vs-null shape and silently mis-binds the
+            // projected column to the inner's first ordinal (returns the inner's Id
+            // instead of the named property). Surface a clear error pointing at the
+            // idiomatic bare `c.Tag` workaround.
+            if (ContainsEntityNullCheck(newBody, freshInner))
+            {
+                throw new NormUnsupportedFeatureException(
+                    "Defensive `inner == null` / `inner != null` checks inside a LEFT JOIN " +
+                    "(GroupJoin + SelectMany + DefaultIfEmpty) projection aren't yet supported — " +
+                    "nORM mis-binds the projected column when the conditional wraps an inner-row " +
+                    "null test. The check is redundant in SQL anyway: LEFT JOIN already NULLs the " +
+                    "unmatched right side, so a downstream `c.Tag` projection returns NULL for the " +
+                    "DefaultIfEmpty rows automatically. Workaround: drop the conditional and " +
+                    "project the column directly — `select new { p.Name, Tag = c.Tag }` instead of " +
+                    "`select new { p.Name, Tag = c == null ? null : c.Tag }`.");
+            }
             var rewrittenResultSel = Expression.Lambda(newBody, freshOuter, freshInner);
 
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
             _sql.Clear();
             JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
+        }
+
+        private static bool ContainsEntityNullCheck(Expression body, ParameterExpression entityParam)
+        {
+            var visitor = new EntityNullCheckDetector(entityParam);
+            visitor.Visit(body);
+            return visitor.Found;
+        }
+
+        private sealed class EntityNullCheckDetector : ExpressionVisitor
+        {
+            private readonly ParameterExpression _entity;
+            public bool Found { get; private set; }
+
+            public EntityNullCheckDetector(ParameterExpression entity) => _entity = entity;
+
+            protected override Expression VisitBinary(BinaryExpression node)
+            {
+                if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+                {
+                    if (IsEntityVsNull(node.Left, node.Right) || IsEntityVsNull(node.Right, node.Left))
+                    {
+                        Found = true;
+                        return node;
+                    }
+                }
+                return base.VisitBinary(node);
+            }
+
+            private bool IsEntityVsNull(Expression maybeEntity, Expression maybeNull)
+            {
+                return maybeEntity == _entity
+                    && maybeNull is ConstantExpression { Value: null };
+            }
         }
 
         private sealed class QuerySyntaxLeftJoinRewriter : ExpressionVisitor
