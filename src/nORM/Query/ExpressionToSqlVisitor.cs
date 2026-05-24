@@ -1069,7 +1069,9 @@ namespace nORM.Query
                 && node.Arguments.Count == 1
                 && (node.Method.Name == nameof(char.IsDigit)
                     || node.Method.Name == nameof(char.IsLetter)
-                    || node.Method.Name == nameof(char.IsWhiteSpace)))
+                    || node.Method.Name == nameof(char.IsWhiteSpace)
+                    || node.Method.Name == nameof(char.IsUpper)
+                    || node.Method.Name == nameof(char.IsLower)))
             {
                 var charSql = GetSql(node.Arguments[0]);
                 switch (node.Method.Name)
@@ -1080,6 +1082,12 @@ namespace nORM.Query
                     case nameof(char.IsLetter):
                         _sql.Append("((").Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
                             .Append(charSql).Append(" BETWEEN 'a' AND 'z'))");
+                        return node;
+                    case nameof(char.IsUpper):
+                        _sql.Append('(').Append(charSql).Append(" BETWEEN 'A' AND 'Z')");
+                        return node;
+                    case nameof(char.IsLower):
+                        _sql.Append('(').Append(charSql).Append(" BETWEEN 'a' AND 'z')");
                         return node;
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
