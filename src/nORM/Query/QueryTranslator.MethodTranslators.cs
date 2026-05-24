@@ -699,6 +699,29 @@ namespace nORM.Query
             /// <returns>The original method call expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Ninth in the post-Take/Skip silent-wrongness family. Each side of the
+                // set op is translated in its own sub-context which bakes any Take/Skip
+                // into the sub-SQL — but the outer composition is
+                // `<left> UNION <right>` (no parentheses) and SQLite (along with most
+                // dialects) parses LIMIT after the LAST SELECT or rejects the unwrapped
+                // mix outright (`near "UNION": syntax error`). Detect Take/Skip in
+                // either side via SourceHasTakeOrSkip and throw with a clear workaround.
+                if (QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0])
+                    || QueryTranslator.SourceHasTakeOrSkip(node.Arguments[1]))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        node.Method.Name + " over a Take/Skip source isn't supported — the translator " +
+                        "translates each side in its own sub-context (baking LIMIT into the sub-SQL) " +
+                        "but the outer composition `<left> UNION <right>` lacks the parentheses that " +
+                        "SQL requires when combining LIMIT-ed SELECTs across a set op, so SQLite " +
+                        "throws a syntax error. SQL needs parenthesised sub-SELECTs " +
+                        "(`(SELECT … LIMIT n) UNION (SELECT …)`) that nORM doesn't yet emit. " +
+                        "Workarounds: " +
+                        "(1) Materialize each windowed side first and union client-side: " +
+                        "`var top = await q.Take(n).ToListAsync(); var all = top.Concat(otherList);`. " +
+                        "(2) Move the Take to AFTER the set op if you wanted top-N-after-union: " +
+                        "`q.Union(other).Take(n)`.");
+                }
                 var leftSql = t.TranslateSubExpression(node.Arguments[0]);
                 var rightSql = t.TranslateSubExpression(node.Arguments[1]);
                 var setOp = node.Method.Name switch
