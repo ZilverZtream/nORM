@@ -289,6 +289,9 @@ namespace nORM.Providers
                     nameof(Math.Log) when args.Length == 2 => $"LOG({args[1]}, {args[0]})",
                     nameof(Math.Log10) when args.Length == 1 => $"LOG({args[0]})",
                     nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
+                    nameof(Math.Truncate) when args.Length == 1 => $"TRUNC({args[0]})",
+                    nameof(Math.Min) when args.Length == 2 => $"LEAST({args[0]}, {args[1]})",
+                    nameof(Math.Max) when args.Length == 2 => $"GREATEST({args[0]}, {args[1]})",
                     _ => null
                 };
             }

@@ -1159,6 +1159,14 @@ namespace nORM.Query
                 {
                     if (binding is MemberAssignment ma && ma.Member is PropertyInfo dtoProp)
                     {
+                        // Navigation collections are populated by the dependent-query / split-query
+                        // pipeline rather than read from the row, so they must not appear as
+                        // projection columns. Detect via the source-side member type.
+                        if (ma.Expression is MemberExpression sourceMember
+                            && IsNavigationCollection(sourceMember, mapping))
+                        {
+                            continue;
+                        }
                         cols.Add(new Column(dtoProp, mapping.Provider, null));
                     }
                 }

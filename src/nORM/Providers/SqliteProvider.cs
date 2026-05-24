@@ -302,6 +302,9 @@ namespace nORM.Providers
                     nameof(Math.Log) when args.Length == 2 => $"LOG({args[1]}, {args[0]})",
                     nameof(Math.Log10) when args.Length == 1 => $"LOG10({args[0]})",
                     nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
+                    // SQLite has no TRUNC; CAST drops the fractional part for finite reals and
+                    // matches Math.Truncate semantics (truncate toward zero).
+                    nameof(Math.Truncate) when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
                     nameof(Math.Min) when args.Length == 2 => $"MIN({args[0]}, {args[1]})",
                     nameof(Math.Max) when args.Length == 2 => $"MAX({args[0]}, {args[1]})",
                     _ => null

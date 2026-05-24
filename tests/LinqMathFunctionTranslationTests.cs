@@ -94,6 +94,33 @@ public class LinqMathFunctionTranslationTests : IAsyncLifetime
         Assert.Equal(new[] { 1 }, ids);
     }
 
+    [Fact]
+    public async Task Min_picks_smaller_of_two_values()
+    {
+        // Min(val, 5) == 2.0 selects the row where val=2.0.
+        var ids = (await _ctx.Query<NumRow>().Where(r => Math.Min(r.Val, 5.0) == 2.0).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 5 }, ids);
+    }
+
+    [Fact]
+    public async Task Max_picks_larger_of_two_values()
+    {
+        // Max(val, 5) == 16.0 selects the row where val=16.0.
+        var ids = (await _ctx.Query<NumRow>().Where(r => Math.Max(r.Val, 5.0) == 16.0).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 4 }, ids);
+    }
+
+    [Fact]
+    public async Task Truncate_drops_fractional_part()
+    {
+        // val=3.5 truncates to 3.
+        var ids = (await _ctx.Query<NumRow>().Where(r => Math.Truncate(r.Val) == 3.0).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 6 }, ids);
+    }
+
     [Table("NumRow")]
     public sealed class NumRow
     {
