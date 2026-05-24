@@ -137,8 +137,22 @@ namespace nORM.Query
             // single-row aggregate result. Detect the shape and emit the correlated
             // subquery here too so `Select(p => new {p.Name, Count = p.Children.Count()})`
             // returns one row per parent with the right child count.
-            if (node.Arguments.Count >= 1
-                && node.Arguments[0] is MemberExpression navMember
+            // Try to unwrap an optional `Where(predicate)` between the navigation and the
+            // aggregate so `parent.Children.Where(c => c.IsActive).Count()` translates the
+            // same way `parent.Children.Count()` does, just AND-ing the predicate into the
+            // subquery WHERE. Without this, the Count fell back to `COUNT(*) FROM Parent`
+            // (no row-per-parent, no filter) — silent-wrongness identical to 0977c64.
+            Expression navCandidate = node.Arguments.Count >= 1 ? node.Arguments[0] : null!;
+            LambdaExpression? navFilter = null;
+            if (navCandidate is MethodCallExpression whereCall
+                && whereCall.Method.Name == nameof(Queryable.Where)
+                && whereCall.Arguments.Count == 2
+                && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
+            {
+                navFilter = whereLambda;
+                navCandidate = whereCall.Arguments[0];
+            }
+            if (navCandidate is MemberExpression navMember
                 && navMember.Expression is ParameterExpression
                 && _mapping.Relations.TryGetValue(navMember.Member.Name, out var relation)
                 && (node.Method.Name is nameof(Queryable.Count)
@@ -146,7 +160,7 @@ namespace nORM.Query
                                      or nameof(Queryable.Any)
                                      or nameof(Queryable.All)))
             {
-                EmitNavigationCountSubquery(sb, node, relation);
+                EmitNavigationCountSubquery(sb, node, relation, navFilter);
                 return node;
             }
 
@@ -253,7 +267,7 @@ namespace nORM.Query
             return node;
         }
 
-        private void EmitNavigationCountSubquery(StringBuilder sb, MethodCallExpression node, TableMapping.Relation relation)
+        private void EmitNavigationCountSubquery(StringBuilder sb, MethodCallExpression node, TableMapping.Relation relation, LambdaExpression? extraFilter)
         {
             // Resolve the dependent table mapping from the relation's DependentType. The
             // navigation registration on Relations doesn't carry the dependent TableMapping
@@ -272,26 +286,109 @@ namespace nORM.Query
             var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
             // Outer alias / table-name reference for parent columns — set via SCV ctor.
             var outerAlias = _outerAlias;
+            var extraFilterSql = extraFilter != null
+                ? RenderNavigationFilter(extraFilter, depAlias)
+                : null;
+            // Use predicate-overload Count(predicate) sugar when the unwrapped filter is the
+            // first / only filter and the outer call is Count() — keeps the SQL compact.
+            // For Any/All, AND the filter into the EXISTS / NOT EXISTS subquery's WHERE.
 
             sb.Append('(').Append("SELECT ");
             if (node.Method.Name is nameof(Queryable.Any))
+            {
                 sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol)
-                  .Append(") THEN 1 ELSE 0 END");
+                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+                if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
+                sb.Append(") THEN 1 ELSE 0 END");
+            }
             else if (node.Method.Name is nameof(Queryable.All))
+            {
                 sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol)
-                  .Append(") THEN 1 ELSE 0 END");
+                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+                // All(p) ≡ NOT EXISTS(row matching NOT p) — invert the extra filter, not AND it.
+                if (extraFilterSql != null) sb.Append(" AND NOT (").Append(extraFilterSql).Append(')');
+                sb.Append(") THEN 1 ELSE 0 END");
+            }
             else
+            {
                 sb.Append("COUNT(*) FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
-
-            if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All))
-            {
-                sb.Append(')');
-                return;
+                if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
             }
             sb.Append(')');
+        }
+
+        private string RenderNavigationFilter(LambdaExpression filter, string depAlias)
+        {
+            // Render a simple `c => c.X op constant` style predicate against the dependent
+            // alias. Supports BinaryExpression with member-access on one side and a constant
+            // (or member of a closure) on the other — the same surface area as the rest of
+            // SCV's translatable subset. More complex predicates fall through to the throw
+            // below which routes back to client-eval messaging.
+            if (filter.Body is BinaryExpression be)
+            {
+                var lhs = RenderFilterSide(be.Left, filter.Parameters[0], depAlias);
+                var rhs = RenderFilterSide(be.Right, filter.Parameters[0], depAlias);
+                var op = be.NodeType switch
+                {
+                    ExpressionType.Equal => "=",
+                    ExpressionType.NotEqual => "<>",
+                    ExpressionType.GreaterThan => ">",
+                    ExpressionType.GreaterThanOrEqual => ">=",
+                    ExpressionType.LessThan => "<",
+                    ExpressionType.LessThanOrEqual => "<=",
+                    ExpressionType.AndAlso => "AND",
+                    ExpressionType.OrElse => "OR",
+                    _ => throw new InvalidOperationException(
+                        $"Navigation filter binary operator '{be.NodeType}' isn't yet supported in a projection subquery. " +
+                        "Use a simple comparison (==, !=, <, >, <=, >=, &&, ||) or wrap with `ClientEvaluationPolicy.Allow`.")
+                };
+                return $"{lhs} {op} {rhs}";
+            }
+            throw new InvalidOperationException(
+                "Navigation filter inside a projection subquery currently supports only simple binary predicates " +
+                "(`c => c.X op constant`). For more complex shapes, wrap with `ClientEvaluationPolicy.Allow`.");
+        }
+
+        private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)
+        {
+            // Member access on the element parameter → column on the dependent.
+            if (expr is MemberExpression me && me.Expression == elementParam)
+            {
+                var colAttr = me.Member.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.ColumnAttribute), inherit: false)
+                    .Cast<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>().FirstOrDefault();
+                var colName = colAttr?.Name ?? me.Member.Name;
+                return $"{depAlias}.{_provider.Escape(colName)}";
+            }
+            // Constant or closure-captured value → literal-ize. The projection-subquery
+            // emit doesn't have access to the parameter manager here, so inline as a SQL
+            // literal — only handles simple ints, doubles, strings, bools. Anything else
+            // falls through to the throw.
+            if (expr is ConstantExpression ce)
+                return FormatLiteral(ce.Value);
+            if (expr is UnaryExpression { NodeType: ExpressionType.Convert } u && u.Operand is ConstantExpression ce2)
+                return FormatLiteral(ce2.Value);
+            if (expr is MemberExpression closureMe && QueryTranslator.TryGetConstantValue(closureMe, out var closureVal))
+                return FormatLiteral(closureVal);
+            throw new InvalidOperationException(
+                $"Navigation filter side '{expr}' isn't a simple member access or constant — only `c.X op constant` is supported in a projection subquery.");
+        }
+
+        private static string FormatLiteral(object? value)
+        {
+            return value switch
+            {
+                null => "NULL",
+                bool b => b ? "1" : "0",
+                string s => $"'{s.Replace("'", "''")}'",
+                int or long or short or byte or sbyte or uint or ulong or ushort => value.ToString()!,
+                double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                float f => f.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                decimal m => m.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                _ => throw new InvalidOperationException(
+                    $"Navigation filter literal of type '{value.GetType().Name}' isn't supported in a projection subquery. " +
+                    "Use int/long/short/byte/string/bool/double/decimal, or wrap with `ClientEvaluationPolicy.Allow`.")
+            };
         }
 
         private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda)
