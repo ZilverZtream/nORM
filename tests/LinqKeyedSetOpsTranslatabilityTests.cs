@@ -69,109 +69,42 @@ public class LinqKeyedSetOpsTranslatabilityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExceptBy_either_translates_or_throws_actionable_error()
+    public async Task ExceptBy_excludes_rows_whose_key_is_in_the_second_key_set()
     {
-        // Excluding category 'A' should leave only 'B' rows (Id=3, Id=4 = 2 rows).
-        Exception? ex = null;
-        var rowCount = -1;
-        try
-        {
-            var excluded = new[] { "A" };
-            var result = await _ctx.Query<KsoItem>()
-                .ExceptBy(excluded, i => i.Category)
-                .ToListAsync();
-            rowCount = result.Count;
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"ExceptBy threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.True(rowCount == 2,
-            $"ExceptBy returned {rowCount} rows; expected 2 (Category != 'A') if translated, " +
-            $"or an exception if unsupported. Other counts mean silent-wrongness.");
+        // LINQ set semantics: first occurrence per surviving key. Source per-key
+        // first: A->1, B->3. Drop A -> {3}.
+        var excluded = new[] { "A" };
+        var result = await _ctx.Query<KsoItem>()
+            .ExceptBy(excluded, i => i.Category)
+            .ToListAsync();
+        Assert.Equal(new[] { 3 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]
-    public async Task IntersectBy_either_translates_or_throws_actionable_error()
+    public async Task IntersectBy_keeps_rows_whose_key_is_in_the_second_key_set()
     {
-        Exception? ex = null;
-        var rowCount = -1;
-        try
-        {
-            var keep = new[] { "B" };
-            var result = await _ctx.Query<KsoItem>()
-                .IntersectBy(keep, i => i.Category)
-                .ToListAsync();
-            rowCount = result.Count;
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"IntersectBy threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        // Intersect-by-key with the single-row key set 'B' keeps the FIRST
-        // matching row per key (Enumerable.IntersectBy semantics) -> 1 row.
-        Assert.True(rowCount == 1,
-            $"IntersectBy returned {rowCount} rows; expected 1 (first row matching Category='B') " +
-            $"if translated, or an exception if unsupported.");
+        // Set semantics -> first row per matched key. Keep 'B' -> Id 3 only.
+        var keep = new[] { "B" };
+        var result = await _ctx.Query<KsoItem>()
+            .IntersectBy(keep, i => i.Category)
+            .ToListAsync();
+        Assert.Equal(new[] { 3 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]
-    public async Task UnionBy_either_translates_or_throws_actionable_error()
+    public async Task UnionBy_appends_second_rows_whose_key_is_not_already_in_source()
     {
-        // Source has Categories {A, B}; UnionBy with an in-memory set that
-        // includes a new Category {X} (and reuses {A}) -- by-key distinct
-        // semantics expect 3 distinct keys total: A, B, X.
-        Exception? ex = null;
-        var rowCount = -1;
-        try
+        // Source per-key first: A->1, B->3. Second adds 'X' (new) and reuses 'A'.
+        // Result keys {A, B, X} in source-then-second order -> {1, 3, 99}.
+        var other = new[]
         {
-            var other = new[]
-            {
-                new KsoItem { Id = 98, Category = "A", Amount = 1 },
-                new KsoItem { Id = 99, Category = "X", Amount = 2 },
-            };
-            var result = await _ctx.Query<KsoItem>()
-                .UnionBy(other, i => i.Category)
-                .ToListAsync();
-            rowCount = result.Count;
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"UnionBy threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        // If translated: 3 distinct Category keys (A, B, X). Silent-wrongness:
-        // returning the full 4-row source or 6 rows (source + other concat) means
-        // the translator silently dropped UnionBy.
-        Assert.True(rowCount == 3,
-            $"UnionBy returned {rowCount} rows; expected 3 distinct Category keys " +
-            $"(A, B, X) if translated, or an exception if unsupported.");
+            new KsoItem { Id = 98, Category = "A", Amount = 1 },
+            new KsoItem { Id = 99, Category = "X", Amount = 2 },
+        };
+        var result = await _ctx.Query<KsoItem>()
+            .UnionBy(other, i => i.Category)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 3, 99 }, result.Select(r => r.Id).ToArray());
     }
 
     [Table("KsoItem")]

@@ -1294,14 +1294,38 @@ namespace nORM.Query
                         _ctx.Provider.GetType().GetHashCode(), mappingHash)
                 .Extend((int)_ctx.Options.ClientEvaluationPolicy);
 
-            if (_planCache.TryGet(fingerprint, out var cached))
+            // ExceptBy / IntersectBy / UnionBy capture an in-memory IEnumerable from
+            // the user's closure into a post-materialize transform. The plan cache
+            // keys by expression fingerprint, which doesn't differentiate captured
+            // collection identity / contents; reusing the cached plan would replay
+            // the prior call's collection. Bypass the cache for these methods so each
+            // invocation translates fresh against the live closure values. (Future
+            // work: model these like CompiledParameters so the captured collection
+            // becomes a per-call lookup instead of a plan-baked closure.)
+            bool bypassPlanCache = ExpressionContainsKeyedSetByOp(filtered);
+
+            if (!bypassPlanCache && _planCache.TryGet(fingerprint, out var cached))
             {
                 parameterValues = ExtractParameterValues(filtered, cached);
                 return cached;
             }
 
             var localFiltered = filtered;
-            var plan = _planCache.GetOrAdd(fingerprint, _ =>
+            QueryPlan plan;
+            if (bypassPlanCache)
+            {
+                using var freshTranslator = new QueryTranslator(_ctx);
+                var p = freshTranslator.Translate(localFiltered);
+                plan = p with
+                {
+                    Fingerprint = fingerprint,
+                    Parameters = new Dictionary<string, object>(p.Parameters),
+                    CompiledParameters = new List<string>(p.CompiledParameters)
+                };
+                parameterValues = ExtractParameterValues(filtered, plan);
+                return plan;
+            }
+            plan = _planCache.GetOrAdd(fingerprint, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
                 var before = GC.GetAllocatedBytesForCurrentThread();
@@ -1322,6 +1346,43 @@ namespace nORM.Query
 
             parameterValues = ExtractParameterValues(filtered, plan);
             return plan;
+        }
+
+        /// <summary>
+        /// Walks the expression tree looking for ExceptBy / IntersectBy / UnionBy
+        /// method calls -- their second argument is a closure-captured in-memory
+        /// collection that needs fresh evaluation per invocation. Plans containing
+        /// these calls bypass the fingerprint-keyed plan cache to avoid replaying
+        /// a prior call's captured collection.
+        /// </summary>
+        private static bool ExpressionContainsKeyedSetByOp(Expression expression)
+        {
+            return KeyedSetByOpDetector.Has(expression);
+        }
+
+        private sealed class KeyedSetByOpDetector : ExpressionVisitor
+        {
+            private bool _found;
+            public static bool Has(Expression e)
+            {
+                var d = new KeyedSetByOpDetector();
+                d.Visit(e);
+                return d._found;
+            }
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (!_found
+                    && (node.Method.DeclaringType == typeof(System.Linq.Queryable)
+                        || node.Method.DeclaringType == typeof(System.Linq.Enumerable))
+                    && (node.Method.Name == "ExceptBy"
+                        || node.Method.Name == "IntersectBy"
+                        || node.Method.Name == "UnionBy"))
+                {
+                    _found = true;
+                    return node;
+                }
+                return base.VisitMethodCall(node);
+            }
         }
 
         /// <summary>
