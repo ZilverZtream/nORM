@@ -472,6 +472,28 @@ namespace nORM.Query
             var sourceQuery = node.Arguments[0];
 
             Visit(sourceQuery);
+            // Sister of bca0523 / 47acc83 / 54c16ae + the CountTranslator pin:
+            // Sum / Min / Max / Average applied after Take / Skip would silently
+            // aggregate the full table and LIMIT the scalar result row, returning the
+            // wrong number. Detect and throw with the materialize-then-aggregate
+            // workaround.
+            if (_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null)
+            {
+                var aggName = node.Method.Name;
+                throw new NormUnsupportedFeatureException(
+                    aggName + " applied after Take or Skip would silently aggregate the full table — " +
+                    "the translator emits `SELECT " + aggName.ToUpperInvariant() + "(col) … LIMIT n` " +
+                    "which runs the aggregate on the full result set and then LIMIT picks the first " +
+                    "scalar row, returning the full-table aggregate rather than the aggregate of the " +
+                    "windowed N rows. LINQ semantics for `q.Take(3)." + aggName + "(...)` require " +
+                    "aggregating the windowed 3, which SQL needs a subquery wrap " +
+                    "(`SELECT " + aggName.ToUpperInvariant() + "(col) FROM (… LIMIT n)`) that nORM " +
+                    "doesn't yet emit. " +
+                    "Workarounds: " +
+                    "(1) If you want the full-table aggregate, drop the Take: `q." + aggName + "(...)`. " +
+                    "(2) If you want the windowed aggregate, materialize and aggregate client-side: " +
+                    "`var top = await q.Take(3).ToListAsync(); var agg = top." + aggName + "(...);`");
+            }
 
             if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
             {
