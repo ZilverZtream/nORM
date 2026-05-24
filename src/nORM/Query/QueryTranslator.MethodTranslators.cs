@@ -633,6 +633,13 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Set _isDistinct BEFORE visiting the source. JoinBuilder.BuildJoinClauseInto
+                // captures `distinct: _isDistinct` at join-emit time (e97b814), which runs
+                // INSIDE the Visit below — if we set the flag afterward, the join SQL is
+                // built without DISTINCT and the test (Join.Distinct) silently returns
+                // duplicates. The Take/Skip pin check below runs AFTER Visit because it
+                // needs _take/_skip populated by inner translators.
+                t._isDistinct = true;
                 var source = t.Visit(node.Arguments[0]);
                 // Sister of bca0523 / 47acc83 for Distinct: Distinct applied AFTER a
                 // Take/Skip silently de-dupes the FULL projected set before the LIMIT
@@ -655,7 +662,6 @@ namespace nORM.Query
                         "(2) Materialize the window first and dedupe client-side: " +
                         "`var top = await q.Take(3).Select(x => x.Cat).ToListAsync(); var unique = top.Distinct().ToList();`");
                 }
-                t._isDistinct = true;
                 return source;
             }
         }
