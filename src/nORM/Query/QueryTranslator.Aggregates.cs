@@ -447,6 +447,14 @@ namespace nORM.Query
                         }
                     }
                 }
+                if (node.Expression is MemberInitExpression memberInit)
+                {
+                    foreach (var binding in memberInit.Bindings)
+                    {
+                        if (binding is MemberAssignment ma && ma.Member.Name == node.Member.Name)
+                            return Visit(ma.Expression);
+                    }
+                }
                 return base.VisitMember(node);
             }
         }

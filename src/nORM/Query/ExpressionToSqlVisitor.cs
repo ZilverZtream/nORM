@@ -464,6 +464,25 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            // Nullable<T> structural members: HasValue -> IS NOT NULL, Value -> operand itself.
+            // GetValueOrDefault is a method, handled in VisitMethodCall.
+            if (node.Expression != null
+                && node.Expression.Type.IsGenericType
+                && node.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                if (node.Member.Name == "HasValue")
+                {
+                    _sql.Append('(');
+                    Visit(node.Expression);
+                    _sql.Append(" IS NOT NULL)");
+                    return node;
+                }
+                if (node.Member.Name == "Value")
+                {
+                    Visit(node.Expression);
+                    return node;
+                }
+            }
             if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
             {
                 if (_groupingKeys.TryGetValue(pe, out var groupKey) && node.Member.Name == "Key")
@@ -595,6 +614,28 @@ namespace nORM.Query
             if (_fastMethodHandlers.TryGetValue(node.Method, out var handler))
             {
                 handler(this, node);
+                return node;
+            }
+            // Nullable<T>.GetValueOrDefault() / GetValueOrDefault(fallback) — COALESCE.
+            if (node.Object != null
+                && node.Method.Name == nameof(Nullable<int>.GetValueOrDefault)
+                && node.Object.Type.IsGenericType
+                && node.Object.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                var inner = GetSql(node.Object);
+                if (node.Arguments.Count == 0)
+                {
+                    var underlying = Nullable.GetUnderlyingType(node.Object.Type)!;
+                    var fallback = underlying == typeof(string) ? "''"
+                        : underlying.IsValueType ? "0"
+                        : "NULL";
+                    _sql.Append("COALESCE(").Append(inner).Append(", ").Append(fallback).Append(')');
+                }
+                else
+                {
+                    var fbSql = GetSql(node.Arguments[0]);
+                    _sql.Append("COALESCE(").Append(inner).Append(", ").Append(fbSql).Append(')');
+                }
                 return node;
             }
             if (!IsTranslatableMethod(node.Method))

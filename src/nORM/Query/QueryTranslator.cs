@@ -109,6 +109,11 @@ namespace nORM.Query
         private List<M2MIncludePlan> _m2mIncludes = new();
         private LambdaExpression? _projection;
         private Func<object, object>? _clientProjection;
+        // When the projection is split (server-side fetch + client-side transform), the server
+        // projection's body type is the intermediate row, not what the caller sees. Recording the
+        // original lambda's result type here lets plan.ElementType reflect the FINAL shape so
+        // CreateList<T> and tracking checks operate against the right type.
+        private Type? _clientProjectionResultType;
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
@@ -215,6 +220,7 @@ namespace nORM.Query
                 _m2mIncludes = new List<M2MIncludePlan>();
                 _projection = null;
                 _clientProjection = null;
+                _clientProjectionResultType = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -255,6 +261,7 @@ namespace nORM.Query
                 _parameterManager.Reset();
                 _projection = null;
                 _clientProjection = null;
+                _clientProjectionResultType = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
@@ -595,7 +602,9 @@ namespace nORM.Query
                 _t._ctx.Provider.ApplyPaging(_t._sql, _t._take, _t._skip, _t._takeParam, _t._skipParam);
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
-                var elementType = _t._groupJoinInfo?.ResultType ?? materializerType;
+                // When the projection was split for client-side evaluation, the FINAL row shape
+                // is the original projection's body type, not the server-side intermediate.
+                var elementType = _t._groupJoinInfo?.ResultType ?? _t._clientProjectionResultType ?? materializerType;
                 var bulkCudShape = new BulkCudQueryShape(
                     _t._where.Length > 0 ? " WHERE " + _t._where.ToSqlString() : string.Empty,
                     _t._groupBy.Count > 0,
