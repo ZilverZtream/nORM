@@ -610,7 +610,49 @@ namespace nORM.Query
                 };
                 t._sql.Clear();
                 t._sql.Append(leftSql).Append(' ').Append(setOp).Append(' ').Append(rightSql);
+                // TranslateSubExpression isolates each side in its own context, so any
+                // Select-projection inside the arguments never propagates to the outer
+                // translator. Without it, Generate() builds the materializer against
+                // _mapping.Columns — for an anonymous-typed Union (`Select(p => new {…})
+                // .Union(Select(c => new {…}))`) that's the left-source entity's columns,
+                // not the projected anonymous type's ctor params, and GetCachedConstructor
+                // throws "No suitable constructor for <>f__AnonymousType…" because the
+                // arities don't match. Lift the projection from the left source (compiler
+                // forces both sides to share the same shape for typed Union) so the
+                // materializer reconstructs the anonymous type correctly.
+                if (t._projection == null)
+                {
+                    var lifted = ExtractTrailingProjection(node.Arguments[0]);
+                    if (lifted != null)
+                        t._projection = lifted;
+                }
                 return node;
+            }
+
+            /// <summary>
+            /// Walks back through the source expression chain looking for the most-recent
+            /// projection-defining call (Select / SelectMany) and returns its lambda.
+            /// Skips over Where / OrderBy / Take / Skip / Distinct / Reverse / AsNoTracking
+            /// / AsSplitQuery, which preserve the projection shape. Returns null if no
+            /// projecting call is found (e.g. raw `Query&lt;T&gt;()` on both sides — the
+            /// entity-Columns path the outer Generate() will fall back to is already correct).
+            /// </summary>
+            private static LambdaExpression? ExtractTrailingProjection(Expression source)
+            {
+                var current = source;
+                while (current is MethodCallExpression mce)
+                {
+                    if ((mce.Method.Name == nameof(Queryable.Select)
+                         || mce.Method.Name == nameof(Queryable.SelectMany))
+                        && mce.Arguments.Count >= 2
+                        && QueryTranslator.StripQuotes(mce.Arguments[mce.Arguments.Count - 1]) is LambdaExpression lambda)
+                    {
+                        return lambda;
+                    }
+                    if (mce.Arguments.Count == 0) break;
+                    current = mce.Arguments[0];
+                }
+                return null;
             }
         }
 
