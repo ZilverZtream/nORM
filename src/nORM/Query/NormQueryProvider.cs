@@ -1164,7 +1164,14 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException("ExecuteDeleteAsync only supports single table queries.");
+                throw new NormUnsupportedFeatureException(
+                    "ExecuteDeleteAsync only supports queries against a single table. The current " +
+                    "expression touches multiple tables (typically via a Join) and SQL DELETE has no " +
+                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
+                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteDeleteAsync()` " +
+                    "or materialize the matching keys first and feed them through Contains: " +
+                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
+                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteDeleteAsync()`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
@@ -1186,7 +1193,14 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException("ExecuteUpdateAsync only supports single table queries.");
+                throw new NormUnsupportedFeatureException(
+                    "ExecuteUpdateAsync only supports queries against a single table. The current " +
+                    "expression touches multiple tables (typically via a Join) and SQL UPDATE has no " +
+                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
+                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteUpdateAsync(...)` " +
+                    "or materialize the matching keys first and feed them through Contains: " +
+                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
+                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteUpdateAsync(...)`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
