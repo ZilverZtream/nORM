@@ -77,6 +77,26 @@ public class LinqPagingAndNullableBoolTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Take_then_Skip_with_runtime_parameters_composes_correctly()
+    {
+        // Captured local variables → both Take and Skip bind to params. The translator
+        // emits `LIMIT (@take - @skip) OFFSET @skip` so the runtime values still produce
+        // the [skip, take) window.
+        int take = 5;
+        int skip = 2;
+        var ids = (await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(take).Skip(skip).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 3, 4, 5 }, ids);
+
+        // And the same compiled chain works for a different (take, skip) combination.
+        take = 7;
+        skip = 4;
+        var idsB = (await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(take).Skip(skip).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 5, 6, 7 }, idsB);
+    }
+
+    [Fact]
     public async Task Nullable_bool_equality_true_excludes_nulls_and_false()
     {
         var ids = (await _ctx.Query<PgRow>().Where(r => r.Flag == true).OrderBy(r => r.Id).ToListAsync())
