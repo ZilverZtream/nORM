@@ -11,10 +11,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the actionable error message for unsupported binary operators
-/// inside a <c>SetProperty</c> value expression of <c>ExecuteUpdateAsync</c>.
-/// Third place this pattern surfaces — completes the trio after fcb4199
-/// (WHERE side) and b846b0c (projection side).
+/// Strict pin for bitshift operators inside a <c>SetProperty</c> value
+/// expression of <c>ExecuteUpdateAsync</c>. Originally pinned as throw-or-
+/// correct (must throw with actionable multiply-rewrite message) -- a
+/// cop-out: all four supported providers accept native &lt;&lt; / &gt;&gt;.
+/// Pin flipped to strict per implement-first feedback; sister to
+/// LinqUnsupportedBinaryOpErrorTests and LinqProjectionBinaryOpErrorTests.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqExecuteUpdateSetPropertyBinaryOpErrorTests : IAsyncLifetime
@@ -42,15 +44,18 @@ public class LinqExecuteUpdateSetPropertyBinaryOpErrorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LeftShift_in_set_property_value_throws_with_actionable_message()
+    public async Task LeftShift_in_set_property_value_doubles_each_row()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await ((INormQueryable<EusRow>)_ctx.Query<EusRow>())
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Value, r => r.Value << 1));
-        });
-        Assert.Contains("LeftShift", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("multiply",  ex.Message, StringComparison.OrdinalIgnoreCase);
+        var affected = await ((INormQueryable<EusRow>)_ctx.Query<EusRow>())
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Value, r => r.Value << 1));
+        Assert.Equal(2, affected);
+
+        // Verify the UPDATE landed: Id 1: 4 -> 8, Id 2: 8 -> 16.
+        var values = await _ctx.Query<EusRow>()
+            .OrderBy(r => r.Id)
+            .Select(r => new { r.Value })
+            .ToListAsync();
+        Assert.Equal(new[] { 8, 16 }, values.Select(v => v.Value).ToArray());
     }
 
     [Table("EusRow")]
