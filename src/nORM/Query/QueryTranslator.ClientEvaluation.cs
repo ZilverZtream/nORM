@@ -73,6 +73,7 @@ namespace nORM.Query
                 nameof(TimeSpan.TotalHours),
                 nameof(TimeSpan.TotalMinutes),
                 nameof(TimeSpan.TotalSeconds),
+                nameof(TimeSpan.TotalMilliseconds),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
