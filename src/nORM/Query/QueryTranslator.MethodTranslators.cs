@@ -348,6 +348,19 @@ namespace nORM.Query
                     // method encountered in the source chain (e.g., "Where"), losing the "Descending"
                     // marker.  node.Method.Name always refers to this OrderBy/OrderByDescending call.
                     var ascending = !node.Method.Name.Contains("Descending");
+                    // GroupBy(...).Select(g => new { ..., Agg = g.Sum(...) }).OrderBy(x => x.Agg):
+                    // ExpandProjection inlines `x.Agg` → `g.Sum(s => s.X)`. The generic SQL visitor
+                    // doesn't know how to translate `g.Sum(...)`, so route the aggregate body
+                    // through TranslateGroupAggregateMethod (the same path Select uses), reusing
+                    // the alias HandleGroupBy assigned to the group element.
+                    if (t._groupBy.Count > 0
+                        && keySelector.Body is MethodCallExpression aggCall
+                        && t.TranslateGroupAggregateMethod(aggCall, t.EscapeAlias("T" + t._joinCounter)) is { } aggSql)
+                    {
+                        t._orderBy.Add((aggSql, ascending));
+                        FastExpressionVisitorPool.Return(visitor);
+                        return source;
+                    }
                     // Composite anonymous-type key (e.g. `OrderBy(r => new { r.A, r.B })`) —
                     // emit one ORDER BY entry per member so the SQL becomes
                     // `ORDER BY "T0"."A", "T0"."B"` rather than the comma-joined single
