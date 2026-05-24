@@ -89,6 +89,21 @@ public class LinqNormFunctionsLikeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Like_pattern_is_bound_as_parameter_not_inlined()
+    {
+        // Pattern containing SQL syntax that would break the statement if it were inlined.
+        // Captured local forces parameter binding via the closure-capture path.
+        var dangerousPattern = "a%' OR '1'='1";
+        var hits = await _ctx.Query<LkRow>()
+            .Where(r => NormFunctions.Like(r.Name, dangerousPattern))
+            .ToListAsync();
+        // The pattern matches nothing because no row name contains the literal characters
+        // `' OR '1'='1`. If the pattern were inlined into the SQL text the WHERE would
+        // collapse to true and every row would come back.
+        Assert.Empty(hits);
+    }
+
+    [Fact]
     public async Task ILike_matches_lowercase_pattern_against_uppercase_value()
     {
         await using var cmd = _cn.CreateCommand();
