@@ -633,8 +633,30 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var source = t.Visit(node.Arguments[0]);
+                // Sister of bca0523 / 47acc83 for Distinct: Distinct applied AFTER a
+                // Take/Skip silently de-dupes the FULL projected set before the LIMIT
+                // applies — `.Take(3).Distinct()` emits `SELECT DISTINCT col … LIMIT 3`
+                // which gives 3 rows from the distinct universe instead of dedupe-of-
+                // the-windowed-3. SQL needs a subquery wrap (`SELECT DISTINCT col FROM
+                // (… LIMIT n)`) that nORM doesn't yet emit. Detect and throw.
+                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Distinct applied after Take or Skip would silently dedupe the full table — the " +
+                        "translator emits `SELECT DISTINCT col … LIMIT n` which gives N rows from the " +
+                        "distinct universe of the full table, not the dedupe of the windowed N rows. " +
+                        "LINQ semantics for `q.Take(3).Distinct()` require taking the first 3 and then " +
+                        "dropping duplicates inside that window — SQL needs a subquery wrap " +
+                        "(`SELECT DISTINCT col FROM (… LIMIT n)`) that nORM doesn't yet emit. " +
+                        "Workarounds: " +
+                        "(1) Move the Distinct BEFORE the Take if you want dedupe-then-window: " +
+                        "`q.Select(x => x.Cat).Distinct().Take(3)` (the canonical top-N-distinct shape). " +
+                        "(2) Materialize the window first and dedupe client-side: " +
+                        "`var top = await q.Take(3).Select(x => x.Cat).ToListAsync(); var unique = top.Distinct().ToList();`");
+                }
                 t._isDistinct = true;
-                return t.Visit(node.Arguments[0]);
+                return source;
             }
         }
 
