@@ -311,6 +311,17 @@ namespace nORM.Providers
                     nameof(DateTime.AddHours) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' hours')",
                     nameof(DateTime.AddMinutes) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' minutes')",
                     nameof(DateTime.AddSeconds) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' seconds')",
+                    // AddMilliseconds needs sub-second precision. SQLite's modifier
+                    // syntax accepts fractional seconds ('+0.5 seconds'), so scale
+                    // the int delta with /1000.0. Default datetime() drops fractional
+                    // output -- use strftime('%Y-%m-%d %H:%M:%f', ...) which keeps
+                    // 'SS.SSS'. Then RTRIM('0') + RTRIM('.') trims trailing zeros
+                    // (and the literal '.' when no fractional remains) so the column
+                    // text matches Microsoft.Data.Sqlite's DateTime serialization
+                    // ('yyyy-MM-dd HH:mm:ss.FFFFFFF' which trims trailing zeros);
+                    // without this, '.500' lexically != param-bound '.5' and Where
+                    // round-trip silently mis-matches.
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 1000.0) || ' seconds'), '0'), '.')",
                     // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                     nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                     _ => null
