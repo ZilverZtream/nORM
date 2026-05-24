@@ -93,36 +93,53 @@ public class LinqSelectManyWhereAggregateTests : IAsyncLifetime
         Assert.Equal(3, rows.Count);
     }
 
-    [Fact]
-    public async Task SelectMany_then_where_then_countasync_pin_actual_observed_value()
+    private sealed class SqlCapturingInterceptor : nORM.Enterprise.IDbCommandInterceptor
     {
-        // Known silent-wrongness: SelectMany+Where+terminal CountAsync returns
-        // 11 (the Id of the first matching child row) instead of 3. The
-        // SelectMany+Where source enumerates correctly (verified by the
-        // ToList test above) and SumAsync works (verified by the Sum test),
-        // so the bug is in the CountAsync terminal-call SQL routing after
-        // a SelectMany source.
-        //
-        // An initial fix attempt in QueryTranslator's aggregate-with-existing-
-        // _sql branch did not trigger -- the SelectMany+Count combination is
-        // routed through a different translator path that hasn't been traced
-        // yet. The fix requires diagnostic capture of the actual emitted SQL
-        // (CommandInterceptor) to identify which path emits the malformed
-        // statement that SQLite leniently parses into returning the first
-        // matching row's first column.
-        //
-        // Workaround: materialize via ToListAsync then count in memory
-        // (the test above). Pin the OBSERVED value with this comment so
-        // the test starts failing the moment the underlying bug is fixed --
-        // forcing the maintainer to update the assertion to 3 and delete
-        // this whole defect-pinning fact.
+        private readonly System.Collections.Generic.List<string> _sink;
+        public SqlCapturingInterceptor(System.Collections.Generic.List<string> sink) { _sink = sink; }
+
+        public Task<nORM.Enterprise.InterceptionResult<int>> NonQueryExecutingAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Threading.CancellationToken ct)
+        { _sink.Add($"[NonQuery] {command.CommandText}"); return Task.FromResult(default(nORM.Enterprise.InterceptionResult<int>)); }
+        public Task NonQueryExecutedAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, int result, System.TimeSpan duration, System.Threading.CancellationToken ct) => Task.CompletedTask;
+        public Task<nORM.Enterprise.InterceptionResult<object?>> ScalarExecutingAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Threading.CancellationToken ct)
+        { _sink.Add($"[Scalar] {command.CommandText}"); return Task.FromResult(default(nORM.Enterprise.InterceptionResult<object?>)); }
+        public Task ScalarExecutedAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, object? result, System.TimeSpan duration, System.Threading.CancellationToken ct) => Task.CompletedTask;
+        public Task<nORM.Enterprise.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Threading.CancellationToken ct)
+        { _sink.Add($"[Reader] {command.CommandText}"); return Task.FromResult(default(nORM.Enterprise.InterceptionResult<System.Data.Common.DbDataReader>)); }
+        public Task ReaderExecutedAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Data.Common.DbDataReader reader, System.TimeSpan duration, System.Threading.CancellationToken ct) => Task.CompletedTask;
+        public Task CommandFailedAsync(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Exception exception, System.Threading.CancellationToken ct) => Task.CompletedTask;
+
+        // Sync hooks -- SQLite's PrefersSyncExecution=true takes the sync paths, so
+        // override these too to catch the actual emit path.
+        public nORM.Enterprise.InterceptionResult<int> NonQueryExecuting(System.Data.Common.DbCommand command, nORM.Core.DbContext context)
+        { _sink.Add($"[NonQuery-sync] {command.CommandText}"); return nORM.Enterprise.InterceptionResult<int>.Continue(); }
+        public void NonQueryExecuted(System.Data.Common.DbCommand command, nORM.Core.DbContext context, int result, System.TimeSpan duration) { }
+        public nORM.Enterprise.InterceptionResult<object?> ScalarExecuting(System.Data.Common.DbCommand command, nORM.Core.DbContext context)
+        { _sink.Add($"[Scalar-sync] {command.CommandText}"); return nORM.Enterprise.InterceptionResult<object?>.Continue(); }
+        public void ScalarExecuted(System.Data.Common.DbCommand command, nORM.Core.DbContext context, object? result, System.TimeSpan duration) { }
+        public nORM.Enterprise.InterceptionResult<System.Data.Common.DbDataReader> ReaderExecuting(System.Data.Common.DbCommand command, nORM.Core.DbContext context)
+        { _sink.Add($"[Reader-sync] {command.CommandText}"); return nORM.Enterprise.InterceptionResult<System.Data.Common.DbDataReader>.Continue(); }
+        public void ReaderExecuted(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Data.Common.DbDataReader reader, System.TimeSpan duration) { }
+        public void CommandFailed(System.Data.Common.DbCommand command, nORM.Core.DbContext context, System.Exception exception) { }
+    }
+
+    [Fact]
+    public async Task SelectMany_then_where_then_countasync_returns_correct_count()
+    {
+        // Earlier silent-wrongness (8c12072 / 5215fdd diagnostic): SelectMany
+        // populates _sql with `SELECT <cols> FROM Parent JOIN Child ...` via
+        // HandleSelectMany; QueryTranslator's Generate then skipped the
+        // entire prefix-build (including the aggregate COUNT(*) prepend)
+        // because it's guarded by `if (_sql.Length == 0)`. ExecuteScalar
+        // on the raw SELECT returned the first row's first column (T1.Id
+        // == 11) instead of an aggregate.
+        // Fix rewrites the SELECT-clause column list to COUNT(*) when
+        // _isAggregate && _sql.Length > 0.
         var count = await _ctx.Query<SmwParent>()
             .SelectMany(p => p.Items!)
             .Where(i => i.Amount > 10)
             .CountAsync();
-        // BUG: should be 3. Currently returns 11 (the Id of child row 11,
-        // which is the first row matching Amount > 10).
-        Assert.Equal(11, count);
+        Assert.Equal(3, count);
     }
 
     [Table("SmwParent")]
