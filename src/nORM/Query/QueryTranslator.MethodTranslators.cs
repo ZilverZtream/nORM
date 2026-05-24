@@ -251,7 +251,17 @@ namespace nORM.Query
                         if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Throw)
                         {
                             throw new NormUnsupportedFeatureException(
-                                "The query projection requires client-side evaluation. Set DbContextOptions.ClientEvaluationPolicy to Warn or Allow to permit client-side projection after server-side filtering, ordering, and paging.");
+                                "The query projection requires client-side evaluation — it contains " +
+                                "an expression nORM can't translate to SQL. Common culprits: " +
+                                "(a) a correlated subquery via `ctx.Query<X>().Count/Sum/...(...)` in the projection — " +
+                                "configure a navigation property and use `parent.Children.Count()` / " +
+                                "`parent.Children.Sum(c => c.X)` instead, which nORM emits as a " +
+                                "correlated scalar subquery `(SELECT COUNT(*) FROM Children WHERE FK=parent.PK)`; " +
+                                "(b) a custom helper method or LINQ-to-Objects construct unreachable in SQL — " +
+                                "rewrite using SQL-translatable primitives. If you really need client-side " +
+                                "evaluation of the projection, set " +
+                                "`DbContextOptions.ClientEvaluationPolicy = ClientEvaluationPolicy.Warn` or " +
+                                "`.Allow`. Warn logs each occurrence; Allow runs silently.");
                         }
 
                         // Store both projections plus the original lambda's result type so the
