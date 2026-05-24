@@ -274,6 +274,9 @@ namespace nORM.Providers
             t == typeof(uint)  || t == typeof(ulong)  || t == typeof(ushort) ||
             t == typeof(byte)  || t == typeof(sbyte)  || t == typeof(decimal);
 
+        /// <summary>MySQL CAST(... AS CHAR) is the cross-version-safe text conversion target.</summary>
+        public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS CHAR)";
+
         /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT IGNORE INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";

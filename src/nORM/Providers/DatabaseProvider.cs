@@ -401,6 +401,14 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
+        /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation —
+        /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
+        /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native
+        /// text type (NVARCHAR(MAX) on SQL Server, TEXT on SQLite/Postgres, CHAR on MySQL).
+        /// </summary>
+        public virtual string GetToStringSql(string innerSql) => $"CAST({innerSql} AS VARCHAR)";
+
+        /// <summary>
         /// Returns an INSERT statement for a join table row that does nothing (ignores) on duplicate key.
         /// Providers override this for their native upsert/ignore syntax.
         /// </summary>
