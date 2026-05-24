@@ -87,11 +87,17 @@ namespace nORM.Query
             }
             else
             {
-                var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx2);
                 groupBySql = visitor.Translate(keySelectorLambda.Body);
+                // Use AddLiteralParameter (not AddParameter) so the inline-constant `@p0` from
+                // a COALESCE-fallback / literal-bearing key selector isn't also flagged in
+                // `_compiledParams`. Flagging it makes BindPlanParameters treat the slot as a
+                // compiled-query closure binding and skip the literal value at execution time —
+                // SQLite then throws `Must add values for the following parameters`. Matches the
+                // composite-key path above which already uses AddLiteralParameter.
                 foreach (var kvp in visitor.GetParameters())
-                    AddParameter(kvp.Key, kvp.Value);
+                    AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(visitor);
                 _groupBy.Add(groupBySql);
             }
@@ -205,15 +211,17 @@ namespace nORM.Query
                             {
                                 if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                                     _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                                var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                                var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var sql = visitor.Translate(arg);
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(sql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
                                 PooledStringBuilder.Return(builder);
+                                // See HandleGroupBy simple-key path: AddLiteralParameter so the
+                                // visitor's inline constants don't get mis-flagged as compiled.
                                 foreach (var kvp in visitor.GetParameters())
-                                    AddParameter(kvp.Key, kvp.Value);
+                                    AddLiteralParameter(kvp.Key, kvp.Value);
                                 FastExpressionVisitorPool.Return(visitor);
                             }
                         }
