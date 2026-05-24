@@ -396,10 +396,12 @@ namespace nORM.Query
                     _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
             using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
-            // Prefer the SelectMany result selector's NewExpression body for column extraction:
-            // it names exactly the (outer, inner) projections the caller wants. Fall back to the
-            // already-running outer _projection only when no result selector exists.
-            NewExpression? projectionNewExpr = (resultSelector?.Body as NewExpression) ?? (_projection?.Body as NewExpression);
+            // When an OUTER projection is already in flight (a later .Select() set _projection),
+            // it expresses the FINAL row shape the caller wants and supersedes any transparent
+            // identifier the SelectMany may have introduced via `(l, r) => new { l, r }`.
+            // Otherwise fall back to the SelectMany's own result selector — which is the
+            // common shape for `from l in L from r in R select new { l.X, r.Y }` (no later Select).
+            NewExpression? projectionNewExpr = (_projection?.Body as NewExpression) ?? (resultSelector?.Body as NewExpression);
             if (projectionNewExpr != null)
             {
                 var neededColumns = JoinBuilder.ExtractNeededColumns(projectionNewExpr, outerMapping, crossMapping, outerAlias, crossAlias);
@@ -447,7 +449,13 @@ namespace nORM.Query
             _sql.Append(crossSql.ToSqlString());
             if (resultSelector != null)
             {
-                _projection = resultSelector;
+                // Record the transparent-identifier lambda for ExpandProjection — it lets a
+                // downstream Where / Select that consumes `t.l` / `t.r` get rewritten back to
+                // the join's outer/inner parameters. Keep _projection alone so the outer
+                // Select's materializer projection (set BEFORE source visit) survives.
+                _transparentIdentifier = resultSelector;
+                if (_projection == null)
+                    _projection = resultSelector;
             }
             else
             {

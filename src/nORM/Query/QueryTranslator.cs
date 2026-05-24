@@ -108,6 +108,12 @@ namespace nORM.Query
         private List<IncludePlan> _includes = new();
         private List<M2MIncludePlan> _m2mIncludes = new();
         private LambdaExpression? _projection;
+        // Records the SelectMany result selector that builds a transparent identifier
+        // (e.g. `(l, r) => new { l, r }`). Used by ExpandProjection to inline `t.l` /
+        // `t.r` references in downstream Where / Select lambdas back to the join's
+        // outer / inner parameters — separate from _projection so the outer Select's
+        // materializer projection isn't clobbered by the TI lambda.
+        private LambdaExpression? _transparentIdentifier;
         private Func<object, object>? _clientProjection;
         // When the projection is split (server-side fetch + client-side transform), the server
         // projection's body type is the intermediate row, not what the caller sees. Recording the
@@ -1415,6 +1421,17 @@ namespace nORM.Query
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
         private LambdaExpression ExpandProjection(LambdaExpression lambda)
         {
+            // Prefer the transparent-identifier lambda when present — that's the one that
+            // unpacks `t.l` / `t.r` back into the join's outer/inner parameters. Fall back
+            // to a normal _projection inline for non-join shapes.
+            if (_transparentIdentifier != null &&
+                lambda.Parameters.Count == 1 &&
+                lambda.Parameters[0].Type == _transparentIdentifier.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(lambda.Parameters[0], _transparentIdentifier.Body).Visit(lambda.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body);
+                return Expression.Lambda(body, _transparentIdentifier.Parameters);
+            }
             if (_projection != null &&
                 lambda.Parameters.Count == 1 &&
                 lambda.Parameters[0].Type == _projection.Body.Type)
