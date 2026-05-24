@@ -914,6 +914,21 @@ namespace nORM.Query
                 return node;
             }
 
+            // Guid.Parse(s) — identity pass-through. The receiver expression is already a string
+            // (the column), and the comparison side (a Guid constant) binds as DbType.Guid which
+            // every supported provider converts to its textual representation before binding.
+            // So `WHERE Guid.Parse(TextCol) == constGuid` reduces to `WHERE TextCol = @p0` — no
+            // CAST needed. ParseExact / TryParse have richer semantics that don't apply.
+            if (node.Object == null
+                && node.Method.Name == "Parse"
+                && node.Arguments.Count == 1
+                && node.Method.DeclaringType == typeof(Guid)
+                && node.Arguments[0].Type == typeof(string))
+            {
+                Visit(node.Arguments[0]);
+                return node;
+            }
+
             // enum.HasFlag(other) — lower to `(col & other) = other`. Preserves .NET semantics
             // (true only when every bit of `other` is set in receiver). The receiver must be
             // an enum instance; we don't filter by [Flags] attribute because the runtime
