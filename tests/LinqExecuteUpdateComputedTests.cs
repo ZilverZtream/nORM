@@ -85,6 +85,24 @@ public class LinqExecuteUpdateComputedTests : IAsyncLifetime
         Assert.Equal("updated", row.Label);
     }
 
+    [Fact]
+    public async Task ExecuteUpdate_assigns_computed_value_from_two_other_columns()
+    {
+        // SetProperty assigns Counter = Id * 10 — pulls from a different column of the
+        // same row, exercising the multi-column-reference path of the value translator.
+        var affected = await _ctx.Query<EuRow>()
+            .Where(r => r.Label == "a")
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Counter, r => r.Id * 10));
+        Assert.Equal(2, affected);
+
+        var byId = (await _ctx.Query<EuRow>().OrderBy(r => r.Id).ToListAsync()).ToArray();
+        // Id=1 (Label='a') → 10. Id=3 (Label='a') → 30. Others unchanged.
+        Assert.Equal(10, byId[0].Counter);
+        Assert.Equal(5,  byId[1].Counter);
+        Assert.Equal(30, byId[2].Counter);
+        Assert.Equal(20, byId[3].Counter);
+    }
+
     [Table("EuRow")]
     public sealed class EuRow
     {
