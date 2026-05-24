@@ -938,6 +938,28 @@ namespace nORM.Query
             {
                 t._isAggregate = true;
                 var source = t.Visit(node.Arguments[0]);
+                // Sister of bca0523 / 47acc83 / 54c16ae for Count/LongCount: Count applied
+                // AFTER Take/Skip would silently count the full table and then LIMIT the
+                // single scalar result row — `q.Take(3).Count()` returns 5 (full count)
+                // instead of 3 (windowed count). SQL would need
+                // `SELECT COUNT(*) FROM (… LIMIT n)` which nORM doesn't yet emit. Detect
+                // and throw before _projection / _methodName setup.
+                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Count / LongCount applied after Take or Skip would silently count the full " +
+                        "table — the translator emits `SELECT COUNT(*) … LIMIT n` where COUNT runs on " +
+                        "the full result set and LIMIT picks the first scalar row, returning the " +
+                        "full-table count rather than the count of the windowed N rows. LINQ semantics " +
+                        "for `q.Take(3).Count()` require counting the windowed 3, which SQL needs a " +
+                        "subquery wrap (`SELECT COUNT(*) FROM (… LIMIT n)`) that nORM doesn't yet emit. " +
+                        "Workarounds: " +
+                        "(1) If you want the full-table count, drop the Take: `q.Count()`. " +
+                        "(2) If you want the windowed count, materialize and count client-side: " +
+                        "`var top = await q.Take(3).ToListAsync(); var n = top.Count;` " +
+                        "(3) Use `Math.Min(n, await q.Count())` if you're checking whether a window " +
+                        "is bounded — but understand that's an upper bound, not a windowed count.");
+                }
                 // Preserve _projection when DISTINCT is active so the COUNT(*) builder can
                 // wrap as `SELECT COUNT(*) FROM (SELECT DISTINCT <proj> FROM ...) AS T0` —
                 // otherwise nuke it so Count(x => predicate) doesn't try to project columns
