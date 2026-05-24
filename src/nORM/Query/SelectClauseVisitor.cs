@@ -150,6 +150,26 @@ namespace nORM.Query
                 return node;
             }
 
+            // `parent.Children.Select(c => c.X).Sum/Min/Max/Average()` — Select interposes
+            // between the navigation and the aggregate. Mirror of ExpressionToSqlVisitor's
+            // efba58f path: emit `(SELECT AGG(selector_sql) FROM Child __nav WHERE __nav.FK = outer.PK)`.
+            if (node.Arguments.Count == 1
+                && node.Method.Name is nameof(Queryable.Sum)
+                                   or nameof(Queryable.Min)
+                                   or nameof(Queryable.Max)
+                                   or nameof(Queryable.Average)
+                && node.Arguments[0] is MethodCallExpression selCall
+                && selCall.Method.Name == nameof(Queryable.Select)
+                && selCall.Arguments.Count == 2
+                && selCall.Arguments[0] is MemberExpression selNav
+                && selNav.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(selNav.Member.Name, out var selRelation)
+                && StripQuotes(selCall.Arguments[1]) is LambdaExpression selectorLambda)
+            {
+                EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, selRelation, selectorLambda);
+                return node;
+            }
+
             // Use ToUpperInvariant to avoid locale-sensitive casing (e.g., Turkish-I problem).
             var methodNameUpper = node.Method.Name.ToUpperInvariant();
 
@@ -272,6 +292,50 @@ namespace nORM.Query
                 return;
             }
             sb.Append(')');
+        }
+
+        private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda)
+        {
+            // Mirror of EmitNavigationCountSubquery — adds aggregate-function dispatch and
+            // a per-row selector. Selector is a member access on the dependent element
+            // (e.g. `c => c.Amount`); resolve it to the column name via attribute lookup.
+            var depType = relation.DependentType;
+            var depTable = depType.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.TableAttribute), inherit: false)
+                .Cast<System.ComponentModel.DataAnnotations.Schema.TableAttribute>().FirstOrDefault()?.Name ?? depType.Name;
+            var depAlias = _provider.Escape("__nav");
+            var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
+            var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
+
+            // Resolve the selector to a column name. Only a simple member access is supported
+            // here (matching efba58f scope) — `c => c.X` not `c => c.X + 1`.
+            string selectorSql;
+            if (selectorLambda.Body is MemberExpression me)
+            {
+                var colAttr = me.Member.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.ColumnAttribute), inherit: false)
+                    .Cast<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>().FirstOrDefault();
+                var colName = colAttr?.Name ?? me.Member.Name;
+                selectorSql = $"{depAlias}.{_provider.Escape(colName)}";
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection currently supports only a bare member access selector (`c => c.X`). " +
+                    "Computed selectors (e.g. `c => c.A + c.B`) aren't yet routed through the correlated subquery emit — wrap with `ClientEvaluationPolicy.Allow` or aggregate after materialising.");
+            }
+
+            var sqlAgg = methodName switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                nameof(Queryable.Average) => "AVG",
+                _ => methodName.ToUpperInvariant()
+            };
+
+            sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
+              .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+              .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(_outerAlias).Append('.').Append(pkCol)
+              .Append(')');
         }
 
         private string TranslateProjectionArg(Expression arg)
