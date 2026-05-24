@@ -56,29 +56,45 @@ namespace nORM.Query
             if (keySelectorLambda == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
 
-            // G1: Composite GroupBy keys (p => new { p.A, p.B }) are not supported.
-            // Visiting a NewExpression without a VisitNew override causes ExpressionToSqlVisitor to
-            // concatenate column SQL fragments without separators, producing invalid GROUP BY SQL
-            // (e.g., "GROUP BY T0.[Category]T0.[Price]"). Fail early with a clear message.
-            if (keySelectorLambda.Body is NewExpression)
-                throw new NormQueryException(
-                    "Composite GroupBy keys (e.g., p => new { p.A, p.B }) are not supported. " +
-                    "Use a single column as the GroupBy key (e.g., p => p.Category), or pre-project " +
-                    "to a scalar value before calling GroupBy.");
-
             Visit(sourceQuery);
 
             var param = keySelectorLambda.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
-            var visitor = FastExpressionVisitorPool.Get(in vctx2);
-            var groupBySql = visitor.Translate(keySelectorLambda.Body);
-            foreach (var kvp in visitor.GetParameters())
-                AddParameter(kvp.Key, kvp.Value);
-            FastExpressionVisitorPool.Return(visitor);
-            _groupBy.Add(groupBySql);
+
+            string groupBySql;
+            // Composite key (p => new { p.A, p.B }) → translate each arg individually so the
+            // emitted GROUP BY clause is comma-separated, and remember the per-member SQL so
+            // the result-projection path can resolve `g.Key.A` back to its column.
+            if (keySelectorLambda.Body is NewExpression compositeKey)
+            {
+                var parts = new List<string>(compositeKey.Arguments.Count);
+                for (int i = 0; i < compositeKey.Arguments.Count; i++)
+                {
+                    var vctxPart = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var partVisitor = FastExpressionVisitorPool.Get(in vctxPart);
+                    var partSql = partVisitor.Translate(compositeKey.Arguments[i]);
+                    foreach (var kvp in partVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(partVisitor);
+                    parts.Add(partSql);
+                    _groupBy.Add(partSql);
+                    var memberName = compositeKey.Members?[i]?.Name ?? $"Item{i + 1}";
+                    _compositeKeyMemberSql[memberName] = partSql;
+                }
+                groupBySql = string.Join(", ", parts);
+            }
+            else
+            {
+                var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                var visitor = FastExpressionVisitorPool.Get(in vctx2);
+                groupBySql = visitor.Translate(keySelectorLambda.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    AddParameter(kvp.Key, kvp.Value);
+                FastExpressionVisitorPool.Return(visitor);
+                _groupBy.Add(groupBySql);
+            }
 
             // If there's a result selector, handle the projection
             if (node.Arguments.Count > 2)
@@ -155,6 +171,21 @@ namespace nORM.Query
                             {
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape(memberName));
+                                selectItems.Add(builder.ToString());
+                                PooledStringBuilder.Return(builder);
+                                continue;
+                            }
+                            // Composite-key member access: `key.A` where key is the result selector's
+                            // first parameter and A is one of the anonymous-type members on the
+                            // original GroupBy key. Resolve to the per-member GROUP BY column SQL.
+                            if (arg is MemberExpression compositeKeyAccess
+                                && compositeKeyAccess.Expression is ParameterExpression maybeKey
+                                && resultSelector.Parameters.Count >= 1
+                                && maybeKey == resultSelector.Parameters[0]
+                                && _compositeKeyMemberSql.TryGetValue(compositeKeyAccess.Member.Name, out var memberSql))
+                            {
+                                builder = PooledStringBuilder.Rent();
+                                builder.Append(memberSql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
                                 PooledStringBuilder.Return(builder);
                                 continue;
