@@ -252,9 +252,26 @@ namespace nORM.Query
             switch (methodName)
             {
                 case "Count":
-                    return "COUNT(*)";
                 case "LongCount":
-                    return "COUNT(*)";
+                    {
+                        // 1-arg `g.Count()` → COUNT(*). 2-arg `g.Count(predicate)` (extension
+                        // method form Enumerable.Count(source, predicate) puts the lambda at [1])
+                        // must apply the predicate: COUNT(CASE WHEN <pred> THEN 1 ELSE NULL END)
+                        // — NULL excluded by SQL count semantics, matching .NET behaviour.
+                        var predicateArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+                        var predicate = predicateArg != null ? StripQuotes(predicateArg) as LambdaExpression : null;
+                        if (predicate == null) return "COUNT(*)";
+                        if (!_correlatedParams.ContainsKey(predicate.Parameters[0]))
+                            _correlatedParams[predicate.Parameters[0]] = (_mapping, alias);
+                        var vctxPred = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                        var predVisitor = FastExpressionVisitorPool.Get(in vctxPred);
+                        var predSql = predVisitor.Translate(predicate.Body);
+                        foreach (var kvp in predVisitor.GetParameters())
+                            AddLiteralParameter(kvp.Key, kvp.Value);
+                        FastExpressionVisitorPool.Return(predVisitor);
+                        return $"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)";
+                    }
                 case "Sum":
                     {
                         // Extension method form: Enumerable.Sum(source, selector) — selector at [1]
