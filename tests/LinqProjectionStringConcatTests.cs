@@ -80,31 +80,14 @@ public class LinqProjectionStringConcatTests : IAsyncLifetime
     {
         // string.Concat(a, b, c) static form -- different visitor route than `+`,
         // worth pinning separately so a regression in one path doesn't slip
-        // past the other.
-        System.Exception? ex = null;
-        string[]? names = null;
-        try
-        {
-            var result = await _ctx.Query<PscPerson>()
-                .OrderBy(p => p.Id)
-                .Select(p => string.Concat(p.First, " ", p.Last))
-                .ToListAsync();
-            names = result.ToArray();
-        }
-        catch (System.Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is System.InvalidOperationException || ex is System.NotSupportedException,
-                $"string.Concat in projection threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.Equal(new[] { "Ada Lovelace", "Grace Hopper", "Alan Turing" }, names);
+        // past the other. ETSV handles this at ~line 1333 via provider's concat
+        // primitive; SCV reaches it via the same provider route. Strict pin --
+        // no throw-or-correct contract; the feature works and must keep working.
+        var result = await _ctx.Query<PscPerson>()
+            .OrderBy(p => p.Id)
+            .Select(p => string.Concat(p.First, " ", p.Last))
+            .ToListAsync();
+        Assert.Equal(new[] { "Ada Lovelace", "Grace Hopper", "Alan Turing" }, result.ToArray());
     }
 
     [Fact]
