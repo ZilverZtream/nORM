@@ -511,6 +511,31 @@ namespace nORM.Query
                     }
                 }
 
+                // Aggregate COUNT(*) on a pre-populated _sql (SelectMany / GroupJoin path).
+                // HandleSelectMany emits `SELECT <cols> FROM Parent JOIN Child ON ...` into
+                // _sql directly, then the `if (_sql.Length == 0)` branch below is skipped
+                // entirely -- including the aggregate COUNT(*) prefix. Result was
+                // ExecuteScalar reading the first row's first column (e.g. T1.Id == 11)
+                // instead of an aggregate. Discovered in 8c12072. Rewrite the SELECT-clause
+                // column list to COUNT(*) before WHERE/etc append; ORDER BY and paging are
+                // meaningless on a scalar COUNT so drop them silently.
+                if (_t._isAggregate && _t._groupBy.Count == 0 && _t._sql.Length > 0
+                    && _t._methodName is "Count" or "LongCount")
+                {
+                    var sqlStr = _t._sql.ToSqlString();
+                    var fromIdx = sqlStr.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+                    if (fromIdx > 0)
+                    {
+                        var afterFrom = sqlStr.Substring(fromIdx);
+                        _t._sql.Clear();
+                        _t._sql.Append("SELECT COUNT(*)").Append(afterFrom);
+                        _t._orderBy.Clear();
+                        _t._take = null;
+                        _t._takeParam = null;
+                        _t._skip = null;
+                        _t._skipParam = null;
+                    }
+                }
                 if (_t._sql.Length == 0)
                 {
                     var fromClause = _t._mapping.EscTable;
