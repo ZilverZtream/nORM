@@ -265,6 +265,10 @@ namespace nORM.Query
                     case UnaryExpression ue when ue.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
                         return Render(ue.Operand);
 
+                    case ConditionalExpression cond:
+                        // Ternary -> CASE WHEN test THEN ifTrue ELSE ifFalse END.
+                        return $"(CASE WHEN {RenderPredicate(cond.Test)} THEN {Render(cond.IfTrue)} ELSE {Render(cond.IfFalse)} END)";
+
                     case BinaryExpression be:
                         // String concat: `+` between two strings lowers to a BinaryExpression
                         // with both operand types == string. Use the provider's concat dialect
@@ -313,6 +317,43 @@ namespace nORM.Query
                 IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
                 _ => System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "NULL",
             };
+
+            // Predicate rendering for conditional `Test` branches. Boolean operators map to
+            // SQL keywords; comparisons emit raw operators. Re-uses the value-side Render for
+            // operands so column references and literals work consistently.
+            string RenderPredicate(Expression p)
+            {
+                switch (p)
+                {
+                    case BinaryExpression pb:
+                        var pop = pb.NodeType switch
+                        {
+                            ExpressionType.Equal => "=",
+                            ExpressionType.NotEqual => "<>",
+                            ExpressionType.GreaterThan => ">",
+                            ExpressionType.GreaterThanOrEqual => ">=",
+                            ExpressionType.LessThan => "<",
+                            ExpressionType.LessThanOrEqual => "<=",
+                            ExpressionType.AndAlso or ExpressionType.And => "AND",
+                            ExpressionType.OrElse or ExpressionType.Or => "OR",
+                            _ => throw new NormUnsupportedFeatureException(
+                                $"Predicate operator {pb.NodeType} is not supported inside a SetProperty conditional."),
+                        };
+                        if (pop is "AND" or "OR")
+                            return $"({RenderPredicate(pb.Left)} {pop} {RenderPredicate(pb.Right)})";
+                        return $"({Render(pb.Left)} {pop} {Render(pb.Right)})";
+
+                    case UnaryExpression pn when pn.NodeType == ExpressionType.Not:
+                        return $"(NOT {RenderPredicate(pn.Operand)})";
+
+                    case MemberExpression pm when pm.Type == typeof(bool):
+                        // Bare boolean column: emit `col = TRUE`.
+                        return $"({Render(pm)} = {_ctx.Provider.BooleanTrueLiteral})";
+
+                    default:
+                        return Render(p);
+                }
+            }
         }
 
         private static Expression StripQuotes(Expression e)
