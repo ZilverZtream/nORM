@@ -349,6 +349,15 @@ namespace nORM.Query
                     // method encountered in the source chain (e.g., "Where"), losing the "Descending"
                     // marker.  node.Method.Name always refers to this OrderBy/OrderByDescending call.
                     t._orderBy.Add((sql, !node.Method.Name.Contains("Descending")));
+                    // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
+                    // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer
+                    // translator. Without this the emitted SQL references @p0 but the command's
+                    // parameter list never gets it bound — SQLite throws "Must add values for
+                    // the following parameters" at execution time.
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
                 }
                 return source;
