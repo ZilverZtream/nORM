@@ -168,6 +168,15 @@ namespace nORM.Query
                             // g.Key inside a NewExpression projects the group key column.
                             if (arg is MemberExpression keyMember && keyMember.Member.Name == "Key")
                             {
+                                // Composite key materialised as a nested anonymous type requires
+                                // emitting one column per composite member AND a multi-step
+                                // materialiser that reconstructs the nested type — not yet plumbed.
+                                // The single-column code path below would emit
+                                // `"T0"."A", "T0"."B" AS "Key"` which is two columns aliased only on
+                                // the last one, and the outer materialiser then tries to cast a
+                                // single string into the composite anon type. Surface a clear pin.
+                                if (_compositeKeyMemberSql.Count > 0)
+                                    throw new NormUnsupportedFeatureException(BuildCompositeKeyProjectionUnsupportedMessage());
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
@@ -179,6 +188,10 @@ namespace nORM.Query
                                 && resultSelector.Parameters.Count >= 1
                                 && keyParam == resultSelector.Parameters[0])
                             {
+                                // Same restriction as the g.Key branch above — composite keys here
+                                // arrive as the parameter after SelectTranslator's 3-arg rewrite.
+                                if (_compositeKeyMemberSql.Count > 0)
+                                    throw new NormUnsupportedFeatureException(BuildCompositeKeyProjectionUnsupportedMessage());
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(groupBySql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
@@ -307,6 +320,21 @@ namespace nORM.Query
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             return sql;
+        }
+
+        private string BuildCompositeKeyProjectionUnsupportedMessage()
+        {
+            var members = string.Join(", ", _compositeKeyMemberSql.Keys);
+            return $"Projecting `g.Key` as a single column when the GROUP BY key is composite ({members}) " +
+                   "isn't supported — SQL has no way to fold the key parts into a single value, and nORM " +
+                   "doesn't yet emit a multi-column projection plus nested-construction materialiser for " +
+                   "the outer anonymous type. Workaround: flatten the composite Key into individual top-level " +
+                   "projection members, e.g. " +
+                   "`Select(g => new { g.Key." + (_compositeKeyMemberSql.Keys.FirstOrDefault() ?? "A") +
+                   ", g.Key." + (_compositeKeyMemberSql.Keys.Skip(1).FirstOrDefault() ?? "B") +
+                   ", Total = g.Sum(s => s.X) })`. " +
+                   "Downstream `Where(x => x.Region == ...)` / `OrderBy(x => x.Region)` on those flattened " +
+                   "members then route through the standard HAVING / ORDER BY paths.";
         }
 
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
