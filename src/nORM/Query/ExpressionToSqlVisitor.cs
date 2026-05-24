@@ -1057,6 +1057,18 @@ namespace nORM.Query
                 EmitEnumToStringCase(GetSql(node.Object), Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type);
                 return node;
             }
+            // No-arg ToString() on a bool: .NET returns "True" / "False" capitalized.
+            // CAST AS TEXT on a 0/1 column returns "0"/"1" -- emit an explicit CASE
+            // so the SQL value matches .NET semantics.
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 0
+                && node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(bool))
+            {
+                var inner = GetSql(node.Object);
+                _sql.Append("(CASE WHEN ").Append(inner).Append(" = 1 THEN 'True' ELSE 'False' END)");
+                return node;
+            }
 
             // char.IsDigit(c) / char.IsLetter(c) / char.IsWhiteSpace(c) — static methods on
             // System.Char. ASCII-only ranges via portable BETWEEN / OR / IN comparisons; matches

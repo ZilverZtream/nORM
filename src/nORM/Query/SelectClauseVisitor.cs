@@ -259,6 +259,13 @@ namespace nORM.Query
                 {
                     sb.Append(ExpressionToSqlVisitor.BuildEnumToStringCase(_provider, receiverSql, underlying));
                 }
+                else if (underlying == typeof(bool))
+                {
+                    // .NET bool.ToString returns "True" / "False" (capitalized) --
+                    // CAST AS TEXT on a 0/1 column returns "0"/"1" instead. Emit
+                    // an explicit CASE so the projected text matches .NET.
+                    sb.Append("(CASE WHEN ").Append(receiverSql).Append(" = 1 THEN 'True' ELSE 'False' END)");
+                }
                 else
                 {
                     sb.Append(_provider.GetToStringSql(receiverSql));
