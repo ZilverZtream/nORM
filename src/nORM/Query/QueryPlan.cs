@@ -95,7 +95,14 @@ namespace nORM.Query
         // the result list once read so the caller sees rows in the original ORDER BY
         // direction. The DB still scans only N rows (TakeLast) or n - N (SkipLast) so
         // there's no full-table-scan penalty.
-        bool PostReverse = false
+        bool PostReverse = false,
+        // DistinctBy uses a client-side dedupe over the materialized list: the SQL
+        // returns every row, then this delegate keeps one row per key (source order).
+        // A future translator pass can emit ROW_NUMBER OVER (PARTITION BY key) WHERE
+        // rn = 1 server-side; the external row-set contract stays the same so callers
+        // don't notice. The delegate captures a compiled keySelector that returns the
+        // grouping key for an arbitrary entity instance.
+        System.Func<System.Collections.IList, System.Collections.IList>? PostMaterializeTransform = null
     );
 
     internal sealed record BulkCudQueryShape(

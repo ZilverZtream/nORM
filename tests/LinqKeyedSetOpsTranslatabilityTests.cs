@@ -56,26 +56,16 @@ public class LinqKeyedSetOpsTranslatabilityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DistinctBy_throws_actionable_error_with_groupby_workaround_hint()
+    public async Task DistinctBy_returns_one_row_per_key_first_in_source_order()
     {
-        // DistinctBy is not translated; expect a nORM error pointing the user
-        // at the GroupBy().Select(g => g.First()) workaround so they don't
-        // accidentally call .AsEnumerable().DistinctBy() and materialize the
-        // whole table.
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-            await _ctx.Query<KsoItem>()
-                .DistinctBy(i => i.Category)
-                .ToListAsync());
-
-        Assert.True(
-            ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-            $"DistinctBy threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-        // Actionability: message should mention DistinctBy or GroupBy so the
-        // user knows what's not supported and what to use instead.
-        var msgLower = ex.Message.ToLowerInvariant();
-        Assert.True(
-            msgLower.Contains("distinctby") || msgLower.Contains("groupby") || msgLower.Contains("group by") || msgLower.Contains("not supported") || msgLower.Contains("unsupported") || msgLower.Contains("translat"),
-            $"DistinctBy error message lacks actionable hint about workaround. Got: {ex.Message}");
+        // Originally pinned as "throws actionable error" -- subsequently flipped
+        // to a positive translate path via a post-materialize compiled key
+        // selector. Source ordered by Id; first per Category: A -> 1, B -> 3.
+        var result = await _ctx.Query<KsoItem>()
+            .OrderBy(i => i.Id)
+            .DistinctBy(i => i.Category)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 3 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]

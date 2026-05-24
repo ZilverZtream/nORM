@@ -143,6 +143,12 @@ namespace nORM.Query
         // applying Take/Skip. The materializer reverses the final list so the caller
         // sees rows in the original ORDER BY direction.
         internal bool _postReverseResult;
+        // Set by DistinctByTranslator to a closure that takes the materialized list
+        // and returns a deduplicated list (one entry per key, source order preserved).
+        // v1 implementation runs in memory after the row scan; the QueryPlan field
+        // makes the contract pluggable so a future ROW_NUMBER subquery emit can
+        // replace it server-side without breaking callers.
+        internal System.Func<System.Collections.IList, System.Collections.IList>? _postMaterializeTransform;
         private HashSet<string> _tables = new();
         private readonly Stack<TranslationContextSnapshot> _contextStack = new();
         private List<PropertyInfo> _detectedCollections = new();
@@ -719,7 +725,8 @@ namespace nORM.Query
                     Complexity: _t._complexityMetrics,
                     M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null,
                     BulkCudShape: bulkCudShape,
-                    PostReverse: _t._postReverseResult
+                    PostReverse: _t._postReverseResult,
+                    PostMaterializeTransform: _t._postMaterializeTransform
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

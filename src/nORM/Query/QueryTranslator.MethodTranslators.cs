@@ -31,6 +31,7 @@ namespace nORM.Query
             { "GroupJoin", new JoinTranslator(true) },
             { "SelectMany", new SelectManyTranslator() },
             { "Distinct", new DistinctTranslator() },
+            { "DistinctBy", new DistinctByTranslator() },
             { "Reverse", new ReverseTranslator() },
             { "Union", new SetOperationTranslator() },
             { "Concat", new SetOperationTranslator() },
@@ -707,6 +708,55 @@ namespace nORM.Query
             // reverse of just N rows.
             t._postReverseResult = true;
             return source;
+        }
+
+        /// <summary>
+        /// v1 DistinctBy: SQL fetches every row, then a compiled key selector
+        /// dedupes the materialized list keeping the first occurrence per key
+        /// (LINQ semantics). The contract -- "one row per distinct key, full row
+        /// preserved" -- is correct; for large tables a future translator pass can
+        /// emit `ROW_NUMBER() OVER (PARTITION BY key) WHERE rn = 1` server-side
+        /// without breaking the caller.
+        /// </summary>
+        private sealed class DistinctByTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var keyLambda = StripQuotes(node.Arguments[1]) as LambdaExpression
+                    ?? throw new NormQueryException(string.Format(
+                        ErrorMessages.QueryTranslationFailed,
+                        "DistinctBy requires a key selector lambda."));
+
+                // Compile the key selector to an open delegate operating on object so the
+                // dedupe loop in the executor doesn't need to know the element type.
+                var entityType = keyLambda.Parameters[0].Type;
+                var keyType = keyLambda.Body.Type;
+                var entityObjParam = Expression.Parameter(typeof(object), "entity");
+                var castEntity = Expression.Convert(entityObjParam, entityType);
+                var body = new ParameterReplacer(keyLambda.Parameters[0], castEntity).Visit(keyLambda.Body)!;
+                var boxedBody = keyType.IsValueType ? (Expression)Expression.Convert(body, typeof(object)) : body;
+                var keySelector = Expression.Lambda<Func<object, object?>>(boxedBody, entityObjParam).Compile();
+
+                System.Collections.IList Dedupe(System.Collections.IList list)
+                {
+                    if (list.Count <= 1) return list;
+                    // Build a fresh list of the same element type so the caller gets
+                    // back e.g. List<DbiItem> rather than List<object>. Reuse the
+                    // executor's CreateList factory via the element type captured here.
+                    var deduped = QueryExecutor.CreateList(entityType, list.Count);
+                    var seen = new HashSet<object?>(EqualityComparer<object?>.Default);
+                    foreach (var item in list)
+                    {
+                        var key = item is null ? null : keySelector(item);
+                        if (seen.Add(key))
+                            deduped.Add(item);
+                    }
+                    return deduped;
+                }
+
+                t._postMaterializeTransform = Dedupe;
+                return t.Visit(node.Arguments[0]);
+            }
         }
 
         private sealed class JoinTranslator : IMethodCallTranslator
