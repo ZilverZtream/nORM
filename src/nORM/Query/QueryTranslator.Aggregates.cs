@@ -244,6 +244,38 @@ namespace nORM.Query
                 _selectItemsPool.Return(selectItems);
             }
         }
+        /// <summary>
+        /// Extracts the predicate lambda from an Enumerable / IGrouping aggregate call —
+        /// the extension-method form `Enumerable.Method(source, predicate)` puts the lambda
+        /// at Arguments[1], the instance form `g.Method(predicate)` at Arguments[0].
+        /// Returns null when no predicate argument is present (the no-arg overload).
+        /// </summary>
+        private LambdaExpression? ExtractAggregatePredicate(MethodCallExpression methodCall)
+        {
+            var arg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
+                ? methodCall.Arguments[1]
+                : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
+            return arg != null ? StripQuotes(arg) as LambdaExpression : null;
+        }
+
+        /// <summary>
+        /// Translates a predicate / selector lambda body against the group's element alias,
+        /// merging any literal constants as compiled-literal parameters. Shared by every
+        /// IGrouping aggregate path that needs the CASE-WHEN-emitter pattern.
+        /// </summary>
+        private string TranslateGroupPredicateBody(LambdaExpression predicate, string alias)
+        {
+            if (!_correlatedParams.ContainsKey(predicate.Parameters[0]))
+                _correlatedParams[predicate.Parameters[0]] = (_mapping, alias);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            var sql = visitor.Translate(predicate.Body);
+            foreach (var kvp in visitor.GetParameters())
+                AddLiteralParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(visitor);
+            return sql;
+        }
+
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
         {
             var methodName = methodCall.Method.Name;
@@ -258,19 +290,33 @@ namespace nORM.Query
                         // method form Enumerable.Count(source, predicate) puts the lambda at [1])
                         // must apply the predicate: COUNT(CASE WHEN <pred> THEN 1 ELSE NULL END)
                         // — NULL excluded by SQL count semantics, matching .NET behaviour.
-                        var predicateArg = methodCall.Arguments.Count > 1 && StripQuotes(methodCall.Arguments[0]) is not LambdaExpression
-                            ? methodCall.Arguments[1] : methodCall.Arguments.Count > 0 ? methodCall.Arguments[0] : null;
-                        var predicate = predicateArg != null ? StripQuotes(predicateArg) as LambdaExpression : null;
+                        var predicate = ExtractAggregatePredicate(methodCall);
                         if (predicate == null) return "COUNT(*)";
-                        if (!_correlatedParams.ContainsKey(predicate.Parameters[0]))
-                            _correlatedParams[predicate.Parameters[0]] = (_mapping, alias);
-                        var vctxPred = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                        var predVisitor = FastExpressionVisitorPool.Get(in vctxPred);
-                        var predSql = predVisitor.Translate(predicate.Body);
-                        foreach (var kvp in predVisitor.GetParameters())
-                            AddLiteralParameter(kvp.Key, kvp.Value);
-                        FastExpressionVisitorPool.Return(predVisitor);
+                        var predSql = TranslateGroupPredicateBody(predicate, alias);
                         return $"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)";
+                    }
+                case "Any":
+                    {
+                        // 1-arg `g.Any()` → CAST(COUNT(*) > 0 AS INT) but in a grouped projection
+                        // the group is guaranteed non-empty so it's always true — emit literal `1`.
+                        // 2-arg `g.Any(predicate)` → `MAX(CASE WHEN pred THEN 1 ELSE 0 END) = 1`.
+                        // SQLite returns 0/1; the materializer coerces to bool. Matches .NET
+                        // Enumerable.Any semantics (true when ≥1 row satisfies the predicate).
+                        var predicate = ExtractAggregatePredicate(methodCall);
+                        if (predicate == null) return "1";
+                        var predSql = TranslateGroupPredicateBody(predicate, alias);
+                        return $"(MAX(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
+                    }
+                case "All":
+                    {
+                        // `g.All(predicate)` → `MIN(CASE WHEN pred THEN 1 ELSE 0 END) = 1`. True
+                        // only when every row in the group satisfies the predicate (one false
+                        // row pulls the MIN to 0). An empty group would yield NULL but groups
+                        // by definition are non-empty, so the comparison stays well-defined.
+                        var predicate = ExtractAggregatePredicate(methodCall);
+                        if (predicate == null) return "1";
+                        var predSql = TranslateGroupPredicateBody(predicate, alias);
+                        return $"(MIN(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
                     }
                 case "Sum":
                     {
