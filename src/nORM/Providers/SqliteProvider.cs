@@ -255,6 +255,13 @@ namespace nORM.Providers
                     // projection path -- which routes through TranslateFunction --
                     // gets the same one-char extraction the Where path gets.
                     "get_Chars" when args.Length == 2 => $"SUBSTR({args[0]}, ({args[1]}) + 1, 1)",
+                    // Static IsNullOrEmpty / IsNullOrWhiteSpace. Mirror
+                    // ExpressionToSqlVisitor's inline emission (~line 1166) so the
+                    // projection path matches the Where path. Without this, SCV
+                    // falls through to its generic function-name handler and emits
+                    // raw "ISNULLOREMPTY(...)" -- a SQLite 'no such function' error.
+                    nameof(string.IsNullOrEmpty) when args.Length == 1 => $"({args[0]} IS NULL OR {args[0]} = '')",
+                    nameof(string.IsNullOrWhiteSpace) when args.Length == 1 => $"({args[0]} IS NULL OR LTRIM(RTRIM({args[0]})) = '')",
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
