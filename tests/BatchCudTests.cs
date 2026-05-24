@@ -105,8 +105,11 @@ public class BatchCudTests
     }
 
     [Fact]
-    public async Task ExecuteUpdateAsync_rejects_inline_computed_set_value_with_actionable_message()
+    public async Task ExecuteUpdateAsync_inline_string_concat_of_captured_locals_rejected_with_actionable_message()
     {
+        // Inline string concat of two captured locals is a BinaryExpression — not a literal
+        // value and not a lambda. The translator can't reduce it to either form. Callers
+        // should pre-compute (assign to a local first) or use the lambda overload.
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
@@ -124,9 +127,7 @@ public class BatchCudTests
                 .Where(u => u.Id == 1)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, prefix + suffix)));
 
-        Assert.Contains("precomputed captured local values", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("server expressions", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("before calling ExecuteUpdateAsync", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("literal/captured constant", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
