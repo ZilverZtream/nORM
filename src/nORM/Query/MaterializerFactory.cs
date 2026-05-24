@@ -1452,6 +1452,27 @@ namespace nORM.Query
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(_convertToCharMethod, getRawValue);
             }
+            else if (underlyingType == typeof(byte) || underlyingType == typeof(sbyte)
+                || underlyingType == typeof(short) || underlyingType == typeof(ushort)
+                || underlyingType == typeof(uint) || underlyingType == typeof(ulong))
+            {
+                // Small / wide integer columns: SQLite returns these as boxed Int64. Direct
+                // Expression.Convert(boxed-long → byte) throws InvalidCastException at runtime.
+                // Route through the matching System.Convert.To*(object, IFormatProvider)
+                // overload which performs the numeric narrowing safely.
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                var converter = underlyingType.Name switch
+                {
+                    nameof(Byte)   => typeof(Convert).GetMethod(nameof(Convert.ToByte),   new[] { typeof(object), typeof(IFormatProvider) })!,
+                    nameof(SByte)  => typeof(Convert).GetMethod(nameof(Convert.ToSByte),  new[] { typeof(object), typeof(IFormatProvider) })!,
+                    nameof(Int16)  => typeof(Convert).GetMethod(nameof(Convert.ToInt16),  new[] { typeof(object), typeof(IFormatProvider) })!,
+                    nameof(UInt16) => typeof(Convert).GetMethod(nameof(Convert.ToUInt16), new[] { typeof(object), typeof(IFormatProvider) })!,
+                    nameof(UInt32) => typeof(Convert).GetMethod(nameof(Convert.ToUInt32), new[] { typeof(object), typeof(IFormatProvider) })!,
+                    nameof(UInt64) => typeof(Convert).GetMethod(nameof(Convert.ToUInt64), new[] { typeof(object), typeof(IFormatProvider) })!,
+                    _ => throw new System.InvalidOperationException($"Unexpected narrow-integer type '{underlyingType.Name}'.")
+                };
+                call = Expression.Call(converter, getRawValue, Expression.Constant(System.Globalization.CultureInfo.InvariantCulture, typeof(IFormatProvider)));
+            }
             else
             {
                 call = underlyingType.Name switch
