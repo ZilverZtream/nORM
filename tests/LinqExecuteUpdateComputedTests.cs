@@ -86,6 +86,19 @@ public class LinqExecuteUpdateComputedTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ExecuteUpdate_appends_to_string_column_via_server_side_concat()
+    {
+        var affected = await _ctx.Query<EuRow>()
+            .Where(r => r.Label == "a")
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Label, r => r.Label + "!"));
+        Assert.Equal(2, affected);
+
+        var labels = (await _ctx.Query<EuRow>().OrderBy(r => r.Id).ToListAsync())
+            .Select(r => r.Label).ToArray();
+        Assert.Equal(new[] { "a!", "b", "a!", "c" }, labels);
+    }
+
+    [Fact]
     public async Task ExecuteUpdate_assigns_computed_value_from_two_other_columns()
     {
         // SetProperty assigns Counter = Id * 10 — pulls from a different column of the
