@@ -49,7 +49,7 @@ namespace nORM.Query
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
             return node;
         }
         private Expression HandleGroupJoin(MethodCallExpression node)
@@ -92,7 +92,7 @@ namespace nORM.Query
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
             // outer-key contiguity (needed for streaming group segmentation) is always first.
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null, distinct: _isDistinct);
             // Insert outer-key sort at the front of _orderBy so it is always first.
             _orderBy.Insert(0, (outerKeySql, true));
             var outerType = outerKeySelector.Parameters[0].Type;
@@ -524,7 +524,7 @@ namespace nORM.Query
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
         }
 
         private sealed class QuerySyntaxLeftJoinRewriter : ExpressionVisitor
