@@ -1647,6 +1647,14 @@ namespace nORM.Query
             // Extract expression from closure-captured IQueryable.
             if (TryGetConstantValue(source, out var srcConstValue) && srcConstValue is System.Linq.IQueryable iqSrc)
                 source = iqSrc.Expression!;
+            // Mirror BuildExists (line ~1584): materialize any `NormQueryable.Query<T>(ctx)`
+            // calls inside the source into ConstantExpression(IQueryable) so the sub-translator's
+            // VisitConstant picks up the query as the entity source instead of trying to bind
+            // the DbContext as a SQL parameter (which throws "No mapping exists from object
+            // type nORM.Core.DbContext"). Without this, `Where(p => ctx.Query<O>().Select(o
+            // => o.Id).Contains(p.Id))` — the semi-join-via-Contains idiom — silently
+            // fails to translate.
+            source = QueryCallMaterializer.Materialize(source);
 
             // Compile-time null: ConstantExpression{null} OR Convert(null, T?) (UnaryExpression).
             bool isNullValue = (value is ConstantExpression { Value: null })
