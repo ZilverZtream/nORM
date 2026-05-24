@@ -171,11 +171,12 @@ namespace nORM.Query
 
             if (type == typeof(DateOnly))
             {
-                p.DbType = System.Data.DbType.Date;
-                // Keep DateOnly as-is for ParameterAssign path. SQLite binds DateOnly as TEXT
-                // which enables correct text comparison in WHERE clauses. The AddOptimizedParam
-                // path converts to DateTime for non-SQLite providers that need it.
-                p.Value = v;
+                // See ParameterOptimizer.AddOptimizedParam: bind DateOnly as canonical
+                // `yyyy-MM-dd` text so equality predicates round-trip against TEXT-stored
+                // dates. The previous DbType.Date + DateOnly path produced format mismatches
+                // (`'2024-06-30 00:00:00'` vs stored `'2024-06-30'`) on SQLite.
+                p.Value = ((DateOnly)v).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                p.DbType = System.Data.DbType.String;
                 return;
             }
 
