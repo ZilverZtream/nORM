@@ -1225,7 +1225,12 @@ namespace nORM.Query
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
             if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
-                throw new NormUnsupportedFeatureException("AsAsyncEnumerable does not support Include or GroupJoin operations.");
+                throw new NormUnsupportedFeatureException(
+                    "AsAsyncEnumerable does not support Include or GroupJoin. Eager-load paths " +
+                    "issue a dependent fetch after the principal materializer completes — incompatible " +
+                    "with row-by-row streaming. Use `await query.ToListAsync()` to materialize the " +
+                    "fully-loaded set in one round-trip, or remove the Include and reissue the " +
+                    "child query manually per principal if streaming is required.");
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
