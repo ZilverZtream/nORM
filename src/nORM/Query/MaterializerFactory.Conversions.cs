@@ -118,6 +118,13 @@ namespace nORM.Query
             if (value is string s) return TimeSpan.Parse(s, CultureInfo.InvariantCulture);
             if (value is long ticks) return new TimeSpan(ticks);
             if (value is int ticks32) return new TimeSpan(ticks32);
+            // REAL (double / float) columns coming from a projection that emitted
+            // julianday(end) - julianday(start)) * 86400 represent total seconds;
+            // TimeSpan.FromSeconds reconstructs the duration with sub-second
+            // precision (SQLite's julianday is a double, so the diff retains the
+            // fractional component down to microseconds).
+            if (value is double sec) return TimeSpan.FromSeconds(sec);
+            if (value is float secF) return TimeSpan.FromSeconds(secF);
             return (TimeSpan)Convert.ChangeType(value, typeof(TimeSpan), CultureInfo.InvariantCulture);
         }
 
@@ -217,13 +224,17 @@ namespace nORM.Query
                 if (dbValue is DateTime dt) return new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), TimeSpan.Zero);
                 if (dbValue is string s) return DateTimeOffset.Parse(s, CultureInfo.InvariantCulture);
             }
-            // TimeSpan: stored as TEXT or numeric ticks; coerce both.
+            // TimeSpan: stored as TEXT or numeric ticks; coerce both. REAL
+            // values come from projection expressions that emit julianday
+            // arithmetic (DateTime - DateTime), pre-multiplied to seconds.
             if (underlyingType == typeof(TimeSpan))
             {
                 if (dbValue is TimeSpan ts2) return ts2;
                 if (dbValue is string s2) return TimeSpan.Parse(s2, CultureInfo.InvariantCulture);
                 if (dbValue is long ticks) return new TimeSpan(ticks);
                 if (dbValue is int ticks32) return new TimeSpan(ticks32);
+                if (dbValue is double sec) return TimeSpan.FromSeconds(sec);
+                if (dbValue is float secF) return TimeSpan.FromSeconds(secF);
             }
             // char: stored as single-character TEXT on TEXT-storage providers; numeric
             // storage isn't common but accept it via Convert.ToChar.

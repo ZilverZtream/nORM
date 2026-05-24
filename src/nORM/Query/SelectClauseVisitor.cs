@@ -829,6 +829,30 @@ namespace nORM.Query
                 sb.Append(_provider.GetConcatSql(leftSql, rightSql));
                 return node;
             }
+            // DateTime - DateTime in projection -> TimeSpan. SQL '-' on TEXT
+            // columns returns 0 (silent-wrongness); convert via julianday math
+            // and tag the column with the marker the materializer recognizes
+            // for "REAL seconds -> TimeSpan.FromSeconds" conversion.
+            if (node.NodeType == ExpressionType.Subtract
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(DateTime))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                // (julianday(end) - julianday(start)) * 86400 -> REAL seconds.
+                // Materializer reads as double; user expects TimeSpan -- handled
+                // by MaterializerFactory's GetFieldValue path which converts a
+                // numeric reader value to TimeSpan via TimeSpan.FromSeconds.
+                sb.Append("((julianday(").Append(leftSql).Append(") - julianday(")
+                  .Append(rightSql).Append(")) * 86400.0)");
+                return node;
+            }
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch
