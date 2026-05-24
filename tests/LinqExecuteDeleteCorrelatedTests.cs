@@ -69,6 +69,21 @@ public class LinqExecuteDeleteCorrelatedTests : IAsyncLifetime
         Assert.Equal(new[] { "Bob", "Carol", "Dave" }, remaining);
     }
 
+    [Fact]
+    public async Task ExecuteUpdate_with_correlated_Any_subquery_updates_matched_parents()
+    {
+        // Same plumbing as the delete cases, but driven through ExecuteUpdate — the
+        // qualifier-rewrite that fixed correlated DELETE must also fix correlated UPDATE.
+        var affected = await _ctx.Query<EdUser>()
+            .Where(u => _ctx.Query<EdOrder>().Any(o => o.UserId == u.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Name, u => u.Name + "*"));
+        Assert.Equal(2, affected); // Alice (1) and Carol (3) have orders; Bob (2) and Dave (4) don't.
+
+        var byId = (await _ctx.Query<EdUser>().OrderBy(u => u.Id).ToListAsync())
+            .Select(u => u.Name).ToArray();
+        Assert.Equal(new[] { "Alice*", "Bob", "Carol*", "Dave" }, byId);
+    }
+
     [Table("EdUser")]
     public sealed class EdUser
     {
