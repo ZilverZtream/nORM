@@ -161,6 +161,51 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // string.Equals with a StringComparison argument -- mirror
+            // ExpressionToSqlVisitor's HandleStringEqualsStatic/Instance
+            // fast handlers so projection and Where return identical truths.
+            // The static overload takes (a, b, comparison); instance is
+            // (b, comparison). Wrap both sides in LOWER for ignore-case
+            // variants; otherwise emit '='. Without this branch the
+            // analyzer accepts Equals but SCV emits raw 'EQUALS(...)'
+            // and SQLite throws 'no such function'.
+            if (node.Method.Name == nameof(string.Equals)
+                && node.Method.DeclaringType == typeof(string))
+            {
+                Expression? lhs = null, rhs = null, comparison = null;
+                if (node.Object == null
+                    && node.Arguments.Count == 3
+                    && node.Arguments[2].Type == typeof(StringComparison))
+                {
+                    lhs = node.Arguments[0];
+                    rhs = node.Arguments[1];
+                    comparison = node.Arguments[2];
+                }
+                else if (node.Object != null
+                    && node.Arguments.Count == 2
+                    && node.Arguments[1].Type == typeof(StringComparison))
+                {
+                    lhs = node.Object;
+                    rhs = node.Arguments[0];
+                    comparison = node.Arguments[1];
+                }
+                if (lhs != null && rhs != null && comparison != null)
+                {
+                    var lhsSql = TranslateProjectionArg(lhs);
+                    var rhsSql = TranslateProjectionArg(rhs);
+                    bool ignoreCase = QueryTranslator.TryGetConstantValue(comparison, out var cv)
+                        && cv is StringComparison sc
+                        && (sc is StringComparison.OrdinalIgnoreCase
+                                or StringComparison.InvariantCultureIgnoreCase
+                                or StringComparison.CurrentCultureIgnoreCase);
+                    if (ignoreCase)
+                        sb.Append("(LOWER(").Append(lhsSql).Append(") = LOWER(").Append(rhsSql).Append("))");
+                    else
+                        sb.Append('(').Append(lhsSql).Append(" = ").Append(rhsSql).Append(')');
+                    return node;
+                }
+            }
+
             // No-arg ToString() on a non-string receiver -- lower to the provider's
             // CAST AS TEXT for primitives, or CASE-WHEN-per-name for enums. Mirrors
             // ExpressionToSqlVisitor's matching handlers so projection and predicate
