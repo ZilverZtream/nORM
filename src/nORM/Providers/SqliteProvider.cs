@@ -278,7 +278,13 @@ namespace nORM.Providers
                     nameof(DateTime.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
                     nameof(DateTime.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
                     nameof(DateTime.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
-                    nameof(DateTime.Date) => $"date({args[0]})",
+                    // SQLite's date() returns 'YYYY-MM-DD' but ParameterManager
+                    // serializes DateTime params as 'yyyy-MM-dd HH:mm:ss.fffffff'.
+                    // A text comparison between those two formats never matches,
+                    // so column.Date == constantDate silently returns zero rows.
+                    // Emit the matching long format so Where round-trips; the
+                    // materializer parses either form back to DateTime.
+                    nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {args[0]})",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
                     // SQLite's date modifier syntax accepts an unsigned-positive form
                     // ('7 days') and an explicitly-signed negative form ('-3 days'); the
