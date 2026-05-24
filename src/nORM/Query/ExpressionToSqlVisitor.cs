@@ -1120,6 +1120,18 @@ namespace nORM.Query
                     && int.TryParse(fmt.AsSpan(1), out var digits)
                     && digits >= 0 && digits <= 17)
                 {
+                    // Reserve a placeholder compiled-param slot when the format
+                    // string is a closure-captured MemberExpression so the
+                    // ParameterValueExtractor's value-list stays aligned with
+                    // the compiled-param name list. Same shape as 407e03d's
+                    // DateTime±TimeSpan fix; ConstantExpression literals don't
+                    // need this since the extractor only walks MemberExpressions.
+                    if (node.Arguments[0] is MemberExpression)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
                     var inner = GetSql(node.Object);
                     _sql.Append("printf('%.").Append(digits).Append("f', ").Append(inner).Append(')');
                     return node;
