@@ -7813,18 +7813,20 @@ public class CoverageBoostGroup69Tests
     }
 
     [Fact]
-    public void QueryTranslator_UnsupportedBinaryOpInJoin_ThrowsNormUnsupportedFeatureException()
+    public void QueryTranslator_LeftShift_in_Where_translates_via_sql_bitshift()
     {
-        // Covers the default throw branch in ExpressionToSqlVisitor.VisitBinary for binary
-        // operators that have no SQL equivalent. LeftShift is one such operator — none of
-        // the supported providers expose it through a uniform translator API.
+        // Previously asserted the throw for LeftShift; that was a cop-out --
+        // SQLite, SQL Server, MySQL, and PostgreSQL all support << directly,
+        // so the translator now emits the operator and Translate succeeds.
+        // Pin the working behavior so a regression that reintroduces the
+        // throw surfaces.
         using var cn = CreateItemDb69();
         using var ctx = new DbContext(cn, new SqliteProvider());
 
         var q = ctx.Query<CovItem>().Where(e => (e.Value << 1) > 5);
         using var t = QueryTranslator.Rent(ctx);
-        var ex = Assert.ThrowsAny<Exception>(() => t.Translate(q.Expression));
-        Assert.Contains("LeftShift", ex.Message);
+        var plan = t.Translate(q.Expression);
+        Assert.NotNull(plan);
     }
 
     [Fact]

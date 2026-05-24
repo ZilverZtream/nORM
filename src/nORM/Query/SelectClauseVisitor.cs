@@ -774,12 +774,16 @@ namespace nORM.Query
                 ExpressionType.Multiply => "*",
                 ExpressionType.Divide => "/",
                 ExpressionType.Modulo => "%",
+                // SQLite, SQL Server, MySQL, and PostgreSQL all support << and >>
+                // as bitwise shift operators with the same precedence semantics
+                // as .NET, so emit the operator directly rather than forcing the
+                // multiply-rewrite workaround the old throw suggested.
+                ExpressionType.LeftShift => "<<",
+                ExpressionType.RightShift => ">>",
                 _ => throw new InvalidOperationException(
                     $"Binary operator '{node.NodeType}' has no portable SQL equivalent in a SELECT " +
-                    "projection. For LeftShift / RightShift, rewrite as multiply / divide by a power " +
-                    "of 2 (`x * 2` for `x << 1`, `x / 4` for `x >> 2`) — the SQL planner produces the " +
-                    "same execution plan and the rewrite works on every provider. For Power, use " +
-                    "`Math.Pow(x, n)` which lowers to the provider's POWER / POW function."),
+                    "projection. For Power, use `Math.Pow(x, n)` which lowers to the provider's " +
+                    "POWER / POW function."),
             }).Append(' ');
             Visit(node.Right);
             sb.Append(')');
