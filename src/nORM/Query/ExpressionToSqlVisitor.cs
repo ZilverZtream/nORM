@@ -186,6 +186,57 @@ namespace nORM.Query
             return builder.ToSqlString();
         }
 
+        private readonly struct FormatSegment
+        {
+            public readonly bool IsLiteral;
+            public readonly string? Literal;
+            public readonly int ArgIndex;
+            public FormatSegment(string literal) { IsLiteral = true; Literal = literal; ArgIndex = -1; }
+            public FormatSegment(int argIndex) { IsLiteral = false; Literal = null; ArgIndex = argIndex; }
+        }
+
+        /// <summary>
+        /// Splits a <c>string.Format</c> template into literal/placeholder segments.
+        /// Returns null if the template contains alignment (<c>{0,5}</c>) or format
+        /// specifiers (<c>{0:N2}</c>) — those have no portable SQL equivalent and
+        /// belong on the client-evaluation path. Escaped braces (<c>{{</c>, <c>}}</c>)
+        /// are recognized and emitted as literal single braces.
+        /// </summary>
+        private static List<FormatSegment>? TryParseSimpleFormatSegments(string template)
+        {
+            var segments = new List<FormatSegment>();
+            var literal = new System.Text.StringBuilder();
+            int i = 0;
+            while (i < template.Length)
+            {
+                char c = template[i];
+                if (c == '{')
+                {
+                    if (i + 1 < template.Length && template[i + 1] == '{') { literal.Append('{'); i += 2; continue; }
+                    if (literal.Length > 0) { segments.Add(new FormatSegment(literal.ToString())); literal.Clear(); }
+                    int end = template.IndexOf('}', i + 1);
+                    if (end < 0) return null;
+                    var inner = template.Substring(i + 1, end - i - 1);
+                    if (inner.Length == 0 || inner.IndexOfAny(new[] { ',', ':' }) >= 0) return null;
+                    if (!int.TryParse(inner, out var argIdx) || argIdx < 0) return null;
+                    segments.Add(new FormatSegment(argIdx));
+                    i = end + 1;
+                }
+                else if (c == '}')
+                {
+                    if (i + 1 < template.Length && template[i + 1] == '}') { literal.Append('}'); i += 2; continue; }
+                    return null; // unmatched closing brace
+                }
+                else
+                {
+                    literal.Append(c);
+                    i++;
+                }
+            }
+            if (literal.Length > 0) segments.Add(new FormatSegment(literal.ToString()));
+            return segments;
+        }
+
         /// <summary>
         /// C# emits `charExpr OP charExpr` as `intExpr OP intExpr` via implicit `char→int`
         /// promotions. When at least one side is `Convert(charExpr, int)`, recover the char
@@ -768,12 +819,14 @@ namespace nORM.Query
                 return node;
             }
             // No-arg ToString() on a column/expression — lower to provider-specific CAST.
-            // Receiver type must NOT already be string (string.ToString is identity but
-            // hitting this branch would emit a redundant CAST).
+            // Receiver type must NOT already be string (identity, would emit a redundant
+            // CAST) and must NOT be an enum (CAST(StatusInt AS TEXT) returns "0"/"1"/"2"
+            // rather than the enum names users actually expect — that's a client-eval shape).
             if (node.Method.Name == nameof(object.ToString)
                 && node.Arguments.Count == 0
                 && node.Object != null
-                && node.Object.Type != typeof(string))
+                && node.Object.Type != typeof(string)
+                && !(Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type).IsEnum)
             {
                 var inner = GetSql(node.Object);
                 _sql.Append(_provider.GetToStringSql(inner));
@@ -961,6 +1014,58 @@ namespace nORM.Query
                         .Append(" THEN -1 WHEN ").Append(lhs).Append(" > ").Append(rhs)
                         .Append(" THEN 1 ELSE 0 END)");
                     return node;
+                }
+                // static string.Format("template", args...) where the template uses only
+                // simple positional placeholders (`{0}`, `{1}`, ...). Lowers to a provider
+                // concat that interleaves literal pieces and argument SQL. Format specifiers
+                // (`{0:N2}` / `{0,5}`) get rejected so client-evaluation can take over for
+                // those — no provider has a portable equivalent of .NET format strings.
+                if (node.Object == null
+                    && node.Method.Name == nameof(string.Format)
+                    && node.Arguments.Count >= 2
+                    && TryGetConstantValue(node.Arguments[0], out var fmtRaw) && fmtRaw is string template)
+                {
+                    var segments = TryParseSimpleFormatSegments(template);
+                    if (segments != null)
+                    {
+                        // Collect remaining args (one per argument expression). string.Format
+                        // accepts `params object[]`, so the second argument may be a
+                        // NewArrayExpression wrapping the parts — unwrap if so.
+                        var argExprs = new List<Expression>();
+                        for (int i = 1; i < node.Arguments.Count; i++)
+                        {
+                            var a = node.Arguments[i];
+                            if (a is NewArrayExpression arr) argExprs.AddRange(arr.Expressions);
+                            else argExprs.Add(a);
+                        }
+                        var parts = new List<string>();
+                        foreach (var seg in segments)
+                        {
+                            if (seg.IsLiteral)
+                            {
+                                if (seg.Literal!.Length > 0)
+                                    parts.Add($"'{seg.Literal.Replace("'", "''")}'");
+                            }
+                            else
+                            {
+                                if (seg.ArgIndex >= argExprs.Count)
+                                    return base.VisitMethodCall(node); // bad template, defer
+                                var argSql = GetSql(argExprs[seg.ArgIndex]);
+                                var argType = argExprs[seg.ArgIndex].Type;
+                                if (argType != typeof(string))
+                                    argSql = _provider.GetToStringSql(argSql);
+                                parts.Add(argSql);
+                            }
+                        }
+                        if (parts.Count == 0)
+                        {
+                            _sql.Append("''");
+                            return node;
+                        }
+                        var concatSql = parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                        _sql.Append(concatSql);
+                        return node;
+                    }
                 }
                 // static string.Concat(a, b, ...) -> provider-specific concat
                 if (node.Object == null && node.Method.Name == nameof(string.Concat) && node.Arguments.Count >= 1)
