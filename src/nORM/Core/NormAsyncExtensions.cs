@@ -273,6 +273,62 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns the element at the specified zero-based index. EF Core parity:
+        /// <c>q.ElementAtAsync(index)</c>. The translator's <c>ElementAtTranslator</c>
+        /// rewrites this as <c>Skip(index).Take(1)</c>, so the underlying SQL fetches a
+        /// single row.
+        /// </summary>
+        public static Task<T> ElementAtAsync<T>(this IQueryable<T> source, int index, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (index < 0)
+                throw new ArgumentOutOfRangeException(nameof(index), "ElementAt index must be non-negative.");
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var elementAtExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.ElementAt),
+                    new[] { typeof(T) },
+                    source.Expression,
+                    Expression.Constant(index));
+                return normProvider.ExecuteAsync<T>(elementAtExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "ElementAtAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ElementAtAsync().");
+        }
+
+        /// <summary>
+        /// Returns the element at the specified zero-based index, or <c>null</c> when the
+        /// index is out of range. EF Core parity: <c>q.ElementAtOrDefaultAsync(index)</c>.
+        /// </summary>
+        public static Task<T?> ElementAtOrDefaultAsync<T>(this IQueryable<T> source, int index, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (index < 0)
+                return Task.FromResult<T?>(null);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var elementAtOrDefaultExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.ElementAtOrDefault),
+                    new[] { typeof(T) },
+                    source.Expression,
+                    Expression.Constant(index));
+                return normProvider.ExecuteAsync<T?>(elementAtOrDefaultExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "ElementAtOrDefaultAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ElementAtOrDefaultAsync().");
+        }
+
+        /// <summary>
         /// Returns whether the nORM query contains the given value. EF Core parity:
         /// <c>q.ContainsAsync(value)</c>. Lowered to <c>Queryable.Contains(source, value)</c>
         /// which the existing translator routes through the EXISTS pipeline.
