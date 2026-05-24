@@ -18,6 +18,12 @@ namespace nORM.Query
         private readonly TableMapping _mapping;
         private readonly List<string> _groupBy;
         private readonly DatabaseProvider _provider;
+        // Outer-row alias used to reference parent columns from correlated subqueries
+        // emitted inside the projection (e.g. `parent.Children.Count()` →
+        // `(SELECT COUNT(*) FROM Child WHERE Child.FK = {outerAlias}.PK)`). Defaults to
+        // the principal table's escaped name when no JOIN alias is in scope — SQLite
+        // accepts table-qualified outer-scope references even without an explicit AS alias.
+        private readonly string _outerAlias;
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder? _sb;
@@ -26,11 +32,12 @@ namespace nORM.Query
         /// <summary>SQL aggregate function name for COUNT operations.</summary>
         private const string CountFunctionName = "COUNT";
 
-        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider)
+        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _groupBy = groupBy ?? throw new ArgumentNullException(nameof(groupBy));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+            _outerAlias = outerAlias ?? mapping.EscTable;
         }
 
         /// <summary>
@@ -121,6 +128,28 @@ namespace nORM.Query
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             var sb = EnsureBuilder();
+
+            // `parent.Children.Count()` (or Any/All/LongCount) inside a Select projection.
+            // ExpressionToSqlVisitor recognises this shape and rewrites it into a correlated
+            // subquery (`(SELECT COUNT(*) FROM Child WHERE Child.FK = parent.PK)`), but this
+            // visitor previously fell through to the generic aggregate path and emitted
+            // `COUNT(*)` against the outer table — turning the per-row projection into a
+            // single-row aggregate result. Detect the shape and emit the correlated
+            // subquery here too so `Select(p => new {p.Name, Count = p.Children.Count()})`
+            // returns one row per parent with the right child count.
+            if (node.Arguments.Count >= 1
+                && node.Arguments[0] is MemberExpression navMember
+                && navMember.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(navMember.Member.Name, out var relation)
+                && (node.Method.Name is nameof(Queryable.Count)
+                                     or nameof(Queryable.LongCount)
+                                     or nameof(Queryable.Any)
+                                     or nameof(Queryable.All)))
+            {
+                EmitNavigationCountSubquery(sb, node, relation);
+                return node;
+            }
+
             // Use ToUpperInvariant to avoid locale-sensitive casing (e.g., Turkish-I problem).
             var methodNameUpper = node.Method.Name.ToUpperInvariant();
 
@@ -202,6 +231,47 @@ namespace nORM.Query
             }
             sb.Append(')');
             return node;
+        }
+
+        private void EmitNavigationCountSubquery(StringBuilder sb, MethodCallExpression node, TableMapping.Relation relation)
+        {
+            // Resolve the dependent table mapping from the relation's DependentType. The
+            // navigation registration on Relations doesn't carry the dependent TableMapping
+            // directly, so look it up via the principal mapping's column lookup (Relations is
+            // populated post-build, so we can reach DependentType.Mapping through the
+            // ForeignKey property — which IS on the dependent type).
+            var depType = relation.DependentType;
+            // We need an escaped table identifier and column for the dependent. Since SCV
+            // doesn't have a TableMappingProvider, build the SQL identifiers manually from
+            // attributes — match the same convention TableMapping uses (table name from
+            // [Table] attribute or type name; columns from property names escaped by provider).
+            var depTable = depType.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.TableAttribute), inherit: false)
+                .Cast<System.ComponentModel.DataAnnotations.Schema.TableAttribute>().FirstOrDefault()?.Name ?? depType.Name;
+            var depAlias = _provider.Escape("__nav");
+            var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
+            var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
+            // Outer alias / table-name reference for parent columns — set via SCV ctor.
+            var outerAlias = _outerAlias;
+
+            sb.Append('(').Append("SELECT ");
+            if (node.Method.Name is nameof(Queryable.Any))
+                sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol)
+                  .Append(") THEN 1 ELSE 0 END");
+            else if (node.Method.Name is nameof(Queryable.All))
+                sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol)
+                  .Append(") THEN 1 ELSE 0 END");
+            else
+                sb.Append("COUNT(*) FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+
+            if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All))
+            {
+                sb.Append(')');
+                return;
+            }
+            sb.Append(')');
         }
 
         private string TranslateProjectionArg(Expression arg)
