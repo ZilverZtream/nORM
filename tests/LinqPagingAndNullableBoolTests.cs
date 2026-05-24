@@ -59,6 +59,18 @@ public class LinqPagingAndNullableBoolTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Take_then_Skip_throws_unsupported_with_actionable_message()
+    {
+        // Take(n).Skip(m) needs a subquery wrap to preserve LINQ semantics — fail deterministically
+        // so callers either rewrite as Skip-then-Take or wait for the wrap pipeline.
+        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(5).Skip(2).ToListAsync();
+        });
+        Assert.Contains("Take(n).Skip(m)", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Nullable_bool_equality_true_excludes_nulls_and_false()
     {
         var ids = (await _ctx.Query<PgRow>().Where(r => r.Flag == true).OrderBy(r => r.Id).ToListAsync())
