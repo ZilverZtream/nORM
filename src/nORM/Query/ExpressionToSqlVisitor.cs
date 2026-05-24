@@ -814,6 +814,28 @@ namespace nORM.Query
                 }
             }
 
+            // char.ToUpper(c) / char.ToLower(c) — route through the provider's existing
+            // UPPER / LOWER string functions. The argument expression is typically a
+            // SUBSTR(...) from a string-indexer, so the SQL becomes
+            // `LOWER(SUBSTR("T0"."Code", @p0 + 1, 1)) = @p1` (the lifted-char comparison
+            // fix in 86d7ac1 keeps the right side bound as a single-char string).
+            if (node.Method.DeclaringType == typeof(char)
+                && node.Object == null
+                && node.Arguments.Count == 1
+                && (node.Method.Name == nameof(char.ToUpper) || node.Method.Name == nameof(char.ToLower)))
+            {
+                var charSql = GetSql(node.Arguments[0]);
+                var fnName = node.Method.Name == nameof(char.ToUpper)
+                    ? nameof(string.ToUpper)
+                    : nameof(string.ToLower);
+                var fn = _provider.TranslateFunction(fnName, typeof(string), charSql);
+                if (fn != null)
+                {
+                    _sql.Append(fn);
+                    return node;
+                }
+            }
+
             // enum.HasFlag(other) — lower to `(col & other) = other`. Preserves .NET semantics
             // (true only when every bit of `other` is set in receiver). The receiver must be
             // an enum instance; we don't filter by [Flags] attribute because the runtime
