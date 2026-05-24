@@ -421,6 +421,82 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns the single element of a nORM query asynchronously. Throws
+        /// <see cref="InvalidOperationException"/> if the source contains zero or more
+        /// than one element. The underlying translator emits LIMIT 2 so the duplicate
+        /// case is detected with a single round-trip.
+        /// </summary>
+        public static Task<T> SingleAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var singleExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Single),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteAsync<T>(singleExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "SingleAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync().");
+        }
+
+        /// <summary>
+        /// Predicate-overload of <see cref="SingleAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>SingleAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).SingleAsync()</c>.
+        /// </summary>
+        public static Task<T> SingleAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return SingleAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
+        /// Returns the single element of a nORM query asynchronously, or <c>null</c> if the
+        /// source is empty. Throws <see cref="InvalidOperationException"/> if the source
+        /// contains more than one element.
+        /// </summary>
+        public static Task<T?> SingleOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var singleOrDefaultExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.SingleOrDefault),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteAsync<T?>(singleOrDefaultExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "SingleOrDefaultAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync().");
+        }
+
+        /// <summary>
+        /// Predicate-overload of <see cref="SingleOrDefaultAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>SingleOrDefaultAsync(predicate)</c> spelling.
+        /// </summary>
+        public static Task<T?> SingleOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return SingleOrDefaultAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Executes a bulk delete for the entities matching the query.
         /// </summary>
         /// <typeparam name="T">Type of the entity.</typeparam>
