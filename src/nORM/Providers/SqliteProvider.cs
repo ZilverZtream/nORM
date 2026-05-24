@@ -286,6 +286,17 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(TimeOnly))
+            {
+                return name switch
+                {
+                    nameof(TimeOnly.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
+                    nameof(TimeOnly.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
+                    nameof(TimeOnly.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch

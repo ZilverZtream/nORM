@@ -392,6 +392,17 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(TimeOnly))
+            {
+                return name switch
+                {
+                    nameof(TimeOnly.Hour) => $"DATEPART(hour, {args[0]})",
+                    nameof(TimeOnly.Minute) => $"DATEPART(minute, {args[0]})",
+                    nameof(TimeOnly.Second) => $"DATEPART(second, {args[0]})",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch
