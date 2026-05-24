@@ -404,7 +404,13 @@ namespace nORM.Query
                 ExpressionType.And => " & ",
                 ExpressionType.Or => " | ",
                 // ExclusiveOr is handled above via DatabaseProvider.GetBitwiseXorSql
-                _ => throw new NormUnsupportedFeatureException($"Binary operator '{node.NodeType}' is not supported.")
+                _ => throw new NormUnsupportedFeatureException(
+                    $"Binary operator '{node.NodeType}' has no portable SQL equivalent. " +
+                    "For LeftShift / RightShift on integer columns, rewrite as multiply or " +
+                    "divide by a power of 2 (`x * 2` instead of `x << 1`, `x / 4` instead of " +
+                    "`x >> 2`) — the SQL planner produces the same execution plan and the " +
+                    "rewrite works on every provider. For Power, use `Math.Pow(x, n)` which " +
+                    "lowers to the provider's POWER / POW function.")
             });
             Visit(node.Right);
             _sql.Append(")");
