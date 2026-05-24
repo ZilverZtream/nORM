@@ -118,23 +118,27 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // Where after a set-op (Union / Concat / Intersect / Except) would generate
-                // `<set-op SQL> WHERE ...`, which most databases parse as "apply WHERE to the
-                // right side only" — not what LINQ semantics want. The subquery-wrap pipeline
-                // for the unified row shape is post-v1; throw deterministically with an
-                // actionable rewrite suggestion instead of letting invalid SQL hit the
-                // database.
+                // Where after a set-op (Union / Concat / Intersect / Except) needs a subquery
+                // wrap so the predicate applies to the unified rows rather than just the
+                // right side of the set op. Visit the set-op source (fills _sql with
+                // `<left SQL> <SETOP> <right SQL>`), then wrap as `SELECT * FROM (...) AS T0`
+                // and let the rest of Where translation emit the predicate against T0 — which
+                // is the alias the predicate visitor naturally uses for the element parameter.
+                bool wrappedSetOp = false;
                 if (node.Arguments[0] is MethodCallExpression setOpSource
                     && setOpSource.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
                 {
-                    throw new NormUnsupportedFeatureException(
-                        $"Where applied AFTER {setOpSource.Method.Name} is not currently supported " +
-                        "(post-v1 work). Push the predicate into each side of the set operation " +
-                        $"(e.g. a.Where(p).{setOpSource.Method.Name}(b.Where(p))) or materialize " +
-                        "the union first.");
+                    t.Visit(node.Arguments[0]);
+                    var innerSql = t._sql.ToString();
+                    t._sql.Clear();
+                    var wrapAlias = t.EscapeAlias("T0");
+                    t._sql.AppendFragment("SELECT * FROM (").Append(innerSql).AppendFragment(") AS ").Append(wrapAlias);
+                    // After the wrap, the joined columns live in T0; subsequent Where/OrderBy
+                    // predicates need their parameters mapped to that alias.
+                    wrappedSetOp = true;
                 }
 
-                var source = t.Visit(node.Arguments[0]);
+                var source = wrappedSetOp ? node.Arguments[0] : t.Visit(node.Arguments[0]);
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
                     lambda = t.ExpandProjection(lambda);
@@ -388,16 +392,30 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
-                // Take-then-Skip needs a subquery wrap to honor LINQ semantics (take N first,
-                // then skip M of those). The current flat OFFSET / LIMIT form would silently
-                // collapse to the Skip-then-Take meaning. Fail deterministically until the
-                // subquery-wrap pipeline lands — Skip-then-Take is the documented form.
+                // Take-then-Skip is algebraically equivalent to Skip(m).Take(n-m): both
+                // return rows in the half-open range [m, n). Rewrite by shrinking the
+                // already-set Take to (take - skip) so the SQL emits LIMIT (n-m) OFFSET m
+                // and honours LINQ semantics without a subquery wrap. Negative or zero
+                // newTake means the Take window ended before Skip began — collapse to a
+                // no-row query by setting _take = 0.
+                if (t._take.HasValue && QueryTranslator.TryGetIntValue(node.Arguments[1], out int skipForLiteral))
+                {
+                    if (skipForLiteral < 0)
+                        throw new ArgumentOutOfRangeException(nameof(skipForLiteral), skipForLiteral, "Skip count must be non-negative.");
+                    var originalTake = t._take.Value;
+                    t._take = Math.Max(0, originalTake - skipForLiteral);
+                    t._skip = skipForLiteral;
+                    t._skipParam = null;
+                    return source;
+                }
+                // Param Take + Skip and Take + param Skip composition needs a real
+                // subquery wrap to keep the LIMIT expression separable from the OFFSET.
+                // The wrap pipeline is not yet plumbed; throw with a rewrite hint.
                 if (t._take.HasValue || t._takeParam != null)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "Take(n).Skip(m) requires a subquery wrap to preserve LINQ semantics and is not " +
-                        "currently supported. Rewrite as Skip(m).Take(n) (the standard pagination form), " +
-                        "or compose the Take in an inner query that materializes first.");
+                        "Take(n).Skip(m) with a runtime parameter on either side is not yet supported. " +
+                        "Rewrite as Skip(m).Take(n) (the standard pagination form) so the values stay independent.");
                 }
                 if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
                 {
