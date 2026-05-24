@@ -112,40 +112,18 @@ public class LinqWhereDateTimeAddDaysArithmeticTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_with_AddDays_on_column_side_returns_correct_rows_or_throws_actionable_error()
+    public async Task Where_with_AddDays_on_column_side_returns_older_rows_strictly()
     {
-        // Column-side AddDays: r.Stamp.AddDays(7) < UtcNow. Equivalent to
-        // r.Stamp < UtcNow.AddDays(-7) -> rows older than a week ago.
-        // Expected: Id 1 (-30d), Id 2 (-10d). Excludes -3d/now/+3d.
-        //
-        // This is the harder path -- requires column-relative SQL date math
-        // (strftime / datetime '+7 days'). If unsupported, must throw a
-        // nORM-typed error pointing at the constant-side rewrite as the
-        // documented workaround.
-        System.Exception? ex = null;
-        int[]? matched = null;
-        try
-        {
-            var result = await _ctx.Query<WdaItem>()
-                .Where(r => r.Stamp.AddDays(7) < DateTime.UtcNow)
-                .OrderBy(r => r.Id)
-                .ToListAsync();
-            matched = result.Select(r => r.Id).ToArray();
-        }
-        catch (System.Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is System.InvalidOperationException || ex is System.NotSupportedException,
-                $"Column-side AddDays threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.Equal(new[] { 1, 2 }, matched);
+        // Originally pinned as throw-or-correct; verified to translate via the
+        // provider's datetime(col, '+N days') template (see memory item #75 and
+        // SqliteProvider TranslateFunction). r.Stamp.AddDays(7) < UtcNow ->
+        // rows where Stamp + 7d is in the past -> Stamp older than a week ago.
+        // Expected: Id 1 (-30d), Id 2 (-10d).
+        var result = await _ctx.Query<WdaItem>()
+            .Where(r => r.Stamp.AddDays(7) < DateTime.UtcNow)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, result.Select(r => r.Id).ToArray());
     }
 
     [Table("WdaItem")]
