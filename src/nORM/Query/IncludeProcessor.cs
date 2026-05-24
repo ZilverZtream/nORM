@@ -392,8 +392,14 @@ namespace nORM.Query
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
                     throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
-                        "Use a projected query or manual loading instead.");
+                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
+                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
+                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
+                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
+                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
+                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
+                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
+                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 
@@ -477,8 +483,14 @@ namespace nORM.Query
             foreach (var (rel, map) in include.Path.Zip(pathMappings))
                 if (map.KeyColumns.Length > 1)
                     throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not yet supported. " +
-                        "Use a projected query or manual loading instead.");
+                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
+                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
+                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
+                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
+                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
+                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
+                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
+                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 

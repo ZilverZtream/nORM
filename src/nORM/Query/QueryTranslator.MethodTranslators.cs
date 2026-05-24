@@ -995,8 +995,14 @@ namespace nORM.Query
                             var depMap = t._ctx.GetMapping(relation.DependentType);
                             if (depMap.KeyColumns.Length > 1)
                                 throw new NormUnsupportedFeatureException(
-                                    $"Include on '{depMap.Type.Name}' with a composite primary key is not yet supported. " +
-                                    "Use a projected query or manual loading instead.");
+                                    $"Include on '{depMap.Type.Name}' with a composite primary key is not supported by " +
+                                    "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
+                                    "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
+                                    "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
+                                    "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
+                                    "the parent graph client-side; (2) fetch the principals first, then issue a second " +
+                                    "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
+                                    "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
                             t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
                             t.TrackMapping(relation.DependentType);
                         }
