@@ -343,12 +343,29 @@ namespace nORM.Query
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
-                    var sql = visitor.Translate(keySelector.Body);
                     // Use node.Method.Name instead of t._methodName: visiting the source expression
                     // in t.Visit(node.Arguments[0]) above may have updated t._methodName to the last
                     // method encountered in the source chain (e.g., "Where"), losing the "Descending"
                     // marker.  node.Method.Name always refers to this OrderBy/OrderByDescending call.
-                    t._orderBy.Add((sql, !node.Method.Name.Contains("Descending")));
+                    var ascending = !node.Method.Name.Contains("Descending");
+                    // Composite anonymous-type key (e.g. `OrderBy(r => new { r.A, r.B })`) —
+                    // emit one ORDER BY entry per member so the SQL becomes
+                    // `ORDER BY "T0"."A", "T0"."B"` rather than the comma-joined single
+                    // SELECT-list shape that the projection visitor would emit naturally
+                    // and that SQL rejects inside ORDER BY.
+                    if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
+                    {
+                        foreach (var member in newKey.Arguments)
+                        {
+                            var memberSql = visitor.Translate(member);
+                            t._orderBy.Add((memberSql, ascending));
+                        }
+                    }
+                    else
+                    {
+                        var sql = visitor.Translate(keySelector.Body);
+                        t._orderBy.Add((sql, ascending));
+                    }
                     // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
                     // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer
                     // translator. Without this the emitted SQL references @p0 but the command's
