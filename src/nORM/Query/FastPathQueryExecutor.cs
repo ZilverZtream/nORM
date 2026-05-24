@@ -378,14 +378,17 @@ namespace nORM.Query
                        TryCollectPredicates(and.Right, predicates);
             }
 
-            if (expression is MemberExpression boolMember && boolMember.Type == typeof(bool))
+            if (expression is MemberExpression boolMember
+                && boolMember.Type == typeof(bool)
+                && boolMember.Expression is ParameterExpression)
             {
                 predicates.Add(new PredicateInfo(boolMember.Member.Name, ExpressionType.Equal, true));
                 return true;
             }
 
-            if (expression is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression negatedMember } &&
-                negatedMember.Type == typeof(bool))
+            if (expression is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression negatedMember }
+                && negatedMember.Type == typeof(bool)
+                && negatedMember.Expression is ParameterExpression)
             {
                 predicates.Add(new PredicateInfo(negatedMember.Member.Name, ExpressionType.Equal, false));
                 return true;

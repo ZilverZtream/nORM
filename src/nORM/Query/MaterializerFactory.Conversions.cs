@@ -96,6 +96,32 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Converts a boxed DB value to <see cref="DateTimeOffset"/>. SQLite stores
+        /// DateTimeOffset as TEXT and Expression.Convert(object, DateTimeOffset) doesn't
+        /// know how to parse the string form.
+        /// </summary>
+        public static DateTimeOffset ConvertToDateTimeOffset(object value)
+        {
+            if (value is DateTimeOffset dto) return dto;
+            if (value is DateTime dt) return new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), TimeSpan.Zero);
+            if (value is string s) return DateTimeOffset.Parse(s, CultureInfo.InvariantCulture);
+            return (DateTimeOffset)Convert.ChangeType(value, typeof(DateTimeOffset), CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Converts a boxed DB value to <see cref="TimeSpan"/>. Providers vary: SQLite uses
+        /// TEXT, some store ticks as INTEGER.
+        /// </summary>
+        public static TimeSpan ConvertToTimeSpan(object value)
+        {
+            if (value is TimeSpan ts) return ts;
+            if (value is string s) return TimeSpan.Parse(s, CultureInfo.InvariantCulture);
+            if (value is long ticks) return new TimeSpan(ticks);
+            if (value is int ticks32) return new TimeSpan(ticks32);
+            return (TimeSpan)Convert.ChangeType(value, typeof(TimeSpan), CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
         /// Computes a 64-bit projection hash by combining two independent 32-bit hashes
         /// from the <see cref="ExpressionFingerprint"/>. This reduces collision probability
         /// compared to a single 32-bit hash (roughly 1-in-2^64 vs 1-in-2^32 per pair).
@@ -165,6 +191,22 @@ namespace nORM.Query
                 if (dbValue is DateTime dt) return TimeOnly.FromDateTime(dt);
                 if (dbValue is string s) return TimeOnly.Parse(s, CultureInfo.InvariantCulture);
                 return TimeOnly.FromTimeSpan((TimeSpan)Convert.ChangeType(dbValue, typeof(TimeSpan), CultureInfo.InvariantCulture));
+            }
+            // DateTimeOffset: providers commonly store as TEXT (SQLite) or DATETIMEOFFSET (SQL Server).
+            // Convert.ChangeType doesn't know how to coerce string → DateTimeOffset, so handle here.
+            if (underlyingType == typeof(DateTimeOffset))
+            {
+                if (dbValue is DateTimeOffset dto) return dto;
+                if (dbValue is DateTime dt) return new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), TimeSpan.Zero);
+                if (dbValue is string s) return DateTimeOffset.Parse(s, CultureInfo.InvariantCulture);
+            }
+            // TimeSpan: stored as TEXT or numeric ticks; coerce both.
+            if (underlyingType == typeof(TimeSpan))
+            {
+                if (dbValue is TimeSpan ts2) return ts2;
+                if (dbValue is string s2) return TimeSpan.Parse(s2, CultureInfo.InvariantCulture);
+                if (dbValue is long ticks) return new TimeSpan(ticks);
+                if (dbValue is int ticks32) return new TimeSpan(ticks32);
             }
 
             // Use cached conversion delegate for better performance.
