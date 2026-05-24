@@ -291,6 +291,12 @@ namespace nORM.Providers
                     // gives a string-comparable form that matches the param shape and
                     // round-trips back to TimeSpan via the materializer.
                     nameof(DateTime.TimeOfDay) => $"strftime('%H:%M:%S', {args[0]})",
+                    // strftime('%f', col) returns 'SS.SSS' (seconds with millisecond
+                    // precision). Multiplying by 1000 yields the integer ms portion of
+                    // the minute; modulo 1000 strips the seconds component. ROUND
+                    // guards against FP truncation (e.g. 45.456 * 1000 = 45455.99...
+                    // would truncate to 455 instead of 456).
+                    nameof(DateTime.Millisecond) => $"(CAST(ROUND(strftime('%f', {args[0]}) * 1000) AS INTEGER) % 1000)",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
                     // SQLite's date modifier syntax accepts an unsigned-positive form
                     // ('7 days') and an explicitly-signed negative form ('-3 days'); the
