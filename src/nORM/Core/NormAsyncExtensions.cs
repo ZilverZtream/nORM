@@ -244,6 +244,20 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Predicate-overload of <see cref="AnyAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>AnyAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).AnyAsync()</c>. Lowered to the same Where + Any pipeline
+        /// internally.
+        /// </summary>
+        public static Task<bool> AnyAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return AnyAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Gets first result from nORM query asynchronously - only works with nORM queries
         /// </summary>
         public static Task<T> FirstAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
