@@ -1020,7 +1020,19 @@ namespace nORM.Query
                     value = ce.Value;
                     return true;
                 case MemberExpression me:
-                    if (me.Expression != null && TryGetConstantValue(me.Expression, out var obj))
+                    // Static member access (DateTime.UtcNow, MyClass.StaticField). me.Expression
+                    // is null in this case — read directly from the type.
+                    if (me.Expression == null)
+                    {
+                        value = me.Member switch
+                        {
+                            FieldInfo sfi => sfi.GetValue(null),
+                            PropertyInfo spi => spi.GetValue(null),
+                            _ => null
+                        };
+                        return true;
+                    }
+                    if (TryGetConstantValue(me.Expression, out var obj))
                     {
                         value = me.Member switch
                         {
