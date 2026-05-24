@@ -123,6 +123,53 @@ namespace nORM.Query
             var sb = EnsureBuilder();
             // Use ToUpperInvariant to avoid locale-sensitive casing (e.g., Turkish-I problem).
             var methodNameUpper = node.Method.Name.ToUpperInvariant();
+
+            // static string.Format("template", args...) — emit as a provider concat of
+            // literal pieces and projected argument columns. Format specifiers (`{0:N2}` /
+            // `{0,5}`) fall through to the aggregate path (which throws), matching the
+            // WHERE-side behaviour: simple positional placeholders translate, anything
+            // richer needs client-eval.
+            if (node.Method.DeclaringType == typeof(string)
+                && node.Object == null
+                && node.Method.Name == nameof(string.Format)
+                && node.Arguments.Count >= 2
+                && node.Arguments[0] is ConstantExpression { Value: string template })
+            {
+                var segments = TryParseFormatSegments(template);
+                if (segments != null)
+                {
+                    var argExprs = new List<Expression>();
+                    for (int i = 1; i < node.Arguments.Count; i++)
+                    {
+                        var a = node.Arguments[i];
+                        if (a is NewArrayExpression arr) argExprs.AddRange(arr.Expressions);
+                        else argExprs.Add(a);
+                    }
+                    var parts = new List<string>();
+                    foreach (var seg in segments)
+                    {
+                        if (seg.IsLiteral)
+                        {
+                            if (seg.Literal!.Length > 0)
+                                parts.Add($"'{seg.Literal.Replace("'", "''")}'");
+                        }
+                        else
+                        {
+                            if (seg.ArgIndex >= argExprs.Count) goto fallthrough;
+                            var arg = argExprs[seg.ArgIndex];
+                            var inner = TranslateProjectionArg(arg);
+                            if (arg.Type != typeof(string))
+                                inner = _provider.GetToStringSql(inner);
+                            parts.Add(inner);
+                        }
+                    }
+                    if (parts.Count == 0) { sb.Append("''"); return node; }
+                    sb.Append(parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
+                    return node;
+                }
+            }
+            fallthrough:
+
             sb.Append(methodNameUpper).Append('(');
             if (node.Arguments.Count > 1)
             {
@@ -155,6 +202,62 @@ namespace nORM.Query
             }
             sb.Append(')');
             return node;
+        }
+
+        private string TranslateProjectionArg(Expression arg)
+        {
+            var saved = _sb;
+            var tmp = new StringBuilder();
+            _sb = tmp;
+            try
+            {
+                Visit(arg);
+                return tmp.ToString();
+            }
+            finally
+            {
+                _sb = saved;
+            }
+        }
+
+        private readonly struct FormatSegment
+        {
+            public readonly bool IsLiteral;
+            public readonly string? Literal;
+            public readonly int ArgIndex;
+            public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; }
+            public FormatSegment(int i) { IsLiteral = false; Literal = null; ArgIndex = i; }
+        }
+
+        private static List<FormatSegment>? TryParseFormatSegments(string template)
+        {
+            var segments = new List<FormatSegment>();
+            var literal = new StringBuilder();
+            int i = 0;
+            while (i < template.Length)
+            {
+                char c = template[i];
+                if (c == '{')
+                {
+                    if (i + 1 < template.Length && template[i + 1] == '{') { literal.Append('{'); i += 2; continue; }
+                    if (literal.Length > 0) { segments.Add(new FormatSegment(literal.ToString())); literal.Clear(); }
+                    int end = template.IndexOf('}', i + 1);
+                    if (end < 0) return null;
+                    var inner = template.Substring(i + 1, end - i - 1);
+                    if (inner.Length == 0 || inner.IndexOfAny(new[] { ',', ':' }) >= 0) return null;
+                    if (!int.TryParse(inner, out var argIdx) || argIdx < 0) return null;
+                    segments.Add(new FormatSegment(argIdx));
+                    i = end + 1;
+                }
+                else if (c == '}')
+                {
+                    if (i + 1 < template.Length && template[i + 1] == '}') { literal.Append('}'); i += 2; continue; }
+                    return null;
+                }
+                else { literal.Append(c); i++; }
+            }
+            if (literal.Length > 0) segments.Add(new FormatSegment(literal.ToString()));
+            return segments;
         }
 
         protected override Expression VisitConditional(ConditionalExpression node)
