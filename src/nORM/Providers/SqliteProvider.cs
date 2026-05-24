@@ -333,6 +333,14 @@ namespace nORM.Providers
                     // without this, '.500' lexically != param-bound '.5' and Where
                     // round-trip silently mis-matches.
                     nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 1000.0) || ' seconds'), '0'), '.')",
+                    // AddTicks is the finest-grained Add* (1 tick = 100ns). Same
+                    // strftime + RTRIM trim shape as AddMilliseconds; the divisor
+                    // is 1e7 (10_000_000 ticks per second). SQLite's modifier
+                    // syntax accepts the fractional value directly so very small
+                    // tick deltas (e.g. 7500 ticks = 0.00075 seconds) get applied
+                    // correctly while still trimming the trailing-zero / dot to
+                    // match Microsoft.Data.Sqlite's FFFFFFF DateTime binding.
+                    nameof(DateTime.AddTicks) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 10000000.0) || ' seconds'), '0'), '.')",
                     // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                     nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                     _ => null
