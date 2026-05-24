@@ -126,6 +126,25 @@ namespace nORM.Query
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(null, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            // Preserve the result selector so downstream Where/OrderBy on the projected
+            // anonymous type (e.g. `(p, cs) => new {Name=p.Name, Count=cs.Count()}` →
+            // later `.OrderBy(r => r.Name)`) can expand `r.Name` back through it. We
+            // cannot reuse `_projection` for this — the materialiser would try to build
+            // a 2-parameter projection materialiser and crash; the GroupJoin materialiser
+            // path uses the compiled `GroupJoinInfo.ResultSelector` Func instead.
+            _groupJoinResultSelector = resultSelector;
+            // The result selector's parameter instances are DIFFERENT from the key-selector's
+            // (each lambda has its own scope). Pre-register them in _correlatedParams so a
+            // downstream OrderBy/Where that's ExpandProjection-ed through this selector
+            // resolves `p.Name` against the outer alias (T0) rather than auto-registering
+            // with `_joinCounter` (which is now the inner alias index, producing wrong-table
+            // references like `T1.Name`).
+            if (resultSelector.Parameters.Count >= 1
+                && !_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
+            if (resultSelector.Parameters.Count >= 2
+                && !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
             // Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
             // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
