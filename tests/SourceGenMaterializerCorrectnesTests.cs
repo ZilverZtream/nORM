@@ -104,6 +104,27 @@ public class SourceGenMaterializerCorrectnessTests
     // ── FromSqlRawAsync uses compiled materializer; reordered columns must be correct ──
 
     [Fact]
+    public async Task SourceGen_NonNullNullableValueType_RoundTripsBackToProperty()
+    {
+        // Pins that source-gen materializers handle a NULLABLE column whose value is NOT
+        // null — every existing test asserted Assert.Null on Created. This test reads a
+        // concrete DateTime back into DateTime?.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "SELECT 1 AS Id, 'x' AS Name, 0 AS Price, 0 AS Status, 0 AS IsActive, '00000000-0000-0000-0000-000000000000' AS Guid, '2024-03-14 09:30:00' AS Created";
+
+        using var reader = cmd.ExecuteReader();
+        Assert.True(reader.Read());
+
+        var mat = CompiledMaterializerStore.Get<Materialized>();
+        var entity = await mat(reader, CancellationToken.None);
+        Assert.NotNull(entity.Created);
+        Assert.Equal(new DateTime(2024, 3, 14, 9, 30, 0), entity.Created!.Value);
+    }
+
+    [Fact]
     public async Task FromSqlRawAsync_ReorderedColumns_ValuesCorrect()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
