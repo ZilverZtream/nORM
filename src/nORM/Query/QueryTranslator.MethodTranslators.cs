@@ -216,9 +216,11 @@ namespace nORM.Query
                                 "The query projection requires client-side evaluation. Set DbContextOptions.ClientEvaluationPolicy to Warn or Allow to permit client-side projection after server-side filtering, ordering, and paging.");
                         }
 
-                        // Store both projections
+                        // Store both projections plus the original lambda's result type so the
+                        // plan's elementType reflects what the caller actually receives.
                         t._projection = serverProjection;
                         t._clientProjection = clientProjection;
+                        t._clientProjectionResultType = originalProjection.Body.Type;
 
                         if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Warn)
                         {
