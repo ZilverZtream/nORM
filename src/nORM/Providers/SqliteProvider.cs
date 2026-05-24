@@ -359,6 +359,15 @@ namespace nORM.Providers
                     nameof(TimeSpan.TotalSeconds) => $"(CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER))",
                     nameof(TimeSpan.TotalMinutes) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 60.0)",
                     nameof(TimeSpan.TotalHours) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 3600.0)",
+                    // TotalMilliseconds needs the fractional-seconds component. The
+                    // canonical 'c' format emits 7-digit ticks past position 9 when
+                    // nonzero (TimeSpan keeps trailing zeros unlike DateTime's
+                    // FFFFFFF). Each tick is 100ns, so the 7-digit value divided by
+                    // 10000 gives milliseconds. The CASE guards the length-8
+                    // 'HH:mm:ss' shape (no fractional present); without it substr
+                    // returns an empty string which CASTs to 0 anyway but the CASE
+                    // makes the intent explicit.
+                    nameof(TimeSpan.TotalMilliseconds) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) * 1000.0 + CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10) AS REAL) / 10000.0 ELSE 0 END)",
                     _ => null
                 };
             }
