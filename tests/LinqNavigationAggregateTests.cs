@@ -148,6 +148,22 @@ public class LinqNavigationAggregateTests : IAsyncLifetime
         Assert.Equal(new[] { 1, 2, 3, 4 }, ids);
     }
 
+    [Fact]
+    public async Task Any_with_closure_captured_threshold_runs_subquery_with_runtime_value()
+    {
+        // Regression: a closure-captured value inside a navigation aggregate predicate is
+        // emitted as a compiled parameter by the sub-translator. If the sub-translator's
+        // Dispose() wipes the outer's compiled-param list, BindPlanParameters binds the
+        // placeholder DBNull and the query returns nothing. This test pins the live value.
+        int threshold = 40;
+        var ids = (await _ctx.Query<NavAuthor>()
+            .Where(a => a.Books.Any(b => b.Price >= threshold))
+            .OrderBy(a => a.Id)
+            .ToListAsync())
+            .Select(a => a.Id).ToArray();
+        Assert.Equal(new[] { 2, 3 }, ids);
+    }
+
     [Table("NavAuthor")]
     public sealed class NavAuthor
     {
