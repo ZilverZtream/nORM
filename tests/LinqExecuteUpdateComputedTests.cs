@@ -100,6 +100,25 @@ public class LinqExecuteUpdateComputedTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ExecuteUpdate_uses_Math_Abs_in_value_expression()
+    {
+        // Insert a row with a negative counter, then clamp all rows to abs(counter).
+        await using (var cmd = _cn.CreateCommand())
+        {
+            cmd.CommandText = "INSERT INTO EuRow VALUES (5, -42, 'd');";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        var affected = await _ctx.Query<EuRow>()
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Counter, r => Math.Abs(r.Counter)));
+        Assert.Equal(5, affected);
+
+        var counters = (await _ctx.Query<EuRow>().OrderBy(r => r.Id).ToListAsync())
+            .Select(r => r.Counter).ToArray();
+        Assert.Equal(new[] { 0, 5, 10, 20, 42 }, counters);
+    }
+
+    [Fact]
     public async Task ExecuteUpdate_appends_to_string_column_via_server_side_concat()
     {
         var affected = await _ctx.Query<EuRow>()
