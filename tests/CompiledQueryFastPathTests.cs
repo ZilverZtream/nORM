@@ -361,10 +361,11 @@ public class CompiledQueryFastPathTests
     }
 
     /// <summary>
-    /// AssignValue must set DbType = Date for a DateOnly value.
+    /// AssignValue binds a DateOnly value as canonical `yyyy-MM-dd` text via
+    /// DbType.String so equality predicates round-trip against TEXT-stored dates.
     /// </summary>
     [Fact]
-    public void AssignValue_DateOnly_SetsDateDbType()
+    public void AssignValue_DateOnly_BindsCanonicalIsoString()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -374,7 +375,8 @@ public class CompiledQueryFastPathTests
         var date = new DateOnly(2026, 3, 15);
         ParameterAssign.AssignValue(p, date);
 
-        Assert.Equal(DbType.Date, p.DbType);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal("2026-03-15", p.Value);
     }
 
     /// <summary>
@@ -772,7 +774,9 @@ public class CompiledQueryFastPathTests
 
         Assert.Empty(rows);
         Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Guid);
-        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Date);
+        // DateOnly now binds as canonical ISO `yyyy-MM-dd` text via DbType.String so
+        // equality predicates round-trip against TEXT-stored dates.
+        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.String && p.Value is string s && s == "2026-05-21");
         Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Time && p.Value is TimeSpan);
     }
 
