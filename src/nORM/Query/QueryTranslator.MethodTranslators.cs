@@ -65,7 +65,9 @@ namespace nORM.Query
             { "ThenInclude", new ThenIncludeTranslator() },
             { "AsNoTracking", new AsNoTrackingTranslator() },
             { "AsSplitQuery", new AsSplitQueryTranslator() },
-            { "AsOf", new AsOfTranslator() }
+            { "AsOf", new AsOfTranslator() },
+            { "Cast", new CastOrOfTypeTranslator() },
+            { "OfType", new CastOrOfTypeTranslator() }
         };
 
         private static string GetWindowAlias(LambdaExpression selector, int paramIndex, string defaultAlias)
@@ -1061,6 +1063,34 @@ namespace nORM.Query
                 t._noTracking = true;
                 var source = node.Object ?? node.Arguments[0];
                 return t.Visit(source);
+            }
+        }
+
+        private sealed class CastOrOfTypeTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var source = node.Arguments[0];
+                var sourceElement = GetElementType(source);
+                var targetElement = node.Method.GetGenericArguments().FirstOrDefault();
+                if (targetElement == null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} requires a generic type argument.");
+                }
+                // Cast / OfType collapse to an identity pass-through at the SQL layer when
+                // the target type matches the source element type (or is a reference-type
+                // base that the runtime cast will satisfy on materialization). TPH/derived
+                // filtering by discriminator isn't wired in v1 — surface that case explicitly
+                // rather than silently returning the wrong rows.
+                if (targetElement == sourceElement ||
+                    (!targetElement.IsValueType && targetElement.IsAssignableFrom(sourceElement)))
+                {
+                    return t.Visit(source);
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> would require a runtime type filter " +
+                    "that nORM has not yet wired to TPH/discriminator metadata. Project explicitly with Select(...) instead.");
             }
         }
 
