@@ -408,6 +408,11 @@ namespace nORM.Providers
                     nameof(Math.Log) when args.Length == 2 => $"LOG({args[0]}, {args[1]})",
                     nameof(Math.Log10) when args.Length == 1 => $"LOG10({args[0]})",
                     nameof(Math.Sign) when args.Length == 1 => $"SIGN({args[0]})",
+                    // T-SQL ROUND with truncate flag (1) drops fractional digits instead of rounding.
+                    nameof(Math.Truncate) when args.Length == 1 => $"ROUND({args[0]}, 0, 1)",
+                    // T-SQL has no scalar Min/Max, only the aggregate. Emit a CASE.
+                    nameof(Math.Min) when args.Length == 2 => $"(CASE WHEN {args[0]} < {args[1]} THEN {args[0]} ELSE {args[1]} END)",
+                    nameof(Math.Max) when args.Length == 2 => $"(CASE WHEN {args[0]} > {args[1]} THEN {args[0]} ELSE {args[1]} END)",
                     _ => null
                 };
             }
