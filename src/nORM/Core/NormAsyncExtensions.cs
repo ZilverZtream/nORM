@@ -296,6 +296,20 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Predicate-overload of <see cref="FirstAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>FirstAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).FirstAsync()</c>. Lowered to the same Where + First pipeline
+        /// internally.
+        /// </summary>
+        public static Task<T> FirstAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return FirstAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Gets first result or default from nORM query asynchronously - only works with nORM queries
         /// </summary>
         public static Task<T?> FirstOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
@@ -316,6 +330,20 @@ namespace nORM.Core
                 "FirstOrDefaultAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync().");
+        }
+
+        /// <summary>
+        /// Predicate-overload of <see cref="FirstOrDefaultAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>FirstOrDefaultAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).FirstOrDefaultAsync()</c>. Lowered to the same Where + FirstOrDefault
+        /// pipeline internally.
+        /// </summary>
+        public static Task<T?> FirstOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return FirstOrDefaultAsync(source.Where(predicate), ct);
         }
 
         /// <summary>
@@ -344,6 +372,19 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Predicate-overload of <see cref="LastAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>LastAsync(predicate)</c> spelling. Still requires an OrderBy
+        /// on the outer source to be deterministic.
+        /// </summary>
+        public static Task<T> LastAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return LastAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Gets the last result or default from nORM query asynchronously.
         /// </summary>
         public static Task<T?> LastOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
@@ -364,6 +405,19 @@ namespace nORM.Core
                 "LastOrDefaultAsync extension can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.LastOrDefaultAsync().");
+        }
+
+        /// <summary>
+        /// Predicate-overload of <see cref="LastOrDefaultAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>LastOrDefaultAsync(predicate)</c> spelling. Still requires an OrderBy
+        /// on the outer source to be deterministic.
+        /// </summary>
+        public static Task<T?> LastOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return LastOrDefaultAsync(source.Where(predicate), ct);
         }
 
         /// <summary>
