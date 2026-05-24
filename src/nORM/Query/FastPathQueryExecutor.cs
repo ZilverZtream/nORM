@@ -305,6 +305,14 @@ namespace nORM.Query
             int? skipCount = null;
             int? takeCount = null;
             var sawPagingOrOrdering = false;
+            // The walk goes top-down (outer-most LINQ call first). If we see paging/Take/Skip
+            // BEFORE the Where or OrderBy at the outer level, the chain is actually
+            // `.Take(n).Where(p)` / `.Take(n).OrderBy(k)` — LINQ semantics demand the Where /
+            // OrderBy operate on the windowed result, which requires a subquery wrap that
+            // this fast path can't emit. Surrender to the slow translator so its bca0523 /
+            // sister pin can throw with the workaround hint instead of silently filtering
+            // the full table. Tracked via `sawPaging` — true once Take/Skip is seen.
+            bool sawPaging = false;
 
             while (expr is MethodCallExpression call)
             {
@@ -324,6 +332,7 @@ namespace nORM.Query
                             return false;
                         takeCount = take;
                         sawPagingOrOrdering = true;
+                        sawPaging = true;
                         expr = call.Arguments[0];
                         break;
 
@@ -332,6 +341,7 @@ namespace nORM.Query
                             return false;
                         skipCount = skip;
                         sawPagingOrOrdering = true;
+                        sawPaging = true;
                         expr = call.Arguments[0];
                         break;
 
@@ -339,6 +349,9 @@ namespace nORM.Query
                     case nameof(Queryable.OrderByDescending):
                         if (orderProperty != null)
                             return false;
+                        // OrderBy applied AFTER Take/Skip (i.e. outer-most call) — see comment
+                        // above. Reject so the slow translator's bca0523 pin fires.
+                        if (sawPaging) return false;
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression orderLambda ||
                             orderLambda.Body is not MemberExpression orderMember)
                             return false;
@@ -351,6 +364,9 @@ namespace nORM.Query
                     case nameof(Queryable.Where):
                         if (predicates.Count > 0)
                             return false;
+                        // Where applied AFTER Take/Skip — silent-wrongness vector. Reject so
+                        // the slow translator's sister pin throws with the workaround hint.
+                        if (sawPaging) return false;
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression whereLambda ||
                             !TryCollectPredicates(whereLambda.Body, predicates))
                             return false;

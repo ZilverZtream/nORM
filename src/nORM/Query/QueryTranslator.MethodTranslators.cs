@@ -141,6 +141,29 @@ namespace nORM.Query
                 }
 
                 var source = wrappedSetOp ? node.Arguments[0] : t.Visit(node.Arguments[0]);
+                // Sister of bca0523 for Where: Where applied AFTER a Take/Skip would
+                // silently filter the FULL table before the LIMIT applies (SQL appends
+                // WHERE to the flat query), instead of filtering inside the windowed
+                // result as LINQ semantics demand. Detect and pin with the same
+                // materialize-then-filter workaround pattern. Note: Where BEFORE Take is
+                // the common pre-paging filter pattern and stays untouched — this only
+                // fires when `_take`/`_skip` is already set by the time Where translates,
+                // i.e. the chain order is `…Take(n).Where(p)`.
+                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Where applied after Take or Skip would silently filter the full table — the " +
+                        "translator appends the WHERE onto a flat query, so " +
+                        "`q.OrderBy(Id).Take(3).Where(r => r.Active)` emits `WHERE Active = 1 LIMIT 3` " +
+                        "which filters every row first then takes 3 surviving rows, instead of taking " +
+                        "the first 3 rows and filtering inside that window. SQL needs a subquery wrap " +
+                        "(`SELECT * FROM (… LIMIT n) WHERE p`) that nORM doesn't yet emit. " +
+                        "Workarounds: " +
+                        "(1) Move the Where BEFORE the Take if you want filter-then-window: " +
+                        "`q.Where(r => r.Active).OrderBy(Id).Take(3)`. " +
+                        "(2) Materialize the window first and filter client-side: " +
+                        "`var top = await q.OrderBy(Id).Take(3).ToListAsync(); var filtered = top.Where(r => r.Active).ToList();`");
+                }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
                     lambda = t.ExpandProjection(lambda);
