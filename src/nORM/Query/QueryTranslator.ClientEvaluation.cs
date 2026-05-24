@@ -89,10 +89,19 @@ namespace nORM.Query
                 // Check if this is a method that can be translated to SQL
                 var declaringType = node.Method.DeclaringType;
 
-                // Check if provider can translate this function
+                // Check if provider can translate this function. Build placeholder args of
+                // the correct arity so the provider's arity-guarded switches (e.g.
+                // `nameof(Math.Sqrt) when args.Length == 1`) can probe safely. Without this,
+                // the no-args call falls into 1-arg arms like `nameof(Math.Abs) => $"ABS({args[0]})"`
+                // and throws IndexOutOfRangeException when the analyzer first visits a
+                // projection containing `Math.Abs(col)`. The probe only cares about whether
+                // a name+arity pair is translatable; real args bind at SQL emit time.
                 if (declaringType != null)
                 {
-                    var translated = _provider.TranslateFunction(node.Method.Name, declaringType);
+                    var arity = node.Arguments.Count + (node.Object != null ? 1 : 0);
+                    var probeArgs = new string[arity];
+                    for (int i = 0; i < arity; i++) probeArgs[i] = string.Empty;
+                    var translated = _provider.TranslateFunction(node.Method.Name, declaringType, probeArgs);
                     if (translated == null && !_sqlTranslatableMethods.Contains(node.Method.Name))
                     {
                         // This method cannot be translated to SQL
