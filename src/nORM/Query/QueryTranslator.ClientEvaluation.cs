@@ -39,6 +39,8 @@ namespace nORM.Query
                 nameof(string.IsNullOrWhiteSpace),
                 nameof(string.Replace),
                 nameof(string.IndexOf),
+                nameof(string.PadLeft),
+                nameof(string.PadRight),
                 "get_Chars",
                 nameof(char.IsDigit),
                 nameof(char.IsLetter),
