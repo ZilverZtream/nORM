@@ -2505,6 +2505,20 @@ namespace nORM.Query
             var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
             if (TryGetConstantValue(patternExpr, out var raw) && raw is string s)
             {
+                // Reserve a placeholder compiled-param slot when the pattern is a
+                // closure-captured MemberExpression so the ParameterValueExtractor's
+                // value-list stays aligned with the compiled-param name list. Without
+                // this, a Where with `Name.StartsWith(prefix) && Tag == other` shifts
+                // by one and @cp0 gets bound to the prefix value instead of `other` --
+                // silently returning the wrong row set. Same fix shape as 407e03d /
+                // eeff6e7. ConstantExpression literals are exempt since the extractor
+                // only walks MemberExpressions.
+                if (patternExpr is MemberExpression)
+                {
+                    var placeholder = $"{visitor._provider.ParamPrefix}cp{visitor._compiledParams.Count}_unused";
+                    visitor._params[placeholder] = DBNull.Value;
+                    visitor._compiledParams.Add(placeholder);
+                }
                 // Pre-folded constant: bind the lowered pattern when ignoring case so the SQL
                 // doesn't need to wrap it again at run time.
                 var pattern = ignoreCase ? s.ToLowerInvariant() : s;
