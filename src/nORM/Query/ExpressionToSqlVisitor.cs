@@ -1888,6 +1888,25 @@ namespace nORM.Query
         {
             if (method.GetCustomAttribute<SqlFunctionAttribute>() != null)
                 return true;
+            // Instance Contains on a closure-captured collection (List<T>, HashSet<T>,
+            // ICollection<T>, etc.) is rewritten to a SQL IN clause by the handler
+            // around line 1318 -- but that handler only runs if we admit the call here.
+            // Without this clause, `Where(i => list.Contains(i.Id))` throws "Method
+            // 'Contains' cannot be translated" while the array equivalent
+            // `Where(i => arr.Contains(i.Id))` works because it binds to
+            // Enumerable.Contains (declaring type Enumerable is already in
+            // s_safeDeclaringTypes). We require a single argument and a non-null
+            // receiver whose type is a generic collection to keep the surface
+            // narrow -- string.Contains has its own LIKE-based path and is reached
+            // through the s_safeDeclaringTypes branch below.
+            if (method.Name == nameof(List<int>.Contains)
+                && method.GetParameters().Length == 1
+                && method.DeclaringType is { } dt
+                && dt != typeof(string)
+                && IsTranslatableContainsReceiver(dt))
+            {
+                return true;
+            }
             if (method.DeclaringType == null || !s_safeDeclaringTypes.Contains(method.DeclaringType))
                 return false;
             // System.Convert.ToString is intentionally translatable as CAST(... AS TEXT);
@@ -1895,6 +1914,24 @@ namespace nORM.Query
             if (method.DeclaringType == typeof(Convert) && method.Name == nameof(Convert.ToString))
                 return true;
             return !s_untranslatableMethods.Contains(method.Name);
+        }
+
+        private static bool IsTranslatableContainsReceiver(Type t)
+        {
+            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(t))
+                return true;
+            // Generic interfaces (ICollection<T>, IList<T>, etc.) -- the runtime
+            // erases the parameter so check the open form on the type's interfaces.
+            foreach (var i in t.GetInterfaces())
+            {
+                if (i.IsGenericType)
+                {
+                    var def = i.GetGenericTypeDefinition();
+                    if (def == typeof(ICollection<>) || def == typeof(IEnumerable<>))
+                        return true;
+                }
+            }
+            return false;
         }
         private Expression TranslateWithNullCheck(MethodCallExpression node)
         {
@@ -1914,6 +1951,20 @@ namespace nORM.Query
                 return false;
             if (node.Method.DeclaringType == typeof(string))
                 return false;
+            // Collection-receiver Contains (List<T>.Contains, HashSet<T>.Contains, etc.)
+            // is rewritten to a SQL IN clause by the dedicated handler below; emitting a
+            // CASE WHEN list IS NULL ... wrapper around it would try to bind the entire
+            // CLR collection as a SQL parameter and fail. The Contains handler already
+            // resolves the collection to a constant in the host process before walking
+            // its items, so the null-check is unnecessary anyway.
+            if (node.Method.Name == nameof(List<int>.Contains)
+                && node.Method.GetParameters().Length == 1
+                && node.Method.DeclaringType is { } dt
+                && dt != typeof(string)
+                && IsTranslatableContainsReceiver(dt))
+            {
+                return false;
+            }
             return !node.Object.Type.IsValueType || Nullable.GetUnderlyingType(node.Object.Type) != null;
         }
         /// <summary>
