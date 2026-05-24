@@ -139,6 +139,10 @@ namespace nORM.Query
         private bool _singleResult;
         private bool _noTracking;
         private bool _splitQuery;
+        // Set by TakeLast/SkipLast translators after flipping ORDER BY direction +
+        // applying Take/Skip. The materializer reverses the final list so the caller
+        // sees rows in the original ORDER BY direction.
+        internal bool _postReverseResult;
         private HashSet<string> _tables = new();
         private readonly Stack<TranslationContextSnapshot> _contextStack = new();
         private List<PropertyInfo> _detectedCollections = new();
@@ -714,7 +718,8 @@ namespace nORM.Query
                     ClientProjection: _t._clientProjection,
                     Complexity: _t._complexityMetrics,
                     M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null,
-                    BulkCudShape: bulkCudShape
+                    BulkCudShape: bulkCudShape,
+                    PostReverse: _t._postReverseResult
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
