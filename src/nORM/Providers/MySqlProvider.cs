@@ -277,6 +277,10 @@ namespace nORM.Providers
         /// <summary>MySQL CAST(... AS CHAR) is the cross-version-safe text conversion target.</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS CHAR)";
 
+        /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
+        public override string GetIntCastSql(string innerSql, bool asLong = false)
+            => $"CAST({innerSql} AS SIGNED)";
+
         /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT IGNORE INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
