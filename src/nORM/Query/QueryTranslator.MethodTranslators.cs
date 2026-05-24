@@ -362,6 +362,36 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
+                // Detect OrderBy applied AFTER a Take/Skip — LINQ semantics
+                // (`OrderBy(a).Take(n).OrderBy(b)`) require the outer OrderBy to resort
+                // the limited window, which SQL can only express via a subquery wrap.
+                // nORM's translator instead appends the outer OrderBy onto a flat
+                // `_orderBy` list, emitting `ORDER BY a, b LIMIT n` — wrong rows, wrong
+                // order, no exception. Surface a clear error with the documented
+                // workarounds rather than letting the silent-wrongness through.
+                // (ThenBy / ThenByDescending compose with the EXISTING ordering; they
+                // share the OrderByTranslator dispatch but legitimately add to _orderBy
+                // before Take applies — only the top-level OrderBy/OrderByDescending
+                // after Take/Skip is wrong.)
+                bool isTopLevelOrder = node.Method.Name is nameof(Queryable.OrderBy)
+                                                        or nameof(Queryable.OrderByDescending);
+                if (isTopLevelOrder && (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "OrderBy applied after Take or Skip would silently produce wrong rows — the " +
+                        "translator currently appends the new ORDER BY onto a flat list, so " +
+                        "`OrderByDescending(Score).Take(3).OrderBy(Name)` emits `ORDER BY Score DESC, Name ASC LIMIT 3` " +
+                        "which sorts the FULL table by both keys then limits, rather than first taking the " +
+                        "top-3 by Score and resorting those 3 by Name. SQL needs a subquery wrap " +
+                        "(`SELECT * FROM (… ORDER BY a LIMIT n) ORDER BY b`) that nORM doesn't yet emit. " +
+                        "Workarounds: " +
+                        "(1) Materialize the windowed result first and resort client-side: " +
+                        "`var top = await q.OrderByDescending(Score).Take(3).ToListAsync(); var sorted = top.OrderBy(x => x.Name).ToList();` " +
+                        "(2) If you only need a stable secondary ordering, use ThenBy: " +
+                        "`q.OrderByDescending(Score).ThenBy(Name).Take(3)` — sorts and limits in one pass " +
+                        "(this is a DIFFERENT operation: it picks top-3 by (Score DESC, Name ASC) jointly, " +
+                        "not top-3 by Score then resort).");
+                }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {
                     keySelector = t.ExpandProjection(keySelector);
