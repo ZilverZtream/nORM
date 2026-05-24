@@ -11,11 +11,13 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the actionable error message for unsupported binary operators
-/// (LeftShift / RightShift / Power) inside a SELECT projection. Companion
-/// to the WHERE-side test from fcb4199 — the projection path goes through
-/// SelectClauseVisitor whose unsupported-operator throw was also vague.
-/// Continues the actionable-message series.
+/// Strict pin for the bit-shift binary operators (LeftShift / RightShift)
+/// in projection. Originally pinned as throw-or-correct ('throws with
+/// actionable message pointing at the multiply workaround') -- that was a
+/// cop-out: SQLite, SQL Server, MySQL, and PostgreSQL all support &lt;&lt;
+/// and &gt;&gt; directly. The throw forced users into a needless rewrite
+/// for an operator the planner accepts natively. Pin flipped to strict
+/// per the implement-first feedback.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqProjectionBinaryOpErrorTests : IAsyncLifetime
@@ -43,15 +45,38 @@ public class LinqProjectionBinaryOpErrorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LeftShift_in_projection_throws_with_actionable_message()
+    public async Task LeftShift_in_projection_doubles_value_per_row()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await _ctx.Query<PbRow>().Select(r => new { r.Id, Doubled = r.Value << 1 }).ToListAsync();
-        });
-        // Must identify the operator and point at the supported multiply workaround.
-        Assert.Contains("LeftShift", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("multiply",  ex.Message, StringComparison.OrdinalIgnoreCase);
+        var result = await _ctx.Query<PbRow>()
+            .OrderBy(r => r.Id)
+            .Select(r => new { r.Id, Doubled = r.Value << 1 })
+            .ToListAsync();
+        Assert.Equal(2, result.Count);
+        Assert.Equal(8, result[0].Doubled);   // 4 << 1
+        Assert.Equal(16, result[1].Doubled);  // 8 << 1
+    }
+
+    [Fact]
+    public async Task RightShift_in_projection_halves_value_per_row()
+    {
+        var result = await _ctx.Query<PbRow>()
+            .OrderBy(r => r.Id)
+            .Select(r => new { r.Id, Halved = r.Value >> 1 })
+            .ToListAsync();
+        Assert.Equal(2, result.Count);
+        Assert.Equal(2, result[0].Halved);   // 4 >> 1
+        Assert.Equal(4, result[1].Halved);   // 8 >> 1
+    }
+
+    [Fact]
+    public async Task LeftShift_in_Where_filters_rows_strictly()
+    {
+        // (Value << 1) > 10 -> rows where Value > 5 -> only Id 2 (Value 8).
+        var result = await _ctx.Query<PbRow>()
+            .Where(r => (r.Value << 1) > 10)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 2 }, result.Select(r => r.Id).ToArray());
     }
 
     [Table("PbRow")]

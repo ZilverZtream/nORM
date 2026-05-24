@@ -11,11 +11,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the actionable error message for unsupported binary operators
-/// (LeftShift / RightShift / Power). Pre-existing message was
-/// "Operation 'Op 'LeftShift'' is not supported in this context" — vague,
-/// doesn't tell the user what to do. Continues the actionable-message
-/// series from 887ce1a / 4adca6e / 524f24f / e79d353.
+/// Strict pin for the bit-shift binary operators in Where. Originally
+/// pinned as throw-or-correct ('throws with actionable multiply
+/// workaround') -- a cop-out: SQLite, SQL Server, MySQL, and PostgreSQL
+/// all support &lt;&lt; / &gt;&gt; natively. Pin flipped to strict per
+/// the implement-first feedback. Sister to the projection-side flip in
+/// LinqProjectionBinaryOpErrorTests.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqUnsupportedBinaryOpErrorTests : IAsyncLifetime
@@ -43,15 +44,25 @@ public class LinqUnsupportedBinaryOpErrorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LeftShift_in_where_throws_with_actionable_message()
+    public async Task LeftShift_in_where_filters_rows_strictly()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await _ctx.Query<UbRow>().Where(r => (r.Value << 1) > 5).ToListAsync();
-        });
-        // Must identify the operator and point at the supported multiplication workaround.
-        Assert.Contains("LeftShift", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("multiply", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // (Value << 1) > 5 -> rows where Value > 2 -> {1 (Value 4), 2 (Value 8)}.
+        var result = await _ctx.Query<UbRow>()
+            .Where(r => (r.Value << 1) > 5)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, result.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task RightShift_in_where_filters_rows_strictly()
+    {
+        // (Value >> 1) >= 3 -> rows where Value >= 6 -> {2 (Value 8)}.
+        var result = await _ctx.Query<UbRow>()
+            .Where(r => (r.Value >> 1) >= 3)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 2 }, result.Select(r => r.Id).ToArray());
     }
 
     [Table("UbRow")]
