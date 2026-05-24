@@ -1405,6 +1405,9 @@ namespace nORM.Query
         private static readonly MethodInfo _convertToTimeSpanMethod =
             typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeSpan), BindingFlags.Public | BindingFlags.Static)!;
 
+        private static readonly MethodInfo _convertToCharMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToChar), BindingFlags.Public | BindingFlags.Static)!;
+
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
         {
             var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
@@ -1440,6 +1443,14 @@ namespace nORM.Query
             {
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(_convertToTimeSpanMethod, getRawValue);
+            }
+            else if (underlyingType == typeof(char))
+            {
+                // SQLite stores char as single-character TEXT — direct (string → char) cast
+                // throws InvalidCastException at runtime. Route through ConvertToChar which
+                // pulls the first code unit of the string (or accepts a boxed char / numeric).
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(_convertToCharMethod, getRawValue);
             }
             else
             {

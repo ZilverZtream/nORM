@@ -122,6 +122,23 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Converts a boxed DB value to a <see cref="char"/>. SQLite stores char columns
+        /// as single-character TEXT; Expression.Convert(string → char) throws at runtime,
+        /// so the optimized reader call routes through this helper instead.
+        /// </summary>
+        public static char ConvertToChar(object value)
+        {
+            if (value is char ch) return ch;
+            if (value is string s)
+            {
+                if (s.Length == 0) return '\0';
+                return s[0];
+            }
+            // Numeric storage (rare but possible): treat the value as a UTF-16 code unit.
+            return Convert.ToChar(value, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
         /// Computes a 64-bit projection hash by combining two independent 32-bit hashes
         /// from the <see cref="ExpressionFingerprint"/>. This reduces collision probability
         /// compared to a single 32-bit hash (roughly 1-in-2^64 vs 1-in-2^32 per pair).
@@ -207,6 +224,14 @@ namespace nORM.Query
                 if (dbValue is string s2) return TimeSpan.Parse(s2, CultureInfo.InvariantCulture);
                 if (dbValue is long ticks) return new TimeSpan(ticks);
                 if (dbValue is int ticks32) return new TimeSpan(ticks32);
+            }
+            // char: stored as single-character TEXT on TEXT-storage providers; numeric
+            // storage isn't common but accept it via Convert.ToChar.
+            if (underlyingType == typeof(char))
+            {
+                if (dbValue is char ch) return ch;
+                if (dbValue is string s3) return s3.Length == 0 ? '\0' : s3[0];
+                return Convert.ToChar(dbValue, CultureInfo.InvariantCulture);
             }
 
             // Use cached conversion delegate for better performance.
