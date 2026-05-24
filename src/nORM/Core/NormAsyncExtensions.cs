@@ -273,6 +273,36 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns whether the nORM query contains the given value. EF Core parity:
+        /// <c>q.ContainsAsync(value)</c>. Lowered to <c>Queryable.Contains(source, value)</c>
+        /// which the existing translator routes through the EXISTS pipeline.
+        ///
+        /// Unconstrained TSource (unlike the rest of the family) because the realistic
+        /// shape is <c>q.Select(x =&gt; x.Id).ContainsAsync(42)</c> over a primitive
+        /// projection -- reference-equality contains on entity types would only ever
+        /// match by identity-map shortcut, not translate to useful SQL.
+        /// </summary>
+        public static Task<bool> ContainsAsync<TSource>(this IQueryable<TSource> source, TSource value, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var containsExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Contains),
+                    new[] { typeof(TSource) },
+                    source.Expression,
+                    Expression.Constant(value, typeof(TSource)));
+                return normProvider.ExecuteAsync<bool>(containsExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "ContainsAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ContainsAsync().");
+        }
+
+        /// <summary>
         /// Returns whether every element of a nORM query satisfies the predicate. EF Core parity:
         /// <c>q.AllAsync(p =&gt; p.IsActive)</c>. Vacuously true on an empty source (matches
         /// LINQ semantics).
