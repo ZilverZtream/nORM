@@ -1315,16 +1315,17 @@ namespace nORM.Query
                         break;
                 }
             }
-            // Treat Dictionary<K,V>.ContainsKey(k) as Keys.Contains(k): same LINQ
-            // semantics, same IN-clause SQL emit, but we must walk just the keys
-            // (not the dictionary's KeyValuePair enumeration which would compare
-            // KVP instances to a K value and never match).
-            var isContainsKey = node.Method.Name == "ContainsKey"
+            // Treat Dictionary<K,V>.ContainsKey(k)/ContainsValue(v) as Keys.Contains(k)/
+            // Values.Contains(v): same LINQ semantics, same IN-clause SQL emit, but we
+            // must walk just the keys or values respectively -- the dictionary's default
+            // IEnumerable yields KeyValuePair items which would compare KVP instances to
+            // a K (or V) value and never match.
+            var isDictContains = (node.Method.Name == "ContainsKey" || node.Method.Name == "ContainsValue")
                 && node.Object != null
                 && node.Arguments.Count == 1
                 && node.Method.DeclaringType is { } dictDt
                 && IsDictionaryLikeReceiver(dictDt);
-            if (node.Method.Name == nameof(List<int>.Contains) || isContainsKey)
+            if (node.Method.Name == nameof(List<int>.Contains) || isDictContains)
             {
                 Expression? collectionExpr = null;
                 Expression? valueExpr = null;
@@ -1344,9 +1345,12 @@ namespace nORM.Query
                 if (collectionExpr != null && valueExpr != null && TryGetConstantValue(collectionExpr, out var colVal) && colVal is IEnumerable en && colVal is not string)
                 {
                     var items = new List<object?>();
-                    var keysOnly = isContainsKey && colVal is System.Collections.IDictionary;
-                    var keySource = keysOnly ? ((System.Collections.IDictionary)colVal).Keys : en;
-                    foreach (var item in keySource)
+                    System.Collections.IEnumerable itemSource = en;
+                    if (isDictContains && colVal is System.Collections.IDictionary dict)
+                    {
+                        itemSource = node.Method.Name == "ContainsValue" ? (System.Collections.IEnumerable)dict.Values : (System.Collections.IEnumerable)dict.Keys;
+                    }
+                    foreach (var item in itemSource)
                         items.Add(item);
                     if (items.Count == 0)
                     {
@@ -1920,7 +1924,10 @@ namespace nORM.Query
             }
             // Dictionary<K,V>.ContainsKey(k) -- treated as Keys.Contains(k) by the
             // handler around line 1318 once admitted here.
-            if (method.Name == "ContainsKey"
+            // Dictionary<K,V>.ContainsValue(v) -- treated as Values.Contains(v) on the
+            // same path; both walk a projected collection rather than the dictionary's
+            // KeyValuePair enumeration.
+            if ((method.Name == "ContainsKey" || method.Name == "ContainsValue")
                 && method.GetParameters().Length == 1
                 && method.DeclaringType is { } dictDt
                 && IsDictionaryLikeReceiver(dictDt))
@@ -1997,7 +2004,7 @@ namespace nORM.Query
             {
                 return false;
             }
-            if (node.Method.Name == "ContainsKey"
+            if ((node.Method.Name == "ContainsKey" || node.Method.Name == "ContainsValue")
                 && node.Method.GetParameters().Length == 1
                 && node.Method.DeclaringType is { } dictDt
                 && IsDictionaryLikeReceiver(dictDt))
