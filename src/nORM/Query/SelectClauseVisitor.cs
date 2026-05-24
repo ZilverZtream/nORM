@@ -612,6 +612,26 @@ namespace nORM.Query
                 Visit(node.Operand);
                 return node;
             }
+            // Unary minus / boolean NOT inside a projection. Without explicit handling, the
+            // default ExpressionVisitor base just visits the operand and the unary op is
+            // dropped — `r.Score < 0 ? -r.Score : r.Score` silently returned r.Score for
+            // BOTH branches. Emit the operator as SQL so the value flips correctly.
+            if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
+            {
+                var sb = EnsureBuilder();
+                sb.Append("-(");
+                Visit(node.Operand);
+                sb.Append(')');
+                return node;
+            }
+            if (node.NodeType is ExpressionType.Not)
+            {
+                var sb = EnsureBuilder();
+                sb.Append("NOT (");
+                Visit(node.Operand);
+                sb.Append(')');
+                return node;
+            }
             return base.VisitUnary(node);
         }
 
