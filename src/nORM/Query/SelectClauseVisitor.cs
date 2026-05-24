@@ -647,6 +647,26 @@ namespace nORM.Query
                 sb.Append(')');
                 return node;
             }
+            // C# `+` on string operands is concatenation, not arithmetic. Emit
+            // the provider's concat SQL (`||` on SQLite, `CONCAT(...)` on
+            // SQL Server/MySQL) so projections like `Select(p => p.First + " " + p.Last)`
+            // don't fall through to SQL numeric `+` (which on SQLite coerces TEXT
+            // to 0, returning "0" per row). Capture each side via a StringBuilder
+            // length-snapshot then hand the slices to GetConcatSql.
+            if (node.NodeType == ExpressionType.Add
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                sb.Append(_provider.GetConcatSql(leftSql, rightSql));
+                return node;
+            }
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch
