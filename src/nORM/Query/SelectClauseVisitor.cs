@@ -161,6 +161,41 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // string.StartsWith / EndsWith / Contains -- the projection-time
+            // shape needs LIKE-wildcard escaping the generic provider route
+            // can't do (the provider only sees pre-rendered SQL fragments,
+            // not the raw pattern value). Mirror ExpressionToSqlVisitor's
+            // CreateSafeLikePattern: extract the constant pattern, escape
+            // %, _, and the escape char itself, prepend/append % per op,
+            // then emit `(col LIKE 'escaped%' ESCAPE 'X')`. Variable patterns
+            // (column refs or non-foldable expressions) fall through to the
+            // existing provider route which uses plain || concat without
+            // escape -- acceptable since column-sourced patterns rarely
+            // intentionally embed wildcards.
+            if (node.Object != null
+                && node.Method.DeclaringType == typeof(string)
+                && node.Arguments.Count == 1
+                && (node.Method.Name == nameof(string.StartsWith)
+                    || node.Method.Name == nameof(string.EndsWith)
+                    || node.Method.Name == nameof(string.Contains))
+                && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var rawPattern)
+                && rawPattern is string patternStr)
+            {
+                var receiverSql = TranslateProjectionArg(node.Object);
+                var escapeChar = nORM.Core.NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
+                var escaped = _provider.EscapeLikePattern(patternStr);
+                var wrapped = node.Method.Name switch
+                {
+                    nameof(string.StartsWith) => $"{escaped}%",
+                    nameof(string.EndsWith) => $"%{escaped}",
+                    _ => $"%{escaped}%",
+                };
+                sb.Append('(').Append(receiverSql).Append(" LIKE '")
+                  .Append(wrapped.Replace("'", "''"))
+                  .Append("' ESCAPE '").Append(escapeChar).Append("')");
+                return node;
+            }
+
             // string.Equals with a StringComparison argument -- mirror
             // ExpressionToSqlVisitor's HandleStringEqualsStatic/Instance
             // fast handlers so projection and Where return identical truths.
