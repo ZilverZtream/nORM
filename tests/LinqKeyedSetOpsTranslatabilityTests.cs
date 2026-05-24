@@ -143,6 +143,47 @@ public class LinqKeyedSetOpsTranslatabilityTests : IAsyncLifetime
             $"if translated, or an exception if unsupported.");
     }
 
+    [Fact]
+    public async Task UnionBy_either_translates_or_throws_actionable_error()
+    {
+        // Source has Categories {A, B}; UnionBy with an in-memory set that
+        // includes a new Category {X} (and reuses {A}) -- by-key distinct
+        // semantics expect 3 distinct keys total: A, B, X.
+        Exception? ex = null;
+        var rowCount = -1;
+        try
+        {
+            var other = new[]
+            {
+                new KsoItem { Id = 98, Category = "A", Amount = 1 },
+                new KsoItem { Id = 99, Category = "X", Amount = 2 },
+            };
+            var result = await _ctx.Query<KsoItem>()
+                .UnionBy(other, i => i.Category)
+                .ToListAsync();
+            rowCount = result.Count;
+        }
+        catch (Exception caught)
+        {
+            ex = caught;
+        }
+
+        if (ex != null)
+        {
+            Assert.True(
+                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
+                $"UnionBy threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
+            return;
+        }
+
+        // If translated: 3 distinct Category keys (A, B, X). Silent-wrongness:
+        // returning the full 4-row source or 6 rows (source + other concat) means
+        // the translator silently dropped UnionBy.
+        Assert.True(rowCount == 3,
+            $"UnionBy returned {rowCount} rows; expected 3 distinct Category keys " +
+            $"(A, B, X) if translated, or an exception if unsupported.");
+    }
+
     [Table("KsoItem")]
     public sealed class KsoItem
     {
