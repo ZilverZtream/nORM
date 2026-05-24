@@ -285,6 +285,12 @@ namespace nORM.Providers
                     // Emit the matching long format so Where round-trips; the
                     // materializer parses either form back to DateTime.
                     nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {args[0]})",
+                    // TimeOfDay returns the time portion (TimeSpan). Microsoft.Data.Sqlite
+                    // binds TimeSpan params as canonical 'HH:mm:ss' text (TimeSpan.ToString
+                    // 'c' format for sub-day spans), so emitting strftime('%H:%M:%S', col)
+                    // gives a string-comparable form that matches the param shape and
+                    // round-trips back to TimeSpan via the materializer.
+                    nameof(DateTime.TimeOfDay) => $"strftime('%H:%M:%S', {args[0]})",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
                     // SQLite's date modifier syntax accepts an unsigned-positive form
                     // ('7 days') and an explicitly-signed negative form ('-3 days'); the

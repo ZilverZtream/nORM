@@ -61,6 +61,7 @@ namespace nORM.Query
                 nameof(DateTime.Date),
                 nameof(DateTime.DayOfYear),
                 nameof(DateTime.DayOfWeek),
+                nameof(DateTime.TimeOfDay),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
