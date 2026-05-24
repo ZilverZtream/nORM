@@ -737,8 +737,12 @@ namespace nORM.Query
             {
                 t._isAggregate = true;
                 var source = t.Visit(node.Arguments[0]);
-                // Reset projection and ensure method name reflects Count
-                t._projection = null;
+                // Preserve _projection when DISTINCT is active so the COUNT(*) builder can
+                // wrap as `SELECT COUNT(*) FROM (SELECT DISTINCT <proj> FROM ...) AS T0` —
+                // otherwise nuke it so Count(x => predicate) doesn't try to project columns
+                // that aren't relevant to the row-count.
+                if (!t._isDistinct)
+                    t._projection = null;
                 t._methodName = node.Method.Name;
                 if (node.Arguments.Count > 1)
                 {
@@ -764,8 +768,13 @@ namespace nORM.Query
                         FastExpressionVisitorPool.Return(visitor);
                     }
                 }
-                var newArgs = new[] { source }.Concat(node.Arguments.Skip(1));
-                return node.Update(node.Object, newArgs);
+                // Don't rebuild the Count() MethodCallExpression. Visit() already returned the
+                // translated source and the translator's side effects (_isAggregate, _methodName,
+                // _where) capture everything the plan needs. Rebuilding via node.Update can fail
+                // when the source's expression-tree type (e.g. NormQueryableImpl<TRoot>) doesn't
+                // satisfy the Count<TAnon>(IQueryable<TAnon>) signature after a chain like
+                // Select(anon).Distinct().Count().
+                return source;
             }
         }
 

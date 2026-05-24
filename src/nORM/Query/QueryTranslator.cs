@@ -530,9 +530,26 @@ namespace nORM.Query
                         var prefix = PooledStringBuilder.Rent();
                         try
                         {
-                            prefix.Append("SELECT COUNT(*) FROM ").Append(fromClause);
-                            if (alias != null) prefix.Append(' ').Append(alias);
-                            _t._sql.Insert(0, prefix.ToString());
+                            // DISTINCT over a projected shape (e.g. `Select(anon).Distinct().Count()`)
+                            // must count rows of the distinct set — wrap as `SELECT COUNT(*) FROM
+                            // (SELECT DISTINCT <proj> FROM ...) AS T0`. Plain `SELECT COUNT(*) FROM
+                            // table` would return the full row count and ignore the distinct.
+                            if (_t._isDistinct && _t._projection != null)
+                            {
+                                var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider);
+                                var projSelect = selectVisitor.Translate(_t._projection.Body);
+                                var subqueryAlias = _t.EscapeAlias("T0");
+                                prefix.Append("SELECT COUNT(*) FROM (SELECT DISTINCT ").Append(projSelect).Append(" FROM ").Append(fromClause);
+                                if (alias != null) prefix.Append(' ').Append(alias);
+                                _t._sql.Insert(0, prefix.ToString());
+                                _t._sql.Append(") AS ").Append(subqueryAlias);
+                            }
+                            else
+                            {
+                                prefix.Append("SELECT COUNT(*) FROM ").Append(fromClause);
+                                if (alias != null) prefix.Append(' ').Append(alias);
+                                _t._sql.Insert(0, prefix.ToString());
+                            }
                         }
                         finally
                         {
