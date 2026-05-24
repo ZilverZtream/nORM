@@ -39,6 +39,31 @@ namespace nORM.Query
         internal const int DefaultListCapacity = 16;
 
         /// <summary>
+        /// Upper bound on the pre-sizing hint derived from <c>plan.Take</c>.
+        /// <c>Take(int.MaxValue)</c> is a common "no upper limit" sentinel, but using
+        /// it verbatim as the initial List capacity triggers an
+        /// <see cref="OutOfMemoryException"/> ("Array dimensions exceeded supported range")
+        /// because the runtime tries to reserve a 2 GB backing array up front. The
+        /// allocation is only a hint; the List grows as needed if more rows actually
+        /// arrive. Cap at a value generous enough to avoid resizes for any realistic
+        /// page size yet small enough to allocate cheaply.
+        /// </summary>
+        internal const int MaxPreSizedCapacity = 4096;
+
+        /// <summary>
+        /// Clamps a <c>plan.Take</c>-derived capacity hint to a safe pre-allocation
+        /// range. Returns <see cref="DefaultListCapacity"/> when the hint is missing,
+        /// the hint itself when it fits comfortably, or <see cref="MaxPreSizedCapacity"/>
+        /// otherwise (e.g. for <c>Take(int.MaxValue)</c>).
+        /// </summary>
+        internal static int ClampTakeCapacity(int? take)
+        {
+            if (!take.HasValue) return DefaultListCapacity;
+            if (take.Value <= 0) return 1;
+            return Math.Min(take.Value, MaxPreSizedCapacity);
+        }
+
+        /// <summary>
         /// Number of parameter slots reserved for framework use (tenant filters, OCC tokens, etc.)
         /// when computing maximum batch size for dependent query IN clauses.
         /// Aligned with <see cref="Providers.DatabaseProvider"/> ParameterReserve.
@@ -143,7 +168,7 @@ namespace nORM.Query
             await using var command = cmd;
             try
             {
-                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
+                var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
                 var list = new List<object>(capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -208,7 +233,7 @@ namespace nORM.Query
                     return await MaterializeGroupJoinAsync(plan, command, ct).ConfigureAwait(false);
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
-                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
+                var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -315,7 +340,7 @@ namespace nORM.Query
                 }
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
-                var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
+                var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
                 var list = CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
@@ -401,7 +426,7 @@ namespace nORM.Query
 
         public IList MaterializePooled(QueryPlan plan, DbCommand command)
         {
-            var capacity = plan.SingleResult ? 1 : Math.Max(1, plan.Take ?? DefaultListCapacity);
+            var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
             var list = CreateList(plan.ElementType, capacity);
 
             var trackable = !plan.NoTracking &&
