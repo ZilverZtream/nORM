@@ -450,6 +450,9 @@ namespace nORM.Providers
                     // they work on strings, so the static char form maps cleanly.
                     nameof(char.ToUpper) when args.Length == 1 => $"UPPER({args[0]})",
                     nameof(char.ToLower) when args.Length == 1 => $"LOWER({args[0]})",
+                    // ASCII-range predicates matching the existing IsDigit/IsLetter shape.
+                    nameof(char.IsUpper) when args.Length == 1 => $"({args[0]} BETWEEN 'A' AND 'Z')",
+                    nameof(char.IsLower) when args.Length == 1 => $"({args[0]} BETWEEN 'a' AND 'z')",
                     _ => null
                 };
             }
