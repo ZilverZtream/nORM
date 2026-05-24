@@ -367,6 +367,26 @@ namespace nORM.Query
                     return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "MIN", "NULL", errorMessage: null);
                 case "Max":
                     return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "MAX", "NULL", errorMessage: null);
+                case "First":
+                case "FirstOrDefault":
+                case "Last":
+                case "LastOrDefault":
+                case "Single":
+                case "SingleOrDefault":
+                case "ElementAt":
+                case "ElementAtOrDefault":
+                    // `g.OrderBy(...).Select(...).First()` and friends require a correlated
+                    // subquery emit (SELECT sel FROM tbl WHERE groupKey = outer.groupKey ORDER
+                    // BY sortKey LIMIT 1). nORM's group-aggregate path doesn't yet plumb that
+                    // shape, so surface a clear exception that points at the supported
+                    // `g.Min(selector)` / `g.Max(selector)` equivalents rather than silently
+                    // emitting nothing for the column (which crashes the materializer).
+                    throw new NormUnsupportedFeatureException(
+                        $"`g.{methodName}(...)` inside a grouping projection requires a correlated subquery " +
+                        "that nORM does not yet emit. For `g.OrderBy(sel).First()` / `OrderByDescending(sel).First()` " +
+                        "use `g.Min(sel)` / `g.Max(sel)` instead. For more complex shapes, project the group " +
+                        "elements into a list with `g.ToList()` (when streaming is acceptable) and apply the " +
+                        "operation client-side.");
                 default:
                     return null;
             }
