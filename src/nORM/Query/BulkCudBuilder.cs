@@ -179,29 +179,54 @@ namespace nORM.Query
         public (string Sql, Dictionary<string, object> Params) BuildSetClause<T>(TableMapping mapping, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set)
         {
             if (set == null) throw new ArgumentNullException(nameof(set));
-            var assigns = new List<(string Column, object? Value)>();
+            // Each assignment is either a bound parameter (literal/closure form) or a
+            // pre-translated SQL expression (server-side computed form). Track in one list
+            // and let the emit loop choose `col = @p` vs `col = <expr>`.
+            var assigns = new List<(string Column, string? ParamName, object? ParamValue, string? ExpressionSql)>();
             var call = set.Body as MethodCallExpression;
+            int paramIndex = 0;
+            var parameters = new Dictionary<string, object>();
             while (call != null)
             {
-                var lambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
-                var member = (MemberExpression)lambda.Body;
+                var propLambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
+                var member = (MemberExpression)propLambda.Body;
                 var column = mapping.ColumnsByName[member.Member.Name].EscCol;
-                if (!TryGetSetValue(call.Arguments[1], out var value))
-                    throw new NormUnsupportedFeatureException("ExecuteUpdate set values must be literal constants or precomputed captured local values. Method calls, inline computed values, column-based updates and server expressions are not supported in v1; compute the value before calling ExecuteUpdateAsync.");
-                assigns.Add((column, value));
+
+                var valueArg = StripQuotes(call.Arguments[1]);
+                if (valueArg is LambdaExpression valueLambda)
+                {
+                    // Server-side computed form: SetProperty(x => x.Counter, x => x.Counter + 1).
+                    // Translate the body against the entity columns (no alias prefix — UPDATE
+                    // statements reference columns directly).
+                    var exprSql = TranslateUpdateValueExpression(valueLambda, mapping);
+                    assigns.Add((column, null, null, exprSql));
+                }
+                else if (TryGetSetValue(call.Arguments[1], out var value))
+                {
+                    var pName = _ctx.Provider.ParamPrefix + "u" + paramIndex++;
+                    parameters[pName] = value ?? DBNull.Value;
+                    assigns.Add((column, pName, value, null));
+                }
+                else
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "ExecuteUpdate set values must be a literal/captured constant or an " +
+                        "Expression<Func<T, TProperty>> evaluated server-side. The given expression " +
+                        "could not be reduced to either form.");
+                }
                 call = call.Object as MethodCallExpression;
             }
             assigns.Reverse();
             var sb = _stringBuilderPool.Get();
             try
             {
-                var parameters = new Dictionary<string, object>();
                 for (int i = 0; i < assigns.Count; i++)
                 {
                     if (i > 0) sb.Append(", ");
-                    var pName = _ctx.Provider.ParamPrefix + "u" + i;
-                    sb.Append($"{assigns[i].Column} = {pName}");
-                    parameters[pName] = assigns[i].Value ?? DBNull.Value;
+                    if (assigns[i].ExpressionSql != null)
+                        sb.Append($"{assigns[i].Column} = {assigns[i].ExpressionSql}");
+                    else
+                        sb.Append($"{assigns[i].Column} = {assigns[i].ParamName}");
                 }
                 return (sb.ToString(), parameters);
             }
@@ -210,6 +235,70 @@ namespace nORM.Query
                 sb.Clear();
                 _stringBuilderPool.Return(sb);
             }
+        }
+
+        /// <summary>
+        /// Translates an UPDATE-side value expression to SQL using unprefixed column names
+        /// (UPDATE statements reference columns of the table being updated directly, with
+        /// no FROM-aliased table prefix). Supports member access on the row parameter,
+        /// constants (inlined or captured), arithmetic / string-concat binary operators,
+        /// and primitive Convert. Anything outside that surface throws.
+        /// </summary>
+        private string TranslateUpdateValueExpression(LambdaExpression valueLambda, TableMapping mapping)
+        {
+            var rowParam = valueLambda.Parameters[0];
+            return Render(valueLambda.Body);
+
+            string Render(Expression e)
+            {
+                switch (e)
+                {
+                    case MemberExpression me when me.Expression == rowParam:
+                        if (!mapping.ColumnsByName.TryGetValue(me.Member.Name, out var col))
+                            throw new NormUnsupportedFeatureException(
+                                $"Member '{me.Member.Name}' is not a mapped column on '{mapping.TableName}'.");
+                        return col.EscCol;
+
+                    case ConstantExpression ce:
+                        return RenderLiteral(ce.Value);
+
+                    case UnaryExpression ue when ue.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
+                        return Render(ue.Operand);
+
+                    case BinaryExpression be:
+                        var op = be.NodeType switch
+                        {
+                            ExpressionType.Add => "+",
+                            ExpressionType.Subtract => "-",
+                            ExpressionType.Multiply => "*",
+                            ExpressionType.Divide => "/",
+                            ExpressionType.Modulo => "%",
+                            _ => throw new NormUnsupportedFeatureException(
+                                $"Binary operator {be.NodeType} is not supported inside a SetProperty value expression."),
+                        };
+                        return $"({Render(be.Left)} {op} {Render(be.Right)})";
+
+                    case MemberExpression captured:
+                        // Closure-captured constant — evaluate at translation time and inline.
+                        if (nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue))
+                            return RenderLiteral(capturedValue);
+                        throw new NormUnsupportedFeatureException(
+                            $"Cannot resolve '{captured.Member.Name}' in a SetProperty value expression.");
+
+                    default:
+                        throw new NormUnsupportedFeatureException(
+                            $"Expression node {e.NodeType} is not supported inside a SetProperty value expression.");
+                }
+            }
+
+            string RenderLiteral(object? value) => value switch
+            {
+                null => "NULL",
+                string s => "'" + s.Replace("'", "''") + "'",
+                bool b => b ? _ctx.Provider.BooleanTrueLiteral : _ctx.Provider.BooleanFalseLiteral,
+                IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+                _ => System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "NULL",
+            };
         }
 
         private static Expression StripQuotes(Expression e)
