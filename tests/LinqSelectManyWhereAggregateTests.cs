@@ -97,25 +97,31 @@ public class LinqSelectManyWhereAggregateTests : IAsyncLifetime
     public async Task SelectMany_then_where_then_countasync_pin_actual_observed_value()
     {
         // Known silent-wrongness: SelectMany+Where+terminal CountAsync returns
-        // 11 (the Id of one of the matching child rows) instead of the
-        // correct count 3. The SelectMany+Where source enumerates correctly
-        // (verified by the ToList test above) and SumAsync works (verified
-        // by the Sum test), so the bug is in the CountAsync terminal-call
-        // SQL routing after a SelectMany source. Workaround: materialise
-        // via ToListAsync then count in memory (the test above).
+        // 11 (the Id of the first matching child row) instead of 3. The
+        // SelectMany+Where source enumerates correctly (verified by the
+        // ToList test above) and SumAsync works (verified by the Sum test),
+        // so the bug is in the CountAsync terminal-call SQL routing after
+        // a SelectMany source.
         //
-        // Pin the OBSERVED value with a comment so this test starts
-        // failing the moment someone fixes the underlying bug -- forcing
-        // them to update the assertion to the correct value (3) and
-        // delete this whole defect-pinning fact.
+        // An initial fix attempt in QueryTranslator's aggregate-with-existing-
+        // _sql branch did not trigger -- the SelectMany+Count combination is
+        // routed through a different translator path that hasn't been traced
+        // yet. The fix requires diagnostic capture of the actual emitted SQL
+        // (CommandInterceptor) to identify which path emits the malformed
+        // statement that SQLite leniently parses into returning the first
+        // matching row's first column.
+        //
+        // Workaround: materialize via ToListAsync then count in memory
+        // (the test above). Pin the OBSERVED value with this comment so
+        // the test starts failing the moment the underlying bug is fixed --
+        // forcing the maintainer to update the assertion to 3 and delete
+        // this whole defect-pinning fact.
         var count = await _ctx.Query<SmwParent>()
             .SelectMany(p => p.Items!)
             .Where(i => i.Amount > 10)
             .CountAsync();
         // BUG: should be 3. Currently returns 11 (the Id of child row 11,
-        // which is the first row matching Amount > 10). Documented gap;
-        // surfaces when the next iteration investigates the SelectMany
-        // terminal-count path.
+        // which is the first row matching Amount > 10).
         Assert.Equal(11, count);
     }
 
