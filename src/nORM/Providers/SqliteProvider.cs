@@ -280,12 +280,19 @@ namespace nORM.Providers
                     nameof(DateTime.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
                     nameof(DateTime.Date) => $"date({args[0]})",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
-                    nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' days')",
-                    nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' months')",
-                    nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' years')",
-                    nameof(DateTime.AddHours) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' hours')",
-                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' minutes')",
-                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"datetime({args[0]}, '+' || ({args[1]}) || ' seconds')",
+                    // SQLite's date modifier syntax accepts an unsigned-positive form
+                    // ('7 days') and an explicitly-signed negative form ('-3 days'); the
+                    // previous '+' || ({delta}) prefix produced '+-3 days' for negative
+                    // deltas which SQLite parses as invalid and returns NULL, silently
+                    // dropping every comparison. Letting the bound value carry its own
+                    // sign works for positive (no prefix), negative (leading -), and
+                    // zero (no shift).
+                    nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' days')",
+                    nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' months')",
+                    nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' years')",
+                    nameof(DateTime.AddHours) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' hours')",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' minutes')",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' seconds')",
                     // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                     nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                     _ => null
