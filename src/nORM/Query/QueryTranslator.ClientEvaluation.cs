@@ -58,6 +58,9 @@ namespace nORM.Query
                 nameof(DateTime.Hour),
                 nameof(DateTime.Minute),
                 nameof(DateTime.Second),
+                nameof(DateTime.Date),
+                nameof(DateTime.DayOfYear),
+                nameof(DateTime.DayOfWeek),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
