@@ -267,6 +267,30 @@ namespace nORM.Query
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
                                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Collection selector must be a lambda expression"));
 
+            // Eighth in the post-Take/Skip silent-wrongness family — sister of the
+            // HandleInnerJoin / HandleGroupJoin pins (3716e13). SelectMany over a Take/Skip
+            // outer source emits a flat INNER JOIN with a LIMIT applied to the joined
+            // result — runs the join on the FULL outer table and then takes n joined rows
+            // instead of taking the windowed n outer rows and flattening their inner
+            // collections. SQL needs a subquery wrap (`FROM (… LIMIT n) AS T0 INNER JOIN
+            // …`) that nORM doesn't yet emit. Detect via SourceHasTakeOrSkip and throw.
+            if (SourceHasTakeOrSkip(sourceQuery))
+            {
+                throw new NormUnsupportedFeatureException(
+                    "SelectMany over a Take/Skip outer source isn't supported — the translator " +
+                    "emits a flat join with `LIMIT n` applied to the JOINED result, so the join " +
+                    "runs against the FULL outer table and picks n rows from the flattened set " +
+                    "rather than flattening only the windowed n outer rows (LINQ semantics for " +
+                    "`q.Take(n).SelectMany(p => p.Children, …)`). SQL needs a subquery wrap " +
+                    "(`FROM (… LIMIT n) AS T0 INNER JOIN …`) that nORM doesn't yet emit. " +
+                    "Workarounds: " +
+                    "(1) Materialize the windowed outer first, then fetch and flatten client-side: " +
+                    "`var top = await q.Take(n).Include(p => p.Children).ToListAsync(); " +
+                    "var flat = top.SelectMany(p => p.Children).ToList();`. " +
+                    "(2) Move the Take to AFTER the SelectMany if you wanted top-N-after-flatten: " +
+                    "`q.SelectMany(p => p.Children, …).Take(n)`.");
+            }
+
             // Detect the query-syntax left join shape: `from p in P join c in C on p.K equals
             // c.K into grp from c in grp.DefaultIfEmpty() select projection(p, c)` lowers to
             // GroupJoin().SelectMany(t => t.grp.DefaultIfEmpty(), (t, c) => proj). Rewrite as
