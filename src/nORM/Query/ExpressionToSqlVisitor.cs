@@ -185,8 +185,51 @@ namespace nORM.Query
                 Visit(expression);
             return builder.ToSqlString();
         }
+
+        /// <summary>
+        /// C# emits `charExpr OP charExpr` as `intExpr OP intExpr` via implicit `char→int`
+        /// promotions. When at least one side is `Convert(charExpr, int)`, recover the char
+        /// comparison so the SQL emit doesn't compare a string SUBSTR result against an int
+        /// parameter (which never matches at the database). Returns null when no rewrite
+        /// is needed.
+        /// </summary>
+        private static BinaryExpression? TryRewriteLiftedCharComparison(BinaryExpression node)
+        {
+            bool leftIsLifted = node.Left is UnaryExpression { NodeType: ExpressionType.Convert } lu
+                                && lu.Operand.Type == typeof(char);
+            bool rightIsLifted = node.Right is UnaryExpression { NodeType: ExpressionType.Convert } ru
+                                 && ru.Operand.Type == typeof(char);
+            if (!leftIsLifted && !rightIsLifted) return null;
+
+            Expression Demote(Expression side)
+            {
+                if (side is UnaryExpression { NodeType: ExpressionType.Convert } u && u.Operand.Type == typeof(char))
+                    return u.Operand;
+                if (side is ConstantExpression { Value: not null } intLit && intLit.Type == typeof(int))
+                    return Expression.Constant((char)(int)intLit.Value, typeof(char));
+                if (side is ConstantExpression { Value: null }) return Expression.Constant(null, typeof(char?));
+                return side;
+            }
+
+            var newLeft = Demote(node.Left);
+            var newRight = Demote(node.Right);
+            if (ReferenceEquals(newLeft, node.Left) && ReferenceEquals(newRight, node.Right)) return null;
+            return Expression.MakeBinary(node.NodeType, newLeft, newRight);
+        }
         protected override Expression VisitBinary(BinaryExpression node)
         {
+            // C# lifts char comparisons to int — `r.Name[0] == 'A'` becomes
+            // `Equal(Convert(get_Chars(...), int), Constant(65, int))`. If we let the
+            // generic comparison path emit it, the int parameter (65) would never match
+            // the char-shaped result of SUBSTR(...). Detect the lift on one side and
+            // re-fold both operands back to char so the SQL compares string vs string.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+            {
+                var rewritten = TryRewriteLiftedCharComparison(node);
+                if (rewritten != null) node = rewritten;
+            }
             if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
             {
                 bool leftNull  = IsNullExpression(node.Left);
@@ -811,6 +854,23 @@ namespace nORM.Query
             // String methods are handled by _fastMethodHandlers (see above).
             if (node.Method.DeclaringType == typeof(string))
             {
+                // String indexer s[i] compiles to String.get_Chars(i) — lower to
+                // SUBSTR(col, i+1, 1) via the provider's existing 3-arg Substring shape.
+                // The right-hand char literal binds as a single-char parameter, so the
+                // SQL comparison ends up `SUBSTR(col, i+1, 1) = 'A'`.
+                if (node.Method.Name == "get_Chars"
+                    && node.Object != null
+                    && node.Arguments.Count == 1)
+                {
+                    var receiver = GetSql(node.Object);
+                    var index = GetSql(node.Arguments[0]);
+                    var indexerSql = _provider.TranslateFunction(nameof(string.Substring), typeof(string), receiver, index, "1");
+                    if (indexerSql != null)
+                    {
+                        _sql.Append(indexerSql);
+                        return node;
+                    }
+                }
                 // static string.IsNullOrEmpty(x) -> (x IS NULL OR x = '')
                 // static string.IsNullOrWhiteSpace(x) -> (x IS NULL OR LTRIM(RTRIM(x)) = '')
                 if (node.Object == null && node.Arguments.Count == 1 &&
