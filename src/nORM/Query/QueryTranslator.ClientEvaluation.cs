@@ -61,10 +61,20 @@ namespace nORM.Query
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
+                nameof(Enumerable.LongCount),
                 nameof(Enumerable.Sum),
                 nameof(Enumerable.Average),
                 nameof(Enumerable.Min),
-                nameof(Enumerable.Max)
+                nameof(Enumerable.Max),
+                nameof(Enumerable.Any),
+                nameof(Enumerable.All),
+                // LINQ projection / filter — translatable when sitting between a navigation
+                // collection and an aggregate (e.g. `parent.Children.Select(c => c.X).Sum()`
+                // → SCV emits a correlated subquery). Without these, the analyzer flags the
+                // whole projection as client-eval and SelectTranslator throws the dad1fec
+                // message even though SCV can actually emit valid SQL.
+                nameof(Enumerable.Select),
+                nameof(Enumerable.Where)
             };
 
             public TranslatabilityAnalyzer(DatabaseProvider provider)
