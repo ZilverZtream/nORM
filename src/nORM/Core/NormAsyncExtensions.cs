@@ -252,6 +252,54 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Gets the last result from nORM query asynchronously. Requires an OrderBy to be
+        /// deterministic; the underlying Last translator flips the ORDER BY direction so the
+        /// SQL still reads only one row.
+        /// </summary>
+        public static Task<T> LastAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var lastExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Last),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteAsync<T>(lastExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "LastAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.LastAsync().");
+        }
+
+        /// <summary>
+        /// Gets the last result or default from nORM query asynchronously.
+        /// </summary>
+        public static Task<T?> LastOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var lastOrDefaultExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.LastOrDefault),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteAsync<T?>(lastOrDefaultExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "LastOrDefaultAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.LastOrDefaultAsync().");
+        }
+
+        /// <summary>
         /// Executes a bulk delete for the entities matching the query.
         /// </summary>
         /// <typeparam name="T">Type of the entity.</typeparam>
