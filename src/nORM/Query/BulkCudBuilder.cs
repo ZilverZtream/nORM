@@ -397,7 +397,12 @@ namespace nORM.Query
                             ExpressionType.Divide => "/",
                             ExpressionType.Modulo => "%",
                             _ => throw new NormUnsupportedFeatureException(
-                                $"Binary operator {be.NodeType} is not supported inside a SetProperty value expression."),
+                                $"Binary operator '{be.NodeType}' has no portable SQL equivalent inside a " +
+                                "SetProperty value expression. For LeftShift / RightShift on integer columns, " +
+                                "rewrite as multiply or divide by a power of 2 (`x * 2` instead of `x << 1`, " +
+                                "`x / 4` instead of `x >> 2`) — the SQL planner produces the same execution " +
+                                "plan and the rewrite works on every provider. For Power, use `Math.Pow(x, n)` " +
+                                "which lowers to the provider's POWER / POW function."),
                         };
                         return $"({Render(be.Left)} {op} {Render(be.Right)})";
 
