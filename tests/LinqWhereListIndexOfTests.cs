@@ -55,27 +55,18 @@ public class LinqWhereListIndexOfTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_with_List_IndexOf_fails_fast_with_nORM_typed_error()
+    public async Task Where_with_List_IndexOf_greater_or_equal_zero_translates_via_Contains_rewrite()
     {
-        // IndexOf has no SQL equivalent; the translator must fail fast with
-        // a nORM-typed error rather than fall through to client-eval (which
-        // would silently materialize the whole table and run IndexOf in C#).
+        // Originally pinned as "throws actionable error" -- subsequently flipped
+        // to a positive translate path. The translator detects the
+        // `IndexOf(x) [op] 0/-1` shape and rewrites it to `Contains(x)`
+        // (optionally negated) so the existing d97c5f0 IN-list emit handles it.
         var ids = new List<int> { 2, 4 };
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-            await _ctx.Query<WlioItem>()
-                .Where(i => ids.IndexOf(i.Id) >= 0)
-                .OrderBy(i => i.Id)
-                .ToListAsync());
-
-        Assert.True(
-            ex is NormException || ex is System.InvalidOperationException || ex is System.NotSupportedException,
-            $"List.IndexOf threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-        // Actionability: message should mention the unsupported method name
-        // or point at the translatable alternative (Contains).
-        var msgLower = ex.Message.ToLowerInvariant();
-        Assert.True(
-            msgLower.Contains("indexof") || msgLower.Contains("contains") || msgLower.Contains("not supported") || msgLower.Contains("translat"),
-            $"List.IndexOf error message lacks actionable hint: {ex.Message}");
+        var result = await _ctx.Query<WlioItem>()
+            .Where(i => ids.IndexOf(i.Id) >= 0)
+            .OrderBy(i => i.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 2, 4 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]

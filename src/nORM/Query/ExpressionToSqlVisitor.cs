@@ -268,6 +268,101 @@ namespace nORM.Query
             if (ReferenceEquals(newLeft, node.Left) && ReferenceEquals(newRight, node.Right)) return null;
             return Expression.MakeBinary(node.NodeType, newLeft, newRight);
         }
+
+        /// <summary>
+        /// Recognises <c>collection.IndexOf(x) [op] 0/-1</c> shapes and rewrites them
+        /// to the equivalent <c>collection.Contains(x)</c> (optionally negated) call.
+        /// Lets the dedicated Contains handler (around line 1318) emit a SQL IN clause
+        /// instead of throwing "Method 'IndexOf' cannot be translated".
+        /// Supported operator/threshold combinations:
+        ///   * <c>IndexOf(x) &gt;= 0</c>, <c>&gt; -1</c>, <c>!= -1</c> -> <c>Contains(x)</c>
+        ///   * <c>IndexOf(x) &lt; 0</c>, <c>== -1</c>, <c>&lt;= -1</c> -> <c>!Contains(x)</c>
+        ///   * Reversed operand order is also handled.
+        /// </summary>
+        private static Expression? TryRewriteIndexOfToContains(BinaryExpression node)
+        {
+            // Identify which side is the IndexOf call and which is the int constant.
+            (MethodCallExpression call, int threshold, bool callOnLeft)? probe = null;
+            if (node.Left is MethodCallExpression leftCall
+                && TryGetIntConstant(node.Right, out var rightInt))
+            {
+                probe = (leftCall, rightInt, true);
+            }
+            else if (node.Right is MethodCallExpression rightCall
+                     && TryGetIntConstant(node.Left, out var leftInt))
+            {
+                probe = (rightCall, leftInt, false);
+            }
+            if (probe is not { } p) return null;
+
+            var call = p.call;
+            if (call.Method.Name != "IndexOf"
+                || call.Object == null
+                || call.Arguments.Count != 1
+                || call.Method.GetParameters().Length != 1
+                || !IsTranslatableContainsReceiver(call.Object.Type)
+                || call.Object.Type == typeof(string))
+            {
+                return null;
+            }
+
+            // Map (op, threshold) to "is Contains" vs "is !Contains", normalising for
+            // reversed operand order. The truthy table covers IndexOf>=0, >-1, !=-1
+            // (and the reversed 0<=IndexOf etc.); falsy covers IndexOf<0, ==-1, <=-1.
+            // Anything else (e.g. >5, <-2) isn't a Contains rewrite -- bail out.
+            var op = p.callOnLeft ? node.NodeType : Mirror(node.NodeType);
+            bool? isContainsMatch = (op, p.threshold) switch
+            {
+                (ExpressionType.GreaterThanOrEqual, 0) => true,
+                (ExpressionType.GreaterThan, -1) => true,
+                (ExpressionType.NotEqual, -1) => true,
+                (ExpressionType.LessThan, 0) => false,
+                (ExpressionType.LessThanOrEqual, -1) => false,
+                (ExpressionType.Equal, -1) => false,
+                _ => null
+            };
+            if (isContainsMatch is not { } truthy) return null;
+
+            // Build collection.Contains(arg). The actual Contains method is resolved
+            // on the receiver's runtime type so List<int>.Contains, HashSet<int>.Contains,
+            // etc. all bind correctly. Falls back to IEnumerable<T>.Contains via the
+            // declared interfaces if the type doesn't expose a public Contains.
+            var receiverType = call.Object.Type;
+            var elementType = call.Arguments[0].Type;
+            var containsMethod = receiverType
+                .GetMethod("Contains", new[] { elementType });
+            if (containsMethod == null) return null;
+
+            Expression rewritten = Expression.Call(call.Object, containsMethod, call.Arguments[0]);
+            if (!truthy) rewritten = Expression.Not(rewritten);
+            return rewritten;
+        }
+
+        private static bool TryGetIntConstant(Expression e, out int value)
+        {
+            if (e is ConstantExpression { Value: int i })
+            {
+                value = i;
+                return true;
+            }
+            if (e is UnaryExpression { NodeType: ExpressionType.Convert } u
+                && u.Operand is ConstantExpression { Value: int j })
+            {
+                value = j;
+                return true;
+            }
+            value = 0;
+            return false;
+        }
+
+        private static ExpressionType Mirror(ExpressionType op) => op switch
+        {
+            ExpressionType.GreaterThan => ExpressionType.LessThan,
+            ExpressionType.GreaterThanOrEqual => ExpressionType.LessThanOrEqual,
+            ExpressionType.LessThan => ExpressionType.GreaterThan,
+            ExpressionType.LessThanOrEqual => ExpressionType.GreaterThanOrEqual,
+            _ => op
+        };
         protected override Expression VisitBinary(BinaryExpression node)
         {
             // C# lifts char comparisons to int — `r.Name[0] == 'A'` becomes
@@ -281,6 +376,16 @@ namespace nORM.Query
             {
                 var rewritten = TryRewriteLiftedCharComparison(node);
                 if (rewritten != null) node = rewritten;
+                // `list.IndexOf(x) [op] 0/-1` is the older spelling of `list.Contains(x)`.
+                // Rewrite to a Contains call (optionally negated) so the existing
+                // d97c5f0 IN-list handler picks it up. Without this, IndexOf on a
+                // generic-collection receiver would fail the IsTranslatableMethod gate
+                // and throw "Method 'IndexOf' cannot be translated to SQL".
+                var asContains = TryRewriteIndexOfToContains(node);
+                if (asContains != null)
+                {
+                    return Visit(asContains);
+                }
             }
             if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
             {
