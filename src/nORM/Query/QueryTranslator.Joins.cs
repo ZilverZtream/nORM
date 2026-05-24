@@ -22,6 +22,26 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
+            // Detect `Select(proj).Distinct().Join(...)` and similar outer sources that
+            // would need a subquery wrap (the join's outer key selector references the
+            // projected element rather than a column on the entity). nORM doesn't yet
+            // emit `FROM (SELECT DISTINCT ... FROM tbl) AS T0 INNER JOIN ...` — without
+            // the wrap the outer key resolves to an empty fragment and SQLite throws a
+            // `near "=": syntax error`. Surface a clear exception with two concrete
+            // workarounds: materialize-then-Contains or pre-filter via Where.
+            if (outerQuery is MethodCallExpression outerMce
+                && outerMce.Method.Name == nameof(Queryable.Distinct))
+            {
+                throw new NormUnsupportedFeatureException(
+                    "Join over a `.Distinct()` outer source isn't supported — nORM doesn't yet emit " +
+                    "the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 INNER JOIN ...`) " +
+                    "that this shape needs. Workarounds: " +
+                    "(1) materialize the distinct keys first and feed them through Contains: " +
+                    "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
+                    "then `ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync()`; " +
+                    "(2) push the join through first and apply DISTINCT to the result: " +
+                    "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.");
+            }
             Visit(outerQuery);
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
