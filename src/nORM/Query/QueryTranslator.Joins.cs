@@ -351,9 +351,13 @@ namespace nORM.Query
                     _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
             using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
-            if (_projection?.Body is NewExpression crossNew)
+            // Prefer the SelectMany result selector's NewExpression body for column extraction:
+            // it names exactly the (outer, inner) projections the caller wants. Fall back to the
+            // already-running outer _projection only when no result selector exists.
+            NewExpression? projectionNewExpr = (resultSelector?.Body as NewExpression) ?? (_projection?.Body as NewExpression);
+            if (projectionNewExpr != null)
             {
-                var neededColumns = JoinBuilder.ExtractNeededColumns(crossNew, outerMapping, crossMapping, outerAlias, crossAlias);
+                var neededColumns = JoinBuilder.ExtractNeededColumns(projectionNewExpr, outerMapping, crossMapping, outerAlias, crossAlias);
                 if (neededColumns.Count == 0)
                 {
                     var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
