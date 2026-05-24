@@ -103,7 +103,7 @@ public class CompileTimeQueryParameterParityTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void SG1_DateOnly_AddOptimizedParam_SetsDbTypeDate_And_ConvertsToDateTime()
+    public void SG1_DateOnly_AddOptimizedParam_BindsCanonicalIsoString()
     {
         using var cn = OpenMemory();
         using var cmd = cn.CreateCommand();
@@ -114,29 +114,23 @@ public class CompileTimeQueryParameterParityTests
         Assert.Single(cmd.Parameters);
         var p = cmd.Parameters[0];
         Assert.Equal("@birthday", p.ParameterName);
-        Assert.Equal(DbType.Date, p.DbType);
-        // Value must be converted to DateTime (midnight) for provider compatibility
-        Assert.IsType<DateTime>(p.Value);
-        var dt = (DateTime)p.Value;
-        Assert.Equal(new DateTime(2025, 12, 25, 0, 0, 0), dt);
+        // DateOnly binds as canonical `yyyy-MM-dd` text so equality compare matches TEXT-stored dates.
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal("2025-12-25", p.Value);
     }
 
     [Fact]
-    public void SG1_DateOnly_MinMax_Values()
+    public void SG1_DateOnly_MinMax_Values_BindAsIsoString()
     {
         using var cn = OpenMemory();
 
-        // MinValue
         using var cmd1 = cn.CreateCommand();
         ParameterOptimizer.AddOptimizedParam(cmd1, "@p0", DateOnly.MinValue);
-        var dt1 = (DateTime)cmd1.Parameters[0].Value!;
-        Assert.Equal(DateOnly.MinValue.Year, dt1.Year);
+        Assert.Equal(DateOnly.MinValue.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), cmd1.Parameters[0].Value);
 
-        // MaxValue
         using var cmd2 = cn.CreateCommand();
         ParameterOptimizer.AddOptimizedParam(cmd2, "@p0", DateOnly.MaxValue);
-        var dt2 = (DateTime)cmd2.Parameters[0].Value!;
-        Assert.Equal(DateOnly.MaxValue.Year, dt2.Year);
+        Assert.Equal(DateOnly.MaxValue.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), cmd2.Parameters[0].Value);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

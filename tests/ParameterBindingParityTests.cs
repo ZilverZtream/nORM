@@ -121,9 +121,12 @@ public class ParameterBindingParityTests
     }
 
     [Fact]
-    public void P1_DateOnly_AddOptimizedParam_SetsDbTypeDate()
+    public void P1_DateOnly_AddOptimizedParam_BindsCanonicalIsoString()
     {
-        // Directly verify that AddOptimizedParam converts DateOnly correctly
+        // DateOnly binds as its canonical `yyyy-MM-dd` text form so equality
+        // comparisons match TEXT-stored dates exactly. Converting to a DateTime
+        // with a zero time component used to produce `'2024-03-15 00:00:00'`
+        // which never equality-matched the TEXT-stored `'2024-03-15'`.
         using var cn = OpenMemory();
         using var cmd = cn.CreateCommand();
 
@@ -133,15 +136,8 @@ public class ParameterBindingParityTests
         Assert.Single(cmd.Parameters);
         var p = cmd.Parameters[0];
         Assert.Equal("@p0", p.ParameterName);
-        Assert.Equal(DbType.Date, p.DbType);
-        // Value should be converted to DateTime
-        Assert.IsType<DateTime>(p.Value);
-        var dt = (DateTime)p.Value;
-        Assert.Equal(2024, dt.Year);
-        Assert.Equal(3, dt.Month);
-        Assert.Equal(15, dt.Day);
-        Assert.Equal(0, dt.Hour);
-        Assert.Equal(0, dt.Minute);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal("2024-03-15", p.Value);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -324,21 +320,20 @@ public class ParameterBindingParityTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void P1_CrossProvider_DateOnly_AllProviders_SameDbType()
+    public void P1_CrossProvider_DateOnly_AllProviders_SameBindingShape()
     {
-        // Verify AddOptimizedParam handles DateOnly identically regardless of provider.
-        // The conversion happens at the ADO.NET param level, not provider level.
+        // Verify AddOptimizedParam handles DateOnly identically regardless of provider:
+        // canonical ISO `yyyy-MM-dd` text with DbType.String. Every provider accepts the
+        // ISO date string at the parameter binding boundary.
         var dateOnly = new DateOnly(2025, 1, 1);
 
-        // SqliteConnection creates params that work the same way
         using var cn = OpenMemory();
         using var cmd = cn.CreateCommand();
         ParameterOptimizer.AddOptimizedParam(cmd, "@p0", dateOnly);
 
         var p = cmd.Parameters[0];
-        Assert.Equal(DbType.Date, p.DbType);
-        Assert.IsType<DateTime>(p.Value);
-        Assert.Equal(new DateTime(2025, 1, 1), p.Value);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal("2025-01-01", p.Value);
     }
 
     [Fact]

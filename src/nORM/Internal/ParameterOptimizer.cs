@@ -195,14 +195,16 @@ namespace nORM.Internal
                 }
                 else if (valueType == typeof(DateOnly))
                 {
-                    // DateOnly requires explicit conversion to DateTime for providers that do not
-                    // natively accept DateOnly objects (most providers including SQL Server, MySQL,
-                    // and the majority of ADO.NET drivers). D-4 fix: removed misleading
-                    // "SQL Server < 2022" parenthetical — ADO.NET support is driver-version-
-                    // dependent and independent of the server version.
+                    // Bind DateOnly as its canonical `yyyy-MM-dd` text form. ADO.NET providers
+                    // that store dates as TEXT (SQLite, MySQL CHAR/VARCHAR) compare directly
+                    // against this representation; the ones with first-class DATE columns
+                    // (SQL Server, PostgreSQL) accept the ISO string at the binding boundary and
+                    // narrow it to their native date type without truncating the time component.
+                    // Converting to DateTime(midnight) used to produce `'2024-06-30 00:00:00'`
+                    // which never equality-matched TEXT-stored `'2024-06-30'`.
                     var d = (DateOnly)value;
-                    param.Value = d.ToDateTime(TimeOnly.MinValue);
-                    param.DbType = DbType.Date;
+                    param.Value = d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                    param.DbType = DbType.String;
                 }
                 else if (valueType == typeof(TimeOnly))
                 {
