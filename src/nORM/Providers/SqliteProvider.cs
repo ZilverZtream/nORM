@@ -269,6 +269,11 @@ namespace nORM.Providers
                     // path the Where handler uses for variable patterns) is not duplicated
                     // here -- the projection translates the user-visible "does this row
                     // contain X" shape and matches the most-common 'literal substring' use.
+                    // string.Concat static with 2+ args -- chain via SQLite's || operator.
+                    // Mirror of ExpressionToSqlVisitor's ~line 1333 inline path so SCV
+                    // doesn't fall through to its lambda-expecting Queryable fallback
+                    // (which crashes with "Expected a lambda expression as argument 1").
+                    nameof(string.Concat) when args.Length >= 2 => "(" + string.Join(" || ", args) + ")",
                     nameof(string.StartsWith) when args.Length == 2 => $"({args[0]} LIKE {args[1]} || '%')",
                     nameof(string.EndsWith) when args.Length == 2 => $"({args[0]} LIKE '%' || {args[1]})",
                     nameof(string.Contains) when args.Length == 2 => $"({args[0]} LIKE '%' || {args[1]} || '%')",
