@@ -7815,15 +7815,16 @@ public class CoverageBoostGroup69Tests
     [Fact]
     public void QueryTranslator_UnsupportedBinaryOpInJoin_ThrowsNormUnsupportedFeatureException()
     {
-        // Covers QueryTranslator VisitBinary line 1583 (the default throw case).
+        // Covers the default throw branch in ExpressionToSqlVisitor.VisitBinary for binary
+        // operators that have no SQL equivalent. Bitwise XOR is one such operator — none of
+        // the providers translate it.
         using var cn = CreateItemDb69();
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var q = ctx.Query<CovItem>().Where(e => e.Value + 1 > 5);
+        var q = ctx.Query<CovItem>().Where(e => (e.Value ^ 1) > 5);
         using var t = QueryTranslator.Rent(ctx);
-        // ExpressionToSqlVisitor throws NotSupportedException for unsupported binary ops in predicates
         var ex = Assert.ThrowsAny<Exception>(() => t.Translate(q.Expression));
-        Assert.Contains("Add", ex.Message);
+        Assert.Contains("ExclusiveOr", ex.Message);
     }
 
     [Fact]

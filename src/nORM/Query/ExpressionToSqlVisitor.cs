@@ -237,6 +237,13 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => " <= ",
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
+                // Arithmetic operators flow through to SQL directly; the column type drives the
+                // server's semantics (integer vs decimal vs double).
+                ExpressionType.Add => " + ",
+                ExpressionType.Subtract => " - ",
+                ExpressionType.Multiply => " * ",
+                ExpressionType.Divide => " / ",
+                ExpressionType.Modulo => " % ",
                 _ => throw new NormUnsupportedFeatureException($"Binary operator '{node.NodeType}' is not supported.")
             });
             Visit(node.Right);
