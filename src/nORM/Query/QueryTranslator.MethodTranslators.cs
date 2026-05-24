@@ -25,6 +25,8 @@ namespace nORM.Query
             { "ThenByDescending", new OrderByTranslator() },
             { "Take", new TakeTranslator() },
             { "Skip", new SkipTranslator() },
+            { "TakeLast", new TakeLastTranslator() },
+            { "SkipLast", new SkipLastTranslator() },
             { "Join", new JoinTranslator(false) },
             { "GroupJoin", new JoinTranslator(true) },
             { "SelectMany", new SelectManyTranslator() },
@@ -618,6 +620,93 @@ namespace nORM.Query
                 }
                 return source;
             }
+        }
+
+        /// <summary>
+        /// Implements <c>TakeLast(source, n)</c>. SQL has no native "last N rows"
+        /// operator, so we flip the ORDER BY direction of the source's existing
+        /// ordering, apply LIMIT n on the reversed sequence (the DB scans only N
+        /// rows), then mark the plan with <c>PostReverse=true</c> so the materializer
+        /// reverses the small N-row result list to restore the original order.
+        /// Requires an upstream OrderBy or a mapped key column the translator can
+        /// default-order by; without either, the reversed direction is undefined.
+        /// </summary>
+        private sealed class TakeLastTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+                => ApplyTailPaging(t, node, isTake: true);
+        }
+
+        /// <summary>
+        /// Implements <c>SkipLast(source, n)</c>. Same flip-then-paginate pattern as
+        /// TakeLast: flip ORDER BY direction, apply OFFSET n on the reversed sequence
+        /// (the DB scans every row minus the last N), then reverse the result list
+        /// so the caller sees rows in the original order. For "drop the last N",
+        /// scanning all-minus-N rows is unavoidable in any provider.
+        /// </summary>
+        private sealed class SkipLastTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+                => ApplyTailPaging(t, node, isTake: false);
+        }
+
+        private static Expression ApplyTailPaging(QueryTranslator t, MethodCallExpression node, bool isTake)
+        {
+            // Walk the source first so any upstream OrderBy populates _orderBy.
+            var source = t.Visit(node.Arguments[0]);
+
+            // Reject existing _take/_skip composition for now -- combining tail-paging
+            // with start-paging requires double-subquery emit that nORM doesn't yet do.
+            if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+            {
+                throw new NormUnsupportedFeatureException(
+                    $"{node.Method.Name} cannot compose with an upstream Take/Skip in v1. " +
+                    "Apply TakeLast/SkipLast before any Take/Skip in the chain.");
+            }
+
+            // Ensure we have something to reverse -- fall back to the entity's key
+            // columns if no explicit OrderBy was applied (mirrors ReverseTranslator).
+            if (t._orderBy.Count == 0)
+            {
+                foreach (var key in t._mapping.KeyColumns)
+                    t._orderBy.Add((key.EscCol, true));
+            }
+            // Flip the ORDER BY direction so the SQL returns the LAST N rows first.
+            for (int i = 0; i < t._orderBy.Count; i++)
+            {
+                var (col, asc) = t._orderBy[i];
+                t._orderBy[i] = (col, !asc);
+            }
+
+            // Apply Take or Skip on the reversed sequence. Both literal-int and
+            // parameter-bound counts route through the same paging fields as the
+            // standard Take/Skip translators.
+            if (t.TryBindPagingParameter(node.Arguments[1], out var paramName))
+            {
+                if (isTake) t._takeParam = paramName;
+                else t._skipParam = paramName;
+            }
+            else if (TryGetIntValue(node.Arguments[1], out int countLit))
+            {
+                if (countLit < 0)
+                    throw new ArgumentOutOfRangeException(
+                        node.Method.Name,
+                        countLit,
+                        $"{node.Method.Name} count must be non-negative.");
+                if (isTake) t._take = countLit;
+                else t._skip = countLit;
+            }
+            else
+            {
+                throw new NormUnsupportedFeatureException(
+                    $"{node.Method.Name} argument could not be bound to a parameter or literal.");
+            }
+
+            // Tell the materializer to reverse the final list so the caller sees the
+            // original ORDER BY direction. With LIMIT N this is a cheap in-memory
+            // reverse of just N rows.
+            t._postReverseResult = true;
+            return source;
         }
 
         private sealed class JoinTranslator : IMethodCallTranslator

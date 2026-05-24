@@ -89,7 +89,13 @@ namespace nORM.Query
         Func<object, object>? ClientProjection = null,
         QueryComplexityMetrics Complexity = default,
         List<M2MIncludePlan>? M2MIncludes = null,
-        BulkCudQueryShape? BulkCudShape = null
+        BulkCudQueryShape? BulkCudShape = null,
+        // TakeLast/SkipLast translators flip the ORDER BY direction and apply Take/Skip
+        // to the reversed sequence; setting this flag tells the materializer to reverse
+        // the result list once read so the caller sees rows in the original ORDER BY
+        // direction. The DB still scans only N rows (TakeLast) or n - N (SkipLast) so
+        // there's no full-table-scan penalty.
+        bool PostReverse = false
     );
 
     internal sealed record BulkCudQueryShape(

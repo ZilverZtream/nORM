@@ -56,104 +56,43 @@ public class LinqSkipLastTakeLastTranslatabilityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TakeLast_either_translates_or_throws_actionable_error()
+    public async Task TakeLast_after_OrderBy_returns_tail_slice_in_original_order()
     {
-        // 5-row source ordered by Id; TakeLast(2) should yield {Id=4, Id=5}.
-        // Silent-wrongness:
-        //   * returns 5 rows (no trim)
-        //   * returns 2 rows from the START (TakeLast routed to Take)
-        // Both produce non-throw outcomes -- assertion catches them.
-        Exception? ex = null;
-        int[]? ids = null;
-        try
-        {
-            var result = await _ctx.Query<SltlItem>()
-                .OrderBy(i => i.Id)
-                .TakeLast(2)
-                .ToListAsync();
-            ids = result.Select(r => r.Id).ToArray();
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"TakeLast threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        // No throw: must be the correct tail slice. Anything else is silent-wrongness.
-        Assert.Equal(new[] { 4, 5 }, ids);
+        // 5-row source ordered by Id; TakeLast(2) yields {Id=4, Id=5}.
+        // Implementation: translator flips the ORDER BY direction, applies
+        // LIMIT 2 (DB returns the last 2 ids in descending order), and the
+        // materializer reverses the resulting 2-row list to restore the
+        // original ascending order.
+        var result = await _ctx.Query<SltlItem>()
+            .OrderBy(i => i.Id)
+            .TakeLast(2)
+            .ToListAsync();
+        Assert.Equal(new[] { 4, 5 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]
-    public async Task SkipLast_either_translates_or_throws_actionable_error()
+    public async Task SkipLast_after_OrderBy_drops_tail_returns_remaining_in_original_order()
     {
-        // 5-row source ordered by Id; SkipLast(2) should yield {Id=1, Id=2, Id=3}.
-        // Silent-wrongness:
-        //   * returns 5 rows (no trim)
-        //   * returns IDs {3, 4, 5} (SkipLast routed to Skip from start)
-        Exception? ex = null;
-        int[]? ids = null;
-        try
-        {
-            var result = await _ctx.Query<SltlItem>()
-                .OrderBy(i => i.Id)
-                .SkipLast(2)
-                .ToListAsync();
-            ids = result.Select(r => r.Id).ToArray();
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"SkipLast threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.Equal(new[] { 1, 2, 3 }, ids);
+        // 5-row source ordered by Id; SkipLast(2) yields {Id=1, Id=2, Id=3}.
+        // Implementation: flip ORDER BY direction, apply OFFSET 2 (DB returns
+        // the first n-2 rows in descending order), materializer reverses.
+        var result = await _ctx.Query<SltlItem>()
+            .OrderBy(i => i.Id)
+            .SkipLast(2)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2, 3 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]
-    public async Task TakeLast_zero_either_returns_empty_or_throws_actionable_error()
+    public async Task TakeLast_zero_returns_empty_collection()
     {
-        // Edge case: TakeLast(0) -> Enumerable.TakeLast returns empty. If routed
-        // to "no LIMIT" (interpreted as "no rows wanted == 0 limit") and SQLite
-        // refuses LIMIT 0, this could throw a provider error. Pin either empty
-        // or a nORM-typed error.
-        Exception? ex = null;
-        int rowCount = -1;
-        try
-        {
-            var result = await _ctx.Query<SltlItem>()
-                .OrderBy(i => i.Id)
-                .TakeLast(0)
-                .ToListAsync();
-            rowCount = result.Count;
-        }
-        catch (Exception caught)
-        {
-            ex = caught;
-        }
-
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is NotSupportedException || ex is InvalidOperationException,
-                $"TakeLast(0) threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.Equal(0, rowCount);
+        // Edge case: TakeLast(0) -> empty. The flipped-order LIMIT 0 returns
+        // no rows; the reverse is a no-op on an empty list.
+        var result = await _ctx.Query<SltlItem>()
+            .OrderBy(i => i.Id)
+            .TakeLast(0)
+            .ToListAsync();
+        Assert.Empty(result);
     }
 
     [Table("SltlItem")]

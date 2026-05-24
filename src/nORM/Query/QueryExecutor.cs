@@ -137,6 +137,24 @@ namespace nORM.Query
         /// <remarks>Internal wrapper exposed for use by NormQueryProvider's pooled command path.</remarks>
         internal IList CreateListForType(Type elementType, int capacity) => CreateList(elementType, capacity);
 
+        /// <summary>
+        /// In-place reverse of an <see cref="IList"/>. Used by TakeLast/SkipLast: the
+        /// translator flips ORDER BY direction and applies LIMIT/OFFSET so the SQL
+        /// returns the targeted slice; this restores the original row order without
+        /// allocating a new list. Works on <c>List&lt;T&gt;</c>, arrays, and any
+        /// indexable IList implementation.
+        /// </summary>
+        internal static void ReverseListInPlace(IList list)
+        {
+            int n = list.Count;
+            for (int i = 0, j = n - 1; i < j; i++, j--)
+            {
+                var tmp = list[i];
+                list[i] = list[j];
+                list[j] = tmp;
+            }
+        }
+
         internal static IList CreateList(Type elementType, int capacity)
         {
             var factory = _listFactoryCache.GetOrAdd(elementType, t =>
@@ -212,6 +230,7 @@ namespace nORM.Query
                         await _includeProcessor.LoadManyToManyAsync(m2mPlan, iList, ct, plan.NoTracking).ConfigureAwait(false);
                 }
 
+                if (plan.PostReverse) ReverseListInPlace(list);
                 return list;
             }
             catch (Exception ex)
@@ -317,6 +336,7 @@ namespace nORM.Query
                     await LoadOwnedCollectionsAsync(list, entityMap, ct).ConfigureAwait(false);
                 }
 
+                if (plan.PostReverse) ReverseListInPlace(list);
                 return list;
             }
             catch (Exception ex)
@@ -413,6 +433,7 @@ namespace nORM.Query
                     ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking);
                 }
 
+                if (plan.PostReverse) ReverseListInPlace(list);
                 return list;
             }
             catch (Exception ex)
@@ -447,6 +468,7 @@ namespace nORM.Query
                 list.Add(entity);
             }
 
+            if (plan.PostReverse) ReverseListInPlace(list);
             return list;
         }
 
