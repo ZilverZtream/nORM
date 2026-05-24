@@ -2510,19 +2510,48 @@ namespace nORM.Query
             => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, ignoreCase: false);
 
         private static void HandleStringContainsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.Contains, IsIgnoreCase(node.Arguments[1]));
+        {
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
+            EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.Contains, IsIgnoreCase(node.Arguments[1]));
+        }
 
         private static void HandleStringStartsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.StartsWith, IsIgnoreCase(node.Arguments[1]));
+        {
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
+            EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.StartsWith, IsIgnoreCase(node.Arguments[1]));
+        }
 
         private static void HandleStringEndsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, IsIgnoreCase(node.Arguments[1]));
+        {
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
+            EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, IsIgnoreCase(node.Arguments[1]));
+        }
 
         private static void HandleStringEqualsInstanceWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            => EmitEqualityPredicate(visitor, node.Object!, node.Arguments[0], IsIgnoreCase(node.Arguments[1]));
+        {
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
+            EmitEqualityPredicate(visitor, node.Object!, node.Arguments[0], IsIgnoreCase(node.Arguments[1]));
+        }
 
         private static void HandleStringEqualsStaticWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-            => EmitEqualityPredicate(visitor, node.Arguments[0], node.Arguments[1], IsIgnoreCase(node.Arguments[2]));
+        {
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[2]);
+            EmitEqualityPredicate(visitor, node.Arguments[0], node.Arguments[1], IsIgnoreCase(node.Arguments[2]));
+        }
+
+        // ParameterValueExtractor walks every closure MemberExpression in the
+        // predicate; when a handler folds a closure-captured arg inline without
+        // reserving a compiled-param slot, the value-list shifts and downstream
+        // @cp bindings get the wrong values. Reserve a placeholder when the arg
+        // is a closure capture. Same fix shape as 407e03d / eeff6e7 / cf39b61 /
+        // 04a0003 / 7d6d7ac.
+        private static void ReserveCompiledParamSlotIfClosure(ExpressionToSqlVisitor visitor, Expression arg)
+        {
+            if (arg is not MemberExpression) return;
+            var placeholder = $"{visitor._provider.ParamPrefix}cp{visitor._compiledParams.Count}_unused";
+            visitor._params[placeholder] = DBNull.Value;
+            visitor._compiledParams.Add(placeholder);
+        }
 
         private static void EmitLikePredicate(
             ExpressionToSqlVisitor visitor,
