@@ -176,9 +176,11 @@ namespace nORM.Query
                 return node;
             }
 
-            // `parent.Children.Select(c => c.X).Sum/Min/Max/Average()` — Select interposes
-            // between the navigation and the aggregate. Mirror of ExpressionToSqlVisitor's
-            // efba58f path: emit `(SELECT AGG(selector_sql) FROM Child __nav WHERE __nav.FK = outer.PK)`.
+            // `parent.Children[.Where(pred)].Select(c => c.X).Sum/Min/Max/Average()` —
+            // Select interposes between the navigation and the aggregate, optionally with a
+            // Where between the navigation and the Select. Mirror of ExpressionToSqlVisitor's
+            // efba58f path. Without the Where unwrap, the filter silently vanished AND the
+            // emit produced `SUM()` (no column ref → "wrong number of arguments to SUM").
             if (node.Arguments.Count == 1
                 && node.Method.Name is nameof(Queryable.Sum)
                                    or nameof(Queryable.Min)
@@ -187,13 +189,25 @@ namespace nORM.Query
                 && node.Arguments[0] is MethodCallExpression selCall
                 && selCall.Method.Name == nameof(Queryable.Select)
                 && selCall.Arguments.Count == 2
-                && selCall.Arguments[0] is MemberExpression selNav
-                && selNav.Expression is ParameterExpression
-                && _mapping.Relations.TryGetValue(selNav.Member.Name, out var selRelation)
                 && StripQuotes(selCall.Arguments[1]) is LambdaExpression selectorLambda)
             {
-                EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, selRelation, selectorLambda);
-                return node;
+                Expression selSource = selCall.Arguments[0];
+                LambdaExpression? selFilter = null;
+                if (selSource is MethodCallExpression preWhere
+                    && preWhere.Method.Name == nameof(Queryable.Where)
+                    && preWhere.Arguments.Count == 2
+                    && StripQuotes(preWhere.Arguments[1]) is LambdaExpression preWhereLambda)
+                {
+                    selFilter = preWhereLambda;
+                    selSource = preWhere.Arguments[0];
+                }
+                if (selSource is MemberExpression selNav
+                    && selNav.Expression is ParameterExpression
+                    && _mapping.Relations.TryGetValue(selNav.Member.Name, out var selRelation))
+                {
+                    EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, selRelation, selectorLambda, selFilter);
+                    return node;
+                }
             }
 
             // Use ToUpperInvariant to avoid locale-sensitive casing (e.g., Turkish-I problem).
@@ -403,7 +417,7 @@ namespace nORM.Query
             };
         }
 
-        private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda)
+        private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda, LambdaExpression? extraFilter = null)
         {
             // Mirror of EmitNavigationCountSubquery — adds aggregate-function dispatch and
             // a per-row selector. Selector is a member access on the dependent element
@@ -443,8 +457,13 @@ namespace nORM.Query
 
             sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
               .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-              .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(_outerAlias).Append('.').Append(pkCol)
-              .Append(')');
+              .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(_outerAlias).Append('.').Append(pkCol);
+            if (extraFilter != null)
+            {
+                var filterSql = RenderNavigationFilter(extraFilter, depAlias);
+                sb.Append(" AND ").Append(filterSql);
+            }
+            sb.Append(')');
         }
 
         private string TranslateProjectionArg(Expression arg)
