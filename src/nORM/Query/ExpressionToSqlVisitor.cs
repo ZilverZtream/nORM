@@ -377,6 +377,20 @@ namespace nORM.Query
                 return node;
             }
 
+            // C# `+` on string operands is concatenation, not arithmetic. The
+            // generic `+ ` emit below produces SQL numeric addition which on
+            // SQLite coerces TEXT to 0 (silent "0" results for every row).
+            // Route through the provider's concat SQL (`||` on SQLite,
+            // `CONCAT(...)` on SQL Server/MySQL) when either operand is string.
+            if (node.NodeType == ExpressionType.Add
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+            {
+                var concatLeftSql = GetSql(node.Left);
+                var concatRightSql = GetSql(node.Right);
+                _sql.Append(_provider.GetConcatSql(concatLeftSql, concatRightSql));
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
