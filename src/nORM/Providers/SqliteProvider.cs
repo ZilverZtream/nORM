@@ -297,6 +297,18 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(NormFunctions))
+            {
+                return name switch
+                {
+                    // SQLite LIKE is case-insensitive for ASCII by default. Force the
+                    // case-fold explicitly so callers can rely on consistent semantics
+                    // when collations or PRAGMA case_sensitive_like change.
+                    nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch

@@ -284,6 +284,15 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(NormFunctions))
+            {
+                return name switch
+                {
+                    nameof(NormFunctions.ILike) when args.Length == 2 => $"({args[0]} ILIKE {args[1]})",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch

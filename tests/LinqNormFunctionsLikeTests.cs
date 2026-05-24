@@ -77,6 +77,31 @@ public class LinqNormFunctionsLikeTests : IAsyncLifetime
         Assert.Equal(new[] { 4 }, ids);
     }
 
+    [Fact]
+    public async Task ILike_matches_uppercase_pattern_against_lowercase_value()
+    {
+        // ILike is case-insensitive. Pattern 'AL%' should match both 'alpha' and 'alabama'.
+        var ids = (await _ctx.Query<LkRow>()
+            .Where(r => NormFunctions.ILike(r.Name, "AL%"))
+            .ToListAsync())
+            .Select(r => r.Id).OrderBy(i => i).ToArray();
+        Assert.Equal(new[] { 1, 5 }, ids);
+    }
+
+    [Fact]
+    public async Task ILike_matches_lowercase_pattern_against_uppercase_value()
+    {
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = "INSERT INTO LkRow VALUES (6, 'OMEGA');";
+        await cmd.ExecuteNonQueryAsync();
+
+        var ids = (await _ctx.Query<LkRow>()
+            .Where(r => NormFunctions.ILike(r.Name, "omega"))
+            .ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 6 }, ids);
+    }
+
     [Table("LkRow")]
     public sealed class LkRow
     {
