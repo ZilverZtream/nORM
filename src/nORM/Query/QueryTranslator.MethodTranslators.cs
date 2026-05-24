@@ -359,6 +359,19 @@ namespace nORM.Query
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    // Mirror the WhereTranslator grouping setup so that
+                    // `GroupBy(k).Select(g => new {Cat=g.Key, ...}).OrderBy(x => x.Cat)` works:
+                    // ExpandProjection collapses `x.Cat` → bare key parameter `k`, and the
+                    // visitor's VisitParameter (see e72ca37) emits the group-by SQL when the
+                    // parameter is in _groupingKeys — otherwise it falls through to the base
+                    // ParameterExpression handler which emits NOTHING and the ORDER BY clause
+                    // ends up as `ORDER BY  ASC` (SQLite: `no such column: ASC`).
+                    if (t._groupBy.Count > 0)
+                    {
+                        var groupBySql = PooledStringBuilder.Join(t._groupBy);
+                        foreach (var p in keySelector.Parameters)
+                            visitor.RegisterGroupingKey(p, groupBySql);
+                    }
                     // Use node.Method.Name instead of t._methodName: visiting the source expression
                     // in t.Visit(node.Arguments[0]) above may have updated t._methodName to the last
                     // method encountered in the source chain (e.g., "Where"), losing the "Descending"
