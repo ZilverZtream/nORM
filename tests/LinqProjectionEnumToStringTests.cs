@@ -46,23 +46,43 @@ public class LinqProjectionEnumToStringTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Projection_enum_tostring_throws_actionable_client_eval_error_by_default()
+    public async Task Projection_enum_tostring_returns_member_name_via_case_when_in_sql()
     {
-        // The translator deliberately refuses enum.ToString() in projection
-        // rather than silently CASTing the enum to text (which would return
-        // the underlying numeric "1" instead of the member name "Active").
-        // The error message must point users at both the policy opt-in and
-        // the post-projection workaround so they don't grep the codebase
-        // trying to figure out why the translation refused.
-        var ex = await Assert.ThrowsAsync<nORM.Core.NormUnsupportedFeatureException>(async () =>
+        // The translator emits CASE WHEN col=<n> THEN '<name>' ... ELSE CAST(col
+        // AS TEXT) END for enum.ToString() so the SQL returns the .NET-equivalent
+        // member name rather than the underlying numeric, matching Enum.ToString
+        // semantics. Defined values map to names; undefined ints (none here) fall
+        // through to the ELSE branch for parity with .NET.
+        var rows = await _ctx.Query<EtsRow>()
+            .OrderBy(r => r.Id)
+            .Select(r => new { r.Id, Label = r.Status.ToString() })
+            .ToListAsync();
+        Assert.Equal(new[]
         {
-            await _ctx.Query<EtsRow>()
-                .OrderBy(r => r.Id)
-                .Select(r => new { r.Id, Label = r.Status.ToString() })
-                .ToListAsync();
-        });
-        Assert.Contains("client-side evaluation", ex.Message);
-        Assert.Contains("ClientEvaluationPolicy", ex.Message);
+            (1, "Active"),
+            (2, "Pending"),
+            (3, "Archived"),
+            (4, "Active"),
+            (5, "Pending"),
+        }, rows.Select(r => (r.Id, r.Label)).ToArray());
+    }
+
+    [Fact]
+    public async Task Projection_enum_tostring_returns_integer_text_for_undefined_value()
+    {
+        // .NET's Enum.ToString returns the integer as text for undefined values
+        // (e.g. (EtsStatus)99 -> "99"). The SQL CASE-WHEN ELSE branch preserves
+        // this so the in-memory and SQL projections behave identically.
+        await using (var seedCmd = _cn.CreateCommand())
+        {
+            seedCmd.CommandText = "INSERT INTO EtsRow VALUES (99, 42)";
+            await seedCmd.ExecuteNonQueryAsync();
+        }
+        var label = await _ctx.Query<EtsRow>()
+            .Where(r => r.Id == 99)
+            .Select(r => r.Status.ToString())
+            .FirstAsync();
+        Assert.Equal("42", label);
     }
 
     [Fact]

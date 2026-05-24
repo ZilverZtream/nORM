@@ -107,18 +107,15 @@ namespace nORM.Query
                 // Check if this is a method that can be translated to SQL
                 var declaringType = node.Method.DeclaringType;
 
-                // No-arg ToString() on a non-string, non-enum receiver lowers to the provider's
-                // CAST AS TEXT (handled by SelectClauseVisitor and ExpressionToSqlVisitor).
-                // Admit it here so the analyzer doesn't pre-flag the whole projection as
-                // client-eval before the per-visitor handler ever runs. Enum.ToString() stays
-                // rejected because CAST(enumCol AS TEXT) returns "0"/"1" (the underlying int)
-                // rather than the enum names users actually expect -- intentionally a
-                // client-eval shape.
+                // No-arg ToString() on a non-string receiver lowers to the provider's
+                // CAST AS TEXT (primitives) or a CASE-WHEN-per-name expansion (enums) --
+                // both handled by SelectClauseVisitor and ExpressionToSqlVisitor. Admit
+                // here so the analyzer doesn't pre-flag the whole projection as client-
+                // eval before the per-visitor handler runs.
                 if (node.Method.Name == nameof(object.ToString)
                     && node.Arguments.Count == 0
                     && node.Object != null
-                    && node.Object.Type != typeof(string)
-                    && !(Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type).IsEnum)
+                    && node.Object.Type != typeof(string))
                 {
                     return base.VisitMethodCall(node);
                 }

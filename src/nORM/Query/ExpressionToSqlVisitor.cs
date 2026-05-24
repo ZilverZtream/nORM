@@ -852,6 +852,34 @@ namespace nORM.Query
             return node;
         }
 
+        // Emit CASE WHEN col = <int> THEN '<name>' ... ELSE CAST(col AS TEXT) END for
+        // an enum-typed receiver. The ELSE branch mirrors .NET's Enum.ToString behavior
+        // on undefined values (returns the integer as text). Names are quote-escaped
+        // by doubling single quotes so values like O'Brien (hypothetical) round-trip.
+        // Shared between projection (SelectClauseVisitor) and predicates (this class)
+        // via the static helper below.
+        internal void EmitEnumToStringCase(string columnSql, Type enumType)
+        {
+            _sql.Append(BuildEnumToStringCase(_provider, columnSql, enumType));
+        }
+
+        internal static string BuildEnumToStringCase(DatabaseProvider provider, string columnSql, Type enumType)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("(CASE");
+            var values = Enum.GetValues(enumType);
+            var underlyingType = Enum.GetUnderlyingType(enumType);
+            foreach (var value in values)
+            {
+                var name = Enum.GetName(enumType, value!) ?? value!.ToString()!;
+                var underlying = Convert.ChangeType(value, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
+                sb.Append(" WHEN ").Append(columnSql).Append(" = ").Append(underlying)
+                  .Append(" THEN '").Append(name.Replace("'", "''")).Append('\'');
+            }
+            sb.Append(" ELSE ").Append(provider.GetToStringSql(columnSql)).Append(" END)");
+            return sb.ToString();
+        }
+
         // Fold a NewExpression whose arguments are all compile-time constants
         // (or evaluate to constants via Expression.Lambda().Compile()) into a
         // single bound parameter at translation time. Without this, an inline
@@ -1003,9 +1031,9 @@ namespace nORM.Query
                 return node;
             }
             // No-arg ToString() on a column/expression — lower to provider-specific CAST.
-            // Receiver type must NOT already be string (identity, would emit a redundant
-            // CAST) and must NOT be an enum (CAST(StatusInt AS TEXT) returns "0"/"1"/"2"
-            // rather than the enum names users actually expect — that's a client-eval shape).
+            // Receiver type must NOT already be string (identity, would emit a redundant CAST).
+            // Enums get a dedicated CASE-WHEN per-name path below since CAST AS TEXT would
+            // return "0"/"1"/"2" instead of the names .NET Enum.ToString returns.
             if (node.Method.Name == nameof(object.ToString)
                 && node.Arguments.Count == 0
                 && node.Object != null
@@ -1014,6 +1042,17 @@ namespace nORM.Query
             {
                 var inner = GetSql(node.Object);
                 _sql.Append(_provider.GetToStringSql(inner));
+                return node;
+            }
+            // No-arg ToString() on an enum receiver: emit CASE WHEN col=<n> THEN '<name>'
+            // ... ELSE CAST(col AS TEXT) END. The ELSE matches .NET's Enum.ToString which
+            // returns the integer as text for undefined values (e.g. (Status)99 -> "99").
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 0
+                && node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type).IsEnum)
+            {
+                EmitEnumToStringCase(GetSql(node.Object), Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type);
                 return node;
             }
 
