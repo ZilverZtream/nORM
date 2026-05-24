@@ -780,6 +780,40 @@ namespace nORM.Query
                 return node;
             }
 
+            // char.IsDigit(c) / char.IsLetter(c) / char.IsWhiteSpace(c) — static methods on
+            // System.Char. ASCII-only ranges via portable BETWEEN / OR / IN comparisons; matches
+            // the common "is the first char a digit/letter/space" validation pattern. We don't
+            // try to match the full Unicode definition (System.Char.IsLetter accepts every
+            // Unicode L* category) because no provider has a portable way to express that —
+            // this is the de-facto SQL parity behaviour EF Core also implements.
+            if (node.Method.DeclaringType == typeof(char)
+                && node.Object == null
+                && node.Arguments.Count == 1
+                && (node.Method.Name == nameof(char.IsDigit)
+                    || node.Method.Name == nameof(char.IsLetter)
+                    || node.Method.Name == nameof(char.IsWhiteSpace)))
+            {
+                var charSql = GetSql(node.Arguments[0]);
+                switch (node.Method.Name)
+                {
+                    case nameof(char.IsDigit):
+                        _sql.Append('(').Append(charSql).Append(" BETWEEN '0' AND '9')");
+                        return node;
+                    case nameof(char.IsLetter):
+                        _sql.Append("((").Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
+                            .Append(charSql).Append(" BETWEEN 'a' AND 'z'))");
+                        return node;
+                    case nameof(char.IsWhiteSpace):
+                        // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
+                        // characters that actually appear in textual database content.
+                        _sql.Append('(').Append(charSql).Append(" = ' ' OR ")
+                            .Append(charSql).Append(" = CHAR(9) OR ")
+                            .Append(charSql).Append(" = CHAR(10) OR ")
+                            .Append(charSql).Append(" = CHAR(13))");
+                        return node;
+                }
+            }
+
             // enum.HasFlag(other) — lower to `(col & other) = other`. Preserves .NET semantics
             // (true only when every bit of `other` is set in receiver). The receiver must be
             // an enum instance; we don't filter by [Flags] attribute because the runtime
