@@ -271,6 +271,17 @@ namespace nORM.Query
                 return node;
             }
 
+            // Bitwise XOR needs provider-specific syntax — SQLite has no `^` operator and
+            // PostgreSQL uses `#`. Route through DatabaseProvider.GetBitwiseXorSql which
+            // hands back the right token (or a synthesised `(a|b) - (a&b)` on SQLite).
+            if (node.NodeType == ExpressionType.ExclusiveOr)
+            {
+                var leftSql = GetSql(node.Left);
+                var rightSql = GetSql(node.Right);
+                _sql.Append(_provider.GetBitwiseXorSql(leftSql, rightSql));
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
@@ -290,6 +301,14 @@ namespace nORM.Query
                 ExpressionType.Multiply => " * ",
                 ExpressionType.Divide => " / ",
                 ExpressionType.Modulo => " % ",
+                // Bitwise operators on integer columns: the And/Or/ExclusiveOr node types
+                // overload as both boolean (no short-circuit) and bitwise depending on operand
+                // type. Lower to SQL bit operators so flag-mask predicates like
+                // `(Flags & 4) == 4` translate server-side. All four supported providers
+                // (SQLite, SQL Server, Postgres, MySQL) accept & | ^ for integer columns.
+                ExpressionType.And => " & ",
+                ExpressionType.Or => " | ",
+                // ExclusiveOr is handled above via DatabaseProvider.GetBitwiseXorSql
                 _ => throw new NormUnsupportedFeatureException($"Binary operator '{node.NodeType}' is not supported.")
             });
             Visit(node.Right);

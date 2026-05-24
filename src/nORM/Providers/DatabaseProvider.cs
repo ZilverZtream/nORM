@@ -409,6 +409,13 @@ namespace nORM.Providers
         public virtual string GetToStringSql(string innerSql) => $"CAST({innerSql} AS VARCHAR)";
 
         /// <summary>
+        /// Returns SQL that XORs two integer expressions. SQL Server and MySQL accept the
+        /// `^` operator; PostgreSQL uses `#`; SQLite has no XOR operator and falls back to
+        /// `(a | b) - (a &amp; b)` — algebraically equivalent on integers.
+        /// </summary>
+        public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
+
+        /// <summary>
         /// Returns an INSERT statement for a join table row that does nothing (ignores) on duplicate key.
         /// Providers override this for their native upsert/ignore syntax.
         /// </summary>
