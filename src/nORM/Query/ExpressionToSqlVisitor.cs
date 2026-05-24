@@ -1069,6 +1069,33 @@ namespace nORM.Query
                 _sql.Append("(CASE WHEN ").Append(inner).Append(" = 1 THEN 'True' ELSE 'False' END)");
                 return node;
             }
+            // numeric.ToString(formatString) -- mirror SelectClauseVisitor's
+            // 6b2743c handler so Where(p => p.Score.ToString("F2") == "3.14")
+            // works symmetrically with projection. Only the "F<N>" / "f<N>"
+            // fixed-decimal subset is portable; other formats throw with the
+            // same supported-subset guidance SCV emits.
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 1
+                && node.Object != null
+                && node.Object.Type != typeof(string)
+                && node.Arguments[0].Type == typeof(string))
+            {
+                if (TryGetConstantValue(node.Arguments[0], out var rawFmt)
+                    && rawFmt is string fmt
+                    && fmt.Length >= 2
+                    && (fmt[0] == 'F' || fmt[0] == 'f')
+                    && int.TryParse(fmt.AsSpan(1), out var digits)
+                    && digits >= 0 && digits <= 17)
+                {
+                    var inner = GetSql(node.Object);
+                    _sql.Append("printf('%.").Append(digits).Append("f', ").Append(inner).Append(')');
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    "Numeric ToString(formatString) in Where supports only the \"F<N>\" / \"f<N>\" " +
+                    "fixed-decimal subset. For other formats, materialize the rows first and filter " +
+                    "after .ToList().");
+            }
 
             // char.IsDigit(c) / char.IsLetter(c) / char.IsWhiteSpace(c) — static methods on
             // System.Char. ASCII-only ranges via portable BETWEEN / OR / IN comparisons; matches
