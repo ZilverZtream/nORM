@@ -260,6 +260,17 @@ namespace nORM.Providers
                     nameof(string.Substring) when args.Length == 2 => $"SUBSTR({args[0]}, {args[1]} + 1)",
                     nameof(string.Substring) when args.Length == 3 => $"SUBSTR({args[0]}, {args[1]} + 1, {args[2]})",
                     nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
+                    // PadLeft/PadRight: SQLite has no REPLICATE, so the classic
+                    // hex(zeroblob(n)) + REPLACE idiom is the portable way to build
+                    // N copies of a single char. zeroblob(k) creates k null bytes,
+                    // hex() renders them as 2k hex chars (k copies of '00'); REPLACE
+                    // swaps '00' for the desired fill char to get k copies. The CASE
+                    // returns the input unchanged when length(col) >= width, matching
+                    // .NET semantics (PadLeft never truncates).
+                    nameof(string.PadLeft) when args.Length == 2 => $"(CASE WHEN length({args[0]}) >= {args[1]} THEN {args[0]} ELSE replace(hex(zeroblob({args[1]} - length({args[0]}))), '00', ' ') || {args[0]} END)",
+                    nameof(string.PadLeft) when args.Length == 3 => $"(CASE WHEN length({args[0]}) >= {args[1]} THEN {args[0]} ELSE replace(hex(zeroblob({args[1]} - length({args[0]}))), '00', {args[2]}) || {args[0]} END)",
+                    nameof(string.PadRight) when args.Length == 2 => $"(CASE WHEN length({args[0]}) >= {args[1]} THEN {args[0]} ELSE {args[0]} || replace(hex(zeroblob({args[1]} - length({args[0]}))), '00', ' ') END)",
+                    nameof(string.PadRight) when args.Length == 3 => $"(CASE WHEN length({args[0]}) >= {args[1]} THEN {args[0]} ELSE {args[0]} || replace(hex(zeroblob({args[1]} - length({args[0]}))), '00', {args[2]}) END)",
                     // SQLite INSTR returns 1-based position or 0 if not found; .NET IndexOf returns
                     // 0-based position or -1, so subtract 1 unconditionally.
                     nameof(string.IndexOf) when args.Length == 2 => $"(INSTR({args[0]}, {args[1]}) - 1)",
