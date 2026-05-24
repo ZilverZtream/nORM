@@ -359,6 +359,21 @@ namespace nORM.Query
                         // Ternary -> CASE WHEN test THEN ifTrue ELSE ifFalse END.
                         return $"(CASE WHEN {RenderPredicate(cond.Test)} THEN {Render(cond.IfTrue)} ELSE {Render(cond.IfFalse)} END)";
 
+                    case MethodCallExpression mc when mc.Method.DeclaringType is { } dt &&
+                        (dt == typeof(Math) || dt == typeof(string) || dt == typeof(Convert)):
+                        // Delegate Math.*, string.*, and Convert.* to the provider's
+                        // TranslateFunction so SetProperty value expressions can use
+                        // server-side functions like Math.Abs / Math.Min / string.Trim.
+                        var fnArgs = new string[mc.Arguments.Count + (mc.Object != null ? 1 : 0)];
+                        int ai = 0;
+                        if (mc.Object != null) fnArgs[ai++] = Render(mc.Object);
+                        for (int i = 0; i < mc.Arguments.Count; i++) fnArgs[ai++] = Render(mc.Arguments[i]);
+                        var fnSql = _ctx.Provider.TranslateFunction(mc.Method.Name, dt, fnArgs);
+                        if (fnSql == null)
+                            throw new NormUnsupportedFeatureException(
+                                $"{dt.Name}.{mc.Method.Name}({mc.Arguments.Count} args) is not translatable on provider {_ctx.Provider.GetType().Name}.");
+                        return fnSql;
+
                     case BinaryExpression be:
                         // String concat: `+` between two strings lowers to a BinaryExpression
                         // with both operand types == string. Use the provider's concat dialect
