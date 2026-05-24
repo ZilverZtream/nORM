@@ -889,18 +889,28 @@ namespace nORM.Query
                 }
             }
 
-            // int.Parse(s) / long.Parse(s) — lower to a per-provider integer CAST. Single-arg
-            // overload only; the IFormatProvider / NumberStyles overloads add culture / format
-            // semantics that SQL casts can't faithfully reproduce, so those still fall to the
-            // unsupported-method throw.
+            // int.Parse(s) / long.Parse(s) / decimal.Parse(s) / double.Parse(s) — lower to a
+            // per-provider numeric CAST. Single-arg overload AND the 2-arg overload that takes
+            // an IFormatProvider (e.g. CultureInfo.InvariantCulture) are both supported — the
+            // format provider only affects culture-specific parsing of the literal string, which
+            // doesn't apply to a SQL cast. NumberStyles / signed-binary overloads still fall
+            // through to unsupported (no SQL equivalent for those).
             if (node.Object == null
-                && node.Arguments.Count == 1
                 && node.Method.Name == "Parse"
-                && (node.Method.DeclaringType == typeof(int) || node.Method.DeclaringType == typeof(long))
-                && node.Arguments[0].Type == typeof(string))
+                && node.Arguments.Count is 1 or 2
+                && (node.Method.DeclaringType == typeof(int) || node.Method.DeclaringType == typeof(long)
+                    || node.Method.DeclaringType == typeof(decimal) || node.Method.DeclaringType == typeof(double))
+                && node.Arguments[0].Type == typeof(string)
+                && (node.Arguments.Count == 1 || typeof(IFormatProvider).IsAssignableFrom(node.Arguments[1].Type)))
             {
                 var inner = GetSql(node.Arguments[0]);
-                _sql.Append(_provider.GetIntCastSql(inner, asLong: node.Method.DeclaringType == typeof(long)));
+                var dt = node.Method.DeclaringType!;
+                string castSql;
+                if (dt == typeof(int) || dt == typeof(long))
+                    castSql = _provider.GetIntCastSql(inner, asLong: dt == typeof(long));
+                else
+                    castSql = _provider.GetRealCastSql(inner, asDecimal: dt == typeof(decimal));
+                _sql.Append(castSql);
                 return node;
             }
 

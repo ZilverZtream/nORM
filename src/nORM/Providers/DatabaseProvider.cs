@@ -425,6 +425,19 @@ namespace nORM.Providers
             => $"CAST({innerSql} AS {(asLong ? "BIGINT" : "INTEGER")})";
 
         /// <summary>
+        /// Returns SQL that parses <paramref name="innerSql"/> as a floating-point /
+        /// fixed-precision number. Used to translate <c>double.Parse(col)</c> and
+        /// <c>decimal.Parse(col)</c>. Defaults to ANSI <c>CAST(x AS DOUBLE PRECISION)</c>
+        /// for <paramref name="asDecimal"/>=false and <c>CAST(x AS DECIMAL(38, 10))</c>
+        /// otherwise. Providers without DOUBLE PRECISION or with stricter DECIMAL
+        /// syntax override.
+        /// </summary>
+        public virtual string GetRealCastSql(string innerSql, bool asDecimal = false)
+            => asDecimal
+                ? $"CAST({innerSql} AS DECIMAL(38, 10))"
+                : $"CAST({innerSql} AS DOUBLE PRECISION)";
+
+        /// <summary>
         /// Returns an INSERT statement for a join table row that does nothing (ignores) on duplicate key.
         /// Providers override this for their native upsert/ignore syntax.
         /// </summary>
