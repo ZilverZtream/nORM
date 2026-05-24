@@ -554,7 +554,39 @@ namespace nORM.Query
                 _sql.Append("))");
                 return node;
             }
+            // Numeric / enum conversions in projections: (int)entity.Status, (long)e.Count, etc.
+            // SQL columns are already typed, so just emit the operand. Reference-type Convert
+            // (interface casts, base→derived) has no SQL meaning and falls through to default.
+            if (node.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+            {
+                var operandType = node.Operand.Type;
+                var targetType = node.Type;
+                var operandUnderlying = Nullable.GetUnderlyingType(operandType) ?? operandType;
+                var targetUnderlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+                bool operandIsPrimitive = operandUnderlying.IsPrimitive || operandUnderlying.IsEnum
+                    || operandUnderlying == typeof(decimal) || operandUnderlying == typeof(string);
+                bool targetIsPrimitive = targetUnderlying.IsPrimitive || targetUnderlying.IsEnum
+                    || targetUnderlying == typeof(decimal) || targetUnderlying == typeof(string);
+                if (operandIsPrimitive && targetIsPrimitive)
+                {
+                    Visit(node.Operand);
+                    return node;
+                }
+            }
             return base.VisitUnary(node);
+        }
+        protected override Expression VisitConditional(ConditionalExpression node)
+        {
+            // x ? a : b -> (CASE WHEN x THEN a ELSE b END). Nested conditionals naturally
+            // recurse, producing CASE WHEN ... WHEN ... ELSE ... END.
+            _sql.Append("(CASE WHEN ");
+            Visit(node.Test);
+            _sql.Append(" THEN ");
+            Visit(node.IfTrue);
+            _sql.Append(" ELSE ");
+            Visit(node.IfFalse);
+            _sql.Append(" END)");
+            return node;
         }
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
