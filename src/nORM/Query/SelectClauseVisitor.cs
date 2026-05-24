@@ -330,7 +330,12 @@ namespace nORM.Query
                 ExpressionType.Multiply => "*",
                 ExpressionType.Divide => "/",
                 ExpressionType.Modulo => "%",
-                _ => throw new InvalidOperationException($"Binary operator {node.NodeType} is not supported in projections."),
+                _ => throw new InvalidOperationException(
+                    $"Binary operator '{node.NodeType}' has no portable SQL equivalent in a SELECT " +
+                    "projection. For LeftShift / RightShift, rewrite as multiply / divide by a power " +
+                    "of 2 (`x * 2` for `x << 1`, `x / 4` for `x >> 2`) — the SQL planner produces the " +
+                    "same execution plan and the rewrite works on every provider. For Power, use " +
+                    "`Math.Pow(x, n)` which lowers to the provider's POWER / POW function."),
             }).Append(' ');
             Visit(node.Right);
             sb.Append(')');
