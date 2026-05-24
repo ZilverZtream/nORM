@@ -51,12 +51,44 @@ namespace nORM.Query
         // String methods (Contains, StartsWith, EndsWith) are handled via _fastMethodHandlers
         // for better performance, avoiding a redundant _translators dictionary lookup.
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
-            new()
+            BuildFastMethodHandlers();
+
+        private static Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> BuildFastMethodHandlers()
+        {
+            var dict = new Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>>
             {
                 { typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!, HandleStringContains },
                 { typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!, HandleStringStartsWith },
                 { typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!, HandleStringEndsWith }
             };
+            // 2-arg StringComparison overloads — common in user predicates. We honour
+            // ordinal-ignore-case / invariant-ignore-case / current-ignore-case by wrapping
+            // both sides of the LIKE / equality compare in LOWER(); culture-specific
+            // collation isn't reachable from SQL but case-folding to lower is the
+            // de-facto cross-provider approximation.
+            var containsCi = typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string), typeof(StringComparison) });
+            if (containsCi != null) dict.Add(containsCi, HandleStringContainsWithComparison);
+            var startsCi = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string), typeof(StringComparison) });
+            if (startsCi != null) dict.Add(startsCi, HandleStringStartsWithComparison);
+            var endsCi = typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string), typeof(StringComparison) });
+            if (endsCi != null) dict.Add(endsCi, HandleStringEndsWithComparison);
+            var equalsInstanceCi = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(StringComparison) });
+            if (equalsInstanceCi != null) dict.Add(equalsInstanceCi, HandleStringEqualsInstanceWithComparison);
+            var equalsStaticCi = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(string), typeof(StringComparison) });
+            if (equalsStaticCi != null) dict.Add(equalsStaticCi, HandleStringEqualsStaticWithComparison);
+            return dict;
+        }
+
+        private static bool IsIgnoreCase(Expression comparisonArg)
+        {
+            if (TryGetConstantValue(comparisonArg, out var v) && v is StringComparison sc)
+            {
+                return sc is StringComparison.OrdinalIgnoreCase
+                          or StringComparison.InvariantCultureIgnoreCase
+                          or StringComparison.CurrentCultureIgnoreCase;
+            }
+            return false;
+        }
         internal ExpressionToSqlVisitor() { }
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
                                       ParameterExpression parameter, string tableAlias,
@@ -1611,70 +1643,78 @@ namespace nORM.Query
             throw new ArgumentException($"Cannot determine element type from expression of type {type}");
         }
         private static void HandleStringContains(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-        {
-            visitor.Visit(node.Object!);
-            visitor._sql.Append(" LIKE ");
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.Contains, ignoreCase: false);
 
-            // Support both constant and variable values
-            if (TryGetConstantValue(node.Arguments[0], out var contains) && contains is string cs)
-            {
-                // Fast path for constants: pre-build the pattern
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor.AppendConstant(visitor.CreateSafeLikePattern(cs, LikeOperation.Contains), typeof(string));
-                visitor._sql.Append($" ESCAPE '{escChar}'");
-            }
-            else
-            {
-                // Variable path: escape the value at runtime to prevent SQL injection
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(visitor._provider.GetConcatSql("'%'", visitor._provider.GetConcatSql(escapedSql, "'%'")));
-                visitor._sql.Append($" ESCAPE '{escChar}'");
-            }
-        }
         private static void HandleStringStartsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-        {
-            visitor.Visit(node.Object!);
-            visitor._sql.Append(" LIKE ");
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.StartsWith, ignoreCase: false);
 
-            // Support both constant and variable values
-            if (TryGetConstantValue(node.Arguments[0], out var starts) && starts is string ss)
-            {
-                // Fast path for constants: pre-build the pattern
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor.AppendConstant(visitor.CreateSafeLikePattern(ss, LikeOperation.StartsWith), typeof(string));
-                visitor._sql.Append($" ESCAPE '{escChar}'");
-            }
-            else
-            {
-                // Variable path: escape the value at runtime to prevent SQL injection
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(visitor._provider.GetConcatSql(escapedSql, "'%'"));
-                visitor._sql.Append($" ESCAPE '{escChar}'");
-            }
-        }
         private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
-        {
-            visitor.Visit(node.Object!);
-            visitor._sql.Append(" LIKE ");
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, ignoreCase: false);
 
-            // Support both constant and variable values
-            if (TryGetConstantValue(node.Arguments[0], out var ends) && ends is string es)
+        private static void HandleStringContainsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.Contains, IsIgnoreCase(node.Arguments[1]));
+
+        private static void HandleStringStartsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.StartsWith, IsIgnoreCase(node.Arguments[1]));
+
+        private static void HandleStringEndsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, IsIgnoreCase(node.Arguments[1]));
+
+        private static void HandleStringEqualsInstanceWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitEqualityPredicate(visitor, node.Object!, node.Arguments[0], IsIgnoreCase(node.Arguments[1]));
+
+        private static void HandleStringEqualsStaticWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitEqualityPredicate(visitor, node.Arguments[0], node.Arguments[1], IsIgnoreCase(node.Arguments[2]));
+
+        private static void EmitLikePredicate(
+            ExpressionToSqlVisitor visitor,
+            Expression target,
+            Expression patternExpr,
+            LikeOperation op,
+            bool ignoreCase)
+        {
+            var lhs = visitor.GetSql(target);
+            if (ignoreCase) lhs = $"LOWER({lhs})";
+            visitor._sql.Append(lhs).Append(" LIKE ");
+            var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
+            if (TryGetConstantValue(patternExpr, out var raw) && raw is string s)
             {
-                // Fast path for constants: pre-build the pattern
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                visitor.AppendConstant(visitor.CreateSafeLikePattern(es, LikeOperation.EndsWith), typeof(string));
+                // Pre-folded constant: bind the lowered pattern when ignoring case so the SQL
+                // doesn't need to wrap it again at run time.
+                var pattern = ignoreCase ? s.ToLowerInvariant() : s;
+                visitor.AppendConstant(visitor.CreateSafeLikePattern(pattern, op), typeof(string));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
+                return;
             }
-            else
+            // Variable pattern: escape at runtime, fold to lower when ignoring case, and
+            // bracket with %-wildcards according to the operation.
+            var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(patternExpr));
+            if (ignoreCase) escapedSql = $"LOWER({escapedSql})";
+            var concat = op switch
             {
-                // Variable path: escape the value at runtime to prevent SQL injection
-                var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-                var escapedSql = visitor._provider.GetLikeEscapeSql(visitor.GetSql(node.Arguments[0]));
-                visitor._sql.Append(visitor._provider.GetConcatSql("'%'", escapedSql));
-                visitor._sql.Append($" ESCAPE '{escChar}'");
+                LikeOperation.Contains => visitor._provider.GetConcatSql("'%'", visitor._provider.GetConcatSql(escapedSql, "'%'")),
+                LikeOperation.StartsWith => visitor._provider.GetConcatSql(escapedSql, "'%'"),
+                LikeOperation.EndsWith => visitor._provider.GetConcatSql("'%'", escapedSql),
+                _ => escapedSql
+            };
+            visitor._sql.Append(concat);
+            visitor._sql.Append($" ESCAPE '{escChar}'");
+        }
+
+        private static void EmitEqualityPredicate(
+            ExpressionToSqlVisitor visitor,
+            Expression left,
+            Expression right,
+            bool ignoreCase)
+        {
+            var lhs = visitor.GetSql(left);
+            var rhs = visitor.GetSql(right);
+            if (ignoreCase)
+            {
+                lhs = $"LOWER({lhs})";
+                rhs = $"LOWER({rhs})";
             }
+            visitor._sql.Append('(').Append(lhs).Append(" = ").Append(rhs).Append(')');
         }
         // ContainsTranslator, StartsWithTranslator, and EndsWithTranslator were consolidated into
         // _fastMethodHandlers. String methods are exclusively handled there.
