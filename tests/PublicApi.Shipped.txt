@@ -566,6 +566,7 @@ M:nORM.Providers.SqliteProvider.NullSafeNotEqual(System.String,System.String):Sy
 M:nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String):System.String
+M:nORM.Query.NormFunctions.Like(System.String,System.String):System.Boolean
 M:nORM.Query.OptimizedSqlBuilder.#ctor()
 M:nORM.Query.OptimizedSqlBuilder.#ctor(System.Int32)
 M:nORM.Query.OptimizedSqlBuilder.Append(System.Char):nORM.Query.OptimizedSqlBuilder
@@ -1005,6 +1006,7 @@ T:nORM.Providers.PostgresProvider
 T:nORM.Providers.ProviderCapabilities
 T:nORM.Providers.SqlServerProvider
 T:nORM.Providers.SqliteProvider
+T:nORM.Query.NormFunctions
 T:nORM.Query.OptimizedSqlBuilder
 T:nORM.Query.SqlFunctionAttribute
 T:nORM.Scaffolding.DatabaseScaffolder
