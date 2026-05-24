@@ -59,15 +59,21 @@ public class LinqPagingAndNullableBoolTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Take_then_Skip_throws_unsupported_with_actionable_message()
+    public async Task Take_then_Skip_returns_inner_window_via_algebraic_rewrite()
     {
-        // Take(n).Skip(m) needs a subquery wrap to preserve LINQ semantics — fail deterministically
-        // so callers either rewrite as Skip-then-Take or wait for the wrap pipeline.
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(5).Skip(2).ToListAsync();
-        });
-        Assert.Contains("Take(n).Skip(m)", ex.Message, StringComparison.Ordinal);
+        // Take(5).Skip(2) ≡ Skip(2).Take(3) (rows [2, 5)) — both yield rows 3, 4, 5.
+        var ids = (await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(5).Skip(2).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 3, 4, 5 }, ids);
+    }
+
+    [Fact]
+    public async Task Take_then_Skip_with_skip_at_or_beyond_take_returns_empty()
+    {
+        // Take(3).Skip(3): the Take window ends exactly where Skip begins → 0 rows.
+        var ids = (await _ctx.Query<PgRow>().OrderBy(r => r.Id).Take(3).Skip(3).ToListAsync())
+            .Select(r => r.Id).ToArray();
+        Assert.Empty(ids);
     }
 
     [Fact]

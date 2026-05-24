@@ -51,27 +51,24 @@ public class LinqSetOpCompositionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_after_Union_throws_with_actionable_rewrite_hint()
+    public async Task Where_after_Union_wraps_in_subquery_and_filters_combined_rows()
     {
-        // Where applied to the unified rows would need a subquery wrap; that's post-v1. We
-        // throw deterministically with a message that names the working alternative.
         var left  = _ctx.Query<ScRow>().Where(r => r.Id <= 2);
         var right = _ctx.Query<ScRow>().Where(r => r.Id >= 4);
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await left.Union(right).Where(r => r.Id != 4).ToListAsync();
-        });
-        Assert.Contains("Union", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var ids = (await left.Union(right).Where(r => r.Id != 4).OrderBy(r => r.Id).ToListAsync())
+                  .Select(r => r.Id).ToArray();
+        Assert.Equal(new[] { 1, 2, 5 }, ids);
     }
 
     [Fact]
-    public async Task Where_pushed_into_each_side_of_Union_works_today()
+    public async Task Where_after_Concat_wraps_in_subquery_and_filters_combined_rows()
     {
-        var left  = _ctx.Query<ScRow>().Where(r => r.Id <= 2 && r.Id != 4);
-        var right = _ctx.Query<ScRow>().Where(r => r.Id >= 4 && r.Id != 4);
-        var ids = (await left.Union(right).OrderBy(r => r.Id).ToListAsync())
+        var left  = _ctx.Query<ScRow>().Where(r => r.Id <= 2);
+        var right = _ctx.Query<ScRow>().Where(r => r.Id >= 3);
+        // Concat preserves duplicates; filter applies to all rows.
+        var ids = (await left.Concat(right).Where(r => r.Id != 3).OrderBy(r => r.Id).ToListAsync())
                   .Select(r => r.Id).ToArray();
-        Assert.Equal(new[] { 1, 2, 5 }, ids);
+        Assert.Equal(new[] { 1, 2, 4, 5 }, ids);
     }
 
     [Fact]
