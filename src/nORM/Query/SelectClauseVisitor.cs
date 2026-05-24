@@ -829,6 +829,27 @@ namespace nORM.Query
                 sb.Append(_provider.GetConcatSql(leftSql, rightSql));
                 return node;
             }
+            // DateTime + TimeSpan / DateTime - TimeSpan -> DateTime. The
+            // TimeSpan operand folds via TryGetConstantValue; emit
+            // strftime + RTRIM to match Microsoft.Data.Sqlite's FFFFFFF
+            // binding so the result round-trips for downstream comparisons.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && QueryTranslator.TryGetConstantValue(node.Right, out var rhsTs)
+                && rhsTs is TimeSpan span)
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var seconds = span.TotalSeconds;
+                if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
+                var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                sb.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
+                  .Append(", '").Append(secondsLiteral).Append(" seconds'), '0'), '.')");
+                return node;
+            }
             // DateTime - DateTime in projection -> TimeSpan. SQL '-' on TEXT
             // columns returns 0 (silent-wrongness); convert via julianday math
             // and tag the column with the marker the materializer recognizes
