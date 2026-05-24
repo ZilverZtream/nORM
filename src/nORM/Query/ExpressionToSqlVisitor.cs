@@ -1119,14 +1119,23 @@ namespace nORM.Query
             }
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            // Separate tempParams dict so subTranslator.Dispose() (which Resets its Parameters)
-            // does not wipe params shared with the outer query. Copy collected params back before dispose.
+            // Both Parameters and CompiledParameters use SEPARATE dicts/lists for the sub-
+            // translator. QueryTranslator.Dispose() calls ParameterManager.Reset() which
+            // Clear()s these collections — sharing them with the outer would wipe the
+            // outer's accumulated params and compiled-param registrations the moment the
+            // sub-translator goes out of `using`. Copy both back before dispose.
             var tempParams = new Dictionary<string, object>();
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
+            var tempCompiled = new List<string>();
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
             foreach (var kvp in tempParams)
                 _params[kvp.Key] = kvp.Value;
+            foreach (var compiled in tempCompiled)
+            {
+                if (!_compiledParams.Contains(compiled))
+                    _compiledParams.Add(compiled);
+            }
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
@@ -1141,11 +1150,17 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             var tempParams = new Dictionary<string, object>();
-            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), _compiledParams, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
+            var tempCompiled = new List<string>();
+            using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
             foreach (var kvp in tempParams)
                 _params[kvp.Key] = kvp.Value;
+            foreach (var compiled in tempCompiled)
+            {
+                if (!_compiledParams.Contains(compiled))
+                    _compiledParams.Add(compiled);
+            }
 
             // Rewrite the entity SELECT into SELECT COUNT(*) by replacing everything before the
             // first ` FROM `. Strip any trailing ORDER BY which is meaningless inside a scalar
@@ -1186,14 +1201,21 @@ namespace nORM.Query
             var mapping = _ctx.GetMapping(rootType);
             var freshCorrelatedForIn = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
             var tempParams = new Dictionary<string, object>();
+            var tempCompiled = new List<string>();
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex,
-                freshCorrelatedForIn, new HashSet<string>(), _compiledParams, _paramMap, 0,
+                freshCorrelatedForIn, new HashSet<string>(), tempCompiled, _paramMap, 0,
                 recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
-            // Copy collected params to outer _params BEFORE subTranslator.Dispose() clears tempParams.
+            // Copy collected params and compiled-param registrations to outer BEFORE
+            // subTranslator.Dispose() clears those collections.
             foreach (var kvp in tempParams)
                 _params[kvp.Key] = kvp.Value;
+            foreach (var compiled in tempCompiled)
+            {
+                if (!_compiledParams.Contains(compiled))
+                    _compiledParams.Add(compiled);
+            }
 
             // SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
             bool isNullable = !value.Type.IsValueType || Nullable.GetUnderlyingType(value.Type) != null;
@@ -1264,16 +1286,23 @@ namespace nORM.Query
             var rootType = GetRootElementType(filteredSource);
             var mapping = _ctx.GetMapping(rootType);
             var existsTempParams = new Dictionary<string, object>();
+            var existsTempCompiled = new List<string>();
             using var existsTranslator = QueryTranslator.Create(
                 _ctx, mapping, existsTempParams, _paramIndex,
                 freshCorrelated, new HashSet<string>(),
-                _compiledParams, _paramMap, 0,
+                existsTempCompiled, _paramMap, 0,
                 recursionDepth: _recursionDepth + 1);
             var existsPlan = existsTranslator.Translate(filteredSource);
             _paramIndex = existsTranslator.ParameterIndex;
-            // Copy collected params to outer _params BEFORE existsTranslator.Dispose() clears existsTempParams.
+            // Copy collected params and compiled-param registrations to outer BEFORE
+            // existsTranslator.Dispose() clears those collections.
             foreach (var kvp in existsTempParams)
                 _params[kvp.Key] = kvp.Value;
+            foreach (var compiled in existsTempCompiled)
+            {
+                if (!_compiledParams.Contains(compiled))
+                    _compiledParams.Add(compiled);
+            }
             _sql.Append("EXISTS(");
             _sql.Append(existsPlan.Sql);
             _sql.Append(")");
