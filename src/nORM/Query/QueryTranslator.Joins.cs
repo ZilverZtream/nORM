@@ -83,6 +83,25 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
+            // Sister of the HandleInnerJoin guard above: `Select(proj).Distinct().GroupJoin(...)`
+            // also needs the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 LEFT
+            // JOIN ...`) that nORM doesn't yet emit. Without it the outer key resolves to an
+            // empty fragment and execution dies inside the group-join materializer with an
+            // opaque "Unexpected error in MaterializeGroupJoin". Surface the same actionable
+            // exception so callers can apply the same Contains / post-join-Distinct rewrite.
+            if (outerQuery is MethodCallExpression outerMce
+                && outerMce.Method.Name == nameof(Queryable.Distinct))
+            {
+                throw new NormUnsupportedFeatureException(
+                    "GroupJoin over a `.Distinct()` outer source isn't supported — nORM doesn't yet emit " +
+                    "the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 LEFT JOIN ...`) " +
+                    "that this shape needs. Workarounds: " +
+                    "(1) materialize the distinct keys first and project the right-side groups via Contains: " +
+                    "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
+                    "then `var rs = await ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync();` " +
+                    "and group client-side with `keys.Select(k => new { k, Rs = rs.Where(r => r.Code == k).ToList() })`; " +
+                    "(2) push the GroupJoin through first and apply DISTINCT to the result.");
+            }
             Visit(outerQuery);
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
