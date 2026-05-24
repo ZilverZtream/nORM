@@ -771,11 +771,12 @@ namespace nORM.Query
                             info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                             _correlatedParams[param] = info;
                         }
-                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
+                        // AddLiteralParameter — see HandleAggregateExpression / OrderByTranslator.
                         foreach (var kvp in visitor.GetParameters())
-                            AddParameter(kvp.Key, kvp.Value);
+                            AddLiteralParameter(kvp.Key, kvp.Value);
                         FastExpressionVisitorPool.Return(visitor);
                         sb.Append(sql).Append(" AS ").Append(_provider.Escape(alias));
                     }
@@ -797,11 +798,13 @@ namespace nORM.Query
                     info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                     _correlatedParams[param] = info;
                 }
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
+                // AddLiteralParameter — window-function value selectors with COALESCE / literal
+                // fallbacks must merge constants the same way as the rest of the family.
                 foreach (var kvp in visitor.GetParameters())
-                    AddParameter(kvp.Key, kvp.Value);
+                    AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(visitor);
                 string defaultSql = string.Empty;
                 if (wf.DefaultValueSelector != null)
@@ -812,11 +815,12 @@ namespace nORM.Query
                         info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                         _correlatedParams[dParam] = info;
                     }
-                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
+                    // AddLiteralParameter — see the value-selector branch above.
                     foreach (var kv in visitor2.GetParameters())
-                        AddParameter(kv.Key, kv.Value);
+                        AddLiteralParameter(kv.Key, kv.Value);
                     FastExpressionVisitorPool.Return(visitor2);
                     defaultSql = $", {defSql}";
                 }

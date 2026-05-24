@@ -30,11 +30,15 @@ namespace nORM.Query
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selectorLambda.Body);
+            // See HandleGroupBy / OrderByTranslator / Join family: literal constants in
+            // an aggregate selector (e.g. `Sum(x => x.Col ?? 0)`) must merge as
+            // AddLiteralParameter so they don't get mis-flagged as compiled-runtime
+            // placeholders and skipped at execution time.
             foreach (var kvp in visitor.GetParameters())
-                AddParameter(kvp.Key, kvp.Value);
+                AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             _isAggregate = true;
             _sql.Clear();
@@ -354,11 +358,12 @@ namespace nORM.Query
                 var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var columnSql = visitor.Translate(selector.Body);
+                // AddLiteralParameter — see HandleAggregateExpression above.
                 foreach (var kvp in visitor.GetParameters())
-                    AddParameter(kvp.Key, kvp.Value);
+                    AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(visitor);
                 _isAggregate = true;
                 _sql.Clear();
