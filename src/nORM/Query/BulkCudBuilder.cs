@@ -396,13 +396,16 @@ namespace nORM.Query
                             ExpressionType.Multiply => "*",
                             ExpressionType.Divide => "/",
                             ExpressionType.Modulo => "%",
+                            // All four supported providers accept native << and >>
+                            // bitshift operators with the same semantics as .NET,
+                            // so emit directly rather than forcing the deprecated
+                            // multiply-rewrite workaround.
+                            ExpressionType.LeftShift => "<<",
+                            ExpressionType.RightShift => ">>",
                             _ => throw new NormUnsupportedFeatureException(
                                 $"Binary operator '{be.NodeType}' has no portable SQL equivalent inside a " +
-                                "SetProperty value expression. For LeftShift / RightShift on integer columns, " +
-                                "rewrite as multiply or divide by a power of 2 (`x * 2` instead of `x << 1`, " +
-                                "`x / 4` instead of `x >> 2`) — the SQL planner produces the same execution " +
-                                "plan and the rewrite works on every provider. For Power, use `Math.Pow(x, n)` " +
-                                "which lowers to the provider's POWER / POW function."),
+                                "SetProperty value expression. For Power, use `Math.Pow(x, n)` which lowers " +
+                                "to the provider's POWER / POW function."),
                         };
                         return $"({Render(be.Left)} {op} {Render(be.Right)})";
 
