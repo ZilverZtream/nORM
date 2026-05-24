@@ -128,6 +128,12 @@ namespace nORM.Query
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
         private GroupJoinInfo? _groupJoinInfo;
+        // GroupJoin's result selector lambda preserved so downstream Where/OrderBy can
+        // expand `r.Member` references back to the underlying outer/group expressions.
+        // _projection isn't used for GroupJoin (it has 2 params and the materializer
+        // uses _groupJoinInfo.ResultSelector — a compiled Func — instead), so we need
+        // a separate channel for ExpandProjection.
+        private LambdaExpression? _groupJoinResultSelector;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;
@@ -236,6 +242,7 @@ namespace nORM.Query
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
                 _groupJoinInfo = null;
+                _groupJoinResultSelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _singleResult = false;
@@ -277,6 +284,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
+                _groupJoinResultSelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _contextStack.Clear();
@@ -1196,6 +1204,7 @@ namespace nORM.Query
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
+                _groupJoinResultSelector = null;
                 _joinCounter = joinStart;
                 _singleResult = false;
                 _noTracking = false;
@@ -1460,6 +1469,18 @@ namespace nORM.Query
                 var body = new nORM.Internal.ParameterReplacer(lambda.Parameters[0], _projection.Body).Visit(lambda.Body)!;
                 body = new ProjectionMemberReplacer().Visit(body);
                 return Expression.Lambda(body, _projection.Parameters);
+            }
+            // GroupJoin's result selector isn't stored in _projection (materialiser
+            // limitation — see HandleGroupJoin), but downstream Where/OrderBy still
+            // need to expand `r.Member` back to the outer/group expressions inside
+            // the selector. Fall through to it here when no regular projection is set.
+            if (_groupJoinResultSelector != null &&
+                lambda.Parameters.Count == 1 &&
+                lambda.Parameters[0].Type == _groupJoinResultSelector.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(lambda.Parameters[0], _groupJoinResultSelector.Body).Visit(lambda.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body);
+                return Expression.Lambda(body, _groupJoinResultSelector.Parameters);
             }
             return lambda;
         }
