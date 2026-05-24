@@ -32,6 +32,9 @@ namespace nORM.Query
             { "SelectMany", new SelectManyTranslator() },
             { "Distinct", new DistinctTranslator() },
             { "DistinctBy", new DistinctByTranslator() },
+            { "ExceptBy", new ExceptByTranslator() },
+            { "IntersectBy", new IntersectByTranslator() },
+            { "UnionBy", new UnionByTranslator() },
             { "Reverse", new ReverseTranslator() },
             { "Union", new SetOperationTranslator() },
             { "Concat", new SetOperationTranslator() },
@@ -757,6 +760,140 @@ namespace nORM.Query
                 t._postMaterializeTransform = Dedupe;
                 return t.Visit(node.Arguments[0]);
             }
+        }
+
+        /// <summary>
+        /// v1 ExceptBy / IntersectBy / UnionBy. All three share the same shape as
+        /// DistinctBy: a compiled key selector wraps a post-materialize transform
+        /// that applies the LINQ set-op semantics in memory. ExceptBy and IntersectBy
+        /// take an <c>IEnumerable&lt;TKey&gt;</c> as the second arg; UnionBy takes an
+        /// <c>IEnumerable&lt;TSource&gt;</c> and appends its by-key-new rows after
+        /// the source.
+        /// </summary>
+        private sealed class ExceptByTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+                => InstallKeyedSetOp(t, node, KeyedSetOp.Except);
+        }
+
+        private sealed class IntersectByTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+                => InstallKeyedSetOp(t, node, KeyedSetOp.Intersect);
+        }
+
+        private sealed class UnionByTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+                => InstallKeyedSetOp(t, node, KeyedSetOp.Union);
+        }
+
+        private enum KeyedSetOp { Except, Intersect, Union }
+
+        private static Expression InstallKeyedSetOp(QueryTranslator t, MethodCallExpression node, KeyedSetOp op)
+        {
+            // node.Arguments: [0] = source IQueryable<TSource>,
+            //                 [1] = second IEnumerable<TKey> (Except/Intersect) or
+            //                       IEnumerable<TSource> (Union),
+            //                 [2] = key selector lambda.
+            if (node.Arguments.Count < 3)
+            {
+                throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"{node.Method.Name} requires a second collection and a key selector."));
+            }
+            var keyLambda = StripQuotes(node.Arguments[2]) as LambdaExpression
+                ?? throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"{node.Method.Name} requires a key selector lambda."));
+
+            var entityType = keyLambda.Parameters[0].Type;
+            var keySelector = CompileKeySelector(keyLambda);
+
+            // Compile a delegate that LAZILY reads the second collection from its
+            // closure access expression. The QueryPlan cache keys by expression
+            // fingerprint -- if we captured the IEnumerable's value at translate
+            // time, repeated calls with different captured collections would reuse
+            // the stale-value transform. Reading live on each transform invocation
+            // mirrors how nORM's CompiledParameters re-extract closure values for
+            // SQL parameters per-call.
+            var secondExpr = node.Arguments[1];
+            // Box to non-generic IEnumerable so the delegate type is fixed regardless
+            // of whether the user passed IEnumerable<TKey> (Except/Intersect) or
+            // IEnumerable<TSource> (Union).
+            Expression secondCast = typeof(System.Collections.IEnumerable).IsAssignableFrom(secondExpr.Type)
+                ? secondExpr
+                : Expression.Convert(secondExpr, typeof(System.Collections.IEnumerable));
+            var secondLookup = Expression.Lambda<Func<System.Collections.IEnumerable?>>(secondCast).Compile();
+
+            System.Collections.IList Transform(System.Collections.IList sourceList)
+            {
+                var second = secondLookup() ?? throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"{op}'s second argument resolved to null at invocation time."));
+
+                // Materialize the second collection's keys for this invocation.
+                //   Except/Intersect -> second is IEnumerable<TKey> directly
+                //   Union            -> second is IEnumerable<TSource>; apply keySelector
+                var secondKeys = new HashSet<object?>();
+                object?[]? unionAppendRows = null;
+                if (op == KeyedSetOp.Union)
+                {
+                    var rows = new List<object?>();
+                    foreach (var item in second)
+                    {
+                        var key = item is null ? null : keySelector(item);
+                        secondKeys.Add(key);
+                        rows.Add(item);
+                    }
+                    unionAppendRows = rows.ToArray();
+                }
+                else
+                {
+                    foreach (var item in second) secondKeys.Add(item);
+                }
+
+                var result = QueryExecutor.CreateList(entityType, sourceList.Count);
+                var seenInResult = new HashSet<object?>();
+                foreach (var item in sourceList)
+                {
+                    var key = item is null ? null : keySelector(item);
+                    bool keep = op switch
+                    {
+                        KeyedSetOp.Except => !secondKeys.Contains(key),
+                        KeyedSetOp.Intersect => secondKeys.Contains(key),
+                        // Union starts by taking source rows; dedupe by key.
+                        KeyedSetOp.Union => true,
+                        _ => true
+                    };
+                    if (keep && seenInResult.Add(key))
+                        result.Add(item);
+                }
+                if (op == KeyedSetOp.Union && unionAppendRows != null)
+                {
+                    foreach (var item in unionAppendRows)
+                    {
+                        var key = item is null ? null : keySelector(item);
+                        if (seenInResult.Add(key))
+                            result.Add(item);
+                    }
+                }
+                return result;
+            }
+
+            t._postMaterializeTransform = Transform;
+            return t.Visit(node.Arguments[0]);
+        }
+
+        private static Func<object, object?> CompileKeySelector(LambdaExpression keyLambda)
+        {
+            var entityType = keyLambda.Parameters[0].Type;
+            var keyType = keyLambda.Body.Type;
+            var entityObjParam = Expression.Parameter(typeof(object), "entity");
+            var castEntity = Expression.Convert(entityObjParam, entityType);
+            var body = new ParameterReplacer(keyLambda.Parameters[0], castEntity).Visit(keyLambda.Body)!;
+            var boxedBody = keyType.IsValueType ? (Expression)Expression.Convert(body, typeof(object)) : body;
+            return Expression.Lambda<Func<object, object?>>(boxedBody, entityObjParam).Compile();
         }
 
         private sealed class JoinTranslator : IMethodCallTranslator
