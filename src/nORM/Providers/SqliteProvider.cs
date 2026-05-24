@@ -403,6 +403,20 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(Enum))
+            {
+                // Mirror ExpressionToSqlVisitor's inline HasFlag emission so the
+                // projection path matches the Where path. enumCol.HasFlag(flag)
+                // -> (col & flag) = flag works for any [Flags] enum with non-
+                // overlapping bit values; multi-bit flag arguments require ALL
+                // bits set (the canonical .NET semantic).
+                return name switch
+                {
+                    nameof(Enum.HasFlag) when args.Length == 2 => $"(({args[0]} & {args[1]}) = {args[1]})",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(char))
             {
                 // Mirror ExpressionToSqlVisitor's BETWEEN-style emission for the
