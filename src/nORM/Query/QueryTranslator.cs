@@ -1494,6 +1494,24 @@ namespace nORM.Query
             return _provider.Escape(alias);
         }
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
+
+        /// <summary>
+        /// Strips an optional <c>.Where(pred)</c> wrap so the nav-aggregate detection paths
+        /// (<see cref="QueryTranslator.OrderByTranslator"/> family) can match
+        /// <c>parent.Items.Sum(...)</c> and <c>parent.Items.Where(p).Sum(...)</c> uniformly.
+        /// Returns the unwrapped <c>MemberExpression</c> for <c>parent.Items</c>, or the
+        /// original input if it doesn't fit the shape.
+        /// </summary>
+        internal static Expression UnwrapNavMember(Expression e)
+        {
+            if (e is MethodCallExpression mc
+                && mc.Method.Name == nameof(Queryable.Where)
+                && mc.Arguments.Count == 2)
+            {
+                return mc.Arguments[0];
+            }
+            return e;
+        }
         private LambdaExpression ExpandProjection(LambdaExpression lambda)
         {
             // Prefer the transparent-identifier lambda when present — that's the one that
