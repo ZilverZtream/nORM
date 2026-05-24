@@ -68,6 +68,19 @@ public class LinqCompiledQueryExpandedParityTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Compiled_query_with_Concat_then_OrderBy_sorts_unified_result()
+    {
+        var compiled = Norm.CompileQuery((DbContext c, string _) =>
+            c.Query<CqAuthor>().Where(a => a.Region == "EU")
+             .Concat(c.Query<CqAuthor>().Where(a => a.Region == "US"))
+             .OrderByDescending(a => a.Id));
+
+        var ids = (await compiled(_ctx, "")).Select(a => a.Id).ToArray();
+        // EU rows: 1,3; US rows: 2,4. UNION ALL preserves both, ORDER BY applies to result.
+        Assert.Equal(new[] { 4, 3, 2, 1 }, ids);
+    }
+
+    [Fact]
     public async Task Compiled_query_with_Concat_runs_UNION_ALL_with_runtime_parameter()
     {
         var compiled = Norm.CompileQuery((DbContext c, string region) =>
