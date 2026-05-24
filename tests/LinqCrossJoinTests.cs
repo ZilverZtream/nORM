@@ -43,6 +43,23 @@ public class LinqCrossJoinTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Cross_product_followed_by_Where_filters_pairs()
+    {
+        // Real bug probe: cross-product + Where applied to the inner-element columns.
+        // If the translator emits the right join + filter, we get just (a,z),(b,z) for
+        // R == "z". A broken materializer would crash with a column-binding cast.
+        var pairs = (await (from l in _ctx.Query<CjLeft>()
+                            from r in _ctx.Query<CjRight>()
+                            where r.R == "z"
+                            select new { L = l.L, R = r.R })
+                           .ToListAsync())
+                   .OrderBy(p => p.L).ToArray();
+        Assert.Equal(2, pairs.Length);
+        Assert.Equal(("a", "z"), (pairs[0].L, pairs[0].R));
+        Assert.Equal(("b", "z"), (pairs[1].L, pairs[1].R));
+    }
+
+    [Fact]
     public async Task Cross_product_returns_every_pair_with_projected_columns()
     {
         var rows = (await (from l in _ctx.Query<CjLeft>()

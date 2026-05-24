@@ -207,9 +207,19 @@ namespace nORM.Query
                     // Don't call base.VisitMember — it would visit the parameter and add all entity columns
                     return node;
                 }
+                else if (node.Expression is MemberExpression innerMember
+                    && innerMember.Expression is ParameterExpression
+                    && TryAddMemberColumn(innerMember.Type, node.Member.Name))
+                {
+                    // Nested access of the form `transparentId.entity.Column`. The inner
+                    // member resolves to a mapped entity (outer or inner of the join), and
+                    // the leaf member is one of its columns. Add JUST that column instead
+                    // of falling through to TryAddFullEntity which would pull every column.
+                    return node;
+                }
                 else if (node.Expression is MemberExpression || node.Expression is NewExpression || node.Expression is MemberInitExpression)
                 {
-                    // Nested member access: transparentId.x.Name or anonymous type chains
+                    // Nested member access on something more complex than transparent_id.entity.col
                     Visit(node.Expression);
                     // If the leaf resolves to an entity type, include its columns
                     TryAddFullEntity(node.Type);
