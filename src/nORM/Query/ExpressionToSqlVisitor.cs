@@ -736,6 +736,22 @@ namespace nORM.Query
                 _sql.Append(_provider.GetToStringSql(inner));
                 return node;
             }
+
+            // enum.HasFlag(other) — lower to `(col & other) = other`. Preserves .NET semantics
+            // (true only when every bit of `other` is set in receiver). The receiver must be
+            // an enum instance; we don't filter by [Flags] attribute because the runtime
+            // doesn't either — HasFlag works on any Enum and is the natural shape for
+            // bit-tested permission columns.
+            if (node.Method.Name == nameof(Enum.HasFlag)
+                && node.Arguments.Count == 1
+                && node.Object != null
+                && node.Object.Type.IsEnum)
+            {
+                var receiverSql = GetSql(node.Object);
+                var flagSql = GetSql(node.Arguments[0]);
+                _sql.Append('(').Append(receiverSql).Append(" & ").Append(flagSql).Append(") = ").Append(flagSql);
+                return node;
+            }
             if (!IsTranslatableMethod(node.Method))
                 // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
                 // The {0} argument below is a detail message, not a duplicate prefix.
