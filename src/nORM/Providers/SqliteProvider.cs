@@ -250,6 +250,11 @@ namespace nORM.Providers
             {
                 return name switch
                 {
+                    // String indexer s[i] compiles to String.get_Chars(i). Mirror
+                    // ExpressionToSqlVisitor's lowering to SUBSTR(s, i+1, 1) so the
+                    // projection path -- which routes through TranslateFunction --
+                    // gets the same one-char extraction the Where path gets.
+                    "get_Chars" when args.Length == 2 => $"SUBSTR({args[0]}, ({args[1]}) + 1, 1)",
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
@@ -387,6 +392,24 @@ namespace nORM.Providers
                     // returns an empty string which CASTs to 0 anyway but the CASE
                     // makes the intent explicit.
                     nameof(TimeSpan.TotalMilliseconds) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) * 1000.0 + CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10) AS REAL) / 10000.0 ELSE 0 END)",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(char))
+            {
+                // Mirror ExpressionToSqlVisitor's BETWEEN-style emission for the
+                // common char.IsX validators so projection (which routes through
+                // TranslateFunction) gets identical SQL to the Where path. Without
+                // this branch, SelectClauseVisitor falls through to its generic
+                // function-name handler and emits raw "ISDIGIT(...)" -- a SQLite
+                // 'no such function' error. ASCII-only ranges match the Where
+                // implementation note (no portable Unicode L*).
+                return name switch
+                {
+                    nameof(char.IsDigit) when args.Length == 1 => $"({args[0]} BETWEEN '0' AND '9')",
+                    nameof(char.IsLetter) when args.Length == 1 => $"(({args[0]} BETWEEN 'A' AND 'Z') OR ({args[0]} BETWEEN 'a' AND 'z'))",
+                    nameof(char.IsWhiteSpace) when args.Length == 1 => $"({args[0]} = ' ' OR {args[0]} = CHAR(9) OR {args[0]} = CHAR(10) OR {args[0]} = CHAR(13))",
                     _ => null
                 };
             }
