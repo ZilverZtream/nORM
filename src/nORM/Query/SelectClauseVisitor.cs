@@ -241,6 +241,36 @@ namespace nORM.Query
                 }
             }
 
+            // numeric.ToString(formatString) -- the most-common case is a fixed-
+            // decimal "F<N>" / "f<N>" format like Score.ToString("F2") for currency
+            // / report rendering. SQLite has printf('%.<N>f', col); other providers
+            // expose similar primitives. Detect the constant format string at
+            // translation time, route to printf when it matches F<N>, otherwise
+            // throw with the supported-subset hint so users get a clear error
+            // rather than a silent CAST that drops the format.
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 1
+                && node.Object != null
+                && node.Object.Type != typeof(string)
+                && node.Arguments[0].Type == typeof(string))
+            {
+                if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var rawFmt)
+                    && rawFmt is string fmt
+                    && fmt.Length >= 2
+                    && (fmt[0] == 'F' || fmt[0] == 'f')
+                    && int.TryParse(fmt.AsSpan(1), out var digits)
+                    && digits >= 0 && digits <= 17)
+                {
+                    var recvSql = TranslateProjectionArg(node.Object);
+                    sb.Append("printf('%.").Append(digits).Append("f', ").Append(recvSql).Append(')');
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"Numeric ToString(\"{node.Arguments[0]}\") format is not supported in projection. " +
+                    "Supported subset: \"F<N>\" / \"f<N>\" fixed-decimal (e.g. \"F2\"). For other formats, " +
+                    "project the numeric value and apply the format after materialization.");
+            }
+
             // No-arg ToString() on a non-string receiver -- lower to the provider's
             // CAST AS TEXT for primitives, or CASE-WHEN-per-name for enums. Mirrors
             // ExpressionToSqlVisitor's matching handlers so projection and predicate

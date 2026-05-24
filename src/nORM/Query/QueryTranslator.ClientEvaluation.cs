@@ -122,6 +122,18 @@ namespace nORM.Query
                 {
                     return base.VisitMethodCall(node);
                 }
+                // numeric.ToString(formatString) -- admit so the per-visitor handler
+                // can map fixed-decimal "F<N>" formats to printf('%.<N>f', col).
+                // Other format strings still throw inside the visitor with the
+                // supported-subset hint.
+                if (node.Method.Name == nameof(object.ToString)
+                    && node.Arguments.Count == 1
+                    && node.Object != null
+                    && node.Object.Type != typeof(string)
+                    && node.Arguments[0].Type == typeof(string))
+                {
+                    return base.VisitMethodCall(node);
+                }
 
                 // Check if provider can translate this function. Build placeholder args of
                 // the correct arity so the provider's arity-guarded switches (e.g.
