@@ -131,6 +131,20 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Predicate-overload of <see cref="CountAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>CountAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).CountAsync()</c>. Lowered to the same Where + Count pipeline
+        /// internally so the e438a53 SelectMany+Count silent-wrongness fix applies uniformly.
+        /// </summary>
+        public static Task<int> CountAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return CountAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Counts rows in a nORM query asynchronously and returns a 64-bit total — use when the
         /// expected row count may exceed Int32.MaxValue.
         /// </summary>
