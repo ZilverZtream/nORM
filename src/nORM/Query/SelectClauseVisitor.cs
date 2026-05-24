@@ -147,6 +147,26 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // No-arg ToString() on a non-string, non-enum receiver -- lower to the
+            // provider's CAST AS TEXT. Mirror of ExpressionToSqlVisitor's ~line 860
+            // handler so users can write Select(p => p.Age.ToString()) without
+            // hitting the client-eval guard. Skipping string (identity) and enum
+            // (would emit underlying-int text "0"/"1" rather than the enum names
+            // users expect -- that's intentionally a client-eval shape).
+            if (node.Method.Name == nameof(object.ToString)
+                && node.Arguments.Count == 0
+                && node.Object != null
+                && node.Object.Type != typeof(string)
+                && !(Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type).IsEnum)
+            {
+                var receiverStart = sb.Length;
+                Visit(node.Object);
+                var receiverSql = sb.ToString(receiverStart, sb.Length - receiverStart);
+                sb.Length = receiverStart;
+                sb.Append(_provider.GetToStringSql(receiverSql));
+                return node;
+            }
+
             // `parent.Children.Count()` (or Any/All/LongCount) inside a Select projection.
             // ExpressionToSqlVisitor recognises this shape and rewrites it into a correlated
             // subquery (`(SELECT COUNT(*) FROM Child WHERE Child.FK = parent.PK)`), but this
