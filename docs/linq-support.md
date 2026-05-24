@@ -26,7 +26,7 @@ Status values:
 | `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. `string.Format`/interpolated strings/enum `.ToString()` fall into this path. |
 | `OrderBy`, `ThenBy` | Supported | Including the `Descending` variants. Provider-specific identifier escaping and expression translation apply. |
 | `Reverse` | Supported | Flips the active ORDER BY direction at the SQL layer. |
-| `Skip`, `Take` | Supported | Provider-specific paging. `Skip(n).Take(m)` is the canonical pagination shape. Constraint: `Take(n).Skip(m)` currently treats the two operations commutatively; the wrap-in-subquery form is post-v1. |
+| `Skip`, `Take` | Supported | Provider-specific paging. `Skip(n).Take(m)` is the canonical pagination shape. `Take(n).Skip(m)` throws `NormUnsupportedFeatureException` with an actionable message — the subquery-wrap implementation is post-v1; rewrite as `Skip(m).Take(n)`. |
 | `Distinct` | Supported | Applies to the projected SQL shape. |
 | `Count`, `LongCount`, `Any`, `All` | Supported | Includes predicate overloads and short-circuiting AND/OR. |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | Supported | Emit correlated `EXISTS` / `NOT EXISTS` / scalar `(SELECT COUNT(*) ...)` subqueries against the dependent table. |

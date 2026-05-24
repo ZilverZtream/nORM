@@ -372,6 +372,17 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
+                // Take-then-Skip needs a subquery wrap to honor LINQ semantics (take N first,
+                // then skip M of those). The current flat OFFSET / LIMIT form would silently
+                // collapse to the Skip-then-Take meaning. Fail deterministically until the
+                // subquery-wrap pipeline lands — Skip-then-Take is the documented form.
+                if (t._take.HasValue || t._takeParam != null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Take(n).Skip(m) requires a subquery wrap to preserve LINQ semantics and is not " +
+                        "currently supported. Rewrite as Skip(m).Take(n) (the standard pagination form), " +
+                        "or compose the Take in an inner query that materializes first.");
+                }
                 if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
                 {
                     t._skipParam = sName;
