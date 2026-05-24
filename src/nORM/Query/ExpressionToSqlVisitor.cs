@@ -851,6 +851,50 @@ namespace nORM.Query
             AppendConstant(node.Value, node.Type);
             return node;
         }
+
+        // Fold a NewExpression whose arguments are all compile-time constants
+        // (or evaluate to constants via Expression.Lambda().Compile()) into a
+        // single bound parameter at translation time. Without this, an inline
+        // `new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)` on the RHS of
+        // a Where comparison emits the raw constructor argument list as bound
+        // parameters into the SQL ("col > @p0, @p1, @p2, ..."), producing
+        // SQLite syntax errors. The same applies to user-defined value types
+        // with constant args.
+        protected override Expression VisitNew(NewExpression node)
+        {
+            if (node.Type == typeof(string)) return base.VisitNew(node);
+            foreach (var a in node.Arguments)
+            {
+                if (a is not ConstantExpression && !TryGetConstantValue(a, out _))
+                    return base.VisitNew(node);
+            }
+            try
+            {
+                var lambda = System.Linq.Expressions.Expression.Lambda(node).Compile();
+                var value = lambda.DynamicInvoke();
+                AppendConstant(value, node.Type);
+                return node;
+            }
+            catch
+            {
+                return base.VisitNew(node);
+            }
+        }
+
+        private static bool TryGetConstantValue(Expression expr, out object? value)
+        {
+            value = null;
+            if (expr is ConstantExpression c) { value = c.Value; return true; }
+            try
+            {
+                value = System.Linq.Expressions.Expression.Lambda(expr).Compile().DynamicInvoke();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
         protected override Expression VisitParameter(ParameterExpression node)
         {
             // SelectTranslator rewrites `GroupBy(k).Select(g => proj)` into a 3-arg
