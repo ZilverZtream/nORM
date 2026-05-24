@@ -259,6 +259,29 @@ namespace nORM.Query
             }
             fallthrough:
 
+            // Scalar/named functions on known static surfaces (Math.Abs, Math.Min,
+            // DateTime.AddDays, Convert.ToInt32, NormFunctions.ILike, etc.). The
+            // Queryable-aggregate fall-through below hard-assumes the 2-arg
+            // (source, selector-lambda) shape used by Sum/Min/Max/Count, so without
+            // this routing `Math.Abs(p.Score)` emits `ABS(*)` and `Math.Min(p.A, p.B)`
+            // throws "Expected a lambda expression as argument 1 of 'Min'".
+            // Enumerable/Queryable are excluded so the aggregate path still handles
+            // grouping-aggregate calls.
+            var declType = node.Method.DeclaringType;
+            if (declType != null && declType != typeof(Enumerable) && declType != typeof(Queryable))
+            {
+                var fnArgs = new string[node.Arguments.Count + (node.Object != null ? 1 : 0)];
+                int fnIdx = 0;
+                if (node.Object != null) fnArgs[fnIdx++] = TranslateProjectionArg(node.Object);
+                foreach (var a in node.Arguments) fnArgs[fnIdx++] = TranslateProjectionArg(a);
+                var fnSql = _provider.TranslateFunction(node.Method.Name, declType, fnArgs);
+                if (fnSql != null)
+                {
+                    sb.Append(fnSql);
+                    return node;
+                }
+            }
+
             sb.Append(methodNameUpper).Append('(');
             if (node.Arguments.Count > 1)
             {
