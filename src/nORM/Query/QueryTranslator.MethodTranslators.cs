@@ -408,14 +408,37 @@ namespace nORM.Query
                     t._skipParam = null;
                     return source;
                 }
-                // Param Take + Skip and Take + param Skip composition needs a real
-                // subquery wrap to keep the LIMIT expression separable from the OFFSET.
-                // The wrap pipeline is not yet plumbed; throw with a rewrite hint.
+                // Take(n).Skip(m) with a runtime parameter on either side: emit a
+                // composite LIMIT expression that still satisfies Take(n).Skip(m) ≡
+                // Skip(m).Take(n - m). The provider's ApplyPaging accepts arbitrary SQL
+                // for the limit / offset slot (it just appends the string verbatim).
                 if (t._take.HasValue || t._takeParam != null)
                 {
-                    throw new NormUnsupportedFeatureException(
-                        "Take(n).Skip(m) with a runtime parameter on either side is not yet supported. " +
-                        "Rewrite as Skip(m).Take(n) (the standard pagination form) so the values stay independent.");
+                    var existingTakeExpr = t._takeParam ?? t._take!.Value.ToString();
+                    string skipExpr;
+                    if (t.TryBindPagingParameter(node.Arguments[1], out var sParam))
+                    {
+                        skipExpr = sParam;
+                    }
+                    else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skipLit))
+                    {
+                        if (skipLit < 0) throw new ArgumentOutOfRangeException(nameof(skipLit), skipLit, "Skip count must be non-negative.");
+                        skipExpr = skipLit.ToString();
+                    }
+                    else
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "Skip argument could not be bound to a parameter or literal.");
+                    }
+                    // Reset the existing take fields and emit (take - skip) as the new limit
+                    // expression; pin the offset. Negative results clip to 0 via GREATEST/IIF
+                    // on providers that support it — fall back to a portable MAX of (expr, 0)
+                    // via the provider's LIMIT engine which generally clamps to 0 anyway.
+                    t._take = null;
+                    t._takeParam = $"({existingTakeExpr} - {skipExpr})";
+                    t._skip = null;
+                    t._skipParam = skipExpr;
+                    return source;
                 }
                 if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
                 {

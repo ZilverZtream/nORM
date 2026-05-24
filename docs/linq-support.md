@@ -26,7 +26,7 @@ Status values:
 | `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. `string.Format`/interpolated strings/enum `.ToString()` fall into this path. |
 | `OrderBy`, `ThenBy` | Supported | Including the `Descending` variants. Provider-specific identifier escaping and expression translation apply. |
 | `Reverse` | Supported | Flips the active ORDER BY direction at the SQL layer. |
-| `Skip`, `Take` | Supported | Provider-specific paging. `Skip(m).Take(n)` is the canonical pagination shape. `Take(n).Skip(m)` with literal counts is rewritten algebraically to `Skip(m).Take(n - m)` and returns rows [m, n). When either count is a runtime parameter (rare), the composition still throws with a rewrite hint until the subquery-wrap pipeline lands. |
+| `Skip`, `Take` | Supported | Provider-specific paging. `Skip(m).Take(n)` is the canonical pagination shape. `Take(n).Skip(m)` works with both literal counts (rewritten algebraically to `Skip(m).Take(n - m)`) and runtime parameters (emits `LIMIT (@take - @skip) OFFSET @skip` so the runtime values still produce the [skip, take) window). |
 | `Distinct` | Supported | Applies to the projected SQL shape. |
 | `Count`, `LongCount`, `Any`, `All` | Supported | Includes predicate overloads and short-circuiting AND/OR. |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | Supported | Emit correlated `EXISTS` / `NOT EXISTS` / scalar `(SELECT COUNT(*) ...)` subqueries against the dependent table. |

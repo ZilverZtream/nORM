@@ -459,8 +459,17 @@ namespace nORM.Providers
         /// <exception cref="ArgumentException">Thrown when the prefix is missing.</exception>
         protected void EnsureValidParameterName(string? parameterName, string argumentName)
         {
-            if (parameterName != null && !parameterName.StartsWith(ParamPrefix, StringComparison.Ordinal))
-                throw new ArgumentException($"Parameter name must start with '{ParamPrefix}'", argumentName);
+            if (parameterName == null) return;
+            // Translators may pass a composed paging expression like `(@p0 - @p1)` or
+            // `(@p0 + 5)` when chaining Take/Skip/ElementAt; allow either a bare parameter
+            // reference OR an expression that starts with an opening paren and contains a
+            // parameter reference. Reject anything else to keep raw SQL injection out of
+            // ApplyPaging.
+            if (parameterName.StartsWith(ParamPrefix, StringComparison.Ordinal))
+                return;
+            if (parameterName.Length > 0 && parameterName[0] == '(' && parameterName.Contains(ParamPrefix, StringComparison.Ordinal))
+                return;
+            throw new ArgumentException($"Parameter name must start with '{ParamPrefix}' or be a translator-built composite expression containing one.", argumentName);
         }
 
         /// <summary>
