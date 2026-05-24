@@ -113,16 +113,34 @@ namespace nORM.Query
                     if (i > 0) sb.Append(", ");
                     sb.Append(_groupBy[i]);
                 }
+                return node;
             }
-            else
+
+            if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
             {
-                if (!_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
-                    throw new InvalidOperationException(
-                        $"Member '{node.Member.Name}' on type '{node.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
-                        $"Ensure the property is read/write and not a navigation collection.");
                 sb.Append(col.EscCol);
+                return node;
             }
-            return node;
+
+            // Member on a non-entity type (DateTime.Year, string.Length, TimeSpan.TotalHours,
+            // etc.) — route through the provider's function map the same way
+            // ExpressionToSqlVisitor does on the WHERE side. Without this, projection emits
+            // "Member 'Year' on type 'DateTime' is not mapped to a column" even though the
+            // WHERE side happily accepts the same expression.
+            if (node.Expression != null && node.Member.DeclaringType != null)
+            {
+                var exprSql = TranslateProjectionArg(node.Expression);
+                var fn = _provider.TranslateFunction(node.Member.Name, node.Member.DeclaringType, exprSql);
+                if (fn != null)
+                {
+                    sb.Append(fn);
+                    return node;
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"Member '{node.Member.Name}' on type '{node.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
+                $"Ensure the property is read/write and not a navigation collection.");
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
