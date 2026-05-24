@@ -68,38 +68,34 @@ public class LinqWhereDateTimeDayOfWeekTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_with_DayOfWeek_equals_Saturday_either_translates_or_throws_actionable_error()
+    public async Task Where_with_DayOfWeek_equals_Saturday_returns_only_saturday_rows_strictly()
     {
-        // Probe: keep rows where Stamp.DayOfWeek == Saturday. Expected: Id 6
-        // (2026-01-10 is a Saturday).
-        // Silent-wrongness shapes the probe catches:
+        // Originally pinned as throw-or-correct; SqliteProvider has the
+        // strftime('%w', col) cast for DateTime.DayOfWeek so the Where path
+        // already translates. Strict assertion: Id 6 (2026-01-10) is the
+        // Saturday row.
+        // Silent-wrongness probes that strict still catches:
         //   * dropped predicate -> all 7 rows
         //   * Sunday confused with Saturday -> Id 7
         //   * predicate dropped silently to no-op -> 0 rows
-        System.Exception? ex = null;
-        int[]? matched = null;
-        try
-        {
-            var result = await _ctx.Query<WdwItem>()
-                .Where(r => r.Stamp.DayOfWeek == DayOfWeek.Saturday)
-                .OrderBy(r => r.Id)
-                .ToListAsync();
-            matched = result.Select(r => r.Id).ToArray();
-        }
-        catch (System.Exception caught)
-        {
-            ex = caught;
-        }
+        var result = await _ctx.Query<WdwItem>()
+            .Where(r => r.Stamp.DayOfWeek == DayOfWeek.Saturday)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 6 }, result.Select(r => r.Id).ToArray());
+    }
 
-        if (ex != null)
-        {
-            Assert.True(
-                ex is NormException || ex is System.InvalidOperationException || ex is System.NotSupportedException,
-                $"DateTime.DayOfWeek threw an unfriendly error: {ex.GetType().FullName}: {ex.Message}");
-            return;
-        }
-
-        Assert.Equal(new[] { 6 }, matched);
+    [Fact]
+    public async Task Where_with_DayOfWeek_in_workdays_returns_monday_through_friday_rows()
+    {
+        // Additional coverage: DayOfWeek with an inequality range. Workdays
+        // are DayOfWeek 1..5 (Mon..Fri). Ids 1..5 in the fixed-week dataset.
+        var result = await _ctx.Query<WdwItem>()
+            .Where(r => r.Stamp.DayOfWeek >= DayOfWeek.Monday
+                     && r.Stamp.DayOfWeek <= DayOfWeek.Friday)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]
