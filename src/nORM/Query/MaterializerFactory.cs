@@ -1378,6 +1378,12 @@ namespace nORM.Query
         private static readonly MethodInfo _convertToTimeOnlyMethod =
             typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeOnly), BindingFlags.Public | BindingFlags.Static)!;
 
+        private static readonly MethodInfo _convertToDateTimeOffsetMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToDateTimeOffset), BindingFlags.Public | BindingFlags.Static)!;
+
+        private static readonly MethodInfo _convertToTimeSpanMethod =
+            typeof(MaterializerFactory).GetMethod(nameof(ConvertToTimeSpan), BindingFlags.Public | BindingFlags.Static)!;
+
         private static Expression GetOptimizedReaderCall(ParameterExpression reader, Type propertyType, int index)
         {
             var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
@@ -1402,6 +1408,17 @@ namespace nORM.Query
                 // MM1 fix: TimeOnly — Convert.ChangeType and Expression.Convert don't support TimeOnly
                 var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
                 call = Expression.Call(_convertToTimeOnlyMethod, getRawValue);
+            }
+            else if (underlyingType == typeof(DateTimeOffset))
+            {
+                // SQLite stores DateTimeOffset as TEXT; cast(object→DateTimeOffset) cannot parse it.
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(_convertToDateTimeOffsetMethod, getRawValue);
+            }
+            else if (underlyingType == typeof(TimeSpan))
+            {
+                var getRawValue = Expression.Call(reader, Methods.GetValue, Expression.Constant(index));
+                call = Expression.Call(_convertToTimeSpanMethod, getRawValue);
             }
             else
             {
