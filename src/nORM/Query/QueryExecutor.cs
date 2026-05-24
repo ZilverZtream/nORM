@@ -231,6 +231,16 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
+                if (plan.PostMaterializeTransform != null)
+                {
+                    // This path is strongly typed as List<object> for the projection
+                    // materializer; rebuild rather than reassign so callers still get
+                    // a List<object> rather than the transform's element-typed list.
+                    var transformed = plan.PostMaterializeTransform(list);
+                    var rebuilt = new List<object>(transformed.Count);
+                    foreach (var item in transformed) rebuilt.Add(item!);
+                    list = rebuilt;
+                }
                 return list;
             }
             catch (Exception ex)
@@ -337,6 +347,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
                 return list;
             }
             catch (Exception ex)
@@ -434,6 +445,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
                 return list;
             }
             catch (Exception ex)
