@@ -1315,7 +1315,16 @@ namespace nORM.Query
                         break;
                 }
             }
-            if (node.Method.Name == nameof(List<int>.Contains))
+            // Treat Dictionary<K,V>.ContainsKey(k) as Keys.Contains(k): same LINQ
+            // semantics, same IN-clause SQL emit, but we must walk just the keys
+            // (not the dictionary's KeyValuePair enumeration which would compare
+            // KVP instances to a K value and never match).
+            var isContainsKey = node.Method.Name == "ContainsKey"
+                && node.Object != null
+                && node.Arguments.Count == 1
+                && node.Method.DeclaringType is { } dictDt
+                && IsDictionaryLikeReceiver(dictDt);
+            if (node.Method.Name == nameof(List<int>.Contains) || isContainsKey)
             {
                 Expression? collectionExpr = null;
                 Expression? valueExpr = null;
@@ -1335,7 +1344,9 @@ namespace nORM.Query
                 if (collectionExpr != null && valueExpr != null && TryGetConstantValue(collectionExpr, out var colVal) && colVal is IEnumerable en && colVal is not string)
                 {
                     var items = new List<object?>();
-                    foreach (var item in en)
+                    var keysOnly = isContainsKey && colVal is System.Collections.IDictionary;
+                    var keySource = keysOnly ? ((System.Collections.IDictionary)colVal).Keys : en;
+                    foreach (var item in keySource)
                         items.Add(item);
                     if (items.Count == 0)
                     {
@@ -1907,6 +1918,15 @@ namespace nORM.Query
             {
                 return true;
             }
+            // Dictionary<K,V>.ContainsKey(k) -- treated as Keys.Contains(k) by the
+            // handler around line 1318 once admitted here.
+            if (method.Name == "ContainsKey"
+                && method.GetParameters().Length == 1
+                && method.DeclaringType is { } dictDt
+                && IsDictionaryLikeReceiver(dictDt))
+            {
+                return true;
+            }
             if (method.DeclaringType == null || !s_safeDeclaringTypes.Contains(method.DeclaringType))
                 return false;
             // System.Convert.ToString is intentionally translatable as CAST(... AS TEXT);
@@ -1930,6 +1950,18 @@ namespace nORM.Query
                     if (def == typeof(ICollection<>) || def == typeof(IEnumerable<>))
                         return true;
                 }
+            }
+            return false;
+        }
+
+        private static bool IsDictionaryLikeReceiver(Type t)
+        {
+            if (typeof(System.Collections.IDictionary).IsAssignableFrom(t))
+                return true;
+            foreach (var i in t.GetInterfaces())
+            {
+                if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+                    return true;
             }
             return false;
         }
@@ -1962,6 +1994,13 @@ namespace nORM.Query
                 && node.Method.DeclaringType is { } dt
                 && dt != typeof(string)
                 && IsTranslatableContainsReceiver(dt))
+            {
+                return false;
+            }
+            if (node.Method.Name == "ContainsKey"
+                && node.Method.GetParameters().Length == 1
+                && node.Method.DeclaringType is { } dictDt
+                && IsDictionaryLikeReceiver(dictDt))
             {
                 return false;
             }
