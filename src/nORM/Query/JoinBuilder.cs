@@ -348,13 +348,20 @@ namespace nORM.Query
     string joinType,
     string outerKeySql,
     string innerKeySql,
-    string? orderBy = null)
+    string? orderBy = null,
+    bool distinct = false)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
             joinSql.Reserve(estimatedSize);
 
             joinSql.AppendSelect(System.ReadOnlySpan<char>.Empty);
+            // The join SELECT lives in the same buffer that the outer Build() prefix-insert
+            // path checks via `_sql.Length == 0`. Because we wrote SELECT here ourselves,
+            // that path skips and the `_isDistinct` flag never makes it into the SQL —
+            // emit DISTINCT inline before the column list when the caller requests it.
+            if (distinct)
+                joinSql.Append("DISTINCT ");
             bool wroteAny = false;
 
             if (projection?.Body is System.Linq.Expressions.NewExpression newExpr)
