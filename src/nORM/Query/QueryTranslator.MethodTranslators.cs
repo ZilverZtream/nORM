@@ -145,7 +145,15 @@ namespace nORM.Query
                 {
                     lambda = t.ExpandProjection(lambda);
                     var param = lambda.Parameters[0];
-                    var isGrouping = node.Arguments[0] is MethodCallExpression mc && mc.Method.Name == "GroupBy";
+                    // Any grouped source produces a HAVING clause, not a WHERE — covers both
+                    // the direct shape `GroupBy(k).Where(g => g.Sum(...) > N)` AND the
+                    // common shape with an intermediate projection,
+                    // `GroupBy(k).Select(g => new { Key, Total=g.Sum(...) }).Where(x => x.Total > N)`.
+                    // After ExpandProjection the latter's lambda parameter becomes the IGrouping
+                    // `g`, so RegisterGroupingKey + the visitor's existing aggregate-on-grouping
+                    // path emit `HAVING SUM(...) > @p0`. Detecting on `_groupBy.Count` instead of
+                    // the source method's name is required because the source is `Select` here.
+                    var isGrouping = t._groupBy.Count > 0;
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
                         info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
@@ -158,7 +166,15 @@ namespace nORM.Query
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     if (isGrouping)
                     {
-                        visitor.RegisterGroupingKey(param, PooledStringBuilder.Join(t._groupBy));
+                        // SelectTranslator rewrites `GroupBy(k).Select(g => proj)` into a 3-arg
+                        // `GroupBy(k, (k, gs) => proj)`, so _projection (and the expanded lambda)
+                        // can have TWO parameters: the key `k` and the group `gs`. The body's
+                        // aggregate calls (`gs.Sum(...)`) reference `gs`, not `k` — register
+                        // every parameter as a grouping key so the visitor's aggregate-detection
+                        // path (line 1260) fires for whichever parameter the body actually uses.
+                        var groupBySql = PooledStringBuilder.Join(t._groupBy);
+                        foreach (var p in lambda.Parameters)
+                            visitor.RegisterGroupingKey(p, groupBySql);
                     }
                     var sql = visitor.Translate(lambda.Body);
                     var target = isGrouping ? t._having : t._where;
