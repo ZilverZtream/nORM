@@ -73,19 +73,19 @@ public class LinqProjectionStringPlusIntCoercionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Select_with_int_ToString_in_projection_currently_fails_fast_with_actionable_error()
+    public async Task Select_with_int_ToString_in_projection_concatenates_via_CAST_AS_TEXT()
     {
-        // Documents the current state: int.ToString() in a projection
-        // isn't in the translator's surface and routes through the
-        // client-eval guard. Counter-intuitive given the implicit form
-        // works -- pin the current contract so a future translator
-        // extension that adds ToString() support can tighten this from
-        // throws-actionable-error to returns-concatenated.
-        await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-            await _ctx.Query<PspiPerson>()
-                .OrderBy(p => p.Id)
-                .Select(p => p.First + p.Age.ToString())
-                .ToListAsync());
+        // Companion of the implicit pin above. Originally documented the
+        // throw as the current contract -- subsequently fixed by extending
+        // TranslatabilityAnalyzer + SelectClauseVisitor with no-arg ToString()
+        // -> provider CAST AS TEXT. Both implicit (p.First + p.Age) and
+        // explicit (p.First + p.Age.ToString()) now produce identical
+        // results.
+        var result = await _ctx.Query<PspiPerson>()
+            .OrderBy(p => p.Id)
+            .Select(p => p.First + p.Age.ToString())
+            .ToListAsync();
+        Assert.Equal(new[] { "Ada42", "Grace85", "Alan41" }, result.ToArray());
     }
 
     [Table("PspiPerson")]
