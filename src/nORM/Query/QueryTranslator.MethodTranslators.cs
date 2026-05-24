@@ -118,6 +118,22 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Where after a set-op (Union / Concat / Intersect / Except) would generate
+                // `<set-op SQL> WHERE ...`, which most databases parse as "apply WHERE to the
+                // right side only" — not what LINQ semantics want. The subquery-wrap pipeline
+                // for the unified row shape is post-v1; throw deterministically with an
+                // actionable rewrite suggestion instead of letting invalid SQL hit the
+                // database.
+                if (node.Arguments[0] is MethodCallExpression setOpSource
+                    && setOpSource.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"Where applied AFTER {setOpSource.Method.Name} is not currently supported " +
+                        "(post-v1 work). Push the predicate into each side of the set operation " +
+                        $"(e.g. a.Where(p).{setOpSource.Method.Name}(b.Where(p))) or materialize " +
+                        "the union first.");
+                }
+
                 var source = t.Visit(node.Arguments[0]);
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
