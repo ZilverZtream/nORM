@@ -162,6 +162,14 @@ namespace nORM.Query
         private int? _skip { get => _clauses.Skip; set => _clauses.Skip = value; }
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
         private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
+        // True when _take was set by a terminal operator (First / FirstOrDefault / Single /
+        // SingleOrDefault / Last / LastOrDefault / ElementAt / ElementAtOrDefault) rather
+        // than by a user-facing Take()/Skip(). Used by the post-Take/Skip silent-wrongness
+        // pin family (bca0523 / 47acc83 / 54c16ae / 4fcd795 / c2cce55 / 3427495 / 3716e13 /
+        // f0ccf06 / b4f5ae4) to AVOID false-positives on `q.OrderBy(k).First()` —
+        // ordering BEFORE a terminal LIMIT is correct, and only ordering AFTER a USER
+        // Take/Skip is the silent-wrongness shape the pins guard.
+        private bool _takeSetByTerminal { get => _clauses.TakeSetByTerminal; set => _clauses.TakeSetByTerminal = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());

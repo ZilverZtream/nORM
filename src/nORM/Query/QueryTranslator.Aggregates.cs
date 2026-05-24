@@ -68,7 +68,7 @@ namespace nORM.Query
             // LIMIT truncates the resulting groups. LINQ semantics for `q.Take(3).GroupBy(...)`
             // require grouping ONLY the windowed 3 rows. SQL needs a subquery wrap
             // (`SELECT … FROM (… LIMIT n) GROUP BY col`) that nORM doesn't yet emit.
-            if (_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null)
+            if ((_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null) && !_takeSetByTerminal)
             {
                 throw new NormUnsupportedFeatureException(
                     "GroupBy applied after Take or Skip would silently group the full table — the " +
@@ -499,7 +499,7 @@ namespace nORM.Query
             // aggregate the full table and LIMIT the scalar result row, returning the
             // wrong number. Detect and throw with the materialize-then-aggregate
             // workaround.
-            if (_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null)
+            if ((_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null) && !_takeSetByTerminal)
             {
                 var aggName = node.Method.Name;
                 throw new NormUnsupportedFeatureException(

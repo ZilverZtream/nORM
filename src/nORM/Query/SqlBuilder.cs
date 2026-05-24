@@ -20,6 +20,10 @@ namespace nORM.Query
         public int? Skip { get; set; }
         public string? TakeParam { get; set; }
         public string? SkipParam { get; set; }
+        // True when Take was set by a terminal operator (First/Single/Last/ElementAt)
+        // rather than a user-facing .Take() / .Skip(). Lets the post-Take/Skip pin
+        // family suppress false-positives on `q.OrderBy(k).First()`-style chains.
+        public bool TakeSetByTerminal { get; set; }
         public bool IsDistinct { get; set; }
 
         /// <summary>

@@ -149,7 +149,7 @@ namespace nORM.Query
                 // the common pre-paging filter pattern and stays untouched — this only
                 // fires when `_take`/`_skip` is already set by the time Where translates,
                 // i.e. the chain order is `…Take(n).Where(p)`.
-                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
                         "Where applied after Take or Skip would silently filter the full table — the " +
@@ -398,7 +398,7 @@ namespace nORM.Query
                 // after Take/Skip is wrong.)
                 bool isTopLevelOrder = node.Method.Name is nameof(Queryable.OrderBy)
                                                         or nameof(Queryable.OrderByDescending);
-                if (isTopLevelOrder && (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null))
+                if (isTopLevelOrder && (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
                         "OrderBy applied after Take or Skip would silently produce wrong rows — the " +
@@ -640,7 +640,7 @@ namespace nORM.Query
                 // which gives 3 rows from the distinct universe instead of dedupe-of-
                 // the-windowed-3. SQL needs a subquery wrap (`SELECT DISTINCT col FROM
                 // (… LIMIT n)`) that nORM doesn't yet emit. Detect and throw.
-                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
                         "Distinct applied after Take or Skip would silently dedupe the full table — the " +
@@ -836,6 +836,7 @@ namespace nORM.Query
                 var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
                 t._params[pName] = 1;
                 t._takeParam = pName;
+                t._takeSetByTerminal = true;
                 t._singleResult = t._methodName == "ElementAt";
                 if (t._orderBy.Count == 0)
                     foreach (var key in t._mapping.KeyColumns)
@@ -883,6 +884,10 @@ namespace nORM.Query
                 var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = t._take;
                 t._takeParam = pName;
+                // Mark this _take as set by a terminal so the post-Take/Skip pin family
+                // doesn't false-positive on `q.OrderBy(k).First()`-style chains (the
+                // pins fire on `_take.HasValue && !_takeSetByTerminal`).
+                t._takeSetByTerminal = true;
                 t._singleResult = t._methodName == "First" || t._methodName == "Single";
                 // Preserve the terminal method name because visiting source arguments will
                 // overwrite _methodName with child operator names (e.g., "Where").
@@ -944,6 +949,7 @@ namespace nORM.Query
                 var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
+                t._takeSetByTerminal = true;
                 t._singleResult = t._methodName == "Last";
                 return lastSrc;
             }
@@ -967,7 +973,7 @@ namespace nORM.Query
                 // instead of 3 (windowed count). SQL would need
                 // `SELECT COUNT(*) FROM (… LIMIT n)` which nORM doesn't yet emit. Detect
                 // and throw before _projection / _methodName setup.
-                if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
+                if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
                         "Count / LongCount applied after Take or Skip would silently count the full " +
