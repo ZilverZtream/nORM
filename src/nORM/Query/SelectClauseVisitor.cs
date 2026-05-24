@@ -228,6 +228,37 @@ namespace nORM.Query
                 }
             }
 
+            // Direct selector overload: `parent.Children[.Where(pred)].Sum/Min/Max/Average(c => c.X)`.
+            // EF Core users naturally reach for this 2-arg form first; the Select-then-Sum form
+            // above only matches the 1-arg overload. Without this branch the selector lambda is
+            // visited against the parent mapping and throws "Member 'X' on type 'Child' is not
+            // mapped to a column in table 'Parent'", surfaced as a parity gap in 2bffa3f.
+            if (node.Arguments.Count == 2
+                && node.Method.Name is nameof(Queryable.Sum)
+                                   or nameof(Queryable.Min)
+                                   or nameof(Queryable.Max)
+                                   or nameof(Queryable.Average)
+                && StripQuotes(node.Arguments[1]) is LambdaExpression directSelectorLambda)
+            {
+                Expression directSource = node.Arguments[0];
+                LambdaExpression? directFilter = null;
+                if (directSource is MethodCallExpression directWhere
+                    && directWhere.Method.Name == nameof(Queryable.Where)
+                    && directWhere.Arguments.Count == 2
+                    && StripQuotes(directWhere.Arguments[1]) is LambdaExpression directWhereLambda)
+                {
+                    directFilter = directWhereLambda;
+                    directSource = directWhere.Arguments[0];
+                }
+                if (directSource is MemberExpression directNav
+                    && directNav.Expression is ParameterExpression
+                    && _mapping.Relations.TryGetValue(directNav.Member.Name, out var directRelation))
+                {
+                    EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, directRelation, directSelectorLambda, directFilter);
+                    return node;
+                }
+            }
+
             // Use ToUpperInvariant to avoid locale-sensitive casing (e.g., Turkish-I problem).
             var methodNameUpper = node.Method.Name.ToUpperInvariant();
 
