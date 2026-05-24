@@ -169,6 +169,21 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Predicate-overload of <see cref="LongCountAsync{T}(IQueryable{T}, CancellationToken)"/> -- parity with
+        /// EF Core's <c>LongCountAsync(predicate)</c> spelling so users don't have to chain
+        /// <c>.Where(predicate).LongCountAsync()</c>. Lowered to the same Where + LongCount
+        /// pipeline internally; the e438a53 SELECT-cols→COUNT(*) rewrite arm for
+        /// LongCount applies uniformly.
+        /// </summary>
+        public static Task<long> LongCountAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(predicate);
+            return LongCountAsync(source.Where(predicate), ct);
+        }
+
+        /// <summary>
         /// Converts nORM query to List synchronously - only works with nORM queries
         /// </summary>
         public static List<T> ToListSync<T>(this IQueryable<T> source) where T : class
