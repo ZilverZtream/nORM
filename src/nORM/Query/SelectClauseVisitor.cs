@@ -138,6 +138,12 @@ namespace nORM.Query
                             $"Ensure the property is read/write and not a navigation collection.");
                     sb.Append(col.EscCol);
                 }
+                else
+                {
+                    // Computed selector: arithmetic, conditional, etc. Visit the body so the
+                    // ConditionalExpression / BinaryExpression overrides turn it into SQL.
+                    Visit(lambda.Body);
+                }
             }
             else if (!string.Equals(methodNameUpper, CountFunctionName, StringComparison.Ordinal))
             {

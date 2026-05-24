@@ -1098,6 +1098,17 @@ namespace nORM.Query
                 _compiledParams.Add(name);
             }
         }
+
+        /// <summary>
+        /// Stores a parameter value without flagging it as compiled. Use when copying inline
+        /// constants from a sub-visitor — the sub-visitor's closure-capture path already
+        /// registers compiled entries in the shared list, so blindly re-flagging literals
+        /// causes BindPlanParameters to skip them at execution time.
+        /// </summary>
+        private void AddLiteralParameter(string name, object? value)
+        {
+            _params[name] = value ?? DBNull.Value;
+        }
         private TranslationContextSnapshot CaptureContext()
         {
             return new TranslationContextSnapshot(
