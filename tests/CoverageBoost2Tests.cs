@@ -351,17 +351,16 @@ public class CoverageBoost2Tests : TestBase
     /// G1 fix: HandleGroupBy detects NewExpression key body and throws early.
     /// </summary>
     [Fact]
-    public void GroupBy_CompositeAnonymousTypeKey_ThrowsNormQueryException()
+    public void GroupBy_CompositeAnonymousTypeKey_TranslatesToMultiColumnGroupBy()
     {
         using var cn = OpenMemory();
         using var ctx = new DbContext(cn, new SqliteProvider());
         var query = ctx.Query<CovItem>();
 
-        // Build: query.GroupBy(p => new { p.Name, p.Value })
+        // query.GroupBy(p => new { p.Name, p.Value })
         var param = Expression.Parameter(typeof(CovItem), "p");
         var nameProp  = Expression.Property(param, nameof(CovItem.Name));
         var valueProp = Expression.Property(param, nameof(CovItem.Value));
-        // Anonymous type constructor (2 args: Name string, Value int)
         var anonType = new { Name = "", Value = 0 }.GetType();
         var ctor = anonType.GetConstructors()[0];
         var compositeKey = Expression.New(ctor, new Expression[] { nameProp, valueProp });
@@ -373,12 +372,11 @@ public class CoverageBoost2Tests : TestBase
         var expr = Expression.Call(groupByMethod, query.Expression,
             Expression.Quote(keySelector));
 
-        // TranslateDirectExpr uses reflection, so NormQueryException arrives wrapped
-        // in TargetInvocationException. Unwrap and verify the inner exception.
-        var wrapper = Assert.Throws<System.Reflection.TargetInvocationException>(
-            () => TranslateDirectExpr(expr, ctx));
-        var ex = Assert.IsType<nORM.Core.NormQueryException>(wrapper.InnerException);
-        Assert.Contains("Composite GroupBy", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var (sql, _) = TranslateDirectExpr(expr, ctx);
+        Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        var groupByClause = sql.Substring(sql.IndexOf("GROUP BY", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Name", groupByClause, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Value", groupByClause, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── GROUP 80: TranslateGroupAggregateMethod — Sum/Min/Max/Average/LongCount ──

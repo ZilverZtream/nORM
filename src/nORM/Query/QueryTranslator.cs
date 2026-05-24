@@ -114,6 +114,10 @@ namespace nORM.Query
         // original lambda's result type here lets plan.ElementType reflect the FINAL shape so
         // CreateList<T> and tracking checks operate against the right type.
         private Type? _clientProjectionResultType;
+        // For composite GroupBy keys (p => new { p.A, p.B }), each anonymous-type member's
+        // SQL fragment is recorded here so the result-projection path can resolve `g.Key.A`
+        // back to the right grouped column.
+        private readonly Dictionary<string, string> _compositeKeyMemberSql = new(StringComparer.Ordinal);
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
@@ -221,6 +225,7 @@ namespace nORM.Query
                 _projection = null;
                 _clientProjection = null;
                 _clientProjectionResultType = null;
+                _compositeKeyMemberSql.Clear();
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -262,6 +267,7 @@ namespace nORM.Query
                 _projection = null;
                 _clientProjection = null;
                 _clientProjectionResultType = null;
+                _compositeKeyMemberSql.Clear();
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;

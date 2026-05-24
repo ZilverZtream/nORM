@@ -93,19 +93,6 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
         Assert.NotNull(ex);
     }
 
-    [Fact]
-    public async Task GroupBy_composite_anonymous_type_key_throws_with_clear_message()
-    {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await _ctx.Query<UnRow>()
-                .GroupBy(r => new { r.Id, r.Name })
-                .Select(g => g.Key)
-                .ToListAsync();
-        });
-        Assert.Contains("Composite GroupBy keys", ex.Message, StringComparison.Ordinal);
-    }
-
     [Table("UnRow")]
     public sealed class UnRow
     {
