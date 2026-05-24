@@ -75,7 +75,8 @@ Status values:
 | `DateTimeOffset` members | Supported | Same member surface as `DateTime`; materializer parses SQLite TEXT into `DateTimeOffset`. |
 | `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | Supported | Per provider. |
 | `TimeOnly.Hour` / `Minute` / `Second` | Supported | Per provider. |
-| `TimeSpan` member access (`TotalSeconds`, `Days`, etc.) | Unsupported | Storage-format aware translation is post-v1; route through client-side projection. |
+| `TimeSpan` member access on a stored TimeSpan column (`r.Duration.TotalSeconds`, `.Days`, etc.) | Unsupported | Storage-format aware translation is post-v1; route through client-side projection. |
+| `DateTime`/`DateTimeOffset` subtraction TimeSpan members (`(r.End - r.Start).TotalHours`, `.TotalDays`, `.TotalSeconds`, `.TotalMinutes`, `.TotalMilliseconds`, `.Days`, `.Hours`, `.Minutes`, `.Seconds`) | Supported | Provider lowers via `julianday()*86400` on SQLite, `DATEDIFF(SECOND)` on SQL Server, `EXTRACT(EPOCH FROM ...)` on PostgreSQL, `TIMESTAMPDIFF(SECOND)` on MySQL. Total* members emit fractional values; the integer-component members (`Days`/`Hours`/`Minutes`/`Seconds`) match System.TimeSpan semantics (truncate toward zero with modular wrap). |
 | `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | Supported | Emit `IS NOT NULL`, the operand itself, and `COALESCE(..., fallback)` respectively. |
 | Conditional expressions (`cond ? a : b`) in `Where` and `Select` | Supported | Emit `CASE WHEN ... END`. Nested conditionals supported. |
 | Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | Supported | Column types drive numeric semantics. |

@@ -321,6 +321,16 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// DATEDIFF(SECOND) overflows around 68 years; for the LINQ use-case (TotalHours,
+        /// TotalDays) that's well within range. CAST the result to FLOAT so subsequent
+        /// divisions (e.g. TotalHours = sec / 3600) stay fractional.
+        /// </summary>
+        /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
+        /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
+        public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
+            => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
+
+        /// <summary>
         /// Translates a subset of .NET methods into their SQL Server equivalents.
         /// </summary>
         /// <param name="name">Name of the method being translated.</param>

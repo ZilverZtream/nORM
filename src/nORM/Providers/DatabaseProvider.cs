@@ -207,6 +207,16 @@ namespace nORM.Providers
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
 
         /// <summary>
+        /// Returns SQL that evaluates `end - start` as a fractional number of seconds. Used
+        /// by the LINQ translator to lower `(end - start).TotalSeconds / TotalMinutes /
+        /// TotalHours / Days / etc.` to a portable scalar expression. Both arguments are
+        /// already-translated SQL fragments.
+        /// </summary>
+        public virtual string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTime subtraction is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Translates a JSON path access expression for the provider.
         /// </summary>
         /// <param name="columnName">The name of the JSON column.</param>

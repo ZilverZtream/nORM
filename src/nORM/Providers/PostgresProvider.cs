@@ -206,6 +206,15 @@ namespace nORM.Providers
             _parameterFactory.CreateParameter(name, value);
 
         /// <summary>
+        /// PostgreSQL subtracts timestamps to produce an interval; EXTRACT(EPOCH FROM ...)
+        /// returns fractional seconds, matching .NET TimeSpan.TotalSeconds precision.
+        /// </summary>
+        /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
+        /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
+        public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
+            => $"EXTRACT(EPOCH FROM ({endSql} - {startSql}))";
+
+        /// <summary>
         /// Attempts to translate a .NET method invocation into its PostgreSQL equivalent.
         /// </summary>
         /// <param name="name">Name of the .NET method being translated.</param>

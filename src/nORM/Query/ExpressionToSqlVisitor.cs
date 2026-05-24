@@ -471,6 +471,20 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            // TimeSpan member access whose receiver is a DateTime subtraction lowers to a
+            // fractional-seconds scalar via the provider, then a unit-conversion divide.
+            // Examples: (end - start).TotalHours, .TotalMinutes, .TotalSeconds, .TotalDays,
+            // .Days, .Hours, .Minutes, .Seconds. Both nullable and non-nullable receivers.
+            if (node.Expression is BinaryExpression timeSpanBinary
+                && timeSpanBinary.NodeType == ExpressionType.Subtract
+                && IsDateTimeLike(timeSpanBinary.Left.Type)
+                && IsDateTimeLike(timeSpanBinary.Right.Type)
+                && node.Expression.Type == typeof(TimeSpan)
+                && TryEmitTimeSpanMember(node.Member.Name, GetSql(timeSpanBinary.Left), GetSql(timeSpanBinary.Right)))
+            {
+                return node;
+            }
+
             // Nullable<T> structural members: HasValue -> IS NOT NULL, Value -> operand itself.
             // GetValueOrDefault is a method, handled in VisitMethodCall.
             if (node.Expression != null
@@ -1318,6 +1332,56 @@ namespace nORM.Query
             typeof(Enumerable), typeof(Queryable), typeof(Json),
             typeof(NormFunctions)
         }.ToFrozenSet();
+
+        private static bool IsDateTimeLike(Type t)
+        {
+            var underlying = Nullable.GetUnderlyingType(t) ?? t;
+            return underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset);
+        }
+
+        /// <summary>
+        /// Emits the SQL for a TimeSpan member access on a `(end - start)` subtraction.
+        /// Returns true when the member name maps to a unit conversion; false otherwise
+        /// (the caller falls through to the normal member-resolution path).
+        /// </summary>
+        private bool TryEmitTimeSpanMember(string memberName, string endSql, string startSql)
+        {
+            var secondsSql = _provider.GetDateTimeDifferenceSecondsSql(endSql, startSql);
+            // Total* return fractional values; Days/Hours/Minutes/Seconds are the integer
+            // component matching System.TimeSpan's semantics (truncate toward zero).
+            switch (memberName)
+            {
+                case nameof(TimeSpan.TotalSeconds):
+                    _sql.Append(secondsSql);
+                    return true;
+                case nameof(TimeSpan.TotalMinutes):
+                    _sql.Append('(').Append(secondsSql).Append(" / 60.0)");
+                    return true;
+                case nameof(TimeSpan.TotalHours):
+                    _sql.Append('(').Append(secondsSql).Append(" / 3600.0)");
+                    return true;
+                case nameof(TimeSpan.TotalDays):
+                    _sql.Append('(').Append(secondsSql).Append(" / 86400.0)");
+                    return true;
+                case nameof(TimeSpan.TotalMilliseconds):
+                    _sql.Append('(').Append(secondsSql).Append(" * 1000.0)");
+                    return true;
+                case nameof(TimeSpan.Days):
+                    _sql.Append("CAST(").Append(secondsSql).Append(" / 86400 AS INTEGER)");
+                    return true;
+                case nameof(TimeSpan.Hours):
+                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 3600 AS INTEGER) % 24)");
+                    return true;
+                case nameof(TimeSpan.Minutes):
+                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 60 AS INTEGER) % 60)");
+                    return true;
+                case nameof(TimeSpan.Seconds):
+                    _sql.Append("(CAST(").Append(secondsSql).Append(" AS INTEGER) % 60)");
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
         /// <summary>
         /// Object-identity methods that must never be translated to SQL because they
