@@ -935,6 +935,23 @@ namespace nORM.Query
             {
                 var lambda = System.Linq.Expressions.Expression.Lambda(node).Compile();
                 var value = lambda.DynamicInvoke();
+                // Reserve a placeholder compiled-param slot for every closure-
+                // captured MemberExpression argument that the fold consumed.
+                // ParameterValueExtractor walks each closure MemberExpression
+                // in document order and adds a value to its list; folding the
+                // NewExpression inline without compensating leaves N closure
+                // values orphaned at the front of the value array, shifting
+                // every subsequent @cp binding by N. Same fix shape as
+                // 407e03d / eeff6e7 / cf39b61 / 04a0003.
+                foreach (var arg in node.Arguments)
+                {
+                    if (arg is MemberExpression)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
+                }
                 AppendConstant(value, node.Type);
                 return node;
             }
