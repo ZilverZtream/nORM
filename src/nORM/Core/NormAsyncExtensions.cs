@@ -131,6 +131,30 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Counts rows in a nORM query asynchronously and returns a 64-bit total — use when the
+        /// expected row count may exceed Int32.MaxValue.
+        /// </summary>
+        public static Task<long> LongCountAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var longCountExpression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.LongCount),
+                    new[] { typeof(T) },
+                    source.Expression);
+                return normProvider.ExecuteAsync<long>(longCountExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "LongCountAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.LongCountAsync().");
+        }
+
+        /// <summary>
         /// Converts nORM query to List synchronously - only works with nORM queries
         /// </summary>
         public static List<T> ToListSync<T>(this IQueryable<T> source) where T : class
