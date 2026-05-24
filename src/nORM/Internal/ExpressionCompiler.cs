@@ -173,9 +173,37 @@ namespace nORM.Internal
             where T : class
         {
             ExpressionUtils.ValidateExpression(queryExpression);
+            ValidateNoTopLevelQueryBranch(queryExpression.Body);
             var timeout = ExpressionUtils.GetCompilationTimeout(queryExpression);
             using var cts = new CancellationTokenSource(timeout);
             return CompileWithTimeout<TContext, TParam, T>(queryExpression, cts.Token);
+        }
+
+        /// <summary>
+        /// CompileQuery bakes a single SQL plan per delegate, so a top-level ternary that
+        /// selects between two different query shapes (e.g. <c>asc ? q.OrderBy(k) : q.OrderByDescending(k)</c>)
+        /// cannot be honored at call time -- the translator would either silently pick one
+        /// branch or crash with a cryptic BCL <c>ArgumentException</c> when reconstructing
+        /// the ConditionalExpression with rewritten branches. Surface a clear error pointing
+        /// at the two-delegate workaround.
+        /// </summary>
+        private static void ValidateNoTopLevelQueryBranch(Expression body)
+        {
+            var e = body;
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert } ue) e = ue.Operand;
+            if (e is ConditionalExpression ce
+                && typeof(IQueryable).IsAssignableFrom(ce.IfTrue.Type)
+                && typeof(IQueryable).IsAssignableFrom(ce.IfFalse.Type))
+            {
+                throw new NormUnsupportedFeatureException(
+                    "CompileQuery does not support a top-level conditional (ternary) that selects between " +
+                    "two different query shapes (e.g. `asc ? q.OrderBy(k) : q.OrderByDescending(k)`). The compiled " +
+                    "SQL plan is decided once and cannot switch query structure at call time. " +
+                    "Workaround: compile each branch into its own delegate and dispatch at the call site:\n" +
+                    "    var asc  = Norm.CompileQuery((MyCtx ctx, int _) => ctx.Query<T>().OrderBy(k));\n" +
+                    "    var desc = Norm.CompileQuery((MyCtx ctx, int _) => ctx.Query<T>().OrderByDescending(k));\n" +
+                    "    var rows = sortAsc ? await asc(ctx, 0) : await desc(ctx, 0);");
+            }
         }
 
         private static Func<TContext, TParam, Task<List<T>>> CompileWithTimeout<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression, CancellationToken token)
