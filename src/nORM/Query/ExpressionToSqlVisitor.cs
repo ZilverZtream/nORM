@@ -257,6 +257,20 @@ namespace nORM.Query
                 return node;
             }
 
+            // `a ?? b` lowers to COALESCE(a, b). The expression tree uses Coalesce as a
+            // BinaryExpression node; sit it before the generic switch below so it doesn't
+            // hit the "operator not supported" throw. Composes with arithmetic / comparison
+            // so `(col ?? 0) > 5` becomes `(COALESCE(col, 0)) > 5`.
+            if (node.NodeType == ExpressionType.Coalesce)
+            {
+                _sql.Append("COALESCE(");
+                Visit(node.Left);
+                _sql.Append(", ");
+                Visit(node.Right);
+                _sql.Append(")");
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
