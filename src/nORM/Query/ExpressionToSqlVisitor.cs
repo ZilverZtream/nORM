@@ -1131,6 +1131,10 @@ namespace nORM.Query
                 var et = GetElementType(source);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
+            // Materialize any `NormQueryable.Query<T>(ctx)` calls inside the source into
+            // ConstantExpression(IQueryable) so the sub-translator's VisitConstant picks up
+            // the query as the entity source instead of emitting `@p<n>` for the ctx instance.
+            source = QueryCallMaterializer.Materialize(source);
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             // Both Parameters and CompiledParameters use SEPARATE dicts/lists for the sub-
@@ -1332,6 +1336,29 @@ namespace nORM.Query
             typeof(Enumerable), typeof(Queryable), typeof(Json),
             typeof(NormFunctions)
         }.ToFrozenSet();
+
+        /// <summary>
+        /// Replaces `NormQueryable.Query&lt;T&gt;(ctxConstant)` MethodCall nodes inside a
+        /// sub-expression with a `ConstantExpression(IQueryable&lt;T&gt;)` so the
+        /// QueryTranslator recognizes them as the query source. Used by BuildExists +
+        /// related sub-translator entry points; the outer compiled-query path does the same
+        /// materialization in ExpressionCompiler.QueryCallEvaluator.
+        /// </summary>
+        private sealed class QueryCallMaterializer : ExpressionVisitor
+        {
+            public static Expression Materialize(Expression e) => new QueryCallMaterializer().Visit(e)!;
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.DeclaringType == typeof(NormQueryable) && node.Method.Name == nameof(NormQueryable.Query))
+                {
+                    var compiled = Expression.Lambda(node).Compile();
+                    var queryable = compiled.DynamicInvoke();
+                    return Expression.Constant(queryable, node.Type);
+                }
+                return base.VisitMethodCall(node);
+            }
+        }
 
         private static bool IsDateTimeLike(Type t)
         {
