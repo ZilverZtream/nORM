@@ -33,6 +33,7 @@ namespace nORM.Query
                 nameof(string.TrimEnd),
                 nameof(string.Format),
                 nameof(string.Concat),
+                nameof(string.Join),
                 nameof(string.Compare),
                 nameof(string.CompareTo),
                 // CompareTo instance-form covered above; nameof(string.CompareTo)
