@@ -562,6 +562,7 @@ namespace nORM.Providers
             {
                 return name switch
                 {
+                    nameof(DateTime.Millisecond) => $"DATEPART(millisecond, {args[0]})",
                     nameof(DateTime.Year) => $"YEAR({args[0]})",
                     nameof(DateTime.Month) => $"MONTH({args[0]})",
                     nameof(DateTime.Day) => $"DAY({args[0]})",
@@ -651,6 +652,7 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"DATEPART(hour, {args[0]})",
                     nameof(TimeOnly.Minute) => $"DATEPART(minute, {args[0]})",
                     nameof(TimeOnly.Second) => $"DATEPART(second, {args[0]})",
+                    nameof(TimeOnly.Millisecond) => $"DATEPART(millisecond, {args[0]})",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     // Matches .NET's TimeOnly.IsBetween semantics.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
