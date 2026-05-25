@@ -144,6 +144,37 @@ namespace nORM.Query
                 return node;
             }
 
+            // (DateTime - DateTime).<TimeSpan-member> -- mirror ETSV's
+            // TryEmitTimeSpanMember. The binary path produces fractional
+            // seconds via julianday*86400; member access extracts a specific
+            // component matching System.TimeSpan's semantics.
+            if (node.Expression is BinaryExpression tsBin
+                && tsBin.NodeType == ExpressionType.Subtract
+                && node.Expression.Type == typeof(TimeSpan))
+            {
+                var endSql = TranslateProjectionArg(tsBin.Left);
+                var startSql = TranslateProjectionArg(tsBin.Right);
+                var secondsSql = $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
+                string? emit = node.Member.Name switch
+                {
+                    nameof(TimeSpan.TotalSeconds) => secondsSql,
+                    nameof(TimeSpan.TotalMinutes) => $"({secondsSql} / 60.0)",
+                    nameof(TimeSpan.TotalHours) => $"({secondsSql} / 3600.0)",
+                    nameof(TimeSpan.TotalDays) => $"({secondsSql} / 86400.0)",
+                    nameof(TimeSpan.TotalMilliseconds) => $"({secondsSql} * 1000.0)",
+                    nameof(TimeSpan.Days) => $"CAST({secondsSql} / 86400 AS INTEGER)",
+                    nameof(TimeSpan.Hours) => $"(CAST({secondsSql} / 3600 AS INTEGER) % 24)",
+                    nameof(TimeSpan.Minutes) => $"(CAST({secondsSql} / 60 AS INTEGER) % 60)",
+                    nameof(TimeSpan.Seconds) => $"(CAST({secondsSql} AS INTEGER) % 60)",
+                    _ => null
+                };
+                if (emit != null)
+                {
+                    sb.Append(emit);
+                    return node;
+                }
+            }
+
             // Nullable<T>.HasValue / .Value -- structural members. HasValue
             // lowers to IS NOT NULL (boolean column); Value passes through to
             // the underlying expression. Mirror of ETSV's VisitMember branch.
