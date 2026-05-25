@@ -50,32 +50,17 @@ public class LinqSetOpsAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Union_after_take_either_unions_windowed_or_throws_actionable_pin()
+    public async Task Union_after_take_unions_windowed_left_with_full_right()
     {
-        System.Exception? caught = null;
-        string[]? result = null;
-        try
-        {
-            result = (await _ctx.Query<SoaLeft>()
-                .OrderBy(l => l.Id)
-                .Take(2)
-                .Select(l => l.Code)
-                .Union(_ctx.Query<SoaRight>().Select(r => r.Code))
-                .ToListAsync()).ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
-
-        // The pin must fire — without it the SetOperationTranslator emits malformed
-        // SQL (sub-SELECTs without parens, LIMIT attached to wrong side) and SQLite
-        // throws a syntax error instead.
-        Assert.NotNull(caught);
-        Assert.IsType<NormUnsupportedFeatureException>(caught);
-        Assert.Contains("Union", caught.Message, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-        Assert.Contains("parenthesised", caught.Message, System.StringComparison.OrdinalIgnoreCase);
+        // Left.OrderBy(Id).Take(2) → {A, B}. Right is the full {X, Y}.
+        // Union semantics: {A, B, X, Y}.
+        var result = (await _ctx.Query<SoaLeft>()
+            .OrderBy(l => l.Id)
+            .Take(2)
+            .Select(l => l.Code)
+            .Union(_ctx.Query<SoaRight>().Select(r => r.Code))
+            .ToListAsync()).OrderBy(c => c).ToArray();
+        Assert.Equal(new[] { "A", "B", "X", "Y" }, result);
     }
 
     [Table("SoaLeft")]

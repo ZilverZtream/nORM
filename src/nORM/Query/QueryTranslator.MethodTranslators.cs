@@ -1045,29 +1045,14 @@ namespace nORM.Query
             /// <returns>The original method call expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // Ninth in the post-Take/Skip silent-wrongness family. Each side of the
-                // set op is translated in its own sub-context which bakes any Take/Skip
-                // into the sub-SQL — but the outer composition is
-                // `<left> UNION <right>` (no parentheses) and SQLite (along with most
-                // dialects) parses LIMIT after the LAST SELECT or rejects the unwrapped
-                // mix outright (`near "UNION": syntax error`). Detect Take/Skip in
-                // either side via SourceHasTakeOrSkip and throw with a clear workaround.
-                if (QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0])
-                    || QueryTranslator.SourceHasTakeOrSkip(node.Arguments[1]))
-                {
-                    throw new NormUnsupportedFeatureException(
-                        node.Method.Name + " over a Take/Skip source isn't supported — the translator " +
-                        "translates each side in its own sub-context (baking LIMIT into the sub-SQL) " +
-                        "but the outer composition `<left> UNION <right>` lacks the parentheses that " +
-                        "SQL requires when combining LIMIT-ed SELECTs across a set op, so SQLite " +
-                        "throws a syntax error. SQL needs parenthesised sub-SELECTs " +
-                        "(`(SELECT … LIMIT n) UNION (SELECT …)`) that nORM doesn't yet emit. " +
-                        "Workarounds: " +
-                        "(1) Materialize each windowed side first and union client-side: " +
-                        "`var top = await q.Take(n).ToListAsync(); var all = top.Concat(otherList);`. " +
-                        "(2) Move the Take to AFTER the set op if you wanted top-N-after-union: " +
-                        "`q.Union(other).Take(n)`.");
-                }
+                // SQL parsers reject ORDER BY / LIMIT / OFFSET on a bare set-op arm.
+                // SQLite is strictest ("ORDER BY clause should come after UNION ALL
+                // not before"); SqlServer and Postgres tolerate some forms but the
+                // semantics are dialect-specific. Wrap any arm that carries an
+                // OrderBy/Take/Skip as a derived table so the clause binds to the
+                // arm only — every dialect accepts `SELECT * FROM (subq) AS alias`.
+                bool leftNeedsWrap  = SourceHasOrderTakeOrSkip(node.Arguments[0]);
+                bool rightNeedsWrap = SourceHasOrderTakeOrSkip(node.Arguments[1]);
                 // UNION / INTERSECT / EXCEPT all use set semantics that dedup by string
                 // equality on SQLite, so '10.5' vs '10.50' register as distinct rows even
                 // though they're the same decimal. Concat (UNION ALL) doesn't dedup, but
@@ -1096,8 +1081,16 @@ namespace nORM.Query
                     "Except" => "EXCEPT",
                     _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
                 };
+                // SQLite rejects bare-parenthesised compound SELECTs in set ops;
+                // every dialect accepts `SELECT * FROM (subq) AS alias` though,
+                // so wrap each LIMIT/OFFSET arm as a derived table. Unwrapped arms
+                // are emitted as-is to keep the SQL minimal.
                 t._sql.Clear();
-                t._sql.Append(leftSql).Append(' ').Append(setOp).Append(' ').Append(rightSql);
+                if (leftNeedsWrap) t._sql.Append("SELECT * FROM (").Append(leftSql).Append(") AS ").Append(t._provider.Escape("__lset0"));
+                else t._sql.Append(leftSql);
+                t._sql.Append(' ').Append(setOp).Append(' ');
+                if (rightNeedsWrap) t._sql.Append("SELECT * FROM (").Append(rightSql).Append(") AS ").Append(t._provider.Escape("__rset0"));
+                else t._sql.Append(rightSql);
                 // TranslateSubExpression isolates each side in its own context, so any
                 // Select-projection inside the arguments never propagates to the outer
                 // translator. Without it, Generate() builds the materializer against
@@ -1115,6 +1108,31 @@ namespace nORM.Query
                         t._projection = lifted;
                 }
                 return node;
+            }
+
+            /// <summary>
+            /// Returns true when the arm-source chain contains <c>OrderBy</c>,
+            /// <c>OrderByDescending</c>, <c>ThenBy</c>, <c>ThenByDescending</c>,
+            /// <c>Take</c>, or <c>Skip</c> — clauses that emit ORDER BY / LIMIT /
+            /// OFFSET in the arm SQL and must be wrapped as a derived table so the
+            /// outer set op parses.
+            /// </summary>
+            private static bool SourceHasOrderTakeOrSkip(Expression source)
+            {
+                var current = source;
+                while (current is MethodCallExpression mce)
+                {
+                    if (mce.Method.Name is nameof(Queryable.Take)
+                        or nameof(Queryable.Skip)
+                        or nameof(Queryable.OrderBy)
+                        or nameof(Queryable.OrderByDescending)
+                        or nameof(Queryable.ThenBy)
+                        or nameof(Queryable.ThenByDescending))
+                        return true;
+                    if (mce.Arguments.Count == 0) break;
+                    current = mce.Arguments[0];
+                }
+                return false;
             }
 
             /// <summary>
