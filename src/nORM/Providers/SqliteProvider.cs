@@ -252,6 +252,38 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
+            // DateTime.ParseExact(s, format[, provider]) -- restricted to a
+            // small set of constant format strings we can losslessly rewrite
+            // into the canonical 'yyyy-MM-dd HH:MM:SS' the materializer reads.
+            // The constant-format guard keeps the rewrite scope honest --
+            // arbitrary format strings can't be re-implemented in pure SQL.
+            if ((declType == typeof(DateTime) || declType == typeof(DateTimeOffset))
+                && node.Method.Name == "ParseExact"
+                && node.Arguments.Count >= 2
+                && node.Arguments[1] is System.Linq.Expressions.ConstantExpression fmtArg
+                && fmtArg.Value is string fmt)
+            {
+                // args[0] is the receiver (none for static); ParseExact is static
+                // so node.Object is null and args[0] is the source string SQL.
+                var src = args[0];
+                switch (fmt)
+                {
+                    case "yyyyMMdd":
+                        return $"(SUBSTR({src},1,4) || '-' || SUBSTR({src},5,2) || '-' || SUBSTR({src},7,2))";
+                    case "yyyy-MM-dd":
+                        return src;
+                    case "yyyyMMddHHmmss":
+                        return $"(SUBSTR({src},1,4) || '-' || SUBSTR({src},5,2) || '-' || SUBSTR({src},7,2) || ' ' || SUBSTR({src},9,2) || ':' || SUBSTR({src},11,2) || ':' || SUBSTR({src},13,2))";
+                    case "yyyy-MM-dd HH:mm:ss":
+                        return src;
+                    default:
+                        throw new NormUnsupportedFeatureException(
+                            $"DateTime.ParseExact format \"{fmt}\" is not supported in SQL translation. " +
+                            "Supported formats: yyyyMMdd, yyyy-MM-dd, yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss. " +
+                            "Other formats require materializing the column and parsing client-side.");
+                }
+            }
+
             // 3-arg string.Replace(old, new, StringComparison) -- SQLite
             // REPLACE is case-sensitive. Honour the case-sensitive modes
             // (Ordinal/CurrentCulture/InvariantCulture) by emitting plain
