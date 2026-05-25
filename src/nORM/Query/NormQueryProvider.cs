@@ -253,6 +253,15 @@ namespace nORM.Query
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
+            // Queryable.Aggregate with a sum-fold accumulator — rewrite to
+            // SUM at translation time so we don't materialise the full result
+            // set client-side. Supported shapes: 1-arg `(acc, x) => acc + x`
+            // and 2-arg `seed, (acc, x) => acc + sub(x)`. Other Aggregate
+            // shapes (resultSelector, non-additive fold) remain untranslated
+            // and fall through to the unsupported-method error below.
+            if (TryRewriteAggregateToSum<TResult>(expression, out var aggResult))
+                return aggResult;
+
             if (TryGetCountQuery(expression, out var countSql, out var countParameters))
             {
                 return ExecuteCountSync<TResult>(countSql, countParameters);
@@ -264,6 +273,189 @@ namespace nORM.Query
             }
             // THREAD STARVATION FIX: Use true synchronous execution path
             return ExecuteInternalSync<TResult>(expression);
+        }
+
+        private bool TryRewriteAggregateToSum<TResult>(Expression expression, out TResult result)
+        {
+            result = default!;
+            if (expression is not MethodCallExpression mc
+                || mc.Method.DeclaringType != typeof(System.Linq.Queryable)
+                || mc.Method.Name != nameof(System.Linq.Queryable.Aggregate))
+                return false;
+
+            // Three Aggregate overloads: 2 args (source, func), 3 args (source, seed, func),
+            // 4 args (source, seed, func, resultSelector — unsupported).
+            LambdaExpression? fold;
+            object? seed;
+            Type seedType;
+            Expression source;
+            if (mc.Arguments.Count == 2)
+            {
+                source = mc.Arguments[0];
+                fold = StripQuotesLocal(mc.Arguments[1]) as LambdaExpression;
+                seed = null;            // 1-arg form: throw on empty; equivalent to Sum() unless empty
+                seedType = mc.Method.GetGenericArguments()[0];
+            }
+            else if (mc.Arguments.Count == 3)
+            {
+                source = mc.Arguments[0];
+                if (!TryEvaluateConstant(mc.Arguments[1], out seed)) return false;
+                fold = StripQuotesLocal(mc.Arguments[2]) as LambdaExpression;
+                seedType = mc.Method.GetGenericArguments()[1];
+            }
+            else
+            {
+                return false;
+            }
+
+            if (fold == null || fold.Parameters.Count != 2 || fold.Body.NodeType != ExpressionType.Add)
+                return false;
+
+            var binary = (BinaryExpression)fold.Body;
+            var accParam = fold.Parameters[0];
+            var elemParam = fold.Parameters[1];
+
+            Expression sub;
+            if (binary.Left == accParam) sub = binary.Right;
+            else if (binary.Right == accParam) sub = binary.Left;
+            else return false;
+            if (ReferencesParameter(sub, accParam)) return false;
+
+            // Build the equivalent Queryable.Sum call. nORM's DirectAggregate
+            // translator only emits SUM SQL when given a selector lambda — the
+            // no-selector overload Sum(IQueryable<T>) materialises the list
+            // and aggregates client-side. Always synthesize the selector form
+            // so the aggregation happens on the server.
+            //
+            // Identity sub over a Select-ed source (the common shape
+            // `Select(r => proj).Aggregate(seed, (acc, s) => acc + s)`): peel
+            // the Select so the synthesized Sum's selector emits `proj` on
+            // the underlying entity rather than a meaningless `s => s` over
+            // the projected scalar.
+            var tSource = mc.Method.GetGenericArguments()[0];
+            Expression sumSource = source;
+            Expression sumBody = sub;
+            ParameterExpression sumParam = elemParam;
+            if (sub == elemParam
+                && source is MethodCallExpression selectCall
+                && selectCall.Method.DeclaringType == typeof(System.Linq.Queryable)
+                && selectCall.Method.Name == nameof(System.Linq.Queryable.Select)
+                && selectCall.Arguments.Count == 2
+                && StripQuotesLocal(selectCall.Arguments[1]) is LambdaExpression selectLambda)
+            {
+                sumSource = selectCall.Arguments[0];
+                sumParam = selectLambda.Parameters[0];
+                sumBody = selectLambda.Body;
+            }
+            var subType = sumBody.Type;
+            var actualTSource = sumSource.Type.IsGenericType
+                ? sumSource.Type.GetGenericArguments()[0]
+                : tSource;
+            var sumLambda = Expression.Lambda(sumBody, sumParam);
+            var sumMethod = FindSumOverload(actualTSource, subType);
+            if (sumMethod == null) return false;
+            var sumCall = Expression.Call(sumMethod, sumSource, Expression.Quote(sumLambda));
+            object? sumResult;
+            try
+            {
+                sumResult = Execute(sumCall);
+            }
+            catch (InvalidOperationException) when (mc.Arguments.Count == 2)
+            {
+                // Sum on empty returns 0; 1-arg Aggregate on empty must throw. Re-throw to match
+                // the .NET semantics.
+                throw;
+            }
+
+            // Combine sumResult + seed (if any). Use checked arithmetic only for integer types
+            // since C# `+` defaults are unchecked at runtime.
+            object finalValue = sumResult ?? Activator.CreateInstance(subType)!;
+            if (seed != null)
+            {
+                finalValue = AddSeedToSum(seed, finalValue, seedType);
+            }
+            result = (TResult)Convert.ChangeType(finalValue, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture)!;
+            return true;
+        }
+
+        private static Expression StripQuotesLocal(Expression e)
+        {
+            while (e is UnaryExpression u && u.NodeType == ExpressionType.Quote) e = u.Operand;
+            return e;
+        }
+
+        private static bool TryEvaluateConstant(Expression e, out object? value)
+        {
+            if (e is ConstantExpression ce) { value = ce.Value; return true; }
+            try { value = Expression.Lambda(e).Compile().DynamicInvoke(); return true; }
+            catch { value = null; return false; }
+        }
+
+        private static bool ReferencesParameter(Expression e, ParameterExpression p)
+        {
+            var found = false;
+            new ParameterFinderVisitor(p, () => found = true).Visit(e);
+            return found;
+        }
+
+        private sealed class ParameterFinderVisitor : ExpressionVisitor
+        {
+            private readonly ParameterExpression _target;
+            private readonly Action _onFound;
+            public ParameterFinderVisitor(ParameterExpression target, Action onFound) { _target = target; _onFound = onFound; }
+            protected override Expression VisitParameter(ParameterExpression node)
+            { if (node == _target) _onFound(); return node; }
+        }
+
+        private static System.Reflection.MethodInfo? FindSumNoSelectorOverload(Type elementType)
+        {
+            // Sum has a non-generic overload for each numeric type that takes
+            // IQueryable<T> directly. Look them up by parameter shape.
+            foreach (var m in typeof(System.Linq.Queryable).GetMethods())
+            {
+                if (m.Name != nameof(System.Linq.Queryable.Sum)) continue;
+                if (m.IsGenericMethodDefinition) continue;
+                var ps = m.GetParameters();
+                if (ps.Length != 1) continue;
+                var pt = ps[0].ParameterType;
+                if (!pt.IsGenericType || pt.GetGenericTypeDefinition() != typeof(IQueryable<>)) continue;
+                if (pt.GetGenericArguments()[0] == elementType) return m;
+            }
+            return null;
+        }
+
+        private static System.Reflection.MethodInfo? FindSumOverload(Type tSource, Type returnType)
+        {
+            foreach (var m in typeof(System.Linq.Queryable).GetMethods())
+            {
+                if (m.Name != nameof(System.Linq.Queryable.Sum)) continue;
+                if (!m.IsGenericMethodDefinition || m.GetGenericArguments().Length != 1) continue;
+                var ps = m.GetParameters();
+                if (ps.Length != 2) continue;
+                var selectorParam = ps[1].ParameterType;
+                if (!selectorParam.IsGenericType) continue;
+                var funcType = selectorParam.GetGenericArguments()[0];
+                if (!funcType.IsGenericType) continue;
+                var funcGen = funcType.GetGenericArguments();
+                if (funcGen.Length != 2) continue;
+                if (funcGen[1] != returnType) continue;
+                return m.MakeGenericMethod(tSource);
+            }
+            return null;
+        }
+
+        private static object AddSeedToSum(object seed, object sumValue, Type accType)
+        {
+            // Normalize both to the accumulator type via direct casts on the
+            // supported numeric types. Convert.ChangeType chokes on bool/null
+            // and we don't need it: Aggregate's seed type drives accType.
+            accType = Nullable.GetUnderlyingType(accType) ?? accType;
+            if (accType == typeof(long))    return (long)System.Convert.ToInt64(seed)    + (long)System.Convert.ToInt64(sumValue);
+            if (accType == typeof(int))     return (int)System.Convert.ToInt32(seed)     + (int)System.Convert.ToInt32(sumValue);
+            if (accType == typeof(double))  return (double)System.Convert.ToDouble(seed) + (double)System.Convert.ToDouble(sumValue);
+            if (accType == typeof(float))   return (float)System.Convert.ToSingle(seed)  + (float)System.Convert.ToSingle(sumValue);
+            if (accType == typeof(decimal)) return (decimal)System.Convert.ToDecimal(seed) + (decimal)System.Convert.ToDecimal(sumValue);
+            throw new NotSupportedException($"Aggregate sum-fold accumulator type '{accType.Name}' is not supported.");
         }
         public object? Execute(Expression expression) => Execute<object>(expression);
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
