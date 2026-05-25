@@ -795,6 +795,14 @@ namespace nORM.Query
                 TimeOnly t => $"'{t.ToString("HH:mm:ss.fffffff", System.Globalization.CultureInfo.InvariantCulture)}'",
                 TimeSpan ts => $"'{ts.ToString("c", System.Globalization.CultureInfo.InvariantCulture)}'",
                 Guid g => $"'{g.ToString("D", System.Globalization.CultureInfo.InvariantCulture)}'",
+                // CultureInfo / IFormatProvider arguments to ParseExact /
+                // TryParse / ToString carry no SQL representation -- the
+                // provider's TranslateMethodCall doesn't consume them. Emit
+                // NULL so the per-arg projection visit doesn't blow up; the
+                // arg never reaches the SQL output because the overload-aware
+                // handler ignores it.
+                System.Globalization.CultureInfo => "NULL",
+                System.IFormatProvider => "NULL",
                 _ => throw new InvalidOperationException(
                     $"Navigation filter literal of type '{value.GetType().Name}' isn't supported in a projection subquery. " +
                     "Use int/long/short/byte/string/bool/double/decimal/DateTime/DateTimeOffset/DateOnly/TimeOnly/TimeSpan/Guid, " +
