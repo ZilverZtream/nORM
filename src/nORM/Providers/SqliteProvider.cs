@@ -678,6 +678,10 @@ namespace nORM.Providers
                     // and yields the expected proleptic-Gregorian result.
                     nameof(DateOnly.FromDayNumber) when args.Length == 1 =>
                         $"date('0001-01-01', '+' || CAST({args[0]} AS TEXT) || ' days')",
+                    // FromDateTime(dt) drops the time portion. SQLite's date()
+                    // emits 'YYYY-MM-DD' which the materializer parses to DateOnly.
+                    nameof(DateOnly.FromDateTime) when args.Length == 1 =>
+                        $"date({args[0]})",
                     // Parse(string) -- Microsoft.Data.Sqlite stores DateOnly
                     // as canonical 'yyyy-MM-dd' text; source TEXT column
                     // already holds compatible text so SQL emission is
@@ -814,6 +818,10 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    // FromDateTime(dt) / FromTimeSpan(ts) drop everything but
+                    // the time portion. SQLite's time() emits 'HH:mm:ss'.
+                    nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",
+                    nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => args[0],
                     // Parse(string) -- Microsoft.Data.Sqlite stores TimeOnly
                     // as canonical 'HH:mm:ss[.fffffff]' text; source TEXT
                     // column already holds compatible text so SQL emission
