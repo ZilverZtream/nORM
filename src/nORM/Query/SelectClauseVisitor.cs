@@ -829,6 +829,34 @@ namespace nORM.Query
                 sb.Append(_provider.GetConcatSql(leftSql, rightSql));
                 return node;
             }
+            // DateTime + TimeSpan COLUMN (rhs is not a foldable constant --
+            // e.g. p.Stamp + p.Duration). Without this branch SQL '+' on TEXT
+            // coerces to numeric and produces garbage that fails GetDateTime
+            // via FromJulianDate. Emit strftime with a constructed modifier
+            // 'sign || N || " seconds"' where N parses the TimeSpan column's
+            // sub-day 'HH:mm:ss' text per b17440e. Sub-day only -- multi-day
+            // TimeSpan columns are out of scope (same scope cap as memory
+            // item TimeSpan handler).
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && !QueryTranslator.TryGetConstantValue(node.Right, out _))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                var sign = node.NodeType == ExpressionType.Add ? "+" : "-";
+                sb.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
+                  .Append(", '").Append(sign).Append("' || (CAST(substr(").Append(rightSql).Append(", 1, 2) AS INTEGER) * 3600 + ")
+                  .Append("CAST(substr(").Append(rightSql).Append(", 4, 2) AS INTEGER) * 60 + ")
+                  .Append("CAST(substr(").Append(rightSql).Append(", 7, 2) AS INTEGER)) || ' seconds'), '0'), '.')");
+                return node;
+            }
             // DateTime + TimeSpan / DateTime - TimeSpan -> DateTime. The
             // TimeSpan operand folds via TryGetConstantValue; emit
             // strftime + RTRIM to match Microsoft.Data.Sqlite's FFFFFFF
