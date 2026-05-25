@@ -530,6 +530,24 @@ namespace nORM.Providers
                     nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
                     nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
                     nameof(Math.Atan2) when args.Length == 2 => $"ATAN2({args[0]}, {args[1]})",
+                    // Hyperbolic + inverse hyperbolic: MySQL has no native
+                    // hyperbolic functions. Emit via algebraic identities
+                    // using EXP / LOG (single-arg LOG is natural log in MySQL,
+                    // matching SQL Server's LOG) / SQRT / POW. Same identities
+                    // used in the SQL Server branch -- see that comment for
+                    // the formula derivation and domain notes.
+                    nameof(Math.Sinh) when args.Length == 1 =>
+                        $"((EXP({args[0]}) - EXP(-({args[0]}))) / 2)",
+                    nameof(Math.Cosh) when args.Length == 1 =>
+                        $"((EXP({args[0]}) + EXP(-({args[0]}))) / 2)",
+                    nameof(Math.Tanh) when args.Length == 1 =>
+                        $"((EXP(2 * ({args[0]})) - 1) / (EXP(2 * ({args[0]})) + 1))",
+                    nameof(Math.Asinh) when args.Length == 1 =>
+                        $"LOG(({args[0]}) + SQRT(POW({args[0]}, 2) + 1))",
+                    nameof(Math.Acosh) when args.Length == 1 =>
+                        $"LOG(({args[0]}) + SQRT(POW({args[0]}, 2) - 1))",
+                    nameof(Math.Atanh) when args.Length == 1 =>
+                        $"(0.5 * LOG((1 + ({args[0]})) / (1 - ({args[0]}))))",
                     _ => null
                 };
             }
