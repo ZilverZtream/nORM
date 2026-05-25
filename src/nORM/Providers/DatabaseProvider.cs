@@ -576,6 +576,22 @@ namespace nORM.Providers
             => $"STRING_AGG({expr}, {sepLiteral})";
 
         /// <summary>
+        /// Returns SQL that evaluates the .NET <c>Regex.IsMatch(input, pattern)</c>
+        /// where <paramref name="patternLiteral"/> is the already-emitted SQL
+        /// fragment for the pattern (typically a single-quoted literal or @-param).
+        /// PostgreSQL: <c>input ~ pattern</c>.
+        /// MySQL: <c>input REGEXP pattern</c>.
+        /// SQLite: <c>input REGEXP pattern</c> (requires a user-registered REGEXP
+        ///   function on the connection -- Microsoft.Data.Sqlite doesn't supply
+        ///   one by default; emitting the operator is still the correct shape).
+        /// SQL Server: throws -- T-SQL has no native regex primitive. A CLR
+        ///   function with the same surface is the user-supplied workaround.
+        /// </summary>
+        public virtual string GetRegexMatchSql(string inputSql, string patternLiteral)
+            => throw new NormUnsupportedFeatureException(
+                $"Regex.IsMatch is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///

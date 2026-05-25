@@ -1350,6 +1350,21 @@ namespace nORM.Query
                 }
             }
 
+            // Regex.IsMatch(input, pattern) -- static 2-arg form. Lowers to
+            // the provider's regex-match operator via GetRegexMatchSql; SQL
+            // Server throws a clear unsupported-feature message since T-SQL
+            // has no built-in regex primitive.
+            if (node.Method.DeclaringType == typeof(System.Text.RegularExpressions.Regex)
+                && node.Method.Name == nameof(System.Text.RegularExpressions.Regex.IsMatch)
+                && node.Arguments.Count == 2
+                && node.Object == null)
+            {
+                var inputSql = GetSql(node.Arguments[0]);
+                var patternSql = GetSql(node.Arguments[1]);
+                _sql.Append(_provider.GetRegexMatchSql(inputSql, patternSql));
+                return node;
+            }
+
             // string.Join(separator, params string[] values) -- the C# variadic
             // form passes a NewArrayInit as args[1] which the generic provider
             // routing collapses to a single opaque entry. Detect early and

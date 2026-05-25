@@ -234,6 +234,16 @@ namespace nORM.Providers
         public override string GetStringAggregateSql(string expr, string sepLiteral)
             => $"GROUP_CONCAT({expr}, {sepLiteral})";
 
+        /// <summary>
+        /// SQLite REGEXP is an infix operator backed by a user-defined function;
+        /// Microsoft.Data.Sqlite doesn't register one by default, so callers must
+        /// supply one via <c>SqliteConnection.CreateFunction("regexp", ...)</c>
+        /// before executing queries that use this method. The emitted SQL is
+        /// still the canonical operator form so the contract is portable.
+        /// </summary>
+        public override string GetRegexMatchSql(string inputSql, string patternLiteral)
+            => $"({inputSql} REGEXP {patternLiteral})";
+
         /// <summary>SQLite uses strftime with an 'N months' modifier on the DateOnly TEXT column.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({monthsSqlFragment}) || ' months')";
