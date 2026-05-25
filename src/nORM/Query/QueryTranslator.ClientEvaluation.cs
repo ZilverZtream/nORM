@@ -79,6 +79,7 @@ namespace nORM.Query
                 nameof(Math.MinMagnitude),
                 nameof(Math.IEEERemainder),
                 nameof(Math.ScaleB),
+                nameof(Math.BigMul),
                 nameof(Math.Clamp),
                 // decimal.Round shares its name with Math.Round but has its
                 // own static (and analyzer is name-based not type-based, so
