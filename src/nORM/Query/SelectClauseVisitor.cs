@@ -947,6 +947,18 @@ namespace nORM.Query
                 _ => methodName.ToUpperInvariant()
             };
 
+            // Decimal columns store as TEXT in SQLite; SQL aggregates inherit
+            // storage class so MIN/MAX/SUM/AVG would lex-compare mixed-
+            // magnitude values. Coerce to REAL so the inner aggregate uses
+            // numeric semantics. Sister to HandleDirectAggregate (2002200)
+            // and OrderBy (c8b8c6b) -- same precision-tradeoff caveat
+            // documented at those sites.
+            var aggSelType = Nullable.GetUnderlyingType(selectorLambda.Body.Type) ?? selectorLambda.Body.Type;
+            if (aggSelType == typeof(decimal))
+            {
+                selectorSql = $"CAST({selectorSql} AS REAL)";
+            }
+
             sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
               .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(_outerAlias).Append('.').Append(pkCol);
