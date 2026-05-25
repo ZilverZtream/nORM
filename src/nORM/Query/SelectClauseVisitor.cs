@@ -248,6 +248,30 @@ namespace nORM.Query
                 }
             }
 
+            // Nullable<T>.GetValueOrDefault() / GetValueOrDefault(fallback) --
+            // mirror ExpressionToSqlVisitor (line ~1138). Lower to COALESCE.
+            if (node.Object != null
+                && node.Method.Name == nameof(Nullable<int>.GetValueOrDefault)
+                && node.Object.Type.IsGenericType
+                && node.Object.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                var inner = TranslateProjectionArg(node.Object);
+                if (node.Arguments.Count == 0)
+                {
+                    var underlying = Nullable.GetUnderlyingType(node.Object.Type)!;
+                    var fallback = underlying == typeof(string) ? "''"
+                        : underlying.IsValueType ? "0"
+                        : "NULL";
+                    sb.Append("COALESCE(").Append(inner).Append(", ").Append(fallback).Append(')');
+                }
+                else
+                {
+                    var fbSql = TranslateProjectionArg(node.Arguments[0]);
+                    sb.Append("COALESCE(").Append(inner).Append(", ").Append(fbSql).Append(')');
+                }
+                return node;
+            }
+
             // string.Join(separator, params string[] values) -- the C# variadic
             // form compiles to a MethodCall with a NewArrayInit second arg
             // holding the value expressions. The args array passed to the
