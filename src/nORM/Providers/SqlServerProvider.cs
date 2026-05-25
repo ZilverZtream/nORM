@@ -429,6 +429,22 @@ namespace nORM.Providers
                     nameof(string.Trim) when args.Length == 1 => $"LTRIM(RTRIM({args[0]}))",
                     nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
                     nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                    // T-SQL has no LPAD/RPAD primitive. Build via REPLICATE
+                    // + concatenation, with a CASE gate so a longer-than-
+                    // target input passes through unchanged (matching .NET
+                    // PadLeft/PadRight's "never truncates" contract).
+                    nameof(string.PadLeft) when args.Length == 2 =>
+                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
+                        $"ELSE REPLICATE(' ', {args[1]} - LEN({args[0]})) + {args[0]} END)",
+                    nameof(string.PadLeft) when args.Length == 3 =>
+                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
+                        $"ELSE REPLICATE({args[2]}, {args[1]} - LEN({args[0]})) + {args[0]} END)",
+                    nameof(string.PadRight) when args.Length == 2 =>
+                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
+                        $"ELSE {args[0]} + REPLICATE(' ', {args[1]} - LEN({args[0]})) END)",
+                    nameof(string.PadRight) when args.Length == 3 =>
+                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
+                        $"ELSE {args[0]} + REPLICATE({args[2]}, {args[1]} - LEN({args[0]})) END)",
                     // SQL Server SUBSTRING is 1-indexed; .NET Substring is 0-indexed, add 1.
                     // The 2-arg form needs an explicit large length because SUBSTRING requires
                     // a length parameter; LEN of the source is always >= what we need.
