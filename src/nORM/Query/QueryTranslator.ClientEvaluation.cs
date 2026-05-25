@@ -148,6 +148,12 @@ namespace nORM.Query
                 nameof(TimeSpan.TotalSeconds),
                 nameof(TimeSpan.TotalMilliseconds),
                 nameof(TimeSpan.Compare),
+                // TimeSpan factory methods -- per-row column args lowered to
+                // SQL printf('%02d:%02d:%02d', ...) by SqliteProvider.TranslateMethodCall.
+                // The materializer reads the resulting 'HH:MM:SS' text via TimeSpan.Parse.
+                nameof(TimeSpan.FromHours),
+                nameof(TimeSpan.FromMinutes),
+                nameof(TimeSpan.FromSeconds),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
