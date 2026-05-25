@@ -1590,6 +1590,7 @@ namespace nORM.Query
                 && node.Arguments.Count == 1
                 && (node.Method.Name == nameof(char.IsDigit)
                     || node.Method.Name == nameof(char.IsLetter)
+                    || node.Method.Name == nameof(char.IsLetterOrDigit)
                     || node.Method.Name == nameof(char.IsWhiteSpace)
                     || node.Method.Name == nameof(char.IsUpper)
                     || node.Method.Name == nameof(char.IsLower)
@@ -1607,6 +1608,14 @@ namespace nORM.Query
                     case nameof(char.IsLetter):
                         _sql.Append("((").Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
                             .Append(charSql).Append(" BETWEEN 'a' AND 'z'))");
+                        return node;
+                    case nameof(char.IsLetterOrDigit):
+                        // Disjunction of IsLetter || IsDigit. ASCII-range only,
+                        // matching the parent IsLetter / IsDigit handlers above.
+                        _sql.Append('(')
+                            .Append('(').Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
+                            .Append(charSql).Append(" BETWEEN 'a' AND 'z') OR (")
+                            .Append(charSql).Append(" BETWEEN '0' AND '9'))");
                         return node;
                     case nameof(char.IsUpper):
                         _sql.Append('(').Append(charSql).Append(" BETWEEN 'A' AND 'Z')");
