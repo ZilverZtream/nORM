@@ -818,6 +818,10 @@ namespace nORM.Providers
                     nameof(decimal.Divide) when args.Length == 2 => $"({args[0]} * 1.0 / {args[1]})",
                     nameof(decimal.Remainder) when args.Length == 2 => $"({args[0]} % {args[1]})",
                     nameof(decimal.Negate) when args.Length == 1 => $"(-({args[0]}))",
+                    // Compare(a, b) returns -1/0/1 indicating less/equal/greater.
+                    // SQLite's SIGN(a-b) yields exactly that triple for non-NaN
+                    // numerics; sister to Math.Sign already mapped.
+                    nameof(decimal.Compare) when args.Length == 2 => $"CAST(SIGN({args[0]} - {args[1]}) AS INTEGER)",
                     _ => null
                 };
             }

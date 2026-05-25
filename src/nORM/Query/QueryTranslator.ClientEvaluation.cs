@@ -97,6 +97,7 @@ namespace nORM.Query
                 nameof(decimal.Divide),
                 nameof(decimal.Remainder),
                 nameof(decimal.Negate),
+                nameof(decimal.Compare),
                 // IEEE 754 predicates on double/float (same name on both).
                 nameof(double.IsNaN),
                 nameof(double.IsInfinity),
