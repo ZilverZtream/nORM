@@ -543,6 +543,29 @@ namespace nORM.Providers
                 };
             }
 
+            // Numeric Parse(string) -- common pattern where numeric values
+            // are stored in a TEXT column and need integer/decimal semantics
+            // for projection or downstream arithmetic. SQLite CAST AS INTEGER
+            // / REAL handles the text->number conversion natively (returns 0
+            // for non-numeric text, matching SQLite's coercion -- not .NET's
+            // FormatException semantic but the closest SQL equivalent).
+            if (declaringType == typeof(int)
+                || declaringType == typeof(long)
+                || declaringType == typeof(short)
+                || declaringType == typeof(byte)
+                || declaringType == typeof(double)
+                || declaringType == typeof(float)
+                || declaringType == typeof(decimal))
+            {
+                if (name == "Parse" && args.Length == 1)
+                {
+                    var sqlType = declaringType == typeof(double) || declaringType == typeof(float) || declaringType == typeof(decimal)
+                        ? "REAL"
+                        : "INTEGER";
+                    return $"CAST({args[0]} AS {sqlType})";
+                }
+            }
+
             if (declaringType == typeof(NormFunctions))
             {
                 return name switch
