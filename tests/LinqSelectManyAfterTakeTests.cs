@@ -58,30 +58,35 @@ public class LinqSelectManyAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SelectMany_after_take_flattens_only_windowed_rows_or_throws_actionable_pin()
+    public async Task SelectMany_after_take_flattens_only_windowed_rows()
     {
-        System.Exception? caught = null;
-        string[]? tags = null;
-        try
-        {
-            tags = (await _ctx.Query<SmaParent>()
-                .OrderBy(p => p.Id)
-                .Take(2)
-                .SelectMany(p => p.Children, (p, c) => c.Tag)
-                .ToListAsync())
-                .ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
+        // OrderBy(Id).Take(2) → parents 1,2 — both have NO children.
+        // Windowed flatten yields 0 rows. Full-table flatten then LIMIT(2) would
+        // yield 2 children of parents 3 and 4 — silent-wrongness.
+        var tags = (await _ctx.Query<SmaParent>()
+            .OrderBy(p => p.Id)
+            .Take(2)
+            .SelectMany(p => p.Children, (p, c) => c.Tag)
+            .ToListAsync())
+            .ToArray();
+        Assert.Empty(tags);
+    }
 
-        // The pin must fire — silent-wrongness here flattened the wrong rows AND from the wrong column.
-        Assert.NotNull(caught);
-        Assert.IsType<NormUnsupportedFeatureException>(caught);
-        Assert.Contains("SelectMany", caught.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Include", caught.Message, System.StringComparison.Ordinal);
+    [Fact]
+    public async Task SelectMany_skip_then_take_flattens_only_windowed_parents_children()
+    {
+        // Skip(2).Take(2) → parents 3 and 4 — both have 2 children each.
+        // Windowed flatten yields the 4 children. NewExpression projection
+        // hits JoinBuilder's column-extraction path.
+        var rows = (await _ctx.Query<SmaParent>()
+            .OrderBy(p => p.Id)
+            .Skip(2)
+            .Take(2)
+            .SelectMany(p => p.Children, (p, c) => new { c.Tag })
+            .ToListAsync())
+            .Select(r => r.Tag).OrderBy(t => t)
+            .ToArray();
+        Assert.Equal(new[] { "k1", "k2", "k3", "k4" }, rows);
     }
 
     [Table("SmaParent")]
