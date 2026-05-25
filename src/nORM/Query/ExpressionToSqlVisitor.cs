@@ -1194,7 +1194,8 @@ namespace nORM.Query
                     || node.Method.Name == nameof(char.IsLetter)
                     || node.Method.Name == nameof(char.IsWhiteSpace)
                     || node.Method.Name == nameof(char.IsUpper)
-                    || node.Method.Name == nameof(char.IsLower)))
+                    || node.Method.Name == nameof(char.IsLower)
+                    || node.Method.Name == nameof(char.IsPunctuation)))
             {
                 var charSql = GetSql(node.Arguments[0]);
                 switch (node.Method.Name)
@@ -1211,6 +1212,17 @@ namespace nORM.Query
                         return node;
                     case nameof(char.IsLower):
                         _sql.Append('(').Append(charSql).Append(" BETWEEN 'a' AND 'z')");
+                        return node;
+                    case nameof(char.IsPunctuation):
+                        _sql.Append("((unicode(").Append(charSql).Append(") BETWEEN 33 AND 35) OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 37 AND 42) OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 44 AND 47) OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 58 AND 59) OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 63 AND 64) OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 91 AND 93) OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 95 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 123 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 125)");
                         return node;
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
