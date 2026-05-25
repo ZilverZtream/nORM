@@ -256,28 +256,19 @@ namespace nORM.Query
             var collectionSelector = StripQuotes(node.Arguments[1]) as LambdaExpression
                                    ?? throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Collection selector must be a lambda expression"));
 
-            // Eighth in the post-Take/Skip silent-wrongness family — sister of the
-            // HandleInnerJoin / HandleGroupJoin pins (3716e13). SelectMany over a Take/Skip
-            // outer source emits a flat INNER JOIN with a LIMIT applied to the joined
-            // result — runs the join on the FULL outer table and then takes n joined rows
-            // instead of taking the windowed n outer rows and flattening their inner
-            // collections. SQL needs a subquery wrap (`FROM (… LIMIT n) AS T0 INNER JOIN
-            // …`) that nORM doesn't yet emit. Detect via SourceHasTakeOrSkip and throw.
+            // SelectMany over a Take/Skip-windowed outer source — wrap the windowed outer
+            // as a derived table so the flatten/join runs only against the LIMITed rows.
+            // Sister of HandleInnerJoin / HandleGroupJoin windowed-outer branches (0de442d).
+            string? smOuterFromOverride = null;
             if (SourceHasTakeOrSkip(sourceQuery))
             {
-                throw new NormUnsupportedFeatureException(
-                    "SelectMany over a Take/Skip outer source isn't supported — the translator " +
-                    "emits a flat join with `LIMIT n` applied to the JOINED result, so the join " +
-                    "runs against the FULL outer table and picks n rows from the flattened set " +
-                    "rather than flattening only the windowed n outer rows (LINQ semantics for " +
-                    "`q.Take(n).SelectMany(p => p.Children, …)`). SQL needs a subquery wrap " +
-                    "(`FROM (… LIMIT n) AS T0 INNER JOIN …`) that nORM doesn't yet emit. " +
-                    "Workarounds: " +
-                    "(1) Materialize the windowed outer first, then fetch and flatten client-side: " +
-                    "`var top = await q.Take(n).Include(p => p.Children).ToListAsync(); " +
-                    "var flat = top.SelectMany(p => p.Children).ToList();`. " +
-                    "(2) Move the Take to AFTER the SelectMany if you wanted top-N-after-flatten: " +
-                    "`q.SelectMany(p => p.Children, …).Take(n)`.");
+                var subSmOuter = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subSmMap);
+                _mapping = subSmMap;
+                MergeSubPlanParameters(subSmOuter);
+                smOuterFromOverride = subSmOuter.Sql;
+                // Skip the Visit(sourceQuery) below — we've already translated it in the
+                // sub-context. The rest of the method uses _mapping (already set above)
+                // and emits the join SQL by hand.
             }
 
             // Detect the query-syntax left join shape: `from p in P join c in C on p.K equals
@@ -325,7 +316,8 @@ namespace nORM.Query
             }
 
             // Visit the source query first to establish base mapping
-            Visit(sourceQuery);
+            if (smOuterFromOverride == null)
+                Visit(sourceQuery);
             var outerMapping = _mapping;
             var outerAlias = EscapeAlias("T0");
             // Track the outer parameter for correlated references
@@ -461,7 +453,11 @@ namespace nORM.Query
                 }
 
                 _sql.Append(' ');
-                _sql.Append("FROM ").Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+                _sql.Append("FROM ");
+                if (smOuterFromOverride != null)
+                    _sql.Append('(').Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
+                else
+                    _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
                 var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
                 _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
                 _sql.Append("ON ").Append(outerAlias).Append('.').Append(relation.PrincipalKey.EscCol)
@@ -551,7 +547,10 @@ namespace nORM.Query
                 crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
                 crossSql.Append(' ');
             }
-            crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+            if (smOuterFromOverride != null)
+                crossSql.Append("FROM (").Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
+            else
+                crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
             if (useLeftJoin)
             {
                 // For DefaultIfEmpty with CROSS JOIN, use LEFT JOIN with trivial condition
