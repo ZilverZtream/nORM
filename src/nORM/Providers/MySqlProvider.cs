@@ -561,6 +561,10 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"HOUR({args[0]})",
                     nameof(TimeOnly.Minute) => $"MINUTE({args[0]})",
                     nameof(TimeOnly.Second) => $"SECOND({args[0]})",
+                    // IsBetween(start, end) wraps around midnight when start > end.
+                    nameof(TimeOnly.IsBetween) when args.Length == 3 =>
+                        $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
+                        $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
                     _ => null
                 };
             }
