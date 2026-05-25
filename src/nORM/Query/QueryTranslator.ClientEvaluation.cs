@@ -83,6 +83,7 @@ namespace nORM.Query
                 nameof(Convert.ToDouble),
                 nameof(Convert.ToDecimal),
                 nameof(Convert.ToBoolean),
+                nameof(Convert.ChangeType),
 
                 // Math methods
                 nameof(Math.Abs),

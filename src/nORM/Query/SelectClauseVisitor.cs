@@ -332,6 +332,41 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // Convert.ChangeType(value, typeof(T)) — the target type is conveyed
+            // as a Type constant; pattern-match it at build time and emit the
+            // equivalent CAST. Mirrors ETSV's Convert.ToXxx single-arg path.
+            // Runtime-variable target types remain unsupported and fall through.
+            if (node.Method.DeclaringType == typeof(Convert)
+                && node.Method.Name == nameof(Convert.ChangeType)
+                && node.Arguments.Count == 2
+                && node.Arguments[1] is ConstantExpression typeConst
+                && typeConst.Value is Type targetType)
+            {
+                var innerStart = sb.Length;
+                Visit(node.Arguments[0]);
+                var innerSql = sb.ToString(innerStart, sb.Length - innerStart);
+                sb.Length = innerStart;
+                var sqlType = targetType switch
+                {
+                    var t when t == typeof(int)     => "INTEGER",
+                    var t when t == typeof(short)   => "INTEGER",
+                    var t when t == typeof(byte)    => "INTEGER",
+                    var t when t == typeof(sbyte)   => "INTEGER",
+                    var t when t == typeof(long)    => "BIGINT",
+                    var t when t == typeof(string)  => "TEXT",
+                    var t when t == typeof(double)  => "REAL",
+                    var t when t == typeof(float)   => "REAL",
+                    var t when t == typeof(decimal) => "DECIMAL",
+                    var t when t == typeof(bool)    => "BOOLEAN",
+                    _ => null
+                };
+                if (sqlType != null)
+                {
+                    sb.Append("CAST(").Append(innerSql).Append(" AS ").Append(sqlType).Append(')');
+                    return node;
+                }
+            }
+
             // TimeSpan.Negate() and TimeSpan.Duration() (abs) on a column receiver.
             // Both route through the seconds-as-REAL hook (sister of 502c24a's unary
             // negate fix) so the materialiser reconstructs via TimeSpan.FromSeconds
