@@ -374,6 +374,14 @@ namespace nORM.Providers
             => $"CAST(TIMESTAMPDIFF(SECOND, {startSql}, {endSql}) AS DOUBLE)";
 
         /// <summary>
+        /// MySQL stores TimeOnly as TIME. TIMEDIFF returns a signed TIME diff;
+        /// TIME_TO_SEC produces the integer-seconds form which can be negative.
+        /// Wrap +86400 MOD 86400 to match TimeOnly's [0, 24h) semantics.
+        /// </summary>
+        public override string GetTimeOnlyDifferenceSecondsSql(string endSql, string startSql)
+            => $"CAST(((TIME_TO_SEC(TIMEDIFF({endSql}, {startSql})) + 86400) MOD 86400) AS DOUBLE)";
+
+        /// <summary>
         /// Translates selected .NET methods to their MySQL SQL equivalents.
         /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)

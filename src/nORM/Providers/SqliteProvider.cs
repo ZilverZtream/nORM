@@ -325,6 +325,25 @@ namespace nORM.Providers
             => $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
 
         /// <summary>
+        /// SQLite stores TimeOnly as 'HH:mm:ss[.fffffff]' text. Parse each side's
+        /// HH/MM/SS components (the SS substring carries the fractional tail when
+        /// present, so CAST(... AS REAL) preserves sub-second precision) into total
+        /// seconds, then wrap the diff modulo 86400 to match TimeOnly's [0, 24h)
+        /// semantics.
+        /// </summary>
+        public override string GetTimeOnlyDifferenceSecondsSql(string endSql, string startSql)
+        {
+            string toSecs(string t) =>
+                $"(CAST(substr({t}, 1, 2) AS INTEGER) * 3600 + " +
+                $"CAST(substr({t}, 4, 2) AS INTEGER) * 60 + " +
+                $"CAST(substr({t}, 7) AS REAL))";
+            // SQLite's % works on REAL operands when either side is REAL; the
+            // raw diff is in (-86400, 86400), so + 86400 first shifts into
+            // (0, 172800) and the modulo wraps anything >= 86400 back down.
+            return $"((({toSecs(endSql)} - {toSecs(startSql)}) + 86400.0) % 86400.0)";
+        }
+
+        /// <summary>
         /// Overload-aware hook -- called by the visitors BEFORE
         /// <see cref="TranslateFunction"/>. Used here to distinguish Math.Round
         /// overloads that share arity but differ in semantics:

@@ -400,6 +400,14 @@ namespace nORM.Providers
             => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
 
         /// <summary>
+        /// SQL Server stores TimeOnly as TIME(7). DATEDIFF(SECOND, t1, t2) on
+        /// two TIMEs returns the signed second diff in (-86400, 86400). Wrap
+        /// with +86400 then % 86400 to match TimeOnly's [0, 24h) semantics.
+        /// </summary>
+        public override string GetTimeOnlyDifferenceSecondsSql(string endSql, string startSql)
+            => $"CAST(((DATEDIFF(SECOND, {startSql}, {endSql}) + 86400) % 86400) AS FLOAT)";
+
+        /// <summary>
         /// Translates a subset of .NET methods into their SQL Server equivalents.
         /// </summary>
         /// <param name="name">Name of the method being translated.</param>

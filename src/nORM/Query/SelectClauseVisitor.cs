@@ -163,20 +163,23 @@ namespace nORM.Query
                 return node;
             }
 
-            // (DateTime - DateTime).<TimeSpan-member> -- mirror ETSV's
-            // TryEmitTimeSpanMember. The binary path produces fractional
-            // seconds via julianday*86400; member access extracts a specific
-            // component matching System.TimeSpan's semantics.
+            // (DateTime - DateTime).<TimeSpan-member> and (TimeOnly - TimeOnly).
+            // <TimeSpan-member> -- mirror ETSV's TryEmitTimeSpanMember. The
+            // binary path produces fractional seconds (DateTime: julianday
+            // delta; TimeOnly: wrapped diff in [0, 24h)); member access
+            // extracts a specific component matching System.TimeSpan's
+            // semantics.
             if (node.Expression is BinaryExpression tsBin
                 && tsBin.NodeType == ExpressionType.Subtract
                 && node.Expression.Type == typeof(TimeSpan))
             {
+                var leftUnderlying = Nullable.GetUnderlyingType(tsBin.Left.Type) ?? tsBin.Left.Type;
+                var rightUnderlying = Nullable.GetUnderlyingType(tsBin.Right.Type) ?? tsBin.Right.Type;
                 var endSql = TranslateProjectionArg(tsBin.Left);
                 var startSql = TranslateProjectionArg(tsBin.Right);
-                // Provider hook: SqliteProvider returns the julianday-based
-                // expression; SqlServer DATEDIFF_BIG(SECOND, ...); Postgres
-                // EXTRACT(EPOCH FROM diff); MySQL TIMESTAMPDIFF(SECOND, ...).
-                var secondsSql = $"({_provider.GetDateTimeDifferenceSecondsSql(endSql, startSql)})";
+                var secondsSql = leftUnderlying == typeof(TimeOnly) && rightUnderlying == typeof(TimeOnly)
+                    ? $"({_provider.GetTimeOnlyDifferenceSecondsSql(endSql, startSql)})"
+                    : $"({_provider.GetDateTimeDifferenceSecondsSql(endSql, startSql)})";
                 string? emit = node.Member.Name switch
                 {
                     nameof(TimeSpan.TotalSeconds) => secondsSql,
@@ -1315,6 +1318,25 @@ namespace nORM.Query
                 // GetFieldValue path which converts numeric to TimeSpan via
                 // TimeSpan.FromSeconds.
                 sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
+                return node;
+            }
+            // TimeOnly - TimeOnly -> TimeSpan, wrapped to [0, 24h) per
+            // .NET's TimeOnly.op_Subtraction. Each provider's hook emits the
+            // wrapped form so the materializer's TimeSpan.FromSeconds path
+            // produces the same wall-clock-elapsed semantics.
+            if (node.NodeType == ExpressionType.Subtract
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeOnly)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeOnly))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                sb.Append('(').Append(_provider.GetTimeOnlyDifferenceSecondsSql(leftSql, rightSql)).Append(')');
                 return node;
             }
             // Bitwise XOR on integer/enum operands -- SQLite has no `^`
