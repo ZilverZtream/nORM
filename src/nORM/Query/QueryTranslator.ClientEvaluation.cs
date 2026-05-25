@@ -123,6 +123,8 @@ namespace nORM.Query
                 nameof(DateTime.Ticks),
                 nameof(DateTime.Compare),
                 nameof(DateTime.ParseExact),
+                nameof(DateTime.IsLeapYear),
+                nameof(DateTime.DaysInMonth),
                 nameof(DateTimeOffset.UtcDateTime),
                 nameof(DateTimeOffset.DateTime),
                 nameof(DateTimeOffset.Offset),
