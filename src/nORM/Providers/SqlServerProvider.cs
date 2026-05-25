@@ -449,7 +449,33 @@ namespace nORM.Providers
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x}, 0)" : $"ROUND({x}, {digits})",
-                truncateTowardZero: (x, digits) => digits == null ? $"ROUND({x}, 0, 1)" : $"ROUND({x}, {digits}, 1)");
+                truncateTowardZero: (x, digits) => digits == null ? $"ROUND({x}, 0, 1)" : $"ROUND({x}, {digits}, 1)")
+            ?? TryTranslateIeee754Predicate(node, args);
+
+        /// <summary>
+        /// double / float IEEE 754 predicates (IsNaN / IsInfinity / IsFinite /
+        /// IsPositiveInfinity / IsNegativeInfinity). T-SQL has no native
+        /// primitives; emit the algebraic form (x != x for IsNaN, CAST('Infinity'
+        /// AS FLOAT) comparison for IsInfinity) so the predicate works on
+        /// computed float expressions (e.g. division results) even though SQL
+        /// Server's FLOAT type itself usually rejects NaN/Infinity at insert.
+        /// </summary>
+        private static string? TryTranslateIeee754Predicate(System.Linq.Expressions.MethodCallExpression node, string[] args)
+        {
+            var dt = node.Method.DeclaringType;
+            if ((dt != typeof(double) && dt != typeof(float)) || args.Length != 1) return null;
+            const string pInf = "CAST('Infinity' AS FLOAT)";
+            const string nInf = "CAST('-Infinity' AS FLOAT)";
+            return node.Method.Name switch
+            {
+                "IsNaN" => $"({args[0]} != {args[0]})",
+                "IsInfinity" => $"({args[0]} = {pInf} OR {args[0]} = {nInf})",
+                "IsFinite" => $"({args[0]} = {args[0]} AND {args[0]} != {pInf} AND {args[0]} != {nInf})",
+                "IsPositiveInfinity" => $"({args[0]} = {pInf})",
+                "IsNegativeInfinity" => $"({args[0]} = {nInf})",
+                _ => null
+            };
+        }
 
         /// <summary>
         /// Translates a subset of .NET methods into their SQL Server equivalents.
