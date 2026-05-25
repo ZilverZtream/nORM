@@ -19,6 +19,23 @@ namespace nORM.Query
         {
             private readonly DatabaseProvider _provider;
             private bool _hasUntranslatableExpression;
+            // Tracks whether ALL untranslatable expressions encountered are
+            // "auto-route-safe" -- pure LINQ-to-Objects leaves that the
+            // SelectTranslator can transparently run client-side after
+            // materializing the raw columns. The narrow allowlist (string.Split,
+            // string.ToCharArray, etc.) lets common shapes "just work" under the
+            // default Throw policy without users having to opt into Warn/Allow.
+            // Complex untranslatables (correlated subqueries, multi-hop nav,
+            // arbitrary helper methods) still surface the Throw with the full
+            // diagnostic.
+            private bool _allUntranslatableAreAutoRouteSafe = true;
+            private static readonly HashSet<string> _autoRouteSafeMethodNames = new(StringComparer.Ordinal)
+            {
+                // Methods that return a non-SQL type from a column input but are
+                // pure / side-effect-free and trivially executable client-side.
+                nameof(string.Split),
+                nameof(string.ToCharArray),
+            };
             private readonly HashSet<string> _sqlTranslatableMethods = new()
             {
                 // String methods
@@ -185,6 +202,14 @@ namespace nORM.Query
 
             public bool HasUntranslatableExpression => _hasUntranslatableExpression;
 
+            /// <summary>
+            /// True when every untranslatable expression encountered is in the
+            /// narrow auto-route-safe allowlist (pure LINQ-to-Objects leaves).
+            /// SelectTranslator uses this to bypass the Throw policy for safe
+            /// shapes like `Select(p =&gt; p.Csv.Split(','))`.
+            /// </summary>
+            public bool AllUntranslatableAreAutoRouteSafe => _allUntranslatableAreAutoRouteSafe;
+
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
                 // Check if this is a method that can be translated to SQL
@@ -243,12 +268,16 @@ namespace nORM.Query
                     {
                         // This method cannot be translated to SQL
                         _hasUntranslatableExpression = true;
+                        if (!_autoRouteSafeMethodNames.Contains(node.Method.Name))
+                            _allUntranslatableAreAutoRouteSafe = false;
                     }
                 }
                 else
                 {
-                    // Unknown declaring type - assume untranslatable
+                    // Unknown declaring type - assume untranslatable AND unsafe
+                    // (we can't reason about side-effects without a type).
                     _hasUntranslatableExpression = true;
+                    _allUntranslatableAreAutoRouteSafe = false;
                 }
 
                 return base.VisitMethodCall(node);
@@ -256,8 +285,11 @@ namespace nORM.Query
 
             protected override Expression VisitInvocation(InvocationExpression node)
             {
-                // Lambda invocations cannot be translated to SQL
+                // Lambda invocations cannot be translated to SQL and aren't
+                // in the auto-route-safe allowlist (caller-supplied lambdas
+                // may have side effects).
                 _hasUntranslatableExpression = true;
+                _allUntranslatableAreAutoRouteSafe = false;
                 return base.VisitInvocation(node);
             }
 
@@ -322,9 +354,17 @@ namespace nORM.Query
             LambdaExpression originalProjection,
             out LambdaExpression? serverProjection,
             out Func<object, object>? clientProjection)
+            => TrySplitProjection(originalProjection, out serverProjection, out clientProjection, out _);
+
+        private bool TrySplitProjection(
+            LambdaExpression originalProjection,
+            out LambdaExpression? serverProjection,
+            out Func<object, object>? clientProjection,
+            out bool allUntranslatableAreAutoRouteSafe)
         {
             serverProjection = null;
             clientProjection = null;
+            allUntranslatableAreAutoRouteSafe = false;
 
             // Analyze if the projection contains untranslatable expressions
             var analyzer = new TranslatabilityAnalyzer(_provider);
@@ -335,6 +375,7 @@ namespace nORM.Query
                 // Everything can be translated to SQL
                 return false;
             }
+            allUntranslatableAreAutoRouteSafe = analyzer.AllUntranslatableAreAutoRouteSafe;
 
             // Extract all member accesses we need from the database
             var extractor = new MemberAccessExtractor(originalProjection.Parameters[0]);
