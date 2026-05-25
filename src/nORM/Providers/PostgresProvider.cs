@@ -504,6 +504,8 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"EXTRACT(MONTH FROM {args[0]})",
                     nameof(DateOnly.Day) => $"EXTRACT(DAY FROM {args[0]})",
                     nameof(DateOnly.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
+                    // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
+                    nameof(DateOnly.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
                     // PostgreSQL `date - date` returns int (days). Anchor on
                     // DATE '0001-01-01' to match .NET DateOnly.MinValue == day 0.
                     nameof(DateOnly.DayNumber) => $"({args[0]} - DATE '0001-01-01')",

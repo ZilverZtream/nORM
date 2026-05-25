@@ -927,6 +927,8 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
+                    // SQLite strftime %w returns 0..6 (Sun..Sat), matching .NET DayOfWeek.
+                    nameof(DateOnly.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                     // DayNumber: days since DateOnly.MinValue (0001-01-01).
                     // .NET stores DayNumber as a 0-based int -- subtract the
                     // Julian Day of 0001-01-01 (1721425.5; the .5 is the JD

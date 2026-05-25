@@ -537,6 +537,8 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"MONTH({args[0]})",
                     nameof(DateOnly.Day) => $"DAY({args[0]})",
                     nameof(DateOnly.DayOfYear) => $"DAYOFYEAR({args[0]})",
+                    // MySQL DAYOFWEEK returns 1=Sun..7=Sat; .NET DayOfWeek is 0=Sun..6=Sat.
+                    nameof(DateOnly.DayOfWeek) => $"(DAYOFWEEK({args[0]}) - 1)",
                     // MySQL TO_DAYS uses proleptic Gregorian anchored at year 0;
                     // TO_DAYS('0001-01-01') == 366 (year 0 was 366 days). Subtract
                     // 366 so the result matches .NET DateOnly.MinValue == day 0.
