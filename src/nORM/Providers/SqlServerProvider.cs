@@ -442,6 +442,31 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(DateTimeOffset))
+            {
+                // DateTimeOffset members specific to the offset-aware type. Handle
+                // these BEFORE the shared DateTime branch so DateTime.X never
+                // accidentally swallows them via name collision.
+                var dtoMatch = name switch
+                {
+                    // SWITCHOFFSET(col, 0) shifts the wall-clock to UTC; CAST AS
+                    // DATETIME2 drops the offset suffix so the materializer reads
+                    // a plain DATETIME2 -> DateTime(Kind=Unspecified).
+                    nameof(DateTimeOffset.UtcDateTime) => $"CAST(SWITCHOFFSET({args[0]}, 0) AS DATETIME2)",
+                    // The wall-clock portion (ignoring the offset) is just the
+                    // DATETIME2 cast of the value -- matches .NET DateTimeOffset.
+                    // DateTime returning Kind=Unspecified.
+                    nameof(DateTimeOffset.DateTime) => $"CAST({args[0]} AS DATETIME2)",
+                    // DATEPART(TZoffset, x) returns the offset in MINUTES as int;
+                    // multiply by 60 to get seconds and CAST to FLOAT so the
+                    // materializer's "double -> TimeSpan.FromSeconds" path picks
+                    // it up correctly.
+                    nameof(DateTimeOffset.Offset) => $"CAST((DATEPART(TZoffset, {args[0]}) * 60) AS FLOAT)",
+                    _ => null
+                };
+                if (dtoMatch != null) return dtoMatch;
+            }
+
             if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch

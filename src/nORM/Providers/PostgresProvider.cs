@@ -346,6 +346,26 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(DateTimeOffset))
+            {
+                // TIMESTAMPTZ stores a UTC instant -- Npgsql normalizes any
+                // stored offset to the session's UTC representation, so the
+                // "offset" portion is effectively always 0 from the LINQ-side
+                // perspective. UtcDateTime / DateTime both unwrap to a
+                // session-independent TIMESTAMP via AT TIME ZONE 'UTC'.
+                var dtoMatch = name switch
+                {
+                    nameof(DateTimeOffset.UtcDateTime) => $"({args[0]} AT TIME ZONE 'UTC')",
+                    nameof(DateTimeOffset.DateTime) => $"({args[0]} AT TIME ZONE 'UTC')",
+                    // Always TimeSpan.Zero: emit as REAL seconds so the
+                    // materializer's double -> TimeSpan.FromSeconds path
+                    // reconstructs TimeSpan.Zero.
+                    nameof(DateTimeOffset.Offset) => "CAST(0 AS DOUBLE PRECISION)",
+                    _ => null
+                };
+                if (dtoMatch != null) return dtoMatch;
+            }
+
             if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch
