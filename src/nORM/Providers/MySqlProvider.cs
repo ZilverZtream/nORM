@@ -573,6 +573,10 @@ namespace nORM.Providers
                     nameof(TimeOnly.Millisecond) => $"(MICROSECOND({args[0]}) DIV 1000)",
                     nameof(TimeOnly.Microsecond) => $"(MICROSECOND({args[0]}) % 1000)",
                     nameof(TimeOnly.Nanosecond) => "0",
+                    // TIME_TO_SEC returns the whole-second count; multiply by
+                    // 10_000_000 ticks/sec. MICROSECOND yields 0..999999;
+                    // multiply by 10 to get ticks (MySQL has microsecond precision).
+                    nameof(TimeOnly.Ticks) => $"(TIME_TO_SEC({args[0]}) * 10000000 + MICROSECOND({args[0]}) * 10)",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
