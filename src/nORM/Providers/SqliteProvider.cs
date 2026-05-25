@@ -767,6 +767,11 @@ namespace nORM.Providers
                     nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     // ScaleB(x, n) = x * 2^n -- direct via SQLite POW.
                     nameof(Math.ScaleB) when args.Length == 2 => $"({args[0]} * POW(2.0, {args[1]}))",
+                    // BigMul(int, int) widens to long. SQLite INTEGER is 64-bit
+                    // so the natural product never overflows for the int*int
+                    // range -- emit the plain multiply; materializer reads the
+                    // INTEGER column as long via column-type affinity.
+                    nameof(Math.BigMul) when args.Length == 2 => $"({args[0]} * {args[1]})",
                     // Clamp(v, min, max) = MIN(MAX(v, min), max). The .NET
                     // ArgumentException for min > max is a runtime guard, not
                     // part of the expression semantics; callers writing
