@@ -231,6 +231,15 @@ namespace nORM.Providers
         }
 
         /// <inheritdoc/>
+        public override string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
+        {
+            var totalSec = (long)localOffset.TotalSeconds;
+            return totalSec == 0
+                ? $"strftime('%Y-%m-%d %H:%M:%S', {dtoSql})"
+                : $"strftime('%Y-%m-%d %H:%M:%S', {dtoSql}, '{(totalSec >= 0 ? "+" : "-")}{System.Math.Abs(totalSec)} seconds')";
+        }
+
+        /// <inheritdoc/>
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER
             // when the parsed span has no fractional component (the common

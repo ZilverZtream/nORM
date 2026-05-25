@@ -201,6 +201,25 @@ namespace nORM.Query
                 return node;
             }
 
+            // dtoCol.LocalDateTime — wall clock at the local machine's offset.
+            // The local offset isn't known to the SQL engine, so capture it at
+            // query-build time via TimeZoneInfo.Local and bake it into the SQL
+            // shift. Matches .NET's behaviour where DTO.LocalDateTime captures
+            // the local TZ at API-call time (with the same DST caveat).
+            if (node.Member.Name == nameof(DateTimeOffset.LocalDateTime)
+                && node.Member.DeclaringType == typeof(DateTimeOffset)
+                && node.Expression != null
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(DateTimeOffset))
+            {
+                var dtoStart = sb.Length;
+                Visit(node.Expression);
+                var dtoSql = sb.ToString(dtoStart, sb.Length - dtoStart);
+                sb.Length = dtoStart;
+                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
+                sb.Append(_provider.GetDateTimeOffsetLocalDateTimeSql(dtoSql, localOffset));
+                return node;
+            }
+
             // (DateTime - DateTime).<TimeSpan-member> and (TimeOnly - TimeOnly).
             // <TimeSpan-member> -- mirror ETSV's TryEmitTimeSpanMember. The
             // binary path produces fractional seconds (DateTime: julianday

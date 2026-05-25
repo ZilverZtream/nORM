@@ -939,6 +939,17 @@ namespace nORM.Providers
                 $"DateTimeOffset.ToOffset is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// SQL evaluating <paramref name="dtoSql"/> as the wall-clock DateTime at
+        /// <paramref name="localOffset"/> — i.e. the value of
+        /// <see cref="DateTimeOffset.LocalDateTime"/> with the local offset baked
+        /// in at query-build time. Result is the date+time portion only (no offset
+        /// suffix), readable as a <see cref="DateTime"/> by the materialiser.
+        /// </summary>
+        public virtual string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTimeOffset.LocalDateTime is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
