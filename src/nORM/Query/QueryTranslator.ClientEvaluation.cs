@@ -72,6 +72,7 @@ namespace nORM.Query
                 nameof(DateTime.DayOfWeek),
                 nameof(DateTime.TimeOfDay),
                 nameof(DateTime.Millisecond),
+                nameof(DateTime.Ticks),
                 nameof(DateTimeOffset.UtcDateTime),
                 nameof(DateTimeOffset.DateTime),
                 nameof(DateTimeOffset.Offset),
