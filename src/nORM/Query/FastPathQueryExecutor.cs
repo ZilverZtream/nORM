@@ -432,6 +432,15 @@ namespace nORM.Query
             if ((value == null || value == DBNull.Value) && binary.NodeType != ExpressionType.Equal)
                 return false;
 
+            // DTO col [op] DateTime literal needs UTC-epoch lowering (the literal
+            // binds without offset and would mismatch rows storing the same UTC
+            // instant in a different offset). The slow translator (ETSV
+            // TryEmitDateTimeOffsetEqualsLiteral) handles this — bail out of the
+            // fast path so it takes that branch.
+            var memberType = Nullable.GetUnderlyingType(member.Type) ?? member.Type;
+            if (memberType == typeof(DateTimeOffset) && value is DateTime)
+                return false;
+
             predicates.Add(new PredicateInfo(member.Member.Name, binary.NodeType, value));
             return true;
         }

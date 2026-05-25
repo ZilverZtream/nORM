@@ -292,6 +292,10 @@ namespace nORM.Providers
             return $"(({dtoSql} AT TIME ZONE INTERVAL '{totalSec} seconds')::timestamp)";
         }
 
+        /// <inheritdoc/>
+        public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
+            => $"CAST(EXTRACT(EPOCH FROM {dtoSql}) AS BIGINT)";
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";

@@ -950,6 +950,19 @@ namespace nORM.Providers
                 $"DateTimeOffset.LocalDateTime is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// SQL evaluating <paramref name="dtoSql"/> as the integer count of seconds
+        /// since the Unix epoch (UTC). Used to lower <c>dtoCol == dateTimeLiteral</c>
+        /// to instant equality — comparing canonical UTC text would mismatch rows
+        /// that stored the same UTC instant in a different offset. Second-resolution
+        /// is a conscious trade-off: sub-second fidelity would require provider-
+        /// specific decimal math and most DTO columns are second-precision in
+        /// practice.
+        /// </summary>
+        public virtual string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTimeOffset UTC-instant comparison is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

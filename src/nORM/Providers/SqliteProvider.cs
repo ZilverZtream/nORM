@@ -240,6 +240,10 @@ namespace nORM.Providers
         }
 
         /// <inheritdoc/>
+        public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
+            => $"CAST(strftime('%s', {dtoSql}) AS INTEGER)";
+
+        /// <inheritdoc/>
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER
             // when the parsed span has no fractional component (the common

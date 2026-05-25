@@ -482,6 +482,17 @@ namespace nORM.Query
                 // For reference types (string, class): only expand when BOTH sides could be null
                 // at runtime (i.e., neither side is a known non-null constant or parameter).
                 // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
+                // DateTimeOffset col == DateTime literal: SQLite stores DTOs as
+                // text with an offset suffix and the literal binds as offset-less
+                // text, so naive equality misses rows storing the same UTC instant
+                // in a different offset. Lower to UTC epoch-seconds comparison via
+                // a provider hook. .NET's DateTime→DateTimeOffset implicit conv
+                // treats Utc-kind as offset 0 and Unspecified/Local as the local
+                // offset (we use the snapshot offset, consistent with
+                // GetDateTimeOffsetLocalDateTimeSql).
+                if (TryEmitDateTimeOffsetEqualsLiteral(node))
+                    return node;
+
                 if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
                 {
                     int ls = _sql.Length;
@@ -3426,6 +3437,64 @@ namespace nORM.Query
             var segment = _sql.ToString(start, _sql.Length - start);
             _sql.Remove(start, _sql.Length - start);
             return segment;
+        }
+
+        // dtoCol [==/!=] dateTimeLiteral — see Bxxxx commit message: SQLite text
+        // storage of DTOs needs UTC-instant comparison, not byte equality of
+        // canonical text. Snapshot semantics mirror [[dto-local-datetime]] for
+        // the DateTime.Kind=Unspecified / Local conversion.
+        private bool TryEmitDateTimeOffsetEqualsLiteral(BinaryExpression node)
+        {
+            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual))
+                return false;
+
+            var leftType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+            var rightType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+
+            Expression colSide; Expression litSide;
+            if (leftType == typeof(DateTimeOffset) && IsColumnReference(node.Left))
+            {
+                colSide = node.Left;
+                litSide = node.Right;
+            }
+            else if (rightType == typeof(DateTimeOffset) && IsColumnReference(node.Right))
+            {
+                colSide = node.Right;
+                litSide = node.Left;
+            }
+            else return false;
+
+            // Peel any Convert wrapping the literal (implicit DateTime→DTO).
+            var peeled = litSide;
+            while (peeled is UnaryExpression u2 && (u2.NodeType == ExpressionType.Convert || u2.NodeType == ExpressionType.ConvertChecked))
+                peeled = u2.Operand;
+
+            if (!TryGetConstantValue(peeled, out var raw) || raw == null)
+                return false;
+
+            DateTimeOffset utcInstant;
+            if (raw is DateTime dt)
+            {
+                if (dt.Kind == DateTimeKind.Utc)
+                    utcInstant = new DateTimeOffset(dt, TimeSpan.Zero);
+                else
+                {
+                    var snap = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
+                    utcInstant = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), snap);
+                }
+            }
+            else if (raw is DateTimeOffset dto) utcInstant = dto;
+            else return false;
+
+            var epochSec = utcInstant.ToUnixTimeSeconds();
+            var colSql = GetSql(colSide);
+            var epochSql = _provider.GetDateTimeOffsetUtcEpochSecondsSql(colSql);
+            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+            _sql.Append("(").Append(epochSql);
+            _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
+            _sql.AppendParameterizedValue(paramName, epochSec, _paramSink);
+            _sql.Append(")");
+            return true;
         }
         /// <summary>
         /// Delegates to the shared ExpressionValueExtractor utility for consistent behavior.
