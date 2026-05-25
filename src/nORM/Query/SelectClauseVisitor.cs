@@ -429,8 +429,16 @@ namespace nORM.Query
                     sb.Append("''");
                     return node;
                 }
-                var elemSqls = joinArr.Expressions.Select(e => TranslateProjectionArg(e)).ToList();
-                sb.Append('(').Append(string.Join($" || {sepLit} || ", elemSqls)).Append(')');
+                // Fold through the provider's concat primitive (SqlServer
+                // uses '+', MySQL uses CONCAT(...)); plain `||` interleave
+                // would emit invalid SQL on those providers.
+                var parts = new List<string>(joinArr.Expressions.Count * 2 - 1);
+                for (int i = 0; i < joinArr.Expressions.Count; i++)
+                {
+                    if (i > 0) parts.Add(sepLit);
+                    parts.Add(TranslateProjectionArg(joinArr.Expressions[i]));
+                }
+                sb.Append(parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
                 return node;
             }
 

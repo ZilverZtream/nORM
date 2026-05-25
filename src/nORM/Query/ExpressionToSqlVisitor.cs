@@ -1288,11 +1288,12 @@ namespace nORM.Query
                 }
             }
 
-            // string.Join(separator, params string[] values) -- mirror SCV's
-            // handler (5f48dc3): the C# variadic form passes a NewArrayInit
-            // as args[1] which the generic provider routing collapses to a
-            // single opaque entry. Detect early and emit interleaved || with
-            // a literal separator.
+            // string.Join(separator, params string[] values) -- the C# variadic
+            // form passes a NewArrayInit as args[1] which the generic provider
+            // routing collapses to a single opaque entry. Detect early and
+            // interleave the literal separator between each element, folding
+            // pairwise through the provider's concat primitive so SQL Server
+            // (uses '+') and MySQL (uses CONCAT(...)) get portable SQL.
             if (node.Method.DeclaringType == typeof(string)
                 && node.Method.Name == nameof(string.Join)
                 && node.Arguments.Count == 2
@@ -1306,13 +1307,14 @@ namespace nORM.Query
                     _sql.Append("''");
                     return node;
                 }
-                _sql.Append('(');
+                var parts = new List<string>(joinArr.Expressions.Count * 2 - 1);
                 for (int i = 0; i < joinArr.Expressions.Count; i++)
                 {
-                    if (i > 0) _sql.Append(" || ").Append(sepLit).Append(" || ");
-                    _sql.Append(GetSql(joinArr.Expressions[i]));
+                    if (i > 0) parts.Add(sepLit);
+                    parts.Add(GetSql(joinArr.Expressions[i]));
                 }
-                _sql.Append(')');
+                var joined = parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                _sql.Append(joined);
                 return node;
             }
             // Fast path: common string methods (Contains, StartsWith, EndsWith) are handled
