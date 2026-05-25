@@ -275,9 +275,16 @@ namespace nORM.Query
                 if (originalProjection != null)
                 {
                     // Try to split the projection into server and client parts
-                    if (t.TrySplitProjection(originalProjection, out var serverProjection, out var clientProjection))
+                    if (t.TrySplitProjection(originalProjection, out var serverProjection, out var clientProjection, out var allAutoRouteSafe))
                     {
-                        if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Throw)
+                        // Auto-route-safe leaves (string.Split, ToCharArray, etc.) bypass
+                        // the Throw policy -- those are pure LINQ-to-Objects shapes that
+                        // can transparently run client-side after raw-column fetch with
+                        // no correctness / cost surprises. Complex untranslatables
+                        // (correlated subqueries, helper-method calls, lambda invocations)
+                        // still surface the full Throw with diagnostic.
+                        if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Throw
+                            && !allAutoRouteSafe)
                         {
                             throw new NormUnsupportedFeatureException(
                                 "The query projection requires client-side evaluation — it contains " +
