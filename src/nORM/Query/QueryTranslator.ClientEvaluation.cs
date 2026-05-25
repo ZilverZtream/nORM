@@ -89,6 +89,13 @@ namespace nORM.Query
                 nameof(decimal.Floor),
                 nameof(decimal.Ceiling),
                 nameof(decimal.Abs),
+                // Static method-form arithmetic.
+                nameof(decimal.Add),
+                nameof(decimal.Subtract),
+                nameof(decimal.Multiply),
+                nameof(decimal.Divide),
+                nameof(decimal.Remainder),
+                nameof(decimal.Negate),
                 // IEEE 754 predicates on double/float (same name on both).
                 nameof(double.IsNaN),
                 nameof(double.IsInfinity),
