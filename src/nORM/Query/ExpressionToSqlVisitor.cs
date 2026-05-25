@@ -2289,7 +2289,9 @@ namespace nORM.Query
             // IsPositiveInfinity) live as statics on double/float. Admitting the
             // declaring types lets the generic TranslateFunction routing pick
             // them up via SqliteProvider's typeof(double)/typeof(float) switch.
-            typeof(double), typeof(float)
+            // typeof(decimal) admits decimal.Round overloads (dispatched via
+            // TranslateMethodCall) plus future decimal-static translations.
+            typeof(double), typeof(float), typeof(decimal)
         }.ToFrozenSet();
 
         /// <summary>

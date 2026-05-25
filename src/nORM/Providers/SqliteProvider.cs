@@ -250,7 +250,11 @@ namespace nORM.Providers
         /// </summary>
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
         {
-            if (node.Method.DeclaringType != typeof(Math) || node.Method.Name != nameof(Math.Round))
+            // Math.Round and decimal.Round share identical overload semantics
+            // and identical .NET defaults (ToEven). Treat them uniformly.
+            var declType = node.Method.DeclaringType;
+            if (!((declType == typeof(Math) && node.Method.Name == nameof(Math.Round))
+                  || (declType == typeof(decimal) && node.Method.Name == nameof(decimal.Round))))
                 return null;
 
             var ps = node.Method.GetParameters();

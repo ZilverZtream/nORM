@@ -80,6 +80,10 @@ namespace nORM.Query
                 nameof(Math.IEEERemainder),
                 nameof(Math.ScaleB),
                 nameof(Math.Clamp),
+                // decimal.Round shares its name with Math.Round but has its
+                // own static (and analyzer is name-based not type-based, so
+                // Math.Round's entry doesn't cover it).
+                nameof(decimal.Round),
                 // IEEE 754 predicates on double/float (same name on both).
                 nameof(double.IsNaN),
                 nameof(double.IsInfinity),
