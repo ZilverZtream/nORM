@@ -2350,7 +2350,14 @@ namespace nORM.Query
             // them up via SqliteProvider's typeof(double)/typeof(float) switch.
             // typeof(decimal) admits decimal.Round overloads (dispatched via
             // TranslateMethodCall) plus future decimal-static translations.
-            typeof(double), typeof(float), typeof(decimal)
+            typeof(double), typeof(float), typeof(decimal),
+            // TimeSpan.Compare / TimeSpan.FromHours etc are statics; admit so
+            // the provider's typeof(TimeSpan) switch (TimeSpan.Compare landed
+            // in 9ae9dab) reaches the WHERE path. DateTimeOffset already
+            // routes via typeof(DateTime)|typeof(DateTimeOffset) in the
+            // provider switch but the analyzer needs the type admitted to
+            // get past the IsTranslatableMethod gate.
+            typeof(TimeSpan), typeof(DateTimeOffset)
         }.ToFrozenSet();
 
         /// <summary>
