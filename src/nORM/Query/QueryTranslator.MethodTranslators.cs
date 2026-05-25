@@ -1106,6 +1106,17 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Reverse after a Take/Skip-windowed source must reverse only the
+                // windowed rows. The default path flips the existing _orderBy
+                // direction and sends a single `ORDER BY … DESC LIMIT N` to the
+                // server — which picks the BOTTOM rows of the full table, not the
+                // reverse of the top-N window. Sister of the post-Take/Skip fixes
+                // (3040f49 / e0f1397 / 99a02ce / a1eb69e / bfc8180 / d6de693).
+                if (node.Arguments[0] is MethodCallExpression revWinSrc
+                    && revWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
                 var revSource = t.Visit(node.Arguments[0]);
                 if (t._orderBy.Count > 0)
                 {
@@ -1121,6 +1132,46 @@ namespace nORM.Query
                         t._orderBy.Add((key.EscCol, false));
                 }
                 return revSource;
+            }
+
+            /// <summary>
+            /// Windowed-source branch — wraps the source as a derived table and
+            /// emits the reversed OrderBy keys on the outer SELECT. Kept in its
+            /// own method so the common-path Translate stays stack-frame lean.
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanR = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapR);
+                t._mapping = subMapR;
+                t.MergeSubPlanParameters(subPlanR);
+                var winAliasR = t.EscapeAlias("__wrev" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT * FROM (").Append(subPlanR.Sql).AppendFragment(") AS ").Append(winAliasR);
+                // Lift the source's OrderBy keys and flip them for the outer SELECT.
+                // If no explicit OrderBy is present in the source chain, fall back
+                // to the mapping's key columns ordered descending (matching the
+                // unwindowed-Reverse default).
+                var orderKeysR = ExtractOrderByKeys(node.Arguments[0]);
+                t._orderBy.Clear();
+                if (orderKeysR.Count > 0)
+                {
+                    foreach (var (keyLambda, asc) in orderKeysR)
+                    {
+                        var okParam = keyLambda.Parameters[0];
+                        if (!t._correlatedParams.ContainsKey(okParam))
+                            t._correlatedParams[okParam] = (subMapR, winAliasR);
+                        var vctxOk = new VisitorContext(t._ctx, subMapR, t._provider, okParam, winAliasR, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                        var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
+                        var okSql = okVisitor.Translate(keyLambda.Body);
+                        FastExpressionVisitorPool.Return(okVisitor);
+                        t._orderBy.Add((okSql, !asc));
+                    }
+                }
+                else
+                {
+                    foreach (var key in subMapR.KeyColumns)
+                        t._orderBy.Add(($"{winAliasR}.{key.EscCol}", false));
+                }
+                return node;
             }
         }
 
