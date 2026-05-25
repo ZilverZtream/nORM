@@ -173,7 +173,10 @@ namespace nORM.Query
             {
                 var endSql = TranslateProjectionArg(tsBin.Left);
                 var startSql = TranslateProjectionArg(tsBin.Right);
-                var secondsSql = $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
+                // Provider hook: SqliteProvider returns the julianday-based
+                // expression; SqlServer DATEDIFF_BIG(SECOND, ...); Postgres
+                // EXTRACT(EPOCH FROM diff); MySQL TIMESTAMPDIFF(SECOND, ...).
+                var secondsSql = $"({_provider.GetDateTimeDifferenceSecondsSql(endSql, startSql)})";
                 string? emit = node.Member.Name switch
                 {
                     nameof(TimeSpan.TotalSeconds) => secondsSql,
@@ -1287,12 +1290,13 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                // (julianday(end) - julianday(start)) * 86400 -> REAL seconds.
-                // Materializer reads as double; user expects TimeSpan -- handled
-                // by MaterializerFactory's GetFieldValue path which converts a
-                // numeric reader value to TimeSpan via TimeSpan.FromSeconds.
-                sb.Append("((julianday(").Append(leftSql).Append(") - julianday(")
-                  .Append(rightSql).Append(")) * 86400.0)");
+                // Provider hook returns REAL seconds (julianday delta on SQLite,
+                // DATEDIFF_BIG on SqlServer, EXTRACT(EPOCH) on Postgres,
+                // TIMESTAMPDIFF on MySQL). Materializer reads as double; user
+                // expects TimeSpan -- handled by MaterializerFactory's
+                // GetFieldValue path which converts numeric to TimeSpan via
+                // TimeSpan.FromSeconds.
+                sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
                 return node;
             }
             // Bitwise XOR on integer/enum operands -- SQLite has no `^`
