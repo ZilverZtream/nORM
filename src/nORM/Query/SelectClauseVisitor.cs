@@ -342,20 +342,47 @@ namespace nORM.Query
                 && node.Arguments[0].Type == typeof(string))
             {
                 if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var rawFmt)
-                    && rawFmt is string fmt
-                    && fmt.Length >= 2
-                    && (fmt[0] == 'F' || fmt[0] == 'f')
-                    && int.TryParse(fmt.AsSpan(1), out var digits)
-                    && digits >= 0 && digits <= 17)
+                    && rawFmt is string fmt)
                 {
-                    var recvSql = TranslateProjectionArg(node.Object);
-                    sb.Append("printf('%.").Append(digits).Append("f', ").Append(recvSql).Append(')');
-                    return node;
+                    // Numeric F<N>/f<N> fixed-decimal -> printf('%.<N>f', ...).
+                    if (fmt.Length >= 2
+                        && (fmt[0] == 'F' || fmt[0] == 'f')
+                        && int.TryParse(fmt.AsSpan(1), out var digits)
+                        && digits >= 0 && digits <= 17)
+                    {
+                        var recvSql = TranslateProjectionArg(node.Object);
+                        sb.Append("printf('%.").Append(digits).Append("f', ").Append(recvSql).Append(')');
+                        return node;
+                    }
+
+                    // DateTime/DateTimeOffset/DateOnly/TimeOnly format strings:
+                    // map the common .NET tokens (yyyy/MM/dd/HH/mm/ss) to strftime
+                    // tokens, preserving literal punctuation. Locale-aware tokens
+                    // (MMM month name, dddd day name, etc.) are not supported --
+                    // those require culture data SQLite doesn't carry.
+                    var underlying = Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type;
+                    if (underlying == typeof(DateTime)
+                        || underlying == typeof(DateTimeOffset)
+                        || underlying == typeof(DateOnly)
+                        || underlying == typeof(TimeOnly))
+                    {
+                        if (TryConvertDotNetDateFormatToStrftime(fmt, out var strftimeFmt))
+                        {
+                            var recvSql = TranslateProjectionArg(node.Object);
+                            sb.Append("strftime('").Append(strftimeFmt).Append("', ").Append(recvSql).Append(')');
+                            return node;
+                        }
+                        throw new InvalidOperationException(
+                            $"DateTime ToString(\"{fmt}\") format is not supported in projection. " +
+                            "Supported tokens: yyyy yy MM dd HH mm ss; literal characters are passed through. " +
+                            "Locale-aware tokens (MMM/MMMM month names, dddd/ddd day names) are unavailable in " +
+                            "SQLite; project the DateTime and format after materialization.");
+                    }
                 }
                 throw new InvalidOperationException(
-                    $"Numeric ToString(\"{node.Arguments[0]}\") format is not supported in projection. " +
-                    "Supported subset: \"F<N>\" / \"f<N>\" fixed-decimal (e.g. \"F2\"). For other formats, " +
-                    "project the numeric value and apply the format after materialization.");
+                    $"ToString(\"{node.Arguments[0]}\") format is not supported in projection on type '{node.Object.Type.Name}'. " +
+                    "Supported subset: numeric \"F<N>\"/\"f<N>\" and DateTime tokens yyyy/yy/MM/dd/HH/mm/ss. " +
+                    "Project the value and apply the format after materialization for other shapes.");
             }
 
             // No-arg ToString() on a non-string receiver -- lower to the provider's
@@ -818,6 +845,51 @@ namespace nORM.Query
             public readonly int ArgIndex;
             public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; }
             public FormatSegment(int i) { IsLiteral = false; Literal = null; ArgIndex = i; }
+        }
+
+        /// <summary>
+        /// Translates a .NET DateTime custom format string into a SQLite
+        /// strftime format string. Returns false on any unsupported token
+        /// (notably locale-aware MMM/MMMM/dddd/ddd). Single-quote characters
+        /// in literal segments are doubled per SQL string-literal rules so the
+        /// caller can wrap the result in '...'. Strftime % is escaped as %%.
+        /// </summary>
+        private static bool TryConvertDotNetDateFormatToStrftime(string fmt, out string strftime)
+        {
+            var sb = new StringBuilder(fmt.Length + 4);
+            int i = 0;
+            while (i < fmt.Length)
+            {
+                if (i + 4 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y' && fmt[i + 2] == 'y' && fmt[i + 3] == 'y')
+                { sb.Append("%Y"); i += 4; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y')
+                { sb.Append("%y"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'M' && fmt[i + 1] == 'M')
+                { sb.Append("%m"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'd' && fmt[i + 1] == 'd')
+                { sb.Append("%d"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'H' && fmt[i + 1] == 'H')
+                { sb.Append("%H"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'm' && fmt[i + 1] == 'm')
+                { sb.Append("%M"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 's' && fmt[i + 1] == 's')
+                { sb.Append("%S"); i += 2; continue; }
+                // Reject locale-aware and unsupported single-character tokens
+                // before they end up in the strftime literal as themselves.
+                char c = fmt[i];
+                if (c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm'
+                    || c == 's' || c == 'y' || c == 'f' || c == 'F' || c == 'z' || c == 'K' || c == 't')
+                {
+                    strftime = string.Empty;
+                    return false;
+                }
+                if (c == '\'') sb.Append("''");
+                else if (c == '%') sb.Append("%%");
+                else sb.Append(c);
+                i++;
+            }
+            strftime = sb.ToString();
+            return true;
         }
 
         private static List<FormatSegment>? TryParseFormatSegments(string template)
