@@ -666,6 +666,12 @@ namespace nORM.Providers
                     nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     // ScaleB(x, n) = x * 2^n -- direct via SQLite POW.
                     nameof(Math.ScaleB) when args.Length == 2 => $"({args[0]} * POW(2.0, {args[1]}))",
+                    // Clamp(v, min, max) = MIN(MAX(v, min), max). The .NET
+                    // ArgumentException for min > max is a runtime guard, not
+                    // part of the expression semantics; callers writing
+                    // Clamp(...) in a query already implicitly assume the
+                    // ordering, so we mirror only the happy path.
+                    nameof(Math.Clamp) when args.Length == 3 => $"MIN(MAX({args[0]}, {args[1]}), {args[2]})",
                     // IEEERemainder(x, y) = x - y * round(x/y, ToEven). SQLite's
                     // native ROUND() rounds half-away-from-zero, so we inline a
                     // banker's-rounding equivalent on |x/y|: integer part via

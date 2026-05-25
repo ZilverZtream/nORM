@@ -79,6 +79,7 @@ namespace nORM.Query
                 nameof(Math.MinMagnitude),
                 nameof(Math.IEEERemainder),
                 nameof(Math.ScaleB),
+                nameof(Math.Clamp),
 
                 // DateTime properties
                 nameof(DateTime.Year),
