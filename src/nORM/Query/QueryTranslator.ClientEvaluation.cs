@@ -41,6 +41,8 @@ namespace nORM.Query
                 // String methods
                 nameof(string.ToUpper),
                 nameof(string.ToLower),
+                nameof(string.ToUpperInvariant),
+                nameof(string.ToLowerInvariant),
                 nameof(string.Contains),
                 nameof(string.StartsWith),
                 nameof(string.EndsWith),

@@ -544,6 +544,8 @@ namespace nORM.Providers
                 {
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
+                    nameof(char.ToUpperInvariant) => $"UPPER({args[0]})",
+                    nameof(char.ToLowerInvariant) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LEN({args[0]})",
                     nameof(string.Trim) when args.Length == 1 => $"LTRIM(RTRIM({args[0]}))",
                     nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
