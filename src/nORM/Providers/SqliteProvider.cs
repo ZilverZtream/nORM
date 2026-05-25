@@ -513,6 +513,12 @@ namespace nORM.Providers
                     // ASCII control chars: codepoints 0-31 plus 127 (DEL).
                     nameof(char.IsControl) when args.Length == 1 =>
                         $"((unicode({args[0]}) BETWEEN 0 AND 31) OR unicode({args[0]}) = 127)",
+                    // char.GetNumericValue: digit value (0..9) for '0'..'9',
+                    // -1.0 otherwise. Cast result to REAL to match the double
+                    // return type the materializer expects.
+                    nameof(char.GetNumericValue) when args.Length == 1 =>
+                        $"(CASE WHEN unicode({args[0]}) BETWEEN 48 AND 57 " +
+                        $"THEN CAST(unicode({args[0]}) - 48 AS REAL) ELSE -1.0 END)",
                     _ => null
                 };
             }

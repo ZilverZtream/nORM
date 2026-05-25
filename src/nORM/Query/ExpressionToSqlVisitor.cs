@@ -1197,7 +1197,8 @@ namespace nORM.Query
                     || node.Method.Name == nameof(char.IsLower)
                     || node.Method.Name == nameof(char.IsPunctuation)
                     || node.Method.Name == nameof(char.IsSymbol)
-                    || node.Method.Name == nameof(char.IsControl)))
+                    || node.Method.Name == nameof(char.IsControl)
+                    || node.Method.Name == nameof(char.GetNumericValue)))
             {
                 var charSql = GetSql(node.Arguments[0]);
                 switch (node.Method.Name)
@@ -1238,6 +1239,10 @@ namespace nORM.Query
                     case nameof(char.IsControl):
                         _sql.Append("((unicode(").Append(charSql).Append(") BETWEEN 0 AND 31) OR ")
                             .Append("unicode(").Append(charSql).Append(") = 127)");
+                        return node;
+                    case nameof(char.GetNumericValue):
+                        _sql.Append("(CASE WHEN unicode(").Append(charSql).Append(") BETWEEN 48 AND 57 ")
+                            .Append("THEN CAST(unicode(").Append(charSql).Append(") - 48 AS REAL) ELSE -1.0 END)");
                         return node;
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
