@@ -48,37 +48,48 @@ public class LinqWhereAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_after_take_either_filters_inside_window_or_throws_with_actionable_pin()
+    public async Task Where_after_take_filters_inside_the_window()
     {
-        System.Exception? caught = null;
-        WatRow[]? result = null;
-        try
-        {
-            result = (await _ctx.Query<WatRow>()
-                .OrderBy(r => r.Id)
-                .Take(3)
-                .Where(r => r.Active == 1)
-                .ToListAsync()).ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
+        // OrderBy(Id).Take(3) → rows 1,2,3. Active=1 inside that window → only row 2.
+        // Full-table filter would also include rows 4 and 5.
+        var rows = (await _ctx.Query<WatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.Active == 1)
+            .ToListAsync())
+            .OrderBy(r => r.Id)
+            .ToArray();
+        Assert.Single(rows);
+        Assert.Equal(2, rows[0].Id);
+    }
 
-        if (caught != null)
-        {
-            // Acceptable: throw with pointing-at-workaround message (mirror of bca0523).
-            Assert.IsType<NormUnsupportedFeatureException>(caught);
-            Assert.Contains("Where", caught.Message, System.StringComparison.Ordinal);
-            Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-            return;
-        }
+    [Fact]
+    public async Task Where_after_skip_filters_only_after_offset()
+    {
+        // Skip(2) → rows 3,4,5. Active=1 matches rows 4 and 5.
+        var rows = (await _ctx.Query<WatRow>()
+            .OrderBy(r => r.Id)
+            .Skip(2)
+            .Where(r => r.Active == 1)
+            .ToListAsync())
+            .OrderBy(r => r.Id)
+            .ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.Equal(4, rows[0].Id);
+        Assert.Equal(5, rows[1].Id);
+    }
 
-        // Acceptable: correctly filtered the window — only (2,20,1) survives.
-        Assert.NotNull(result);
-        var dump = string.Join(", ", result!.Select(r => $"({r.Id},{r.Score},{r.Active})"));
-        Assert.True(result.Length == 1, $"Expected 1 row, got {result.Length}: [{dump}] — likely the silent-wrongness bug (filter ran on full table, then LIMIT applied).");
-        Assert.Equal(2, result[0].Id);
+    [Fact]
+    public async Task Where_after_take_with_no_window_match_returns_empty()
+    {
+        // First 2 rows V=10,20. None > 25 (row 3 has V=30 outside the window).
+        var rows = (await _ctx.Query<WatRow>()
+            .OrderBy(r => r.Id)
+            .Take(2)
+            .Where(r => r.Score > 25)
+            .ToListAsync())
+            .ToArray();
+        Assert.Empty(rows);
     }
 
     [Table("WatRow")]
