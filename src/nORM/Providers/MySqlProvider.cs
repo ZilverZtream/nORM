@@ -548,6 +548,20 @@ namespace nORM.Providers
                         $"LOG(({args[0]}) + SQRT(POW({args[0]}, 2) - 1))",
                     nameof(Math.Atanh) when args.Length == 1 =>
                         $"(0.5 * LOG((1 + ({args[0]})) / (1 - ({args[0]}))))",
+                    // Extended Math methods. MySQL has POW and LOG(B, X).
+                    nameof(Math.Cbrt) when args.Length == 1 => $"POW({args[0]}, 1.0/3.0)",
+                    // MySQL LOG(B, X): base first.
+                    nameof(Math.Log2) when args.Length == 1 => $"LOG(2, {args[0]})",
+                    nameof(Math.MaxMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.MinMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.ScaleB) when args.Length == 2 =>
+                        $"({args[0]} * POW(2.0, {args[1]}))",
+                    // MySQL SIGNED is 64-bit (BIGINT range); cast widens
+                    // the int*int product so |a*b| > 2^31 doesn't overflow.
+                    nameof(Math.BigMul) when args.Length == 2 =>
+                        $"(CAST({args[0]} AS SIGNED) * {args[1]})",
                     _ => null
                 };
             }

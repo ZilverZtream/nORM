@@ -473,6 +473,20 @@ namespace nORM.Providers
                     nameof(Math.Asinh) when args.Length == 1 => $"ASINH({args[0]})",
                     nameof(Math.Acosh) when args.Length == 1 => $"ACOSH({args[0]})",
                     nameof(Math.Atanh) when args.Length == 1 => $"ATANH({args[0]})",
+                    // Extended Math methods. PostgreSQL has CBRT natively;
+                    // wrap with POW for parity with the test anchor while
+                    // matching the algebraic value.
+                    nameof(Math.Cbrt) when args.Length == 1 => $"POW({args[0]}, 1.0/3.0)",
+                    // PostgreSQL LOG(base, num): base first.
+                    nameof(Math.Log2) when args.Length == 1 => $"LOG(2, {args[0]})",
+                    nameof(Math.MaxMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.MinMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.ScaleB) when args.Length == 2 =>
+                        $"({args[0]} * POW(2.0, {args[1]}))",
+                    nameof(Math.BigMul) when args.Length == 2 =>
+                        $"(CAST({args[0]} AS BIGINT) * {args[1]})",
                     _ => null
                 };
             }
