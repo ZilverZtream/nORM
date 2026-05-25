@@ -344,6 +344,12 @@ namespace nORM.Providers
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
             => $"ADDTIME({timeOnlySql}, SEC_TO_TIME({secondsSqlFragment}))";
 
+        /// <summary>MySQL ADDTIME / SUBTIME(TIME, TIME) stay TIME.</summary>
+        public override string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract)
+            => subtract
+                ? $"SUBTIME({timeOnlySql}, {timeSpanColumnSql})"
+                : $"ADDTIME({timeOnlySql}, {timeSpanColumnSql})";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";

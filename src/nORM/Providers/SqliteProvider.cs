@@ -195,6 +195,20 @@ namespace nORM.Providers
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
             => $"strftime('%H:%M:%S', '1900-01-01 ' || {timeOnlySql}, ({secondsSqlFragment}) || ' seconds')";
 
+        /// <summary>
+        /// SQLite TimeSpan columns are 'HH:mm:ss' text; parse seconds via
+        /// substr/CAST and feed to AddSecondsToTimeOnlySql for the strftime
+        /// modifier emit.
+        /// </summary>
+        public override string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-" : "";
+            var seconds = $"{sign}(CAST(substr({timeSpanColumnSql}, 1, 2) AS INTEGER) * 3600 + " +
+                          $"CAST(substr({timeSpanColumnSql}, 4, 2) AS INTEGER) * 60 + " +
+                          $"CAST(substr({timeSpanColumnSql}, 7, 2) AS INTEGER))";
+            return AddSecondsToTimeOnlySql(timeOnlySql, seconds);
+        }
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

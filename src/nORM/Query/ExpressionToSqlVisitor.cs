@@ -1238,41 +1238,45 @@ namespace nORM.Query
                     "DateOnly.AddDays in WHERE requires this provider hook.");
             }
 
-            // TimeOnly.Add(TimeSpan) -- routes through AddSecondsToTimeOnlySql.
-            // The TimeSpan argument is folded to a total-seconds value via
-            // TryGetConstantValue (closure-captured local), then passed as a
-            // constant fragment. Sub-day arithmetic only.
+            // TimeOnly.Add(TimeSpan) -- routes through AddSecondsToTimeOnlySql
+            // for constant / closure-captured TimeSpan, OR
+            // AddTimeSpanColumnToTimeOnlySql for a column-typed TimeSpan.
+            // Sub-day arithmetic only on SQLite.
             if (node.Object != null
                 && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(TimeOnly)
                 && node.Method.Name == nameof(TimeOnly.Add)
                 && node.Arguments.Count == 1
                 && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
             {
-                // Reserve a compiled-param placeholder slot if the TimeSpan
-                // came from a closure (same alignment fix as 407e03d).
-                if (node.Arguments[0] is MemberExpression)
-                {
-                    var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
-                    _params[placeholder] = DBNull.Value;
-                    _compiledParams.Add(placeholder);
-                }
                 var timeSql = GetSql(node.Object);
-                if (!TryGetConstantValue(node.Arguments[0], out var spanVal) || spanVal is not TimeSpan span)
+                if (TryGetConstantValue(node.Arguments[0], out var spanVal) && spanVal is TimeSpan span)
                 {
+                    // Reserve a compiled-param placeholder slot if the TimeSpan
+                    // came from a closure (same alignment fix as 407e03d).
+                    if (node.Arguments[0] is MemberExpression)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
+                    var secondsLiteral = ((long)span.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var arithSql = _provider.AddSecondsToTimeOnlySql(timeSql, secondsLiteral);
+                    if (arithSql != null) { _sql.Append(arithSql); return node; }
                     throw new NormUnsupportedFeatureException(
-                        "TimeOnly.Add requires a constant / closure-captured TimeSpan argument; " +
-                        "column-TimeSpan arithmetic on TimeOnly is not yet supported.");
+                        $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
+                        "TimeOnly.Add (constant TimeSpan) in WHERE requires this provider hook.");
                 }
-                var secondsLiteral = ((long)span.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                var arithSql = _provider.AddSecondsToTimeOnlySql(timeSql, secondsLiteral);
-                if (arithSql != null)
+                else
                 {
-                    _sql.Append(arithSql);
-                    return node;
+                    // Column-typed TimeSpan: provider hook reads the TimeSpan
+                    // column directly using its native TIME / INTERVAL primitives.
+                    var spanSql = GetSql(node.Arguments[0]);
+                    var arithSql = _provider.AddTimeSpanColumnToTimeOnlySql(timeSql, spanSql, subtract: false);
+                    if (arithSql != null) { _sql.Append(arithSql); return node; }
+                    throw new NormUnsupportedFeatureException(
+                        $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToTimeOnlySql; " +
+                        "TimeOnly.Add (TimeSpan column) in WHERE requires this provider hook.");
                 }
-                throw new NormUnsupportedFeatureException(
-                    $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
-                    "TimeOnly.Add in WHERE requires this provider hook.");
             }
 
             // string.Join(separator, params string[] values) -- mirror SCV's
