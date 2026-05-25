@@ -346,12 +346,28 @@ namespace nORM.Providers
             => $"((EXTRACT(EPOCH FROM ({endSql} - {startSql})) + 86400)::numeric % 86400)";
 
         /// <summary>
+        /// Overload-aware Math.Round / decimal.Round handling. PostgreSQL's
+        /// ROUND(double, int) doesn't exist -- ROUND with two args requires
+        /// numeric. For AwayFromZero on doubles, cast to numeric, round,
+        /// then back to double precision. TRUNC handles ToZero.
+        /// </summary>
+        public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
+            => TryTranslateMathRoundWithMode(node, args,
+                awayFromZero: (x, digits) => digits == null
+                    ? $"ROUND(({x})::numeric)"
+                    : $"ROUND(({x})::numeric, {digits})",
+                truncateTowardZero: (x, digits) => digits == null
+                    ? $"TRUNC(({x})::numeric)"
+                    : $"TRUNC(({x})::numeric, {digits})");
+
+        /// <summary>
         /// Attempts to translate a .NET method invocation into its PostgreSQL equivalent.
         /// </summary>
         /// <param name="name">Name of the .NET method being translated.</param>
         /// <param name="declaringType">Type that declares the method.</param>
         /// <param name="args">SQL fragments representing the method arguments.</param>
         /// <returns>The translated SQL expression or <c>null</c> if the method is not supported.</returns>
+
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
             ArgumentNullException.ThrowIfNull(args);
