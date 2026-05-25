@@ -250,9 +250,35 @@ namespace nORM.Providers
         /// </summary>
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
         {
+            var declType = node.Method.DeclaringType;
+
+            // 3-arg string.Compare/CompareTo with a StringComparison enum tail
+            // arg. SQLite's BINARY collation matches Ordinal (byte-wise); NOCASE
+            // matches OrdinalIgnoreCase well for ASCII data. The 2-arg overload
+            // already lives in the typeof(string) switch.
+            if (declType == typeof(string)
+                && (node.Method.Name == nameof(string.Compare) || node.Method.Name == nameof(string.CompareTo))
+                && args.Length == 3
+                && node.Arguments[node.Arguments.Count - 1] is System.Linq.Expressions.ConstantExpression cmpArg
+                && cmpArg.Value is StringComparison cmp)
+            {
+                string collation = cmp switch
+                {
+                    StringComparison.OrdinalIgnoreCase
+                        or StringComparison.CurrentCultureIgnoreCase
+                        or StringComparison.InvariantCultureIgnoreCase => "NOCASE",
+                    _ => "BINARY"
+                };
+                // The instance-form CompareTo arrives with receiver as args[0],
+                // peer as args[1], mode arg as args[2]. Compare static comes
+                // through identically since node.Object is null and three
+                // expression args present.
+                return $"(CASE WHEN {args[0]} COLLATE {collation} < {args[1]} COLLATE {collation} THEN -1 " +
+                       $"WHEN {args[0]} COLLATE {collation} > {args[1]} COLLATE {collation} THEN 1 ELSE 0 END)";
+            }
+
             // Math.Round and decimal.Round share identical overload semantics
             // and identical .NET defaults (ToEven). Treat them uniformly.
-            var declType = node.Method.DeclaringType;
             if (!((declType == typeof(Math) && node.Method.Name == nameof(Math.Round))
                   || (declType == typeof(decimal) && node.Method.Name == nameof(decimal.Round))))
                 return null;
