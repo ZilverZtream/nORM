@@ -313,6 +313,27 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // TimeSpan.Negate() and TimeSpan.Duration() (abs) on a column receiver.
+            // Both route through the seconds-as-REAL hook (sister of 502c24a's unary
+            // negate fix) so the materialiser reconstructs via TimeSpan.FromSeconds
+            // rather than mis-reading the negated/abs'd column-text numeric prefix.
+            if (node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(TimeSpan)
+                && node.Arguments.Count == 0
+                && (node.Method.Name == nameof(TimeSpan.Negate) || node.Method.Name == nameof(TimeSpan.Duration)))
+            {
+                var tsObjStart = sb.Length;
+                Visit(node.Object);
+                var tsObjSql = sb.ToString(tsObjStart, sb.Length - tsObjStart);
+                sb.Length = tsObjStart;
+                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(tsObjSql);
+                if (node.Method.Name == nameof(TimeSpan.Negate))
+                    sb.Append("(-1.0 * ").Append(secondsSql).Append(')');
+                else
+                    sb.Append("ABS(").Append(secondsSql).Append(')');
+                return node;
+            }
+
             // DateTime.Add(TimeSpan) / DateTime.Subtract(TimeSpan) /
             // DateTimeOffset.Add(TimeSpan) / DateTimeOffset.Subtract(TimeSpan) --
             // the instance-method forms route through the same provider hooks
