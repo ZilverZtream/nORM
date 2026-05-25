@@ -257,6 +257,63 @@ namespace nORM.Query
                                 PooledStringBuilder.Return(builder);
                                 continue;
                             }
+                            // Nested anonymous payload: e.g. `Stats = new { Total = g.Sum(...), Count = g.Count() }`.
+                            // Emit one flat column per inner arg with a prefixed alias (`Stats__Total`,
+                            // `Stats__Count`) so the materialiser can reconstruct the nested anon type
+                            // from N sequential columns.
+                            if (arg is NewExpression nestedNew)
+                            {
+                                for (int j = 0; j < nestedNew.Arguments.Count; j++)
+                                {
+                                    var subArg = nestedNew.Arguments[j];
+                                    var subName = nestedNew.Members?[j]?.Name ?? $"Item{j + 1}";
+                                    var aliasName = memberName + "__" + subName;
+                                    if (subArg is MethodCallExpression subAgg
+                                        && TranslateGroupAggregateMethod(subAgg, alias) is { } subAggSql)
+                                    {
+                                        var b = PooledStringBuilder.Rent();
+                                        b.Append(subAggSql).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b.ToString());
+                                        PooledStringBuilder.Return(b);
+                                    }
+                                    else if (subArg is MemberExpression subKeyMember
+                                             && subKeyMember.Member.Name == "Key"
+                                             && _compositeKeyMemberSql.Count == 0)
+                                    {
+                                        var b = PooledStringBuilder.Rent();
+                                        b.Append(groupBySql).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b.ToString());
+                                        PooledStringBuilder.Return(b);
+                                    }
+                                    else if (subArg is MemberExpression subKeyAccess
+                                             && subKeyAccess.Expression is ParameterExpression subMaybeKey
+                                             && resultSelector.Parameters.Count >= 1
+                                             && subMaybeKey == resultSelector.Parameters[0]
+                                             && _compositeKeyMemberSql.TryGetValue(subKeyAccess.Member.Name, out var subMemberSql))
+                                    {
+                                        var b = PooledStringBuilder.Rent();
+                                        b.Append(subMemberSql).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b.ToString());
+                                        PooledStringBuilder.Return(b);
+                                    }
+                                    else
+                                    {
+                                        if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                                            _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
+                                        var subVctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                                        var subVisitor = FastExpressionVisitorPool.Get(in subVctx);
+                                        var subSql = subVisitor.Translate(subArg);
+                                        var b = PooledStringBuilder.Rent();
+                                        b.Append(subSql).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b.ToString());
+                                        PooledStringBuilder.Return(b);
+                                        foreach (var kvp in subVisitor.GetParameters())
+                                            AddLiteralParameter(kvp.Key, kvp.Value);
+                                        FastExpressionVisitorPool.Return(subVisitor);
+                                    }
+                                }
+                                continue;
+                            }
                             if (arg is MethodCallExpression aggregateCall)
                             {
                                 var innerAggregate = TranslateGroupAggregateMethod(aggregateCall, alias);
