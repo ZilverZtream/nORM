@@ -632,29 +632,38 @@ namespace nORM.Query
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
             var sourceQuery = node.Arguments[0];
 
-            Visit(sourceQuery);
-            // Sister of bca0523 / 47acc83 / 54c16ae + the CountTranslator pin:
-            // Sum / Min / Max / Average applied after Take / Skip would silently
-            // aggregate the full table and LIMIT the scalar result row, returning the
-            // wrong number. Detect and throw with the materialize-then-aggregate
-            // workaround.
-            if ((_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null) && !_takeSetByTerminal)
+            // Sum/Min/Max/Average over a Take/Skip-windowed source — wrap the source
+            // as a derived table and emit the aggregate against the wrap alias.
+            // Sister of the post-Take/Skip family.
+            if (sourceQuery is MethodCallExpression aggWinSrc
+                && aggWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
             {
-                var aggName = node.Method.Name;
-                throw new NormUnsupportedFeatureException(
-                    aggName + " applied after Take or Skip would silently aggregate the full table — " +
-                    "the translator emits `SELECT " + aggName.ToUpperInvariant() + "(col) … LIMIT n` " +
-                    "which runs the aggregate on the full result set and then LIMIT picks the first " +
-                    "scalar row, returning the full-table aggregate rather than the aggregate of the " +
-                    "windowed N rows. LINQ semantics for `q.Take(3)." + aggName + "(...)` require " +
-                    "aggregating the windowed 3, which SQL needs a subquery wrap " +
-                    "(`SELECT " + aggName.ToUpperInvariant() + "(col) FROM (… LIMIT n)`) that nORM " +
-                    "doesn't yet emit. " +
-                    "Workarounds: " +
-                    "(1) If you want the full-table aggregate, drop the Take: `q." + aggName + "(...)`. " +
-                    "(2) If you want the windowed aggregate, materialize and aggregate client-side: " +
-                    "`var top = await q.Take(3).ToListAsync(); var agg = top." + aggName + "(...);`");
+                var subPlanA = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapA);
+                _mapping = subMapA;
+                MergeSubPlanParameters(subPlanA);
+                var winAliasA = EscapeAlias("__wagg" + _joinCounter++);
+                if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var aggUpper))
+                    aggUpper = node.Method.Name.ToUpperInvariant();
+                _isAggregate = true;
+                _sql.Clear();
+                if (node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression selA)
+                {
+                    var sp = selA.Parameters[0];
+                    _correlatedParams[sp] = (subMapA, winAliasA);
+                    var vctxA = new VisitorContext(_ctx, subMapA, _provider, sp, winAliasA, _correlatedParams, _compiledParams, _paramMap, _recursionDepth + 1, _params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxA);
+                    var colSql = visitor.Translate(selA.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(visitor);
+                    _sql.Append("SELECT ").Append(aggUpper).Append('(').Append(colSql).Append(") FROM (")
+                        .Append(subPlanA.Sql).AppendFragment(") AS ").Append(winAliasA);
+                }
+                return node;
             }
+
+            Visit(sourceQuery);
 
             if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
             {

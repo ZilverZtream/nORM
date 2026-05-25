@@ -1652,6 +1652,40 @@ namespace nORM.Query
         private sealed class CountTranslator : IMethodCallTranslator
         {
             /// <summary>
+            /// Windowed-source branch — wraps the windowed source as a derived table and
+            /// emits `SELECT COUNT(*) FROM (subSql) AS sub [WHERE pred]`. Kept in its own
+            /// method to keep the common-path Translate stack-frame lean.
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanC = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapC);
+                t._mapping = subMapC;
+                t.MergeSubPlanParameters(subPlanC);
+                var winAliasC = t.EscapeAlias("__wcn" + t._joinCounter++);
+                t._isAggregate = true;
+                t._methodName = node.Method.Name;
+                if (!t._isDistinct) t._projection = null;
+                t._sql.Append("SELECT COUNT(*) FROM (").Append(subPlanC.Sql).AppendFragment(") AS ").Append(winAliasC);
+                if (node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression predLambda)
+                {
+                    var lp = predLambda.Parameters[0];
+                    t._correlatedParams[lp] = (subMapC, winAliasC);
+                    var vctxC = new VisitorContext(t._ctx, subMapC, t._provider, lp, winAliasC, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxC);
+                    var predSql = visitor.Translate(predLambda.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
+                    if (t._where.Length > 0) t._where.Append(" AND ");
+                    t._where.Append('(').Append(predSql).Append(')');
+                }
+                return node;
+            }
+
+            /// <summary>
             /// Processes <c>Count</c> and <c>LongCount</c>, optionally translating a predicate and marking the query as aggregate.
             /// </summary>
             /// <param name="t">The current translator.</param>
@@ -1660,29 +1694,15 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isAggregate = true;
-                var source = t.Visit(node.Arguments[0]);
-                // Sister of bca0523 / 47acc83 / 54c16ae for Count/LongCount: Count applied
-                // AFTER Take/Skip would silently count the full table and then LIMIT the
-                // single scalar result row — `q.Take(3).Count()` returns 5 (full count)
-                // instead of 3 (windowed count). SQL would need
-                // `SELECT COUNT(*) FROM (… LIMIT n)` which nORM doesn't yet emit. Detect
-                // and throw before _projection / _methodName setup.
-                if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
+                // Count after Take/Skip-windowed source — count only the windowed rows.
+                // Sister of the post-Take/Skip family (3040f49 / e0f1397 / 99a02ce /
+                // a1eb69e / bfc8180 / d6de693 / e0529a0).
+                if (node.Arguments[0] is MethodCallExpression countWinSrc
+                    && countWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
                 {
-                    throw new NormUnsupportedFeatureException(
-                        "Count / LongCount applied after Take or Skip would silently count the full " +
-                        "table — the translator emits `SELECT COUNT(*) … LIMIT n` where COUNT runs on " +
-                        "the full result set and LIMIT picks the first scalar row, returning the " +
-                        "full-table count rather than the count of the windowed N rows. LINQ semantics " +
-                        "for `q.Take(3).Count()` require counting the windowed 3, which SQL needs a " +
-                        "subquery wrap (`SELECT COUNT(*) FROM (… LIMIT n)`) that nORM doesn't yet emit. " +
-                        "Workarounds: " +
-                        "(1) If you want the full-table count, drop the Take: `q.Count()`. " +
-                        "(2) If you want the windowed count, materialize and count client-side: " +
-                        "`var top = await q.Take(3).ToListAsync(); var n = top.Count;` " +
-                        "(3) Use `Math.Min(n, await q.Count())` if you're checking whether a window " +
-                        "is bounded — but understand that's an upper bound, not a windowed count.");
+                    return TranslateAfterTakeSkipWindow(t, node);
                 }
+                var source = t.Visit(node.Arguments[0]);
                 // Preserve _projection when DISTINCT is active so the COUNT(*) builder can
                 // wrap as `SELECT COUNT(*) FROM (SELECT DISTINCT <proj> FROM ...) AS T0` —
                 // otherwise nuke it so Count(x => predicate) doesn't try to project columns
