@@ -621,6 +621,9 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"MONTH({args[0]})",
                     nameof(DateOnly.Day) => $"DAY({args[0]})",
                     nameof(DateOnly.DayOfYear) => $"DATEPART(dayofyear, {args[0]})",
+                    // T-SQL DATEPART(weekday) depends on @@DATEFIRST; subtract @@DATEFIRST
+                    // so Sunday=0..Saturday=6 always, matching System.DayOfWeek.
+                    nameof(DateOnly.DayOfWeek) => $"((DATEPART(weekday, {args[0]}) + @@DATEFIRST - 1) % 7)",
                     // DateOnly.DayNumber: days since DateOnly.MinValue (0001-01-01).
                     // SQL Server DATEDIFF(DAY, '0001-01-01', x) returns int days
                     // matching .NET's day-count semantics across the full range.
