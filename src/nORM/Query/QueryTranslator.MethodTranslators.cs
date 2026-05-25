@@ -1063,36 +1063,41 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Distinct after a Take/Skip-windowed source — wrap as derived table so
+                // DISTINCT runs over only the windowed rows. Sister of the post-Take/Skip
+                // family fixes. Includes the common `Take(N).Select(proj).Distinct()`
+                // shape (Select sits between Take and Distinct) — for those we need to
+                // translate the full source chain (including the projection) as the
+                // sub-plan and apply DISTINCT on the outer wrap.
+                if (QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0]))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
+
                 // Set _isDistinct BEFORE visiting the source. JoinBuilder.BuildJoinClauseInto
                 // captures `distinct: _isDistinct` at join-emit time (e97b814), which runs
                 // INSIDE the Visit below — if we set the flag afterward, the join SQL is
                 // built without DISTINCT and the test (Join.Distinct) silently returns
-                // duplicates. The Take/Skip pin check below runs AFTER Visit because it
-                // needs _take/_skip populated by inner translators.
+                // duplicates.
                 t._isDistinct = true;
                 var source = t.Visit(node.Arguments[0]);
-                // Sister of bca0523 / 47acc83 for Distinct: Distinct applied AFTER a
-                // Take/Skip silently de-dupes the FULL projected set before the LIMIT
-                // applies — `.Take(3).Distinct()` emits `SELECT DISTINCT col … LIMIT 3`
-                // which gives 3 rows from the distinct universe instead of dedupe-of-
-                // the-windowed-3. SQL needs a subquery wrap (`SELECT DISTINCT col FROM
-                // (… LIMIT n)`) that nORM doesn't yet emit. Detect and throw.
-                if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
-                {
-                    throw new NormUnsupportedFeatureException(
-                        "Distinct applied after Take or Skip would silently dedupe the full table — the " +
-                        "translator emits `SELECT DISTINCT col … LIMIT n` which gives N rows from the " +
-                        "distinct universe of the full table, not the dedupe of the windowed N rows. " +
-                        "LINQ semantics for `q.Take(3).Distinct()` require taking the first 3 and then " +
-                        "dropping duplicates inside that window — SQL needs a subquery wrap " +
-                        "(`SELECT DISTINCT col FROM (… LIMIT n)`) that nORM doesn't yet emit. " +
-                        "Workarounds: " +
-                        "(1) Move the Distinct BEFORE the Take if you want dedupe-then-window: " +
-                        "`q.Select(x => x.Cat).Distinct().Take(3)` (the canonical top-N-distinct shape). " +
-                        "(2) Materialize the window first and dedupe client-side: " +
-                        "`var top = await q.Take(3).Select(x => x.Cat).ToListAsync(); var unique = top.Distinct().ToList();`");
-                }
                 return source;
+            }
+
+            /// <summary>
+            /// Windowed-source branch — wraps the windowed source as a derived
+            /// table and applies DISTINCT on the outer SELECT. Lives in its own
+            /// method so the common-path Translate stays stack-frame lean.
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanD = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapD);
+                t._mapping = subMapD;
+                t.MergeSubPlanParameters(subPlanD);
+                var winAliasD = t.EscapeAlias("__wdis" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT DISTINCT * FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
+                t._isDistinct = true;
+                return node;
             }
         }
 
