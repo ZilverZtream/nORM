@@ -1179,6 +1179,14 @@ namespace nORM.Providers
                     // documented limitation, mirrors Math.Pow behaviour).
                     nameof(Math.Log2) when args.Length == 1 => $"LOG2({args[0]})",
                     nameof(Math.Cbrt) when args.Length == 1 => $"POW({args[0]}, 1.0/3.0)",
+                    // Basic trig + inverse trig from SQLite 3.35+ math extension.
+                    // Direct one-to-one mappings; all return double.
+                    nameof(Math.Sin) when args.Length == 1 => $"SIN({args[0]})",
+                    nameof(Math.Cos) when args.Length == 1 => $"COS({args[0]})",
+                    nameof(Math.Tan) when args.Length == 1 => $"TAN({args[0]})",
+                    nameof(Math.Asin) when args.Length == 1 => $"ASIN({args[0]})",
+                    nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
+                    nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
                     // Hyperbolic + 2-arg trig from SQLite 3.35+ math extension.
                     // Direct one-to-one mappings.
                     nameof(Math.Sinh) when args.Length == 1 => $"SINH({args[0]})",

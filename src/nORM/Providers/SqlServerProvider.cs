@@ -568,6 +568,17 @@ namespace nORM.Providers
                     // T-SQL has no scalar Min/Max, only the aggregate. Emit a CASE.
                     nameof(Math.Min) when args.Length == 2 => $"(CASE WHEN {args[0]} < {args[1]} THEN {args[0]} ELSE {args[1]} END)",
                     nameof(Math.Max) when args.Length == 2 => $"(CASE WHEN {args[0]} > {args[1]} THEN {args[0]} ELSE {args[1]} END)",
+                    // Basic trig + inverse trig. T-SQL spells two-argument
+                    // arctangent ATN2 (legacy from SQL Server's Sybase
+                    // ancestry), NOT ATAN2 -- this is the only per-provider
+                    // wrinkle in the trig set.
+                    nameof(Math.Sin) when args.Length == 1 => $"SIN({args[0]})",
+                    nameof(Math.Cos) when args.Length == 1 => $"COS({args[0]})",
+                    nameof(Math.Tan) when args.Length == 1 => $"TAN({args[0]})",
+                    nameof(Math.Asin) when args.Length == 1 => $"ASIN({args[0]})",
+                    nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
+                    nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
+                    nameof(Math.Atan2) when args.Length == 2 => $"ATN2({args[0]}, {args[1]})",
                     _ => null
                 };
             }

@@ -521,6 +521,15 @@ namespace nORM.Providers
                     nameof(Math.Truncate) when args.Length == 1 => $"TRUNCATE({args[0]}, 0)",
                     nameof(Math.Min) when args.Length == 2 => $"LEAST({args[0]}, {args[1]})",
                     nameof(Math.Max) when args.Length == 2 => $"GREATEST({args[0]}, {args[1]})",
+                    // Basic trig + inverse trig + 2-arg arctangent. All native
+                    // in MySQL with .NET-matching names.
+                    nameof(Math.Sin) when args.Length == 1 => $"SIN({args[0]})",
+                    nameof(Math.Cos) when args.Length == 1 => $"COS({args[0]})",
+                    nameof(Math.Tan) when args.Length == 1 => $"TAN({args[0]})",
+                    nameof(Math.Asin) when args.Length == 1 => $"ASIN({args[0]})",
+                    nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
+                    nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
+                    nameof(Math.Atan2) when args.Length == 2 => $"ATAN2({args[0]}, {args[1]})",
                     _ => null
                 };
             }
