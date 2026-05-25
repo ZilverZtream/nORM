@@ -556,25 +556,31 @@ public class TerminalOperatorParityTests
     }
 
     [Fact]
-    public async Task Sum_NullableInt_EmptySequence_ReturnsNull()
+    public async Task Sum_NullableInt_EmptySequence_ReturnsZero()
     {
+        // LINQ-to-Objects: Enumerable.Sum(IEnumerable<int?>) returns 0 for an
+        // empty sequence (not null). nORM matches the LINQ semantics since
+        // c1bdd25 -- the scalar-result NULL maps to zero-of-target-type for
+        // Sum specifically, including for nullable arithmetic types.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
         var result = await ctx.Query<TerminalOpRow>().SumAsync(r => r.NullableInt);
-        Assert.Null(result);
+        Assert.Equal(0, result);
     }
 
     [Fact]
-    public async Task Sum_NullableInt_AllNulls_ReturnsNull()
+    public async Task Sum_NullableInt_AllNulls_ReturnsZero()
     {
+        // Same LINQ rule: null elements are excluded from the sum; the
+        // filtered set is empty, so the sum is 0.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         Insert(cn, 1, "A", 10, nullInt: null);
         Insert(cn, 1, "B", 20, nullInt: null);
 
         var result = await ctx.Query<TerminalOpRow>().SumAsync(r => r.NullableInt);
-        Assert.Null(result);
+        Assert.Equal(0, result);
     }
 
     [Fact]

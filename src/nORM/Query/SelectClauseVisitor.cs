@@ -218,7 +218,10 @@ namespace nORM.Query
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
                 if (CoerceDecimalProjectionsToReal && memberType == typeof(decimal))
                 {
-                    sb.Append("CAST(").Append(col.EscCol).Append(" AS REAL)");
+                    // Provider hook: SqliteProvider wraps with CAST AS REAL,
+                    // others identity. Decimal projections from set ops /
+                    // DISTINCT need numeric dedup on SQLite (TEXT storage).
+                    sb.Append(_provider.NormalizeDecimalForCompare(col.EscCol));
                 }
                 else
                 {
@@ -1014,7 +1017,7 @@ namespace nORM.Query
             var aggSelType = Nullable.GetUnderlyingType(selectorLambda.Body.Type) ?? selectorLambda.Body.Type;
             if (aggSelType == typeof(decimal))
             {
-                selectorSql = $"CAST({selectorSql} AS REAL)";
+                selectorSql = _provider.NormalizeDecimalForCompare(selectorSql);
             }
 
             sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
@@ -1313,9 +1316,18 @@ namespace nORM.Query
             bool rightIsDec = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
             if (isDecCmpArith && (leftIsDec || rightIsDec))
             {
-                sb.Append("(CAST(");
+                // Provider hook: SqliteProvider wraps with CAST AS REAL,
+                // others identity (native DECIMAL).
+                var decLeftStart = sb.Length;
                 Visit(node.Left);
-                sb.Append(" AS REAL) ").Append(node.NodeType switch
+                var decLeftSql = sb.ToString(decLeftStart, sb.Length - decLeftStart);
+                sb.Length = decLeftStart;
+                var decRightStart = sb.Length;
+                Visit(node.Right);
+                var decRightSql = sb.ToString(decRightStart, sb.Length - decRightStart);
+                sb.Length = decRightStart;
+                sb.Append('(').Append(_provider.NormalizeDecimalForCompare(decLeftSql))
+                  .Append(' ').Append(node.NodeType switch
                 {
                     ExpressionType.Equal => "=",
                     ExpressionType.NotEqual => "<>",
@@ -1329,9 +1341,7 @@ namespace nORM.Query
                     ExpressionType.Divide => "/",
                     ExpressionType.Modulo => "%",
                     _ => throw new InvalidOperationException()
-                }).Append(" CAST(");
-                Visit(node.Right);
-                sb.Append(" AS REAL))");
+                }).Append(' ').Append(_provider.NormalizeDecimalForCompare(decRightSql)).Append(')');
                 return node;
             }
 
