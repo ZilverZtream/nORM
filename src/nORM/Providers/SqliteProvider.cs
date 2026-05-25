@@ -339,6 +339,15 @@ namespace nORM.Providers
                     // DateTime.
                     nameof(DateTimeOffset.DateTime) when declaringType == typeof(DateTimeOffset) =>
                         $"substr({args[0]}, 1, length({args[0]}) - 6)",
+                    // DateTimeOffset.Offset (TimeSpan) -- parse the trailing 6-char
+                    // zzz substring into the canonical TimeSpan 'c' format
+                    // ('[-]HH:mm:ss') the materializer parses via TimeSpan.Parse.
+                    // The sign char is at position length-5; if '-' we prefix
+                    // a '-' on the output, otherwise the unsigned form.
+                    nameof(DateTimeOffset.Offset) when declaringType == typeof(DateTimeOffset) =>
+                        $"((CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '-' THEN '-' ELSE '' END) " +
+                        $"|| substr({args[0]}, length({args[0]}) - 4, 2) || ':' " +
+                        $"|| substr({args[0]}, length({args[0]}) - 1, 2) || ':00')",
                     nameof(DateTimeOffset.UtcDateTime) when declaringType == typeof(DateTimeOffset) =>
                         $"strftime('%Y-%m-%d %H:%M:%S', substr({args[0]}, 1, length({args[0]}) - 6), " +
                         $"(CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '+' THEN '-' ELSE '+' END) " +
