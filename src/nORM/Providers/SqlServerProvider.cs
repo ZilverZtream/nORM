@@ -473,6 +473,11 @@ namespace nORM.Providers
                 "IsFinite" => $"({args[0]} = {args[0]} AND {args[0]} != {pInf} AND {args[0]} != {nInf})",
                 "IsPositiveInfinity" => $"({args[0]} = {pInf})",
                 "IsNegativeInfinity" => $"({args[0]} = {nInf})",
+                // Normal: finite, non-zero, |x| >= min normal positive double.
+                "IsNormal" => $"({args[0]} = {args[0]} AND {args[0]} != {pInf} AND {args[0]} != {nInf} " +
+                              $"AND {args[0]} != 0 AND ABS({args[0]}) >= 2.2250738585072014E-308)",
+                // Subnormal: non-zero AND |x| < min normal positive.
+                "IsSubnormal" => $"({args[0]} != 0 AND ABS({args[0]}) < 2.2250738585072014E-308)",
                 _ => null
             };
         }
@@ -733,6 +738,8 @@ namespace nORM.Providers
                     // |a * b| > 2^31 - 1.
                     nameof(Math.BigMul) when args.Length == 2 =>
                         $"(CAST({args[0]} AS BIGINT) * {args[1]})",
+                    nameof(Math.CopySign) when args.Length == 2 =>
+                        $"(ABS({args[0]}) * SIGN({args[1]}))",
                     _ => null
                 };
             }

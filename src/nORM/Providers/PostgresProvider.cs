@@ -377,6 +377,9 @@ namespace nORM.Providers
                 "IsFinite" => $"(NOT isnan({args[0]}) AND {args[0]} != 'Infinity'::float8 AND {args[0]} != '-Infinity'::float8)",
                 "IsPositiveInfinity" => $"({args[0]} = 'Infinity'::float8)",
                 "IsNegativeInfinity" => $"({args[0]} = '-Infinity'::float8)",
+                "IsNormal" => $"(NOT isnan({args[0]}) AND {args[0]} != 'Infinity'::float8 AND {args[0]} != '-Infinity'::float8 " +
+                              $"AND {args[0]} != 0 AND ABS({args[0]}) >= 2.2250738585072014E-308)",
+                "IsSubnormal" => $"({args[0]} != 0 AND ABS({args[0]}) < 2.2250738585072014E-308)",
                 _ => null
             };
         }
@@ -591,6 +594,8 @@ namespace nORM.Providers
                         $"({args[0]} * POW(2.0, {args[1]}))",
                     nameof(Math.BigMul) when args.Length == 2 =>
                         $"(CAST({args[0]} AS BIGINT) * {args[1]})",
+                    nameof(Math.CopySign) when args.Length == 2 =>
+                        $"(ABS({args[0]}) * SIGN({args[1]}))",
                     _ => null
                 };
             }

@@ -431,6 +431,9 @@ namespace nORM.Providers
                 "IsFinite" => $"({args[0]} = {args[0]} AND ABS({args[0]}) <= 1.7976931348623157E+307)",
                 "IsPositiveInfinity" => $"({args[0]} = {args[0]} AND {args[0]} > 1.7976931348623157E+307)",
                 "IsNegativeInfinity" => $"({args[0]} = {args[0]} AND {args[0]} < -1.7976931348623157E+307)",
+                "IsNormal" => $"({args[0]} = {args[0]} AND ABS({args[0]}) <= 1.7976931348623157E+307 " +
+                              $"AND {args[0]} != 0 AND ABS({args[0]}) >= 2.2250738585072014E-308)",
+                "IsSubnormal" => $"({args[0]} != 0 AND ABS({args[0]}) < 2.2250738585072014E-308)",
                 _ => null
             };
         }
@@ -639,6 +642,8 @@ namespace nORM.Providers
                     // the int*int product so |a*b| > 2^31 doesn't overflow.
                     nameof(Math.BigMul) when args.Length == 2 =>
                         $"(CAST({args[0]} AS SIGNED) * {args[1]})",
+                    nameof(Math.CopySign) when args.Length == 2 =>
+                        $"(ABS({args[0]}) * SIGN({args[1]}))",
                     _ => null
                 };
             }
