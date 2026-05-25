@@ -51,24 +51,18 @@ public class LinqTakeThenOrderByTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task OrderBy_after_take_throws_with_workaround_hint_for_silent_wrongness()
+    public async Task OrderBy_after_take_resorts_only_the_windowed_rows()
     {
-        // Pre-fix: silently appended the outer ORDER BY to the flat list and emitted
-        // `ORDER BY Score DESC, Name ASC LIMIT 3` — wrong rows (full-table joint sort
-        // then limit) instead of top-3-by-Score then resort. Pin now requires the
-        // translator to throw with the materialize / ThenBy workaround.
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<TtoRow>()
-                .OrderByDescending(r => r.Score)
-                .Take(3)
-                .OrderBy(r => r.Name)
-                .ToListAsync();
-        });
-        Assert.Contains("OrderBy", ex.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Take", ex.Message, System.StringComparison.Ordinal);
-        Assert.Contains("ThenBy", ex.Message, System.StringComparison.Ordinal);
-        Assert.Contains("client-side", ex.Message, System.StringComparison.OrdinalIgnoreCase);
+        // Step 1: OrderByDescending(Score).Take(3) → top-3 by Score DESC = {(4,40,d),(3,30,a),(2,20,b)}.
+        // Step 2: OrderBy(Name) on those 3 → ascending by Name → {a, b, d} → Ids [3,2,4].
+        var rows = (await _ctx.Query<TtoRow>()
+            .OrderByDescending(r => r.Score)
+            .Take(3)
+            .OrderBy(r => r.Name)
+            .ToListAsync())
+            .ToArray();
+        Assert.Equal(3, rows.Length);
+        Assert.Equal(new[] { "a", "b", "d" }, rows.Select(r => r.Name).ToArray());
     }
 
     [Fact]
