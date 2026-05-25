@@ -1107,29 +1107,95 @@ namespace nORM.Query
                     string.Format(ErrorMessages.QueryTranslationFailed,
                     $"Expected a generic IQueryable<T> source type but found '{source.Type.Name}'."));
             var elementType = genericArgs[0];
-            // Same post-Take/Skip silent-wrongness family as bca0523 / 47acc83 / 54c16ae /
-            // 4fcd795 / c2cce55, but a different failure mode: HandleSetOperation translates
-            // the source in a sub-context (which bakes Take/Skip into the sub-plan SQL as
-            // LIMIT 2 / OFFSET m), then unconditionally appends " LIMIT 1" via ApplyPaging.
-            // The result is " … LIMIT 2 LIMIT 1" — SQLite rejects with "near 'LIMIT': syntax
-            // error". Detect Take/Skip in the source expression tree and throw with
-            // explanation rather than letting the malformed SQL escape.
-            if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All) or nameof(Queryable.Contains)
-                && SourceHasTakeOrSkip(source))
+            // Any/All/Contains over a Take/Skip-windowed source: the predicate must
+            // see only the windowed rows, not the full table. SQL evaluation order
+            // applies WHERE before LIMIT, so a flat rewrite `Where(Take(N, q), pred)`
+            // would filter the full table first and the windowing semantics would
+            // be lost. Detect the shape, translate the windowed source AS-IS, and
+            // wrap it as a derived table inside the EXISTS — `EXISTS(SELECT 1 FROM
+            // (windowedSource) AS t WHERE pred LIMIT 1)` — so the predicate runs
+            // against the windowed rowset.
+            bool sourceWindowed = node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All) or nameof(Queryable.Contains)
+                && SourceHasTakeOrSkip(source);
+            if (sourceWindowed)
             {
-                var op = node.Method.Name;
-                throw new NormUnsupportedFeatureException(
-                    op + " applied after Take or Skip currently emits invalid SQL — the predicate is " +
-                    "translated in a sub-context that bakes the LIMIT/OFFSET into the inner query, " +
-                    "and then the EXISTS wrapper appends another LIMIT 1 — SQLite rejects the " +
-                    "stacked LIMITs (`near \"LIMIT\": syntax error`). LINQ semantics for " +
-                    "`q.Take(N)." + op + "(...)` simplify: for N>=1 this is equivalent to " +
-                    "`q." + op + "(...)` (Take(N) followed by Any/All only changes when N=0), so " +
-                    "the cleanest fix is usually to drop the Take. " +
-                    "Workarounds: " +
-                    "(1) Drop the Take: `q." + op + "(...)`. " +
-                    "(2) Materialize the windowed set first and check client-side: " +
-                    "`var top = await q.Take(N).ToListAsync(); var hit = top." + op + "(...);`");
+                LambdaExpression? windowedPred = null;
+                var windowedSource = source;
+                // Predicate-bearing forms come in two shapes depending on the call site:
+                //   (a) 2-arg `Queryable.Any(source, pred)` — predicate at node.Arguments[1].
+                //   (b) 1-arg `Queryable.Any(Where(source, pred))` — async-extensions
+                //       pre-inject a Where wrapper. Peel it off so we translate the
+                //       inner windowed source as a derived table.
+                if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression wAny)
+                {
+                    windowedPred = wAny;
+                }
+                else if (node.Method.Name == nameof(Queryable.All) && node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression wAll)
+                {
+                    var pAll = wAll.Parameters[0];
+                    windowedPred = Expression.Lambda(Expression.Not(wAll.Body), pAll);
+                }
+                else if (node.Method.Name == nameof(Queryable.Contains) && node.Arguments.Count == 2)
+                {
+                    // Contains over a projected source — `Select(Take(...), p => p.V).Contains(value)` —
+                    // peels the Select so we apply the predicate against the underlying entity in
+                    // the derived table, where the column references resolve naturally.
+                    if (source is MethodCallExpression projSel
+                        && projSel.Method.Name == nameof(Queryable.Select)
+                        && projSel.Arguments.Count == 2
+                        && StripQuotes(projSel.Arguments[1]) is LambdaExpression projLambda)
+                    {
+                        var entityElem = projSel.Arguments[0].Type.GetGenericArguments()[0];
+                        var pCtE = projLambda.Parameters[0];
+                        var converted = Expression.Convert(node.Arguments[1], projLambda.Body.Type);
+                        windowedPred = Expression.Lambda(Expression.Equal(projLambda.Body, converted), pCtE);
+                        windowedSource = projSel.Arguments[0];
+                        elementType = entityElem;
+                    }
+                    else
+                    {
+                        var pCt = Expression.Parameter(elementType, "x");
+                        windowedPred = Expression.Lambda(Expression.Equal(pCt, Expression.Convert(node.Arguments[1], elementType)), pCt);
+                    }
+                }
+                else if (source is MethodCallExpression wrapWhere
+                         && wrapWhere.Method.Name == nameof(Queryable.Where)
+                         && wrapWhere.Arguments.Count == 2
+                         && StripQuotes(wrapWhere.Arguments[1]) is LambdaExpression wrapPred)
+                {
+                    var inverted = node.Method.Name == nameof(Queryable.All)
+                        ? Expression.Lambda(Expression.Not(wrapPred.Body), wrapPred.Parameters[0])
+                        : wrapPred;
+                    windowedPred = inverted;
+                    windowedSource = wrapWhere.Arguments[0];
+                }
+                var subPlanWin = TranslateInSubContext(windowedSource, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMappingWin);
+                _mapping = subMappingWin;
+                MergeSubPlanParameters(subPlanWin);
+                using var winBuilder = new OptimizedSqlBuilder();
+                var subAlias = "__win" + _joinCounter++;
+                winBuilder.Append("SELECT 1 FROM (");
+                winBuilder.Append(subPlanWin.Sql);
+                winBuilder.Append(") AS ").Append(_provider.Escape(subAlias));
+                if (windowedPred != null)
+                {
+                    var vctx = new VisitorContext(_ctx, subMappingWin, _provider, windowedPred.Parameters[0], _provider.Escape(subAlias), _correlatedParams, _compiledParams, _paramMap, _recursionDepth + 1, _params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    var predSql = visitor.Translate(windowedPred.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        _params[kvp.Key] = kvp.Value;
+                    FastExpressionVisitorPool.Return(visitor);
+                    winBuilder.Append(" WHERE ").Append(predSql);
+                }
+                _provider.ApplyPaging(winBuilder, 1, null, null, null);
+                _sql.Append(node.Method.Name == nameof(Queryable.All)
+                    ? "SELECT 1 WHERE NOT EXISTS("
+                    : "SELECT 1 WHERE EXISTS(");
+                _sql.Append(winBuilder.ToSqlString());
+                _sql.Append(")");
+                return node;
             }
             if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression anyPred)
             {
