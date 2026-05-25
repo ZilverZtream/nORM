@@ -453,6 +453,14 @@ namespace nORM.Providers
             ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
+        /// MySQL's <c>CAST(x AS VARCHAR(N))</c> is a syntax error — its CAST
+        /// target type is <c>CHAR(N)</c>. Used by the canonical-text
+        /// <see cref="DatabaseProvider.GetDateTimeOffsetFromPartsSql"/> emit.
+        /// </summary>
+        protected override string CastToVarchar(string sql, int width)
+            => $"CAST(({sql}) AS CHAR({width}))";
+
+        /// <summary>
         /// MySQL DOUBLE rejects NaN / Infinity at insert by default; the
         /// predicate is typically false for stored values. The (x != x)
         /// algebraic form remains correct for computed float expressions

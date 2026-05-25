@@ -97,6 +97,44 @@ namespace nORM.Query
                 sb.Append(FormatLiteral(ctorValue));
                 return node;
             }
+
+            // 7-arg new DateTimeOffset(y, m, d, h, mi, s, TimeSpan offset) with at least one
+            // column date/time part and a compile-time constant offset. Emit canonical text;
+            // the materialiser routes the string through DateTimeOffset.Parse.
+            if (node.Type == typeof(DateTimeOffset)
+                && node.Arguments.Count == 7
+                && node.Constructor is { } dto7Ctor
+                && dto7Ctor.GetParameters() is { Length: 7 } dto7Params
+                && dto7Params[0].ParameterType == typeof(int)
+                && dto7Params[1].ParameterType == typeof(int)
+                && dto7Params[2].ParameterType == typeof(int)
+                && dto7Params[3].ParameterType == typeof(int)
+                && dto7Params[4].ParameterType == typeof(int)
+                && dto7Params[5].ParameterType == typeof(int)
+                && dto7Params[6].ParameterType == typeof(TimeSpan)
+                && TryGetTimeSpanConstant(node.Arguments[6], out var tsOff))
+            {
+                string PartSql(Expression e)
+                {
+                    if (ExpressionValueExtractor.TryGetConstantValue(e, out var cv) && cv != null)
+                        return FormatLiteral(cv);
+                    var partBuilder = new System.Text.StringBuilder();
+                    var saved = _sb;
+                    _sb = partBuilder;
+                    try { Visit(e); }
+                    finally { _sb = saved; }
+                    return partBuilder.ToString();
+                }
+                var ySql = PartSql(node.Arguments[0]);
+                var mSql = PartSql(node.Arguments[1]);
+                var dSql = PartSql(node.Arguments[2]);
+                var hSql = PartSql(node.Arguments[3]);
+                var miSql = PartSql(node.Arguments[4]);
+                var sSql = PartSql(node.Arguments[5]);
+                sb.Append(_provider.GetDateTimeOffsetFromPartsSql(ySql, mSql, dSql, hSql, miSql, sSql, tsOff));
+                return node;
+            }
+
             bool firstColumn = true;
             for (int i = 0; i < node.Arguments.Count; i++)
             {
@@ -1578,6 +1616,51 @@ namespace nORM.Query
         /// </summary>
         private StringBuilder EnsureBuilder() =>
             _sb ?? throw new InvalidOperationException("Cannot visit expressions outside of a Translate() call.");
+
+        /// <summary>
+        /// Folds a <see cref="TimeSpan"/> expression to its runtime value when it
+        /// is either a constant, a static/closure member, or a call to one of the
+        /// side-effect-free <c>TimeSpan.From*</c> factories with a constant arg.
+        /// Used by the 7-arg <c>new DateTimeOffset(...)</c> handler whose offset
+        /// arg must be a compile-time constant. ExpressionValueExtractor refuses
+        /// MethodCallExpression by design (RCE prevention); the TimeSpan factories
+        /// have a fixed, audited surface so we admit them here explicitly.
+        /// </summary>
+        private static bool TryGetTimeSpanConstant(Expression e, out TimeSpan value)
+        {
+            value = default;
+            if (ExpressionValueExtractor.TryGetConstantValue(e, out var box) && box is TimeSpan ts)
+            {
+                value = ts;
+                return true;
+            }
+            if (e is MethodCallExpression mc
+                && mc.Object == null
+                && mc.Method.DeclaringType == typeof(TimeSpan)
+                && mc.Arguments.Count == 1
+                && ExpressionValueExtractor.TryGetConstantValue(mc.Arguments[0], out var argBox)
+                && argBox != null)
+            {
+                try
+                {
+                    double d = Convert.ToDouble(argBox, System.Globalization.CultureInfo.InvariantCulture);
+                    switch (mc.Method.Name)
+                    {
+                        case nameof(TimeSpan.FromDays):         value = TimeSpan.FromDays(d);         return true;
+                        case nameof(TimeSpan.FromHours):        value = TimeSpan.FromHours(d);        return true;
+                        case nameof(TimeSpan.FromMinutes):      value = TimeSpan.FromMinutes(d);      return true;
+                        case nameof(TimeSpan.FromSeconds):      value = TimeSpan.FromSeconds(d);      return true;
+                        case nameof(TimeSpan.FromMilliseconds): value = TimeSpan.FromMilliseconds(d); return true;
+                        case nameof(TimeSpan.FromTicks):        value = new TimeSpan((long)d);        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return false;
+        }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
     }

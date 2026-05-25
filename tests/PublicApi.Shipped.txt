@@ -480,6 +480,7 @@ M:nORM.Providers.DatabaseProvider.GetDateTimeDifferenceSecondsSql(System.String,
 M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.TimeSpan):System.String
 M:nORM.Providers.DatabaseProvider.GetHistoryTableExistsProbeSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalPrefix(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String

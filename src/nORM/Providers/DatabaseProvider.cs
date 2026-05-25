@@ -285,6 +285,76 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Builds SQL for <c>new DateTimeOffset(year, month, day, hour, minute, second, offset)</c>
+        /// when at least one of the date/time parts is a column expression and the
+        /// <paramref name="offset"/> is a compile-time constant. Producing canonical
+        /// ISO-8601 text (<c>yyyy-MM-ddTHH:mm:ss±HH:MM</c>) lets the materialiser
+        /// route through <c>DateTimeOffset.Parse</c> uniformly across providers.
+        ///
+        /// Default implementation uses CASE-based zero-padding so it works on every
+        /// SQL dialect; providers can override with a native faster path when one
+        /// exists (e.g. SqlServer's DATETIMEOFFSETFROMPARTS).
+        /// </summary>
+        public virtual string GetDateTimeOffsetFromPartsSql(
+            string ySql, string mSql, string dSql,
+            string hSql, string miSql, string sSql,
+            TimeSpan offset)
+        {
+            var suffix = FormatOffsetSuffix(offset);
+            string PadNum(string sql, int width)
+            {
+                var castSql = CastToVarchar(sql, width);
+                return width == 4
+                    ? $"(CASE WHEN ({sql}) < 10 THEN {GetConcatSql("'000'", castSql)} WHEN ({sql}) < 100 THEN {GetConcatSql("'00'", castSql)} WHEN ({sql}) < 1000 THEN {GetConcatSql("'0'", castSql)} ELSE {castSql} END)"
+                    : $"(CASE WHEN ({sql}) < 10 THEN {GetConcatSql("'0'", castSql)} ELSE {castSql} END)";
+            }
+            return Concat(
+                PadNum(ySql, 4), "'-'",
+                PadNum(mSql, 2), "'-'",
+                PadNum(dSql, 2), "'T'",
+                PadNum(hSql, 2), "':'",
+                PadNum(miSql, 2), "':'",
+                PadNum(sSql, 2),
+                $"'{suffix}'");
+        }
+
+        /// <summary>
+        /// Cast a numeric expression to the provider's variable-length string type
+        /// for concatenation in <see cref="GetDateTimeOffsetFromPartsSql"/>.
+        /// Defaults to ANSI <c>VARCHAR(N)</c>; providers without VARCHAR override.
+        /// </summary>
+        protected virtual string CastToVarchar(string sql, int width)
+            => $"CAST(({sql}) AS VARCHAR({width}))";
+
+        /// <summary>
+        /// Reduces an arbitrary-length sequence of SQL fragments via the provider's
+        /// <see cref="GetConcatSql"/>. Used by helpers that need to compose many
+        /// padded numeric parts into a single canonical text expression.
+        /// </summary>
+        protected string Concat(params string[] parts)
+        {
+            if (parts.Length == 0) return "''";
+            if (parts.Length == 1) return parts[0];
+            var result = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+                result = GetConcatSql(result, parts[i]);
+            return result;
+        }
+
+        /// <summary>
+        /// Renders a <see cref="TimeSpan"/> offset as the trailing <c>±HH:MM</c>
+        /// suffix that <see cref="System.DateTimeOffset.Parse(string, System.IFormatProvider)"/>
+        /// accepts.
+        /// </summary>
+        protected static string FormatOffsetSuffix(TimeSpan offset)
+        {
+            var sign = offset.Ticks >= 0 ? '+' : '-';
+            var abs = offset.Duration();
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{sign}{abs.Hours:D2}:{abs.Minutes:D2}");
+        }
+
+        /// <summary>
         /// Shared helper for non-SQLite providers' <c>TimeSpan.From*</c> static
         /// factories applied to a column expression (or any non-constant arg).
         /// Emits REAL seconds; the materializer's

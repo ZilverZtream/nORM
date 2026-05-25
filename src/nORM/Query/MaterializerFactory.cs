@@ -1429,6 +1429,17 @@ namespace nORM.Query
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, arg.Type, mapping.Type, mapping.Provider, memberName));
                     }
+                    else if (arg is NewExpression ne)
+                    {
+                        // Embedded ctor producing a single value (e.g. `new DateTimeOffset(...)`
+                        // emitted as one canonical-text column by SCV's 7-arg DateTimeOffset
+                        // handler). Reserve one column slot typed as the ctor's result type.
+                        // Multi-column nested anonymous shapes are handled separately by
+                        // CreateNestedAnonymousProjectionMaterializer, which short-circuits
+                        // ahead of this fallback.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, ne.Type, mapping.Type, mapping.Provider, memberName));
+                    }
                 }
                 return cols.ToArray();
             }

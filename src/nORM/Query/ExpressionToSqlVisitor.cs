@@ -1262,6 +1262,45 @@ namespace nORM.Query
                 }
             }
 
+            // 7-arg new DateTimeOffset(y, m, d, h, mi, s, TimeSpan offset) with at least one
+            // column date/time part and a compile-time constant offset. Lower to canonical
+            // ISO-8601 text the materialiser parses via DateTimeOffset.Parse — every provider
+            // can emit text without needing a native DTO-from-parts function.
+            if (node.Type == typeof(DateTimeOffset)
+                && node.Arguments.Count == 7
+                && node.Constructor is { } dto7Ctor
+                && dto7Ctor.GetParameters() is { Length: 7 } dto7Params
+                && dto7Params[0].ParameterType == typeof(int)
+                && dto7Params[1].ParameterType == typeof(int)
+                && dto7Params[2].ParameterType == typeof(int)
+                && dto7Params[3].ParameterType == typeof(int)
+                && dto7Params[4].ParameterType == typeof(int)
+                && dto7Params[5].ParameterType == typeof(int)
+                && dto7Params[6].ParameterType == typeof(TimeSpan))
+            {
+                bool anyDtoPartNonConst = false;
+                for (int i = 0; i < 6; i++)
+                {
+                    var a = node.Arguments[i];
+                    if (a is not ConstantExpression && !TryGetConstantValue(a, out _))
+                    {
+                        anyDtoPartNonConst = true;
+                        break;
+                    }
+                }
+                if (anyDtoPartNonConst && TryGetTimeSpanConstantArg(node.Arguments[6], out var tsOff))
+                {
+                    var ySql = GetSql(node.Arguments[0]);
+                    var mSql = GetSql(node.Arguments[1]);
+                    var dSql = GetSql(node.Arguments[2]);
+                    var hSql = GetSql(node.Arguments[3]);
+                    var miSql = GetSql(node.Arguments[4]);
+                    var sSql = GetSql(node.Arguments[5]);
+                    _sql.Append(_provider.GetDateTimeOffsetFromPartsSql(ySql, mSql, dSql, hSql, miSql, sSql, tsOff));
+                    return node;
+                }
+            }
+
             // 7-arg new DateTime(y, m, d, h, mi, s, ms) with at least one column arg.
             if (node.Type == typeof(DateTime)
                 && node.Arguments.Count == 7
@@ -1343,6 +1382,23 @@ namespace nORM.Query
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Folds a <see cref="TimeSpan"/>-typed argument to its runtime value. Used by
+        /// the 7-arg <c>new DateTimeOffset(...)</c> branch whose offset arg must be a
+        /// compile-time constant. ETSV-side already permits arbitrary lambda compilation
+        /// (the closure fold path at the bottom of <c>VisitNew</c> does the same).
+        /// </summary>
+        private static bool TryGetTimeSpanConstantArg(Expression expr, out TimeSpan value)
+        {
+            value = default;
+            if (TryGetConstantValue(expr, out var box) && box is TimeSpan ts)
+            {
+                value = ts;
+                return true;
+            }
+            return false;
         }
         protected override Expression VisitParameter(ParameterExpression node)
         {
