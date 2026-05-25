@@ -926,6 +926,19 @@ namespace nORM.Providers
                 $"TimeSpan column arithmetic is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Returns SQL evaluating <paramref name="dtoSql"/> (a DateTimeOffset column or
+        /// expression) re-rendered at <paramref name="offset"/>. Implements
+        /// <see cref="DateTimeOffset.ToOffset(TimeSpan)"/>: the UTC instant is invariant,
+        /// only the wall-clock representation and trailing offset suffix change.
+        /// Default throws; each provider overrides with a path tailored to its
+        /// storage shape (native DATETIMEOFFSET on SqlServer, ISO-8601 text
+        /// elsewhere).
+        /// </summary>
+        public virtual string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTimeOffset.ToOffset is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

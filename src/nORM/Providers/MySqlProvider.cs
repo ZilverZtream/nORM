@@ -341,6 +341,22 @@ namespace nORM.Providers
             => $"(TIME_TO_SEC({timeSpanColumnSql}) + MICROSECOND({timeSpanColumnSql}) / 1000000.0)";
 
         /// <summary>
+        /// MySQL has no native DATETIMEOFFSET — MySqlConnector stores DateTimeOffset
+        /// as DATETIME normalised to UTC. Adding the new offset's seconds shifts the
+        /// rendered wall clock; the trailing offset suffix completes the canonical
+        /// text the materialiser parses.
+        /// </summary>
+        public override string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
+        {
+            var suffix = FormatOffsetSuffix(offset);
+            var totalSec = (long)offset.TotalSeconds;
+            var fmtArg = totalSec == 0
+                ? dtoSql
+                : $"DATE_ADD({dtoSql}, INTERVAL {totalSec} SECOND)";
+            return $"CONCAT(DATE_FORMAT({fmtArg}, '%Y-%m-%dT%H:%i:%s'), '{suffix}')";
+        }
+
+        /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
         /// DATE so the materializer reads a DateOnly-compatible value.
         /// </summary>

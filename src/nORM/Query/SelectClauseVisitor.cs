@@ -313,6 +313,21 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // DateTimeOffset.ToOffset(constTimeSpan) -- recompute the column at
+            // the new offset. The UTC instant is invariant; only the wall clock
+            // and trailing offset suffix change. Provider hook handles per-storage
+            // emit (SqlServer SWITCHOFFSET native; canonical text on others).
+            if (node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTimeOffset)
+                && node.Method.Name == nameof(DateTimeOffset.ToOffset)
+                && node.Arguments.Count == 1
+                && TryGetTimeSpanConstant(node.Arguments[0], out var toOffsetTs))
+            {
+                var dtoSql = TranslateProjectionArg(node.Object);
+                sb.Append(_provider.GetDateTimeOffsetWithOffsetSql(dtoSql, toOffsetTs));
+                return node;
+            }
+
             // DateOnly.AddDays / AddMonths / AddYears -- route through the
             // matching AddXToDateOnlySql hook so each provider uses its
             // native date arithmetic.

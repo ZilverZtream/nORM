@@ -213,6 +213,23 @@ namespace nORM.Providers
                 $"END)";
         }
 
+        /// <summary>
+        /// SQLite stores DateTimeOffset as canonical ISO-8601 text. strftime parses
+        /// the column (including its trailing offset suffix) to a UTC instant; the
+        /// 'N seconds' modifier shifts the rendered wall clock by the new offset.
+        /// The literal offset suffix is appended client-side to complete the canonical
+        /// text the materialiser parses via <c>DateTimeOffset.Parse</c>.
+        /// </summary>
+        public override string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
+        {
+            var totalSec = (long)offset.TotalSeconds;
+            var suffix = FormatOffsetSuffix(offset);
+            var inner = totalSec == 0
+                ? $"strftime('%Y-%m-%dT%H:%M:%S', {dtoSql})"
+                : $"strftime('%Y-%m-%dT%H:%M:%S', {dtoSql}, '{(totalSec >= 0 ? "+" : "-")}{System.Math.Abs(totalSec)} seconds')";
+            return $"({inner} || '{suffix}')";
+        }
+
         /// <inheritdoc/>
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER

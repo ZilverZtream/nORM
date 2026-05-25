@@ -336,6 +336,14 @@ namespace nORM.Providers
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             => $"(CAST(DATEDIFF_BIG(MICROSECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}) AS FLOAT) / 1000000.0)";
 
+        /// <summary>
+        /// SQL Server has a native <c>SWITCHOFFSET(datetimeoffset, '+HH:MM')</c>
+        /// function that returns DATETIMEOFFSET at the requested offset for the
+        /// same UTC instant. SqlClient reads it directly as DateTimeOffset.
+        /// </summary>
+        public override string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
+            => $"SWITCHOFFSET({dtoSql}, '{FormatOffsetSuffix(offset)}')";
+
         /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";

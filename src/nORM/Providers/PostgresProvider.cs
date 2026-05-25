@@ -270,6 +270,21 @@ namespace nORM.Providers
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             => $"EXTRACT(EPOCH FROM {timeSpanColumnSql})";
 
+        /// <summary>
+        /// PostgreSQL stores DateTimeOffset as TIMESTAMPTZ (UTC instant). The
+        /// <c>AT TIME ZONE</c> operator's string form uses POSIX semantics where
+        /// the sign is inverted vs ISO-8601 — `'+02:00'` means UTC-2, not UTC+2.
+        /// Using <c>INTERVAL '...'</c> instead gives ISO-8601-compatible semantics
+        /// (positive interval = east of UTC). Format the wall clock result and
+        /// append the canonical offset suffix the materialiser parses.
+        /// </summary>
+        public override string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
+        {
+            var suffix = FormatOffsetSuffix(offset);
+            var totalSec = (long)offset.TotalSeconds;
+            return $"(to_char({dtoSql} AT TIME ZONE INTERVAL '{totalSec} seconds', 'YYYY-MM-DD\"T\"HH24:MI:SS') || '{suffix}')";
+        }
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";
