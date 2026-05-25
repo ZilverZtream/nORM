@@ -1042,8 +1042,25 @@ namespace nORM.Query
                         "(2) Move the Take to AFTER the set op if you wanted top-N-after-union: " +
                         "`q.Union(other).Take(n)`.");
                 }
-                var leftSql = t.TranslateSubExpression(node.Arguments[0]);
-                var rightSql = t.TranslateSubExpression(node.Arguments[1]);
+                // UNION / INTERSECT / EXCEPT all use set semantics that dedup by string
+                // equality on SQLite, so '10.5' vs '10.50' register as distinct rows even
+                // though they're the same decimal. Concat (UNION ALL) doesn't dedup, but
+                // we coerce uniformly so the materialized values match across arms (without
+                // coercion one arm could yield decimal 10.5 from '10.5' while the other
+                // yields 10.50 from '10.50', producing inconsistent row shapes for the same
+                // logical value). The flag is scoped per-arm via try/finally.
+                var savedCoerce = t._coerceDecimalProjectionsToReal;
+                t._coerceDecimalProjectionsToReal = true;
+                string leftSql, rightSql;
+                try
+                {
+                    leftSql = t.TranslateSubExpression(node.Arguments[0]);
+                    rightSql = t.TranslateSubExpression(node.Arguments[1]);
+                }
+                finally
+                {
+                    t._coerceDecimalProjectionsToReal = savedCoerce;
+                }
                 var setOp = node.Method.Name switch
                 {
                     "Union" => "UNION",
