@@ -128,12 +128,14 @@ public class ScalarAggregateTypeTests
     }
 
     [Fact]
-    public async Task Sum_NullableInt_EmptySet_Returns_Null()
+    public async Task Sum_NullableInt_EmptySet_Returns_Zero()
     {
+        // LINQ-to-Objects: Sum over IEnumerable<int?> returns 0 (not null) for
+        // empty / all-null source. nORM matches per c1bdd25.
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
         var result = await ctx.Query<AggRow>().SumAsync(r => r.NullableInt);
-        Assert.Null(result);
+        Assert.Equal(0, result);
     }
 
     // ─── Average ──────────────────────────────────────────────────────────────

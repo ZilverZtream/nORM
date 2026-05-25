@@ -132,6 +132,14 @@ namespace nORM.Providers
         /// </summary>
         public override string NormalizeDateTimeForCompare(string sql) => $"datetime({sql})";
 
+        /// <summary>
+        /// SQLite stores decimal as TEXT and operators lex-compare ('10.5' &lt; '2.0' because
+        /// '1' &lt; '2'). CAST(sql AS REAL) forces numeric semantics for comparison /
+        /// arithmetic / aggregation / dedup / sort. IEEE-754 binary precision loss is the
+        /// standard tradeoff. Other providers' DECIMAL is precise so they keep identity.
+        /// </summary>
+        public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

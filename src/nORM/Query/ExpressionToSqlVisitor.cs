@@ -577,9 +577,13 @@ namespace nORM.Query
             bool rightIsDecimal = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
             if (isDecimalComparable && (leftIsDecimal || rightIsDecimal))
             {
-                _sql.Append("(CAST(");
-                Visit(node.Left);
-                _sql.Append(" AS REAL)");
+                // Route through the provider hook: SqliteProvider wraps with
+                // CAST AS REAL (TEXT storage needs numeric coercion); other
+                // providers' native DECIMAL is precise so the hook is identity
+                // and the SQL shape stays `(left op right)`.
+                var leftSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Left));
+                var rightSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Right));
+                _sql.Append('(').Append(leftSqlD);
                 _sql.Append(node.NodeType switch
                 {
                     ExpressionType.Equal => " = ",
@@ -595,9 +599,7 @@ namespace nORM.Query
                     ExpressionType.Modulo => " % ",
                     _ => throw new InvalidOperationException()
                 });
-                _sql.Append("CAST(");
-                Visit(node.Right);
-                _sql.Append(" AS REAL))");
+                _sql.Append(rightSqlD).Append(')');
                 return node;
             }
 

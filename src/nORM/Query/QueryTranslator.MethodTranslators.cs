@@ -518,10 +518,12 @@ namespace nORM.Query
                     // 2 lex because '1' < '2'). Wrap decimal-typed keys with
                     // CAST AS REAL to force numeric ordering. Sister to the
                     // ETSV.VisitBinary CAST fix (8d795f4).
-                    static string CoerceDecimalKey(string sql, Type keyType)
+                    // Route via provider hook: SqliteProvider wraps decimal with
+                    // CAST AS REAL, other providers keep identity (native DECIMAL).
+                    string CoerceDecimalKey(string sql, Type keyType)
                     {
                         var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
-                        return u == typeof(decimal) ? $"CAST({sql} AS REAL)" : sql;
+                        return u == typeof(decimal) ? t._provider.NormalizeDecimalForCompare(sql) : sql;
                     }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {

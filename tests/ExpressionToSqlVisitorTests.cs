@@ -84,7 +84,20 @@ namespace nORM.Tests
 
             var (sql, parameters) = Translate(predicate, connection, provider);
             var t0 = provider.Escape("T0");
-            var expectedSql = $"({t0}.{provider.Escape(column)} > @p0)";
+            // Decimal columns on SQLite are wrapped via NormalizeDecimalForCompare
+            // (CAST AS REAL) because TEXT storage lex-compares. Native DECIMAL
+            // providers keep identity (the hook returns the raw operand).
+            string expectedSql;
+            if (column == "DecimalValue")
+            {
+                var leftSql = provider.NormalizeDecimalForCompare($"{t0}.{provider.Escape(column)}");
+                var rightSql = provider.NormalizeDecimalForCompare("@p0");
+                expectedSql = $"({leftSql} > {rightSql})";
+            }
+            else
+            {
+                expectedSql = $"({t0}.{provider.Escape(column)} > @p0)";
+            }
             Assert.Equal(expectedSql, sql);
             Assert.Single(parameters);
             Assert.Equal(expectedParam, parameters["@p0"]);

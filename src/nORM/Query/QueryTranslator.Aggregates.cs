@@ -112,7 +112,7 @@ namespace nORM.Query
                     // matches the projection back to the grouped expression.
                     var partType = Nullable.GetUnderlyingType(compositeKey.Arguments[i].Type) ?? compositeKey.Arguments[i].Type;
                     if (partType == typeof(decimal))
-                        partSql = $"CAST({partSql} AS REAL)";
+                        partSql = _provider.NormalizeDecimalForCompare(partSql);
                     parts.Add(partSql);
                     _groupBy.Add(partSql);
                     var memberName = compositeKey.Members?[i]?.Name ?? $"Item{i + 1}";
@@ -137,7 +137,7 @@ namespace nORM.Query
                 // Decimal key: coerce to REAL (see composite-key path above).
                 var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
                 if (keyType == typeof(decimal))
-                    groupBySql = $"CAST({groupBySql} AS REAL)";
+                    groupBySql = _provider.NormalizeDecimalForCompare(groupBySql);
                 _groupBy.Add(groupBySql);
             }
 
@@ -498,7 +498,7 @@ namespace nORM.Query
             var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
             if (selBodyType == typeof(decimal))
             {
-                columnSql = $"CAST({columnSql} AS REAL)";
+                columnSql = _provider.NormalizeDecimalForCompare(columnSql);
             }
 
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
@@ -581,7 +581,7 @@ namespace nORM.Query
                 var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
                 if (selBodyType == typeof(decimal))
                 {
-                    columnSql = $"CAST({columnSql} AS REAL)";
+                    columnSql = _provider.NormalizeDecimalForCompare(columnSql);
                 }
 
                 // Build complete SELECT ... FROM ... so the sql-length guard in Generate()

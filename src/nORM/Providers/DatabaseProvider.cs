@@ -439,6 +439,17 @@ namespace nORM.Providers
         public virtual string NormalizeDateTimeForCompare(string sql) => sql;
 
         /// <summary>
+        /// Wraps a SQL operand for numeric decimal comparison / arithmetic / aggregation /
+        /// dedup / sort. SQL Server / Postgres / MySQL all have native DECIMAL types whose
+        /// operators preserve full decimal precision -- the default is identity. SQLite
+        /// stores decimal as TEXT and lex-compares ('10.5' &lt; '2.0' because '1' &lt; '2'),
+        /// so SqliteProvider overrides to wrap with <c>CAST({sql} AS REAL)</c>. The REAL
+        /// coercion forces numeric semantics but with IEEE-754 binary precision loss --
+        /// the standard tradeoff documented across the decimal-cluster fixes.
+        /// </summary>
+        public virtual string NormalizeDecimalForCompare(string sql) => sql;
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
