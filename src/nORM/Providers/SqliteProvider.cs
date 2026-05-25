@@ -323,6 +323,21 @@ namespace nORM.Providers
                     // Emit the matching long format so Where round-trips; the
                     // materializer parses either form back to DateTime.
                     nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {args[0]})",
+                    // DateTimeOffset.UtcDateTime -- normalize to UTC instant. The
+                    // stored format is 'yyyy-MM-dd HH:mm:ss[.FFFFFFF]zzz' where
+                    // zzz is the trailing 6-char offset (+HH:MM / -HH:MM).
+                    // strftime accepts multi-modifier syntax: pass the timestamp
+                    // sub-substring then negate the parsed offset by hours and
+                    // minutes. Sign-flip uses CASE on the leading char of zzz.
+                    // Materializer reads result as DateTime (Kind=Unspecified)
+                    // -- DateTime.Equals compares ticks not Kind, so round-trip
+                    // works for instant comparisons.
+                    nameof(DateTimeOffset.UtcDateTime) when declaringType == typeof(DateTimeOffset) =>
+                        $"strftime('%Y-%m-%d %H:%M:%S', substr({args[0]}, 1, length({args[0]}) - 6), " +
+                        $"(CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '+' THEN '-' ELSE '+' END) " +
+                        $"|| substr({args[0]}, length({args[0]}) - 4, 2) || ' hours', " +
+                        $"(CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '+' THEN '-' ELSE '+' END) " +
+                        $"|| substr({args[0]}, length({args[0]}) - 1, 2) || ' minutes')",
                     // TimeOfDay returns the time portion (TimeSpan). Microsoft.Data.Sqlite
                     // binds TimeSpan params as canonical 'HH:mm:ss' text (TimeSpan.ToString
                     // 'c' format for sub-day spans), so emitting strftime('%H:%M:%S', col)
