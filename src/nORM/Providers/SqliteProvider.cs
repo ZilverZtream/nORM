@@ -1149,6 +1149,14 @@ namespace nORM.Providers
                     // case-fold explicitly so callers can rely on consistent semantics
                     // when collations or PRAGMA case_sensitive_like change.
                     nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    // Server-side primitives. SQLite datetime('now') returns
+                    // 'YYYY-MM-DD HH:MM:SS' in UTC; randomblob(16) returns a
+                    // 16-byte blob compatible with .NET Guid via the
+                    // GetFieldValue<Guid>() reader path; random()/9.22e18
+                    // squeezes the 64-bit signed result into [0, 1).
+                    nameof(NormFunctions.ServerUtcNow) when args.Length == 0 => "datetime('now')",
+                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => "randomblob(16)",
+                    nameof(NormFunctions.ServerRandom) when args.Length == 0 => "(ABS(random()) / 9223372036854775808.0)",
                     _ => null
                 };
             }

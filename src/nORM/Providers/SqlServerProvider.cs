@@ -612,6 +612,12 @@ namespace nORM.Providers
                 return name switch
                 {
                     nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    // Server-side primitives matching .NET semantics: GETUTCDATE
+                    // returns DATETIME (UTC); NEWID is a Guid-shaped uniqueidentifier;
+                    // RAND() returns float in [0, 1).
+                    nameof(NormFunctions.ServerUtcNow) when args.Length == 0 => "GETUTCDATE()",
+                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => "NEWID()",
+                    nameof(NormFunctions.ServerRandom) when args.Length == 0 => "RAND()",
                     _ => null
                 };
             }
