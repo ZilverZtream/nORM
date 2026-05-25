@@ -429,6 +429,16 @@ namespace nORM.Providers
         public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
 
         /// <summary>
+        /// Wraps a SQL operand for chronological DateTime comparison. SQL Server / Postgres /
+        /// MySQL all have native DATETIME types whose comparison operators are timezone- and
+        /// offset-aware, so the default is identity. SQLite stores DateTime as TEXT and
+        /// comparison is lex-based, which silently mis-orders rows with mixed timezone
+        /// offsets (e.g. '+02:00' suffix vs 'Z') -- SqliteProvider overrides to wrap the
+        /// operand with <c>datetime(...)</c> for chronological semantics.
+        /// </summary>
+        public virtual string NormalizeDateTimeForCompare(string sql) => sql;
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
