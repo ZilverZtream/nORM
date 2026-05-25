@@ -321,6 +321,14 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, 0, 0, 0)";
 
+        /// <summary>PostgreSQL MAKE_DATE builds a DATE from int parts.</summary>
+        public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"MAKE_DATE({yearSql}, {monthSql}, {daySql})";
+
+        /// <summary>PostgreSQL MAKE_TIME builds a TIME from int parts; seconds accept double.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
+            => $"MAKE_TIME({hourSql}, {minuteSql}, {secondSql})";
+
         /// <summary>PostgreSQL's `~` operator evaluates a POSIX regex match against a text column.</summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} ~ {patternLiteral})";

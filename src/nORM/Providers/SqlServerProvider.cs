@@ -411,6 +411,14 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATETIME2FROMPARTS({yearSql}, {monthSql}, {daySql}, 0, 0, 0, 0, 7)";
 
+        /// <summary>T-SQL DATEFROMPARTS builds a DATE from int parts.</summary>
+        public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"DATEFROMPARTS({yearSql}, {monthSql}, {daySql})";
+
+        /// <summary>T-SQL TIMEFROMPARTS(h, m, s, fraction, precision); 0/0 = no sub-second.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
+            => $"TIMEFROMPARTS({hourSql}, {minuteSql}, {secondSql}, 0, 0)";
+
         /// <summary>
         /// T-SQL has no native regex primitive. The supported workarounds are
         /// a CLR scalar function (sql_clr assembly providing RegExMatch) or

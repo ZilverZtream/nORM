@@ -720,6 +720,22 @@ namespace nORM.Providers
                 $"DateTime(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Per-provider DATE-from-parts primitive for translating
+        /// <c>new DateOnly(year, month, day)</c> with column args.
+        /// </summary>
+        public virtual string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
+            => throw new NormUnsupportedFeatureException(
+                $"DateOnly(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
+        /// Per-provider TIME-from-parts primitive for translating
+        /// <c>new TimeOnly(hour, minute, second)</c> with column args.
+        /// </summary>
+        public virtual string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
+            => throw new NormUnsupportedFeatureException(
+                $"TimeOnly(hour, minute, second) with column args is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///

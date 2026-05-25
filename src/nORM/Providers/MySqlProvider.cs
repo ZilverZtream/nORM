@@ -400,6 +400,14 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d')";
 
+        /// <summary>MySQL DATE() wrapper around the STR_TO_DATE text shape ensures DATE return type.</summary>
+        public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"DATE(STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d'))";
+
+        /// <summary>MySQL MAKETIME builds a TIME from int parts; seconds accept double for sub-second.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
+            => $"MAKETIME({hourSql}, {minuteSql}, {secondSql})";
+
         /// <summary>
         /// MySQL stores TimeOnly as TIME. TIMEDIFF returns a signed TIME diff;
         /// TIME_TO_SEC produces the integer-seconds form which can be negative.
