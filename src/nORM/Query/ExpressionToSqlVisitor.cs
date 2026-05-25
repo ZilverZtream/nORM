@@ -601,6 +601,52 @@ namespace nORM.Query
                 return node;
             }
 
+            // DateTime / DateTimeOffset comparison: SQLite stores as TEXT and lex-compares
+            // ISO strings, which mis-orders rows with mixed timezone offsets ('+02:00'
+            // suffix vs 'Z'). Other providers' native DATETIME types compare correctly so
+            // NormalizeDateTimeForCompare is identity for them.
+            //
+            // CRITICAL: wrap ONLY operands that resolve to column references. Parameter
+            // operands are bound from .NET DateTime values whose canonical serialization
+            // ('yyyy-MM-dd HH:mm:ss.fffffff' for Microsoft.Data.Sqlite) already lex-
+            // compares correctly against datetime()'s output. Wrapping a parameter side
+            // breaks because SQLite's datetime() returns EMPTY for max-precision inputs
+            // like DateTime.MaxValue ('9999-12-31 23:59:59.9999999') -- the .9999999
+            // fractional overflows when added to the max year, producing NULL/empty and
+            // collapsing the comparison to UNKNOWN/false.
+            // Only ORDER-sensitive operators get the datetime() wrap. Equality (= / <>)
+            // already works against the canonical storage format (callers must serialize
+            // DateTimeOffset with offset suffix; wrapping the column would strip the
+            // suffix and break exact-match).
+            bool isDateCmp = node.NodeType is
+                    ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
+            Type leftDtType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+            Type rightDtType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+            bool leftIsDt = leftDtType == typeof(DateTime) || leftDtType == typeof(DateTimeOffset);
+            bool rightIsDt = rightDtType == typeof(DateTime) || rightDtType == typeof(DateTimeOffset);
+            bool leftIsCol = IsColumnReference(node.Left);
+            bool rightIsCol = IsColumnReference(node.Right);
+            if (isDateCmp && leftIsDt && rightIsDt && (leftIsCol || rightIsCol))
+            {
+                var leftSql = GetSql(node.Left);
+                var rightSql = GetSql(node.Right);
+                _sql.Append("(")
+                    .Append(leftIsCol ? _provider.NormalizeDateTimeForCompare(leftSql) : leftSql);
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => " = ",
+                    ExpressionType.NotEqual => " <> ",
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append(rightIsCol ? _provider.NormalizeDateTimeForCompare(rightSql) : rightSql).Append(")");
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
@@ -2768,6 +2814,22 @@ namespace nORM.Query
         /// interfering with further translations.
         /// </returns>
         public Dictionary<string, object> GetParameters() => _params;
+        // True when the expression resolves to a column reference (member of the
+        // lambda parameter), not a constant / closure / parameter. Used by the
+        // DateTime-comparison normalization to wrap only column operands.
+        private bool IsColumnReference(Expression expr)
+        {
+            // Strip Convert wrappers (e.g. (DateTime?)col).
+            while (expr is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked))
+                expr = u.Operand;
+            if (expr is MemberExpression me && me.Expression is ParameterExpression)
+                return true;
+            // Joined-table member access via correlated parameter is also a column.
+            if (expr is MemberExpression me2 && me2.Expression is ParameterExpression pe2 && _parameterMappings.ContainsKey(pe2))
+                return true;
+            return false;
+        }
+
         private string GetSql(Expression expression)
         {
             var start = _sql.Length;

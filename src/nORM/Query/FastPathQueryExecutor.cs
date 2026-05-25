@@ -490,8 +490,23 @@ namespace nORM.Query
                 }
                 else
                 {
-                    sql.Append(column.EscCol).Append(' ').Append(SqlOperator(predicate.Operation)).Append(' ')
-                        .Append(ctx.Provider.ParamPrefix).Append('p').Append(paramIndex++);
+                    // Mirror the ETSV DateTime mixed-TZ normalization: wrap the COLUMN side
+                    // with datetime() so stored ISO strings with mixed offsets ('+02:00' /
+                    // 'Z' / '-02:00') compare chronologically. Parameter side is bound from
+                    // .NET DateTime and already in a canonical comparable form -- wrapping
+                    // it would break for DateTime.MaxValue ('9999-12-31 23:59:59.9999999')
+                    // because SQLite's datetime() returns empty for the .9999999 fractional
+                    // overflow. Other providers' override is identity (native DATETIME).
+                    var colType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                    var paramName = ctx.Provider.ParamPrefix + "p" + paramIndex++;
+                    string colSql = column.EscCol;
+                    // Only wrap on ORDER-sensitive operators -- equality matches storage
+                    // format directly (see ETSV comment).
+                    bool isOrderCmp = predicate.Operation is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                                       or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
+                    if (isOrderCmp && (colType == typeof(DateTime) || colType == typeof(DateTimeOffset)))
+                        colSql = ctx.Provider.NormalizeDateTimeForCompare(colSql);
+                    sql.Append(colSql).Append(' ').Append(SqlOperator(predicate.Operation)).Append(' ').Append(paramName);
                 }
             }
 
