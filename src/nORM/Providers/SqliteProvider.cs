@@ -572,6 +572,23 @@ namespace nORM.Providers
                 }
             }
 
+            // bool.Parse(string) -- .NET semantics are case-insensitive
+            // ("True"/"true"/"TRUE" -> true; "False"/"false"/"FALSE" ->
+            // false). SQLite returns 0/1 INTEGER from a boolean expression
+            // which the materializer converts to bool via the column type.
+            if (declaringType == typeof(bool) && name == "Parse" && args.Length == 1)
+            {
+                return $"(LOWER({args[0]}) = 'true')";
+            }
+
+            // Guid.Parse(string) -- SQLite stores Guid as canonical
+            // 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' text and Microsoft.Data
+            // .Sqlite's GetGuid parses it directly. Identity emission.
+            if (declaringType == typeof(Guid) && name == "Parse" && args.Length == 1)
+            {
+                return args[0];
+            }
+
 
             if (declaringType == typeof(NormFunctions))
             {
