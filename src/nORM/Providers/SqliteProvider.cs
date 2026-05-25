@@ -324,6 +324,18 @@ namespace nORM.Providers
         /// <returns>The translated SQL or <c>null</c> if unsupported.</returns>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)
         {
+            // Instance CompareTo on integer primitives (int/long/short/byte/sbyte/uint
+            // /ulong/ushort) -- arrives with the receiver's primitive type as
+            // declaringType. Same sign-based emit as decimal/double's switch entries.
+            if (name == "CompareTo" && args.Length == 2
+                && (declaringType == typeof(int) || declaringType == typeof(long)
+                    || declaringType == typeof(short) || declaringType == typeof(byte)
+                    || declaringType == typeof(sbyte) || declaringType == typeof(uint)
+                    || declaringType == typeof(ulong) || declaringType == typeof(ushort)
+                    || declaringType == typeof(double) || declaringType == typeof(float)))
+            {
+                return $"CAST(SIGN({args[0]} - {args[1]}) AS INTEGER)";
+            }
             if (declaringType == typeof(string))
             {
                 return name switch
@@ -384,6 +396,11 @@ namespace nORM.Providers
                     // on TEXT use BINARY collation by default which matches
                     // the ordinal comparison most callers expect.
                     nameof(string.Compare) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
+                    // Instance form: receiver passes through as args[0] from
+                    // node.Object, peer as args[1]. Identical emit to static
+                    // Compare; same .NET sign-only contract.
+                    nameof(string.CompareTo) when args.Length == 2 =>
                         $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
@@ -505,6 +522,10 @@ namespace nORM.Providers
                     // SIGN yields the canonical triple. CAST settles the result
                     // to INTEGER so the materializer hits int affinity.
                     nameof(DateTime.Compare) when args.Length == 2 =>
+                        $"CAST(SIGN(julianday({args[0]}) - julianday({args[1]})) AS INTEGER)",
+                    // Instance CompareTo -- same emit pattern, args[0] is the
+                    // receiver instance pushed through TranslateFunction.
+                    nameof(DateTime.CompareTo) when args.Length == 2 =>
                         $"CAST(SIGN(julianday({args[0]}) - julianday({args[1]})) AS INTEGER)",
                     _ => null
                 };
@@ -843,6 +864,10 @@ namespace nORM.Providers
                     // SQLite's SIGN(a-b) yields exactly that triple for non-NaN
                     // numerics; sister to Math.Sign already mapped.
                     nameof(decimal.Compare) when args.Length == 2 => $"CAST(SIGN({args[0]} - {args[1]}) AS INTEGER)",
+                    // CompareTo instance form -- same shape as static Compare,
+                    // covers int/long/double/decimal numeric receivers since
+                    // the name string is the same and arity matches.
+                    nameof(decimal.CompareTo) when args.Length == 2 => $"CAST(SIGN({args[0]} - {args[1]}) AS INTEGER)",
                     _ => null
                 };
             }
