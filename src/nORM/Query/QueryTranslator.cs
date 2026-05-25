@@ -181,6 +181,13 @@ namespace nORM.Query
         // Take/Skip is the silent-wrongness shape the pins guard.
         private bool _takeSetByTerminal { get => _clauses.TakeSetByTerminal; set => _clauses.TakeSetByTerminal = value; }
         private bool _isDistinct { get => _clauses.IsDistinct; set => _clauses.IsDistinct = value; }
+
+        // Set by SetOperationTranslator before translating each UNION / INTERSECT /
+        // EXCEPT arm. SQLite stores decimal as TEXT and the set-op dedup compares
+        // strings, so '10.5' and '10.50' register as distinct rows. Coercing both
+        // arms with CAST(col AS REAL) makes the dedup numeric. Same precision
+        // tradeoff as the rest of the decimal-cluster — see SCV.CoerceDecimalProjectionsToReal.
+        internal bool _coerceDecimalProjectionsToReal;
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
         private static readonly ObjectPool<List<string>> _selectItemsPool =
@@ -587,7 +594,7 @@ namespace nORM.Query
                             // table` would return the full row count and ignore the distinct.
                             if (_t._isDistinct && _t._projection != null)
                             {
-                                var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias) { CoerceDecimalProjectionsToReal = true };
+                                var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias) { CoerceDecimalProjectionsToReal = true | _t._coerceDecimalProjectionsToReal };
                                 var projSelect = selectVisitor.Translate(_t._projection.Body);
                                 var subqueryAlias = _t.EscapeAlias("T0");
                                 prefix.Append("SELECT COUNT(*) FROM (SELECT DISTINCT ").Append(projSelect).Append(" FROM ").Append(fromClause);
@@ -622,7 +629,7 @@ namespace nORM.Query
                         }
                         else if (_t._projection != null)
                         {
-                            var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias) { CoerceDecimalProjectionsToReal = _t._isDistinct };
+                            var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias) { CoerceDecimalProjectionsToReal = _t._isDistinct || _t._coerceDecimalProjectionsToReal };
                             select = selectVisitor.Translate(_t._projection.Body);
 
                             // Capture detected collections for split query processing
