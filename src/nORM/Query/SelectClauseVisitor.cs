@@ -349,6 +349,37 @@ namespace nORM.Query
                 return node;
             }
 
+            // string.Concat(params string[] values) and overloads -- mirror of
+            // ExpressionToSqlVisitor (line ~1759). The provider-route can't
+            // unwrap the NewArrayInit so the generic fallthrough at the end of
+            // this method would emit a literal `CONCAT(...)` which SQLite
+            // rejects ("no such function: CONCAT"). Unwrap any NewArrayInit
+            // params-array argument here and chain provider concat operators
+            // (`||` on SQLite, `CONCAT(a,b)` on SQL Server/MySQL).
+            if (node.Object == null
+                && node.Method.DeclaringType == typeof(string)
+                && node.Method.Name == nameof(string.Concat)
+                && node.Arguments.Count >= 1)
+            {
+                var concatParts = new List<string>();
+                foreach (var a in node.Arguments)
+                {
+                    if (a is NewArrayExpression naeC)
+                    {
+                        foreach (var elem in naeC.Expressions)
+                            concatParts.Add(TranslateProjectionArg(elem));
+                    }
+                    else
+                    {
+                        concatParts.Add(TranslateProjectionArg(a));
+                    }
+                }
+                if (concatParts.Count == 0) { sb.Append("''"); return node; }
+                if (concatParts.Count == 1) { sb.Append(concatParts[0]); return node; }
+                sb.Append(concatParts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
+                return node;
+            }
+
             // string.Join(separator, params string[] values) -- the C# variadic
             // form compiles to a MethodCall with a NewArrayInit second arg
             // holding the value expressions. The args array passed to the
