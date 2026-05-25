@@ -1419,6 +1419,56 @@ namespace nORM.Query
             // String methods are handled by _fastMethodHandlers (see above).
             if (node.Method.DeclaringType == typeof(string))
             {
+                // string.Trim / TrimStart / TrimEnd(char[]) -- the generic provider
+                // route would expand the params char[] as multiple SQL args
+                // crashing SQLite TRIM. Mirror be14020's SCV branch: walk
+                // NewArrayInit or fold MemberExpression to extract chars at
+                // translation time, then emit TRIM/LTRIM/RTRIM(s, 'chars').
+                if ((node.Method.Name == nameof(string.Trim)
+                        || node.Method.Name == nameof(string.TrimStart)
+                        || node.Method.Name == nameof(string.TrimEnd))
+                    && node.Object != null
+                    && node.Arguments.Count == 1
+                    && node.Arguments[0].Type == typeof(char[]))
+                {
+                    char[]? chars = null;
+                    if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
+                    {
+                        var arr = new char[nae.Expressions.Count];
+                        bool allConst = true;
+                        for (int i = 0; i < nae.Expressions.Count; i++)
+                        {
+                            if (nae.Expressions[i] is ConstantExpression ec && ec.Value is char ch)
+                                arr[i] = ch;
+                            else { allConst = false; break; }
+                        }
+                        if (allConst) chars = arr;
+                    }
+                    else if (TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
+                    {
+                        // Closure-captured array -- reserve a placeholder slot so
+                        // the ParameterValueExtractor's value-list stays aligned.
+                        // Same shape as 407e03d / eeff6e7 / cf39b61 / 04a0003 /
+                        // 7d6d7ac / c6c4710.
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                        chars = capturedChars;
+                    }
+                    if (chars is { Length: > 0 })
+                    {
+                        var sqlFn = node.Method.Name switch
+                        {
+                            nameof(string.TrimStart) => "LTRIM",
+                            nameof(string.TrimEnd) => "RTRIM",
+                            _ => "TRIM",
+                        };
+                        var recvSql = GetSql(node.Object);
+                        var trimSet = new string(chars).Replace("'", "''");
+                        _sql.Append(sqlFn).Append('(').Append(recvSql).Append(", '").Append(trimSet).Append("')");
+                        return node;
+                    }
+                }
                 // String indexer s[i] compiles to String.get_Chars(i) — lower to
                 // SUBSTR(col, i+1, 1) via the provider's existing 3-arg Substring shape.
                 // The right-hand char literal binds as a single-char parameter, so the
