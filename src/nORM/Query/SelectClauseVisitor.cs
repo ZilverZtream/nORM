@@ -1477,13 +1477,15 @@ namespace nORM.Query
                     $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
                     "DateTime + constant TimeSpan arithmetic in projection requires this provider hook.");
             }
-            // DateTime - DateTime in projection -> TimeSpan. SQL '-' on TEXT
-            // columns returns 0 (silent-wrongness); convert via julianday math
-            // and tag the column with the marker the materializer recognizes
-            // for "REAL seconds -> TimeSpan.FromSeconds" conversion.
+            // DateTime - DateTime / DateTimeOffset - DateTimeOffset in projection
+            // -> TimeSpan. SQL '-' on TEXT columns returns 0 (silent-wrongness);
+            // route through the provider hook (julianday on SQLite parses ISO
+            // offset suffixes, so DTO subtraction yields the UTC-instant
+            // difference even when LHS/RHS were stored in different offsets).
+            static bool IsDateOrDtoType(Type t) => t == typeof(DateTime) || t == typeof(DateTimeOffset);
             if (node.NodeType == ExpressionType.Subtract
-                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
-                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(DateTime))
+                && IsDateOrDtoType(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && IsDateOrDtoType(Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type))
             {
                 var leftStart = sb.Length;
                 Visit(node.Left);
@@ -1493,13 +1495,37 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                // Provider hook returns REAL seconds (julianday delta on SQLite,
-                // DATEDIFF_BIG on SqlServer, EXTRACT(EPOCH) on Postgres,
-                // TIMESTAMPDIFF on MySQL). Materializer reads as double; user
-                // expects TimeSpan -- handled by MaterializerFactory's
-                // GetFieldValue path which converts numeric to TimeSpan via
-                // TimeSpan.FromSeconds.
-                sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
+                // For DateTimeOffset operands, use integer UTC-epoch-seconds
+                // subtraction (sister of GetDateTimeOffsetUtcEpochSecondsSql
+                // from the equality lowering) to avoid the julianday-delta
+                // double-precision noise that turns FromSeconds(15) into
+                // 14.9999991s. DTO storage is conventionally second-precision,
+                // so integer subtraction loses no information here. DateTime
+                // operands keep the existing julianday path.
+                Type lt = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+                Type rt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+                if (lt == typeof(DateTimeOffset) && rt == typeof(DateTimeOffset))
+                {
+                    // `* 1.0` forces REAL coercion in SQLite (sister of the
+                    // TimeSpan-seconds fix). Without it the materialiser's
+                    // ConvertToTimeSpan(long) path treats the diff as ticks and
+                    // returns 15 ticks instead of 15 seconds.
+                    sb.Append("((")
+                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(leftSql))
+                      .Append(" - ")
+                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(rightSql))
+                      .Append(") * 1.0)");
+                }
+                else
+                {
+                    // Provider hook returns REAL seconds (julianday delta on SQLite,
+                    // DATEDIFF_BIG on SqlServer, EXTRACT(EPOCH) on Postgres,
+                    // TIMESTAMPDIFF on MySQL). Materializer reads as double; user
+                    // expects TimeSpan -- handled by MaterializerFactory's
+                    // GetFieldValue path which converts numeric to TimeSpan via
+                    // TimeSpan.FromSeconds.
+                    sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
+                }
                 return node;
             }
             // TimeSpan + TimeSpan and TimeSpan - TimeSpan between two column
