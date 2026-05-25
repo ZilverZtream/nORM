@@ -1141,8 +1141,21 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => "<=",
                 ExpressionType.GreaterThan => ">",
                 ExpressionType.GreaterThanOrEqual => ">=",
-                ExpressionType.AndAlso or ExpressionType.And => "AND",
-                ExpressionType.OrElse or ExpressionType.Or => "OR",
+                // `&&` is always AndAlso (logical) and `||` is OrElse. `&` and
+                // `|` are ExpressionType.And/Or and their meaning depends on
+                // the operand type -- on bool they're logical (no short-circuit),
+                // on integers/enums they're bitwise. Map accordingly so flag
+                // arithmetic (p.Flags & Perm.Read) emits SQLite's bitwise &
+                // rather than logical AND (which silently coerces operands to
+                // truthy 0/1 and gives the wrong answer).
+                ExpressionType.AndAlso => "AND",
+                ExpressionType.OrElse => "OR",
+                ExpressionType.And => (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(bool) ? "AND" : "&",
+                ExpressionType.Or => (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(bool) ? "OR" : "|",
+                // SQLite has no native XOR operator on integers; the lower
+                // (a | b) - (a & b) rewrite is non-trivial in a single-line
+                // emit, so XOR continues to fall through to the default throw
+                // until a caller actually needs it.
                 ExpressionType.Add => "+",
                 ExpressionType.Subtract => "-",
                 ExpressionType.Multiply => "*",
