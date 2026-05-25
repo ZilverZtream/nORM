@@ -122,6 +122,16 @@ namespace nORM.Providers
         /// <summary>SQLite has no XOR operator — synthesize via `(a | b) - (a &amp; b)`.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"(({left} | {right}) - ({left} & {right}))";
 
+        /// <summary>
+        /// SQLite stores DateTime as TEXT; lex compare on raw ISO strings with mixed
+        /// timezone offsets ('+02:00' vs 'Z') silently mis-orders rows because the offset
+        /// suffix dominates the comparison. <c>datetime(...)</c> parses any ISO format
+        /// and produces a canonical 'YYYY-MM-DD HH:MM:SS' UTC text whose lex order matches
+        /// chronological order. Applied bilaterally in ETSV.VisitBinary for DateTime
+        /// comparisons.
+        /// </summary>
+        public override string NormalizeDateTimeForCompare(string sql) => $"datetime({sql})";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 
