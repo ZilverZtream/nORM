@@ -433,9 +433,19 @@ namespace nORM.Query
             {
                 _t.Visit(_expression);
                 var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
-                if (_t._isAggregate && _t._groupBy.Count == 0 && (_expression as MethodCallExpression)?.Method.Name is "Count" or "LongCount")
+                var topLevelMethodName = (_expression as MethodCallExpression)?.Method.Name;
+                if (_t._isAggregate && _t._groupBy.Count == 0 && topLevelMethodName is "Count" or "LongCount")
                 {
                     materializerType = typeof(int);
+                }
+                // Any/All/Contains over a projected source (e.g. `q.Select(p => new {...}).Union(q2).Any()`)
+                // would otherwise drag the projection's anonymous type into the materializer factory
+                // even though the scalar path overwrites the materializer below with a bool reader.
+                // Use a safe scalar type for the pre-build so CreateSyncMaterializer doesn't try
+                // to look up an anonymous-type constructor for the EXISTS scalar result.
+                else if (_t._isAggregate && _t._groupBy.Count == 0 && topLevelMethodName is "Any" or "All" or "Contains")
+                {
+                    materializerType = typeof(bool);
                 }
 
                 // Create both sync and async materializers.
@@ -1081,6 +1091,15 @@ namespace nORM.Query
         {
             _isAggregate = true;
             _singleResult = true;
+            // Any/All/Contains return a scalar bool via `SELECT 1 WHERE EXISTS(...)`.
+            // If the source was a projected set-op (e.g. `q1.Select(p => new { V = p.V }).Union(q2).Any()`),
+            // SetOperationTranslator would have lifted the anonymous-typed projection onto
+            // _projection, and Generate() would then build a materializer against that
+            // anonymous type -- which throws "No suitable constructor for AnonymousType"
+            // because the actual EXISTS result is a single bool column. Clear _projection
+            // so the scalar materializer path is taken (mirror of CountTranslator's
+            // _projection = null behaviour for the same reason).
+            _projection = null;
             var source = node.Arguments[0];
             var genericArgs = source.Type.GetGenericArguments();
             if (genericArgs.Length == 0)
