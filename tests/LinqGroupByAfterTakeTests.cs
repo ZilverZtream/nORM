@@ -47,39 +47,40 @@ public class LinqGroupByAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GroupBy_after_take_groups_windowed_rows_or_throws_actionable_pin()
+    public async Task GroupBy_after_take_aggregates_only_the_windowed_rows()
     {
-        System.Exception? caught = null;
-        (string Cat, double Total)[]? result = null;
-        try
-        {
-            result = (await _ctx.Query<GbaRow>()
-                .OrderBy(r => r.Id)
-                .Take(3)
-                .GroupBy(r => r.Category)
-                .Select(g => new { Cat = g.Key, Total = g.Sum(r => r.Amount) })
-                .ToListAsync())
-                .Select(x => (x.Cat, x.Total))
-                .ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
+        // OrderBy(Id).Take(3) → first 3 rows = all category A (10, 20, 30). Group by Category:
+        //   A: Sum=60. ONE row.
+        // Full-table GROUP BY would also include B → {A=60, B=90} — silent-wrongness.
+        var result = (await _ctx.Query<GbaRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .GroupBy(r => r.Category)
+            .Select(g => new { Cat = g.Key, Total = g.Sum(r => r.Amount) })
+            .ToListAsync())
+            .OrderBy(g => g.Cat)
+            .ToArray();
+        Assert.Single(result);
+        Assert.Equal("A",  result[0].Cat);
+        Assert.Equal(60.0, result[0].Total);
+    }
 
-        if (caught != null)
-        {
-            Assert.IsType<NormUnsupportedFeatureException>(caught);
-            Assert.Contains("GroupBy", caught.Message, System.StringComparison.Ordinal);
-            Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-            return;
-        }
-
-        // Acceptable: GroupBy ran on the windowed 3 (all A's) → single group A=60.
-        Assert.NotNull(result);
-        var dump = string.Join(", ", result!.Select(r => $"{r.Cat}={r.Total}"));
-        Assert.True(result.Length == 1 && result[0].Cat == "A" && result[0].Total == 60.0,
-            $"Expected single group {{A=60}} from windowed top-3, got [{dump}] — likely silent-wrongness (GROUP BY on full table, LIMIT on groups).");
+    [Fact]
+    public async Task GroupBy_after_skip_aggregates_only_the_skipped_subset()
+    {
+        // Skip(3) → rows 4 and 5 = both category B (40, 50). Group by Category:
+        //   B: Sum=90. ONE row.
+        var result = (await _ctx.Query<GbaRow>()
+            .OrderBy(r => r.Id)
+            .Skip(3)
+            .GroupBy(r => r.Category)
+            .Select(g => new { Cat = g.Key, Total = g.Sum(r => r.Amount) })
+            .ToListAsync())
+            .OrderBy(g => g.Cat)
+            .ToArray();
+        Assert.Single(result);
+        Assert.Equal("B",  result[0].Cat);
+        Assert.Equal(90.0, result[0].Total);
     }
 
     [Table("GbaRow")]
