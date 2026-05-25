@@ -1320,6 +1320,46 @@ namespace nORM.Query
         private sealed class ElementAtTranslator : IMethodCallTranslator
         {
             /// <summary>
+            /// Windowed-source branch — wraps the windowed source as a derived
+            /// table and applies the index-skip + LIMIT 1 on the outer SELECT,
+            /// so ElementAt(k) over Take(N) bounds k to the windowed set rather
+            /// than indexing into the full table.
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanEa = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapEa);
+                t._mapping = subMapEa;
+                t.MergeSubPlanParameters(subPlanEa);
+                var winAliasEa = t.EscapeAlias("__wea" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT * FROM (").Append(subPlanEa.Sql).AppendFragment(") AS ").Append(winAliasEa);
+                // Apply the index-skip on the outer wrap. Bind from constant or
+                // compiled-param the same way the unwindowed path does.
+                if (t.TryBindPagingParameter(node.Arguments[1], out var eaName))
+                {
+                    t._skipParam = eaName;
+                }
+                else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int eaIdx))
+                {
+                    t._skip = eaIdx;
+                }
+                else
+                {
+                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"));
+                }
+                t._take = 1;
+                var pNameEa = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                t._params[pNameEa] = 1;
+                t._takeParam = pNameEa;
+                t._takeSetByTerminal = true;
+                t._singleResult = node.Method.Name == "ElementAt";
+                // The outer SELECT preserves the inner ordering naturally
+                // (derived tables retain row order on SQLite and most providers),
+                // so no outer ORDER BY is required for the LIMIT/OFFSET to be
+                // deterministic — the inner sub-plan already has its ORDER BY.
+                return node;
+            }
+
+            /// <summary>
             /// Applies <c>ElementAt</c> or <c>ElementAtOrDefault</c> semantics by adjusting the skip/take parameters.
             /// </summary>
             /// <param name="t">The active <see cref="QueryTranslator"/>.</param>
@@ -1327,6 +1367,11 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                if (node.Arguments[0] is MethodCallExpression eaWinSrc
+                    && eaWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
                 var terminalMethodEa = t._methodName;
                 var elementSource = t.Visit(node.Arguments[0]);
                 t._methodName = terminalMethodEa;
