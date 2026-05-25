@@ -656,6 +656,14 @@ namespace nORM.Providers
                     nameof(Math.Asinh) when args.Length == 1 => $"ASINH({args[0]})",
                     nameof(Math.Acosh) when args.Length == 1 => $"ACOSH({args[0]})",
                     nameof(Math.Atanh) when args.Length == 1 => $"ATANH({args[0]})",
+                    // MaxMagnitude/MinMagnitude -- whichever argument has the
+                    // larger/smaller absolute value. For non-equal magnitudes
+                    // a simple CASE on ABS matches .NET; the equal-magnitude
+                    // IEEE 754 tie-break (Max favors +, Min favors -) is
+                    // documented as out-of-scope -- real column data rarely
+                    // hits exact-magnitude ties.
+                    nameof(Math.MaxMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     _ => null
                 };
             }
