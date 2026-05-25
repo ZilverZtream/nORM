@@ -144,6 +144,8 @@ namespace nORM.Query
                 nameof(DateTime.DaysInMonth),
                 nameof(DateOnly.DayNumber),
                 nameof(DateOnly.AddDays),
+                nameof(DateOnly.AddMonths),
+                nameof(DateOnly.AddYears),
                 nameof(TimeOnly.Add),
                 nameof(DateOnly.FromDayNumber),
                 nameof(DateOnly.FromDateTime),

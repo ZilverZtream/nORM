@@ -230,6 +230,14 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({daysSqlFragment}) || ' days')";
 
+        /// <summary>SQLite uses strftime with an 'N months' modifier on the DateOnly TEXT column.</summary>
+        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
+            => $"strftime('%Y-%m-%d', {dateOnlySql}, ({monthsSqlFragment}) || ' months')";
+
+        /// <summary>SQLite uses strftime with an 'N years' modifier on the DateOnly TEXT column.</summary>
+        public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
+            => $"strftime('%Y-%m-%d', {dateOnlySql}, ({yearsSqlFragment}) || ' years')";
+
         /// <summary>
         /// SQLite TimeOnly is 'HH:mm:ss' text. strftime needs a date prefix to
         /// apply a seconds modifier; we inject '1900-01-01 ' and re-format to

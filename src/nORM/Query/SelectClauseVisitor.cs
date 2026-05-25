@@ -275,24 +275,33 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
-            // DateOnly.AddDays(N) -- routes through AddDaysToDateOnlySql so
-            // each provider uses its native date arithmetic.
+            // DateOnly.AddDays / AddMonths / AddYears -- route through the
+            // matching AddXToDateOnlySql hook so each provider uses its
+            // native date arithmetic.
             if (node.Object != null
                 && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateOnly)
-                && node.Method.Name == nameof(DateOnly.AddDays)
-                && node.Arguments.Count == 1)
+                && node.Arguments.Count == 1
+                && (node.Method.Name == nameof(DateOnly.AddDays)
+                    || node.Method.Name == nameof(DateOnly.AddMonths)
+                    || node.Method.Name == nameof(DateOnly.AddYears)))
             {
                 var dateSql = TranslateProjectionArg(node.Object);
-                var daysSql = TranslateProjectionArg(node.Arguments[0]);
-                var arithSql = _provider.AddDaysToDateOnlySql(dateSql, daysSql);
+                var nSql = TranslateProjectionArg(node.Arguments[0]);
+                var arithSql = node.Method.Name switch
+                {
+                    nameof(DateOnly.AddDays) => _provider.AddDaysToDateOnlySql(dateSql, nSql),
+                    nameof(DateOnly.AddMonths) => _provider.AddMonthsToDateOnlySql(dateSql, nSql),
+                    nameof(DateOnly.AddYears) => _provider.AddYearsToDateOnlySql(dateSql, nSql),
+                    _ => null
+                };
                 if (arithSql != null)
                 {
                     sb.Append(arithSql);
                     return node;
                 }
                 throw new InvalidOperationException(
-                    $"{_provider.GetType().Name} does not implement AddDaysToDateOnlySql; " +
-                    "DateOnly.AddDays in projection requires this provider hook.");
+                    $"{_provider.GetType().Name} does not implement {node.Method.Name}ToDateOnlySql; " +
+                    $"DateOnly.{node.Method.Name} in projection requires this provider hook.");
             }
 
             // string.Trim / TrimStart / TrimEnd with explicit char[] -- the

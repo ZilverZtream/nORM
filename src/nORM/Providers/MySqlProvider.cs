@@ -340,6 +340,14 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({daysSqlFragment}) DAY))";
 
+        /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
+        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
+            => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({monthsSqlFragment}) MONTH))";
+
+        /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
+        public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
+            => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({yearsSqlFragment}) YEAR))";
+
         /// <summary>MySQL ADDTIME(TIME, SEC_TO_TIME(N)) stays TIME (no DATETIME promotion).</summary>
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
             => $"ADDTIME({timeOnlySql}, SEC_TO_TIME({secondsSqlFragment}))";

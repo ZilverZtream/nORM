@@ -270,6 +270,17 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";
 
+        /// <summary>
+        /// PostgreSQL: date + INTERVAL returns timestamp; cast back to date so the
+        /// materializer reads a DateOnly-compatible value.
+        /// </summary>
+        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
+            => $"({dateOnlySql} + ({monthsSqlFragment}) * INTERVAL '1 month')::date";
+
+        /// <summary>PostgreSQL: date + N * INTERVAL '1 year', cast back to date.</summary>
+        public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
+            => $"({dateOnlySql} + ({yearsSqlFragment}) * INTERVAL '1 year')::date";
+
         /// <summary>PostgreSQL TIME + INTERVAL returns TIME natively.</summary>
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
             => $"({timeOnlySql} + ({secondsSqlFragment} || ' seconds')::interval)";

@@ -1226,25 +1226,34 @@ namespace nORM.Query
         }
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            // DateOnly.AddDays(N) -- routes through AddDaysToDateOnlySql so
-            // each provider uses its native date arithmetic (SQLite strftime,
-            // SqlServer DATEADD, Postgres `date + int`, MySQL DATE(DATE_ADD)).
+            // DateOnly.AddDays / AddMonths / AddYears -- route through the
+            // matching AddXToDateOnlySql hook so each provider uses its
+            // native date arithmetic (SQLite strftime, SqlServer DATEADD,
+            // Postgres `date + int` or INTERVAL, MySQL DATE(DATE_ADD)).
             if (node.Object != null
                 && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateOnly)
-                && node.Method.Name == nameof(DateOnly.AddDays)
-                && node.Arguments.Count == 1)
+                && node.Arguments.Count == 1
+                && (node.Method.Name == nameof(DateOnly.AddDays)
+                    || node.Method.Name == nameof(DateOnly.AddMonths)
+                    || node.Method.Name == nameof(DateOnly.AddYears)))
             {
                 var dateSql = GetSql(node.Object);
-                var daysSql = GetSql(node.Arguments[0]);
-                var arithSql = _provider.AddDaysToDateOnlySql(dateSql, daysSql);
+                var nSql = GetSql(node.Arguments[0]);
+                var arithSql = node.Method.Name switch
+                {
+                    nameof(DateOnly.AddDays) => _provider.AddDaysToDateOnlySql(dateSql, nSql),
+                    nameof(DateOnly.AddMonths) => _provider.AddMonthsToDateOnlySql(dateSql, nSql),
+                    nameof(DateOnly.AddYears) => _provider.AddYearsToDateOnlySql(dateSql, nSql),
+                    _ => null
+                };
                 if (arithSql != null)
                 {
                     _sql.Append(arithSql);
                     return node;
                 }
                 throw new NormUnsupportedFeatureException(
-                    $"{_provider.GetType().Name} does not implement AddDaysToDateOnlySql; " +
-                    "DateOnly.AddDays in WHERE requires this provider hook.");
+                    $"{_provider.GetType().Name} does not implement {node.Method.Name}ToDateOnlySql; " +
+                    $"DateOnly.{node.Method.Name} in WHERE requires this provider hook.");
             }
 
             // TimeOnly.Add(TimeSpan) -- routes through AddSecondsToTimeOnlySql

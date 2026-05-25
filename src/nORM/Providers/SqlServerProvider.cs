@@ -332,6 +332,14 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
 
+        /// <summary>SQL Server uses DATEADD(MONTH, N, col) for date arithmetic on DATE columns.</summary>
+        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
+            => $"DATEADD(MONTH, {monthsSqlFragment}, {dateOnlySql})";
+
+        /// <summary>SQL Server uses DATEADD(YEAR, N, col) for date arithmetic on DATE columns.</summary>
+        public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
+            => $"DATEADD(YEAR, {yearsSqlFragment}, {dateOnlySql})";
+
         /// <summary>
         /// SQL Server DATEADD on TIME returns DATETIME -- CAST back to TIME so
         /// the materializer reads a TimeOnly-compatible value.
