@@ -195,6 +195,20 @@ namespace nORM.Providers
         /// <summary>PostgreSQL TEXT is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 
+        /// <summary>
+        /// PostgreSQL uses <c>to_char(x, 'FM999999999990.{N zeros}')</c> for fixed-
+        /// decimal text. 'FM' strips leading whitespace; '9' is optional digit, '0'
+        /// is mandatory digit (forces trailing zero padding for the fractional part).
+        /// For digits=0 the mask is just integer-only.
+        /// </summary>
+        public override string FormatFixedDecimalSql(string sql, int digits)
+        {
+            if (digits <= 0)
+                return $"to_char({sql}, 'FM999999999990')";
+            var fracMask = new string('0', digits);
+            return $"to_char({sql}, 'FM999999999990.{fracMask}')";
+        }
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 
