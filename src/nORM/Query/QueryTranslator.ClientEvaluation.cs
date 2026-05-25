@@ -60,6 +60,8 @@ namespace nORM.Query
                 nameof(Math.Ceiling),
                 nameof(Math.Floor),
                 nameof(Math.Round),
+                nameof(Math.Log2),
+                nameof(Math.Cbrt),
 
                 // DateTime properties
                 nameof(DateTime.Year),

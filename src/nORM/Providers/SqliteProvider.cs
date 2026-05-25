@@ -638,6 +638,14 @@ namespace nORM.Providers
                     nameof(Math.Truncate) when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
                     nameof(Math.Min) when args.Length == 2 => $"MIN({args[0]}, {args[1]})",
                     nameof(Math.Max) when args.Length == 2 => $"MAX({args[0]}, {args[1]})",
+                    // SQLite 3.35+ exposes log2() and pow() as built-ins via the
+                    // math extension. Cbrt has no direct function -- use pow(x, 1/3)
+                    // which matches Math.Cbrt for non-negative reals (the .NET
+                    // double overload returns a real-valued root for negatives too,
+                    // but POW returns NaN for x<0 with a fractional exponent --
+                    // documented limitation, mirrors Math.Pow behaviour).
+                    nameof(Math.Log2) when args.Length == 1 => $"LOG2({args[0]})",
+                    nameof(Math.Cbrt) when args.Length == 1 => $"POW({args[0]}, 1.0/3.0)",
                     _ => null
                 };
             }
