@@ -2384,7 +2384,11 @@ namespace nORM.Query
             // routes via typeof(DateTime)|typeof(DateTimeOffset) in the
             // provider switch but the analyzer needs the type admitted to
             // get past the IsTranslatableMethod gate.
-            typeof(TimeSpan), typeof(DateTimeOffset)
+            typeof(TimeSpan), typeof(DateTimeOffset),
+            // Admit DateOnly/TimeOnly so their statics (FromDateTime,
+            // FromDayNumber, ParseExact, IsBetween, etc.) reach the WHERE
+            // path. The provider switch already has the emits.
+            typeof(DateOnly), typeof(TimeOnly)
         }.ToFrozenSet();
 
         /// <summary>
