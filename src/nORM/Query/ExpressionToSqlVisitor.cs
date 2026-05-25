@@ -1907,6 +1907,19 @@ namespace nORM.Query
                 _sql.Append(BuildEnumToStringCase(_provider, valueSql, getNameEnumType));
                 return node;
             }
+            // Generic Enum.GetName<T>(T value) -- .NET 5+ form. The single
+            // arg is the value; the enum type is the method's generic argument.
+            if (node.Method.Name == nameof(Enum.GetName)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Method.IsGenericMethod
+                && node.Arguments.Count == 1
+                && node.Method.GetGenericArguments() is { Length: 1 } genericArgs
+                && genericArgs[0].IsEnum)
+            {
+                var valueSql = GetSql(node.Arguments[0]);
+                _sql.Append(BuildEnumToStringCase(_provider, valueSql, genericArgs[0]));
+                return node;
+            }
 
             if (node.Method.Name == nameof(Enum.IsDefined)
                 && node.Method.DeclaringType == typeof(Enum)
