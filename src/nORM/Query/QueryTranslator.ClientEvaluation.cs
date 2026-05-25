@@ -51,6 +51,7 @@ namespace nORM.Query
                 nameof(char.IsPunctuation),
                 nameof(char.IsSymbol),
                 nameof(char.IsControl),
+                nameof(char.GetNumericValue),
                 nameof(Enum.HasFlag),
 
                 // Math methods
