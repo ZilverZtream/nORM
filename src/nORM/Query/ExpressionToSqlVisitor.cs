@@ -813,6 +813,32 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            // `entity.GetType().Name/FullName/Namespace/AssemblyQualifiedName` --
+            // fold to the receiver's declared compile-time type. Mirror of the
+            // SCV fold in 149fa9a so the same expression works in WHERE. Type.*
+            // members are declared on MemberInfo (Type's base), so check the
+            // receiver type rather than node.Member.DeclaringType.
+            if (node.Expression is MethodCallExpression gtCall
+                && gtCall.Method.Name == "GetType"
+                && gtCall.Arguments.Count == 0
+                && gtCall.Object != null
+                && typeof(Type).IsAssignableFrom(gtCall.Type))
+            {
+                var declaredType = gtCall.Object.Type;
+                string? typeNameLiteral = node.Member.Name switch
+                {
+                    nameof(Type.Name) => declaredType.Name,
+                    nameof(Type.FullName) => declaredType.FullName,
+                    nameof(Type.Namespace) => declaredType.Namespace,
+                    nameof(Type.AssemblyQualifiedName) => declaredType.AssemblyQualifiedName,
+                    _ => null
+                };
+                if (typeNameLiteral != null)
+                {
+                    _sql.Append('\'').Append(typeNameLiteral.Replace("'", "''")).Append('\'');
+                    return node;
+                }
+            }
             // TimeSpan member access whose receiver is a DateTime subtraction lowers to a
             // fractional-seconds scalar via the provider, then a unit-conversion divide.
             // Examples: (end - start).TotalHours, .TotalMinutes, .TotalSeconds, .TotalDays,
