@@ -410,6 +410,12 @@ namespace nORM.Providers
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 10000000.0) || ' seconds'), '0'), '.')",
                     // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                     nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
+                    // DateTime/DateTimeOffset.Parse(string) -- SQLite stores DateTime
+                    // as TEXT and Microsoft.Data.Sqlite's GetDateTime parses the
+                    // canonical text directly. Identity emission; the materializer
+                    // converts text -> DateTime/DateTimeOffset via the column type
+                    // affinity. Sister to the numeric Parse handler.
+                    "Parse" when args.Length == 1 => args[0],
                     _ => null
                 };
             }
@@ -565,6 +571,7 @@ namespace nORM.Providers
                     return $"CAST({args[0]} AS {sqlType})";
                 }
             }
+
 
             if (declaringType == typeof(NormFunctions))
             {
