@@ -528,7 +528,7 @@ namespace nORM.Query
                         && digits >= 0 && digits <= 17)
                     {
                         var recvSql = TranslateProjectionArg(node.Object);
-                        sb.Append("printf('%.").Append(digits).Append("f', ").Append(recvSql).Append(')');
+                        sb.Append(_provider.FormatFixedDecimalSql(recvSql, digits));
                         return node;
                     }
 

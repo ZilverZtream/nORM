@@ -450,6 +450,22 @@ namespace nORM.Providers
         public virtual string NormalizeDecimalForCompare(string sql) => sql;
 
         /// <summary>
+        /// Formats a numeric SQL expression as a fixed-decimal text with exactly
+        /// <paramref name="digits"/> fractional digits, matching .NET's
+        /// <c>ToString("F{digits}")</c>. Each provider has a different primitive:
+        /// SQLite <c>printf('%.Nf', x)</c>; SQL Server <c>FORMAT(x, 'FN', 'en-US')</c>;
+        /// PostgreSQL <c>to_char(x, 'FM999999990.{N zeros}')</c>; MySQL strips the
+        /// thousand-separators from <c>FORMAT(x, N)</c>.
+        ///
+        /// The default base implementation routes to <c>CAST({sql} AS VARCHAR)</c>
+        /// which loses the fixed-decimal padding but produces valid SQL on any
+        /// provider that doesn't override -- callers should override for
+        /// correctness, not depend on the default for production formatting.
+        /// </summary>
+        public virtual string FormatFixedDecimalSql(string sql, int digits)
+            => $"CAST({sql} AS VARCHAR)";
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

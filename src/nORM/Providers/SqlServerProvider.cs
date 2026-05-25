@@ -290,6 +290,14 @@ namespace nORM.Providers
         /// <summary>SQL Server uses NVARCHAR(MAX) for unbounded textual conversion.</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS NVARCHAR(MAX))";
 
+        /// <summary>
+        /// SQL Server uses <c>FORMAT(x, 'FN', 'en-US')</c> for fixed-decimal text.
+        /// The invariant 'en-US' culture forces a decimal point separator regardless
+        /// of server locale.
+        /// </summary>
+        public override string FormatFixedDecimalSql(string sql, int digits)
+            => $"FORMAT({sql}, 'F{digits}', 'en-US')";
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

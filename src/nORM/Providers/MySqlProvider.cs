@@ -277,6 +277,15 @@ namespace nORM.Providers
         /// <summary>MySQL CAST(... AS CHAR) is the cross-version-safe text conversion target.</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS CHAR)";
 
+        /// <summary>
+        /// MySQL's <c>FORMAT(x, N)</c> inserts thousand-separators by default
+        /// ('1,234.50') which doesn't match .NET's <c>ToString("F2")</c>
+        /// ('1234.50'). Wrap in REPLACE to strip the commas. The result still
+        /// uses a decimal point regardless of server locale.
+        /// </summary>
+        public override string FormatFixedDecimalSql(string sql, int digits)
+            => $"REPLACE(FORMAT({sql}, {digits}), ',', '')";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";

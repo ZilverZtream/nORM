@@ -140,6 +140,13 @@ namespace nORM.Providers
         /// </summary>
         public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
 
+        /// <summary>
+        /// SQLite uses <c>printf('%.Nf', col)</c> to produce a fixed-decimal text
+        /// matching .NET's <c>ToString("F{digits}")</c>.
+        /// </summary>
+        public override string FormatFixedDecimalSql(string sql, int digits)
+            => $"printf('%.{digits}f', {sql})";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

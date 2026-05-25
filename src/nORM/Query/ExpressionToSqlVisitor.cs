@@ -1323,7 +1323,7 @@ namespace nORM.Query
                         _compiledParams.Add(placeholder);
                     }
                     var inner = GetSql(node.Object);
-                    _sql.Append("printf('%.").Append(digits).Append("f', ").Append(inner).Append(')');
+                    _sql.Append(_provider.FormatFixedDecimalSql(inner, digits));
                     return node;
                 }
 
