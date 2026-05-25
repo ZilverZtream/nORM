@@ -688,6 +688,27 @@ namespace nORM.Providers
             => GetRegexReplaceSql($"LOWER({inputSql})", $"LOWER({patternLiteral})", replacementLiteral);
 
         /// <summary>
+        /// Portable Gregorian leap-year predicate. Year divisible by 4 but
+        /// not by 100, OR divisible by 400. Pure arithmetic; works on every
+        /// provider.
+        /// </summary>
+        protected static string BuildIsLeapYearSql(string yearSql)
+            => $"((({yearSql}) % 4 = 0 AND ({yearSql}) % 100 != 0) OR ({yearSql}) % 400 = 0)";
+
+        /// <summary>
+        /// Portable DateTime.DaysInMonth lookup. Month-length CASE with the
+        /// leap-year exception on February. Pure SQL CASE; works on every
+        /// provider.
+        /// </summary>
+        protected static string BuildDaysInMonthSql(string yearSql, string monthSql)
+            => $"(CASE ({monthSql}) " +
+               $"WHEN 1 THEN 31 WHEN 3 THEN 31 WHEN 5 THEN 31 WHEN 7 THEN 31 " +
+               $"WHEN 8 THEN 31 WHEN 10 THEN 31 WHEN 12 THEN 31 " +
+               $"WHEN 4 THEN 30 WHEN 6 THEN 30 WHEN 9 THEN 30 WHEN 11 THEN 30 " +
+               $"WHEN 2 THEN (CASE WHEN ({yearSql}) % 4 = 0 AND (({yearSql}) % 100 != 0 OR ({yearSql}) % 400 = 0) THEN 29 ELSE 28 END) " +
+               $"END)";
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///
