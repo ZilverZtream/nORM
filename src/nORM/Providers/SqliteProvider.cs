@@ -460,6 +460,11 @@ namespace nORM.Providers
                     // returns an empty string which CASTs to 0 anyway but the CASE
                     // makes the intent explicit.
                     nameof(TimeSpan.TotalMilliseconds) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) * 1000.0 + CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10) AS REAL) / 10000.0 ELSE 0 END)",
+                    // Parse(string) -- Microsoft.Data.Sqlite round-trips
+                    // TimeSpan via canonical 'HH:mm:ss[.fffffff]' text. The
+                    // source column already holds compatible text, so SQL
+                    // emission is identity and GetFieldValue<TimeSpan> parses.
+                    "Parse" when args.Length == 1 => args[0],
                     _ => null
                 };
             }
