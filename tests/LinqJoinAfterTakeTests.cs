@@ -50,34 +50,41 @@ public class LinqJoinAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Join_after_take_joins_only_windowed_rows_or_throws_actionable_pin()
+    public async Task Join_after_take_joins_only_windowed_outer_rows()
     {
-        System.Exception? caught = null;
-        (string Code, string Tag)[]? result = null;
-        try
-        {
-            result = (await _ctx.Query<JatLeft>()
-                .OrderBy(l => l.Id)
-                .Take(2)
-                .Join(_ctx.Query<JatRight>(),
-                    l => l.Code,
-                    r => r.Code,
-                    (l, r) => new { l.Code, r.Tag })
-                .ToListAsync())
-                .Select(x => (x.Code, x.Tag))
-                .ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
+        // OrderBy(Id).Take(2) → outer rows (1,'X'), (2,'Y'). Neither code matches Right.
+        // Windowed semantics: 0 joined rows.
+        // Naive translation joined the full table → would yield (3,'A','tagA'), (4,'B','tagB') (2 rows).
+        var result = (await _ctx.Query<JatLeft>()
+            .OrderBy(l => l.Id)
+            .Take(2)
+            .Join(_ctx.Query<JatRight>(),
+                l => l.Code,
+                r => r.Code,
+                (l, r) => new { l.Code, r.Tag })
+            .ToListAsync())
+            .ToArray();
+        Assert.Empty(result);
+    }
 
-        // The pin must fire — silent-wrongness (0 vs 2 rows) is unacceptable.
-        Assert.NotNull(caught);
-        Assert.IsType<NormUnsupportedFeatureException>(caught);
-        Assert.Contains("Join", caught.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Contains", caught.Message, System.StringComparison.Ordinal);
+    [Fact]
+    public async Task Join_after_take_with_intersecting_window_returns_intersection()
+    {
+        // OrderBy(Id).Take(4) → first 4 outer rows: codes X,Y,A,B. Right has A,B,C.
+        // Intersection on Code: {A, B}.
+        var result = (await _ctx.Query<JatLeft>()
+            .OrderBy(l => l.Id)
+            .Take(4)
+            .Join(_ctx.Query<JatRight>(),
+                l => l.Code,
+                r => r.Code,
+                (l, r) => new { l.Code, r.Tag })
+            .ToListAsync())
+            .OrderBy(x => x.Code)
+            .ToArray();
+        Assert.Equal(2, result.Length);
+        Assert.Equal(("A", "tagA"), (result[0].Code, result[0].Tag));
+        Assert.Equal(("B", "tagB"), (result[1].Code, result[1].Tag));
     }
 
     [Table("JatLeft")]

@@ -42,32 +42,24 @@ namespace nORM.Query
                     "(2) push the join through first and apply DISTINCT to the result: " +
                     "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.");
             }
-            // Sister of the post-Take/Skip silent-wrongness family (bca0523 / 47acc83 /
-            // 54c16ae / 4fcd795 / c2cce55 / 3427495). Join over a Take/Skip outer source
-            // emits a flat `… INNER JOIN … LIMIT n` which joins the FULL outer table and
-            // then takes n joined rows, instead of taking the windowed n outer rows and
-            // joining only those. Detect via SourceHasTakeOrSkip walker and throw with
-            // the materialize-then-Contains workaround (mirrors the Distinct pin above).
-            if (SourceHasTakeOrSkip(outerQuery))
-            {
-                throw new NormUnsupportedFeatureException(
-                    "Join over a Take/Skip outer source isn't supported — the translator emits " +
-                    "`… INNER JOIN … LIMIT n` where the JOIN runs on the full outer table and " +
-                    "LIMIT picks n rows from the joined result, rather than taking the windowed n " +
-                    "outer rows and joining only those (LINQ semantics for `q.Take(n).Join(...)`). " +
-                    "SQL needs a subquery wrap (`FROM (… LIMIT n) AS T0 INNER JOIN …`) that nORM " +
-                    "doesn't yet emit. " +
-                    "Workarounds: " +
-                    "(1) Materialize the windowed outer first, then filter the inner with Contains: " +
-                    "`var keys = await q.Take(n).Select(l => l.Code).ToListAsync();` then " +
-                    "`ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync();`. " +
-                    "(2) Move the Take to the OUTSIDE of the join if you wanted top-N-after-join: " +
-                    "`q.Join(other, …).Take(n)`.");
-            }
-            Visit(outerQuery);
+            // Join over a Take/Skip-windowed outer source — wrap the windowed outer as a
+            // derived table so the join matches only the LIMITed/Skipped outer rows.
+            // Sister of the post-Take/Skip silent-wrongness family.
+            string? outerFromOverride = null;
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
             var outerAlias = EscapeAlias("T0");
+            if (SourceHasTakeOrSkip(outerQuery))
+            {
+                var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
+                _mapping = subOuterMap;
+                MergeSubPlanParameters(subOuter);
+                outerFromOverride = "(" + subOuter.Sql + ") AS " + outerAlias;
+            }
+            else
+            {
+                Visit(outerQuery);
+            }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -91,7 +83,7 @@ namespace nORM.Query
             FastExpressionVisitorPool.Return(innerKeyVisitor);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, distinct: _isDistinct, outerFromOverride: outerFromOverride);
             return node;
         }
         private Expression HandleGroupJoin(MethodCallExpression node)
@@ -124,27 +116,24 @@ namespace nORM.Query
                     "and group client-side with `keys.Select(k => new { k, Rs = rs.Where(r => r.Code == k).ToList() })`; " +
                     "(2) push the GroupJoin through first and apply DISTINCT to the result.");
             }
-            // Mirror of the HandleInnerJoin Take/Skip pin: same flat-LIMIT silent-wrongness
-            // applies to GroupJoin (LEFT JOIN), with the additional risk that the MaterializeGroupJoin
-            // path produces opaque errors on malformed SQL. Detect and pin.
-            if (SourceHasTakeOrSkip(outerQuery))
-            {
-                throw new NormUnsupportedFeatureException(
-                    "GroupJoin over a Take/Skip outer source isn't supported — the translator emits " +
-                    "`… LEFT JOIN … LIMIT n` where the JOIN runs on the full outer table and LIMIT " +
-                    "picks n rows from the joined result, rather than taking the windowed n outer " +
-                    "rows and grouping their inner matches (LINQ semantics for " +
-                    "`q.Take(n).GroupJoin(...)`). SQL needs a subquery wrap (`FROM (… LIMIT n) AS T0 " +
-                    "LEFT JOIN …`) that nORM doesn't yet emit. " +
-                    "Workarounds: " +
-                    "(1) Materialize the windowed outer first and group client-side after fetching " +
-                    "the related inner rows. " +
-                    "(2) Move the Take to OUTSIDE the GroupJoin if you wanted top-N-after-grouping.");
-            }
-            Visit(outerQuery);
+            // GroupJoin over a Take/Skip-windowed outer source — wrap the windowed outer
+            // as a derived table so LEFT JOIN runs against the windowed rows only.
+            // Sister of HandleInnerJoin's windowed branch above.
+            string? gjOuterFromOverride = null;
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
             var outerAlias = EscapeAlias("T0");
+            if (SourceHasTakeOrSkip(outerQuery))
+            {
+                var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
+                _mapping = subOuterMap;
+                MergeSubPlanParameters(subOuter);
+                gjOuterFromOverride = "(" + subOuter.Sql + ") AS " + outerAlias;
+            }
+            else
+            {
+                Visit(outerQuery);
+            }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
             if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
                 _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -189,7 +178,7 @@ namespace nORM.Query
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
             // outer-key contiguity (needed for streaming group segmentation) is always first.
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null, distinct: _isDistinct);
+            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null, distinct: _isDistinct, outerFromOverride: gjOuterFromOverride);
             // Insert outer-key sort at the front of _orderBy so it is always first.
             _orderBy.Insert(0, (outerKeySql, true));
             var outerType = outerKeySelector.Parameters[0].Type;

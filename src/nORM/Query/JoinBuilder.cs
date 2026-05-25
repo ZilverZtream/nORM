@@ -349,7 +349,8 @@ namespace nORM.Query
     string outerKeySql,
     string innerKeySql,
     string? orderBy = null,
-    bool distinct = false)
+    bool distinct = false,
+    string? outerFromOverride = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -397,7 +398,19 @@ namespace nORM.Query
             }
 
             joinSql.Append(' ');
-            joinSql.Append("FROM ").Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+            joinSql.Append("FROM ");
+            if (outerFromOverride != null)
+            {
+                // Windowed-outer-source case: caller passes a fully-formed
+                // `(subSql) AS alias` fragment so the join applies to a LIMITed
+                // / Skipped sub-plan rather than the raw outer table. Used by
+                // HandleInnerJoin / HandleGroupJoin's post-Take/Skip windowed branch.
+                joinSql.Append(outerFromOverride).Append(' ');
+            }
+            else
+            {
+                joinSql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+            }
             joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
             joinSql.Append("ON ").Append(outerKeySql).Append(" = ").Append(innerKeySql);
             if (!string.IsNullOrEmpty(orderBy))
