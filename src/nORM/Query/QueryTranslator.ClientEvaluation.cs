@@ -54,6 +54,12 @@ namespace nORM.Query
                 nameof(char.GetNumericValue),
                 nameof(int.Parse),
                 nameof(Enum.HasFlag),
+                // Convert.* from-string overloads -- sister to X.Parse(string).
+                nameof(Convert.ToInt32),
+                nameof(Convert.ToInt64),
+                nameof(Convert.ToDouble),
+                nameof(Convert.ToDecimal),
+                nameof(Convert.ToBoolean),
 
                 // Math methods
                 nameof(Math.Abs),
