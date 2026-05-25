@@ -504,8 +504,13 @@ namespace nORM.Query
             // TimeSpan-column text via SUBSTR + CAST and construct the
             // strftime modifier dynamically. Sub-day TimeSpan only per
             // memory item b17440e.
+            // DateTime AND DateTimeOffset use the same date-arithmetic emit path
+            // (both store comparable text on SQLite and have native temporal types
+            // on other providers). Treat them uniformly.
+            static bool IsDateTimeOrOffset(Type t)
+                => t == typeof(DateTime) || t == typeof(DateTimeOffset);
             if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
-                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && IsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
                 && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
                 && !TryGetConstantValue(node.Right, out _))
             {
@@ -524,14 +529,13 @@ namespace nORM.Query
                 }
                 throw new NormUnsupportedFeatureException(
                     $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
-                    "DateTime +/- TimeSpan column arithmetic in WHERE requires this provider hook.");
+                    "DateTime/Offset +/- TimeSpan column arithmetic in WHERE requires this provider hook.");
             }
-            // DateTime + TimeSpan / DateTime - TimeSpan shift with constant
-            // TimeSpan -- mirror SelectClauseVisitor's projection emission so
-            // Where predicates filtering on a shifted column produce the same
-            // SQL form (strftime + RTRIM trim matching FFFFFFF binding).
+            // DateTime/DateTimeOffset + constant TimeSpan -- folds the rhs span via
+            // TryGetConstantValue (closure MemberExpression carrying a TimeSpan value)
+            // and routes through AddSecondsToDateTimeSql for the provider-native shift.
             if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
-                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && IsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
                 && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
                 && node.Right is MemberExpression rhsMember
                 && TryGetConstantValue(rhsMember, out var rhsTs)
