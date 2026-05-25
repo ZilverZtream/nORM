@@ -50,6 +50,7 @@ namespace nORM.Query
                 nameof(char.IsLower),
                 nameof(char.IsPunctuation),
                 nameof(char.IsSymbol),
+                nameof(char.IsControl),
                 nameof(Enum.HasFlag),
 
                 // Math methods
