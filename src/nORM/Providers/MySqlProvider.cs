@@ -396,6 +396,18 @@ namespace nORM.Providers
                     nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]})",
                     nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
                     nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                    // MySQL LPAD/RPAD truncates when input length exceeds the
+                    // target width; gate with CASE so longer inputs pass
+                    // through unchanged, matching .NET PadLeft/PadRight's
+                    // never-truncate contract.
+                    nameof(string.PadLeft) when args.Length == 2 =>
+                        $"(CASE WHEN CHAR_LENGTH({args[0]}) >= {args[1]} THEN {args[0]} ELSE LPAD({args[0]}, {args[1]}, ' ') END)",
+                    nameof(string.PadLeft) when args.Length == 3 =>
+                        $"(CASE WHEN CHAR_LENGTH({args[0]}) >= {args[1]} THEN {args[0]} ELSE LPAD({args[0]}, {args[1]}, {args[2]}) END)",
+                    nameof(string.PadRight) when args.Length == 2 =>
+                        $"(CASE WHEN CHAR_LENGTH({args[0]}) >= {args[1]} THEN {args[0]} ELSE RPAD({args[0]}, {args[1]}, ' ') END)",
+                    nameof(string.PadRight) when args.Length == 3 =>
+                        $"(CASE WHEN CHAR_LENGTH({args[0]}) >= {args[1]} THEN {args[0]} ELSE RPAD({args[0]}, {args[1]}, {args[2]}) END)",
                     // MySQL SUBSTRING is 1-indexed; .NET Substring is 0-indexed, add 1.
                     nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]}, ({args[1]}) + 1)",
                     nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]}, ({args[1]}) + 1, {args[2]})",
