@@ -1462,10 +1462,12 @@ namespace nORM.Query
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
                         // characters that actually appear in textual database content.
+                        // Provider hook for CHAR-from-codepoint: SQLite/SqlServer/MySQL use
+                        // CHAR(N); PostgreSQL uses chr(N).
                         _sql.Append('(').Append(charSql).Append(" = ' ' OR ")
-                            .Append(charSql).Append(" = CHAR(9) OR ")
-                            .Append(charSql).Append(" = CHAR(10) OR ")
-                            .Append(charSql).Append(" = CHAR(13))");
+                            .Append(charSql).Append(" = ").Append(_provider.GetCharFromCodeSql("9")).Append(" OR ")
+                            .Append(charSql).Append(" = ").Append(_provider.GetCharFromCodeSql("10")).Append(" OR ")
+                            .Append(charSql).Append(" = ").Append(_provider.GetCharFromCodeSql("13")).Append(')');
                         return node;
                 }
             }

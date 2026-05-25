@@ -503,6 +503,13 @@ namespace nORM.Providers
         public virtual string GetCharCodeSql(string charSql) => $"unicode({charSql})";
 
         /// <summary>
+        /// Inverse of <see cref="GetCharCodeSql"/>: converts an integer code point
+        /// to a single-character SQL expression. SQLite / SQL Server / MySQL use
+        /// <c>CHAR(N)</c>; PostgreSQL uses <c>chr(N)</c>.
+        /// </summary>
+        public virtual string GetCharFromCodeSql(string codePointSql) => $"CHAR({codePointSql})";
+
+        /// <summary>
         /// Adds (or subtracts when <paramref name="subtract"/>) a TimeSpan-typed
         /// column expression to a DateTime SQL expression. Differs from
         /// <see cref="AddSecondsToDateTimeSql"/> which takes a numeric seconds
