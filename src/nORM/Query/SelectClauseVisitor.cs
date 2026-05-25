@@ -106,6 +106,34 @@ namespace nORM.Query
         protected override Expression VisitMember(MemberExpression node)
         {
             var sb = EnsureBuilder();
+            // `entity.GetType().Name/FullName/Namespace/AssemblyQualifiedName` --
+            // fold to the receiver's declared compile-time type. nORM doesn't
+            // emit a runtime discriminator at projection-time, so the value is
+            // always the declared entity type. Mirror Type.<member> on
+            // typeof(T) which the existing constant-fold already handles.
+            // Note: Type.Name etc. are declared on MemberInfo (its base), so we
+            // check the receiver type rather than node.Member.DeclaringType.
+            if (node.Expression is MethodCallExpression gtCall
+                && gtCall.Method.Name == "GetType"
+                && gtCall.Arguments.Count == 0
+                && gtCall.Object != null
+                && typeof(Type).IsAssignableFrom(gtCall.Type))
+            {
+                var declaredType = gtCall.Object.Type;
+                string? value = node.Member.Name switch
+                {
+                    nameof(Type.Name) => declaredType.Name,
+                    nameof(Type.FullName) => declaredType.FullName,
+                    nameof(Type.Namespace) => declaredType.Namespace,
+                    nameof(Type.AssemblyQualifiedName) => declaredType.AssemblyQualifiedName,
+                    _ => null
+                };
+                if (value != null)
+                {
+                    sb.Append('\'').Append(value.Replace("'", "''")).Append('\'');
+                    return node;
+                }
+            }
             if (node.Expression is ParameterExpression p && p.Type.IsGenericType && p.Type.GetGenericTypeDefinition() == typeof(IGrouping<,>) && node.Member.Name == "Key")
             {
                 for (int i = 0; i < _groupBy.Count; i++)
