@@ -60,32 +60,32 @@ namespace nORM.Query
             if (keySelectorLambda == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
 
-            Visit(sourceQuery);
-            // Fifth in the post-Take/Skip silent-wrongness family
-            // (bca0523 / 47acc83 / 54c16ae / 4fcd795 / this). GroupBy applied AFTER
-            // Take/Skip would silently group the FULL table — flat SQL emits
-            // `… GROUP BY col … LIMIT n` where GROUP BY runs against the full table and
-            // LIMIT truncates the resulting groups. LINQ semantics for `q.Take(3).GroupBy(...)`
-            // require grouping ONLY the windowed 3 rows. SQL needs a subquery wrap
-            // (`SELECT … FROM (… LIMIT n) GROUP BY col`) that nORM doesn't yet emit.
-            if ((_take.HasValue || _takeParam != null || _skip.HasValue || _skipParam != null) && !_takeSetByTerminal)
+            // GroupBy after a Take/Skip-windowed source — wrap the windowed source as a
+            // derived table so GROUP BY aggregates only the LIMITed window, not the full
+            // table. Sister of the post-Take/Skip fixes in 3040f49 / e0f1397 / 99a02ce /
+            // a1eb69e / bfc8180. Restricted to the immediate-source-is-Take/Skip case
+            // (same recursion-avoidance rationale as the WhereTranslator branch).
+            string alias;
+            bool sourceIsWindowed = sourceQuery is MethodCallExpression directGbSrc
+                && directGbSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip);
+            if (sourceIsWindowed)
             {
-                throw new NormUnsupportedFeatureException(
-                    "GroupBy applied after Take or Skip would silently group the full table — the " +
-                    "translator emits `… GROUP BY col … LIMIT n` where GROUP BY runs on the full " +
-                    "result set and LIMIT truncates the resulting groups, returning wrong group " +
-                    "membership (and wrong aggregates). LINQ semantics for `q.Take(3).GroupBy(k)` " +
-                    "require grouping only the windowed 3 rows, which SQL needs a subquery wrap " +
-                    "(`SELECT … FROM (… LIMIT n) GROUP BY k`) that nORM doesn't yet emit. " +
-                    "Workarounds: " +
-                    "(1) Move the GroupBy BEFORE the Take if you want group-then-window: " +
-                    "`q.GroupBy(k).Select(g => new {…}).Take(3)`. " +
-                    "(2) Materialize the window first and group client-side: " +
-                    "`var top = await q.Take(3).ToListAsync(); var groups = top.GroupBy(r => r.Cat).Select(g => …).ToList();`");
+                var subPlanG = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapG);
+                _mapping = subMapG;
+                MergeSubPlanParameters(subPlanG);
+                alias = EscapeAlias("__wgb" + _joinCounter++);
+                // Store the windowed sub-SQL + alias so BuildGroupBySelectClause emits
+                // `FROM (subSql) AS alias` instead of the bare `FROM tableName alias`.
+                _windowedGroupBySubSql = subPlanG.Sql;
+                _windowedGroupByAlias = alias;
+            }
+            else
+            {
+                Visit(sourceQuery);
+                alias = EscapeAlias("T" + _joinCounter);
             }
 
             var param = keySelectorLambda.Parameters[0];
-            var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
 
@@ -350,8 +350,17 @@ namespace nORM.Query
                 _sql.AppendJoin(", ", selectItems);
                 // Build() skips its SELECT/FROM-prefix block when _sql.Length > 0, so we must
                 // emit FROM ourselves. Subsequent clauses (WHERE/GROUP BY/ORDER BY) are appended
-                // by the Build() pipeline as usual.
-                _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
+                // by the Build() pipeline as usual. When the source was Take/Skip-windowed
+                // (see HandleGroupBy), emit `FROM (windowedSubSql) AS alias` so GROUP BY
+                // aggregates the windowed rows only.
+                if (_windowedGroupBySubSql != null && _windowedGroupByAlias != null)
+                {
+                    _sql.AppendFragment(" FROM (").Append(_windowedGroupBySubSql).AppendFragment(") AS ").Append(_windowedGroupByAlias);
+                }
+                else
+                {
+                    _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
+                }
             }
             finally
             {

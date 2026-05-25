@@ -124,6 +124,12 @@ namespace nORM.Query
         // SQL fragment is recorded here so the result-projection path can resolve `g.Key.A`
         // back to the right grouped column.
         private readonly Dictionary<string, string> _compositeKeyMemberSql = new(StringComparer.Ordinal);
+        // Set by HandleGroupBy when the GroupBy source is a Take/Skip-windowed
+        // sub-plan. BuildGroupBySelectClause uses these instead of `_mapping.EscTable`
+        // to emit `FROM (windowedSubSql) AS alias` so the GROUP BY aggregates the
+        // windowed rows only. Cleared in Clear().
+        private string? _windowedGroupBySubSql;
+        private string? _windowedGroupByAlias;
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
@@ -263,6 +269,8 @@ namespace nORM.Query
                 _clientProjection = null;
                 _clientProjectionResultType = null;
                 _compositeKeyMemberSql.Clear();
+                _windowedGroupBySubSql = null;
+                _windowedGroupByAlias = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -306,6 +314,8 @@ namespace nORM.Query
                 _clientProjection = null;
                 _clientProjectionResultType = null;
                 _compositeKeyMemberSql.Clear();
+                _windowedGroupBySubSql = null;
+                _windowedGroupByAlias = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
