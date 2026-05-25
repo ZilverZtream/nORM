@@ -69,6 +69,7 @@ namespace nORM.Query
                 nameof(DateTime.TimeOfDay),
                 nameof(DateTime.Millisecond),
                 nameof(DateTimeOffset.UtcDateTime),
+                nameof(DateTimeOffset.DateTime),
 
                 // TimeSpan component properties -- sub-day spans only; see
                 // SqliteProvider.TranslateFunction(TimeSpan) for the SUBSTR

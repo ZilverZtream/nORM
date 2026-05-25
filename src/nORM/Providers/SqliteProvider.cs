@@ -332,6 +332,13 @@ namespace nORM.Providers
                     // Materializer reads result as DateTime (Kind=Unspecified)
                     // -- DateTime.Equals compares ticks not Kind, so round-trip
                     // works for instant comparisons.
+                    // DateTimeOffset.DateTime -- the wall-clock DateTime portion,
+                    // IGNORING the offset (.NET returns Kind=Unspecified).
+                    // Strip the trailing 6-char zzz substring to leave the
+                    // canonical timestamp text the materializer parses as
+                    // DateTime.
+                    nameof(DateTimeOffset.DateTime) when declaringType == typeof(DateTimeOffset) =>
+                        $"substr({args[0]}, 1, length({args[0]}) - 6)",
                     nameof(DateTimeOffset.UtcDateTime) when declaringType == typeof(DateTimeOffset) =>
                         $"strftime('%Y-%m-%d %H:%M:%S', substr({args[0]}, 1, length({args[0]}) - 6), " +
                         $"(CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '+' THEN '-' ELSE '+' END) " +
