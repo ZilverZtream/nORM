@@ -147,6 +147,19 @@ namespace nORM.Providers
         public override string FormatFixedDecimalSql(string sql, int digits)
             => $"printf('%.{digits}f', {sql})";
 
+        /// <summary>
+        /// SQLite uses <c>strftime(...)</c> with %Y/%m/%d/%H/%M/%S tokens.
+        /// Converts the .NET pattern (yyyy/MM/dd/HH/mm/ss) to strftime tokens
+        /// via the existing helper; returns null when conversion fails
+        /// (locale-aware MMM/dddd/etc. or other unsupported tokens).
+        /// </summary>
+        public override string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
+        {
+            if (!nORM.Query.SelectClauseVisitor.TryConvertDotNetDateFormatToStrftime(dotNetFormat, out var strftimeFmt))
+                return null;
+            return $"strftime('{strftimeFmt}', {sql})";
+        }
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

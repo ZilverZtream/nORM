@@ -543,17 +543,20 @@ namespace nORM.Query
                         || underlying == typeof(DateOnly)
                         || underlying == typeof(TimeOnly))
                     {
-                        if (TryConvertDotNetDateFormatToStrftime(fmt, out var strftimeFmt))
+                        var recvSql = TranslateProjectionArg(node.Object);
+                        // Provider hook: SqliteProvider uses strftime; SqlServer
+                        // FORMAT('en-US'); Postgres to_char; MySQL DATE_FORMAT.
+                        var formattedSql = _provider.FormatDateUsingDotNetPattern(recvSql, fmt);
+                        if (formattedSql != null)
                         {
-                            var recvSql = TranslateProjectionArg(node.Object);
-                            sb.Append("strftime('").Append(strftimeFmt).Append("', ").Append(recvSql).Append(')');
+                            sb.Append(formattedSql);
                             return node;
                         }
                         throw new InvalidOperationException(
                             $"DateTime ToString(\"{fmt}\") format is not supported in projection. " +
                             "Supported tokens: yyyy yy MM dd HH mm ss; literal characters are passed through. " +
-                            "Locale-aware tokens (MMM/MMMM month names, dddd/ddd day names) are unavailable in " +
-                            "SQLite; project the DateTime and format after materialization.");
+                            "Locale-aware tokens (MMM/MMMM month names, dddd/ddd day names) are unavailable; " +
+                            "project the DateTime and format after materialization.");
                     }
                 }
                 throw new InvalidOperationException(

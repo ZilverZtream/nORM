@@ -466,6 +466,18 @@ namespace nORM.Providers
             => $"CAST({sql} AS VARCHAR)";
 
         /// <summary>
+        /// Formats a DateTime/DateTimeOffset/DateOnly/TimeOnly SQL expression as
+        /// text using a .NET custom date format string (e.g. "yyyy-MM-dd").
+        /// SQLite uses <c>strftime('%Y-%m-%d', x)</c>; SQL Server's <c>FORMAT(x,
+        /// 'yyyy-MM-dd', 'en-US')</c> accepts .NET-style patterns directly;
+        /// PostgreSQL uses <c>to_char(x, 'YYYY-MM-DD')</c>; MySQL uses
+        /// <c>DATE_FORMAT(x, '%Y-%m-%d')</c>. Returns null when the format is
+        /// not supported by the provider (so callers can fall through).
+        /// </summary>
+        public virtual string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
+            => null;
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

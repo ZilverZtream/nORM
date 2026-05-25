@@ -209,6 +209,39 @@ namespace nORM.Providers
             return $"to_char({sql}, 'FM999999999990.{fracMask}')";
         }
 
+        /// <summary>
+        /// PostgreSQL uses <c>to_char(x, 'YYYY-MM-DD')</c> with its own token set
+        /// (different from strftime / .NET): YYYY year, MM month, DD day, HH24
+        /// hour, MI minute, SS second. Converts the .NET pattern to PostgreSQL
+        /// tokens; returns null if any unsupported token appears.
+        /// </summary>
+        public override string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
+        {
+            var sb = new System.Text.StringBuilder(dotNetFormat.Length + 4);
+            int i = 0;
+            while (i < dotNetFormat.Length)
+            {
+                if (i + 4 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 4).SequenceEqual("yyyy")) { sb.Append("YYYY"); i += 4; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("yy")) { sb.Append("YY"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("MM")) { sb.Append("MM"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("dd")) { sb.Append("DD"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("HH")) { sb.Append("HH24"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("mm")) { sb.Append("MI"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("ss")) { sb.Append("SS"); i += 2; continue; }
+                char c = dotNetFormat[i];
+                if (c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm' || c == 's' || c == 'y'
+                    || c == 'f' || c == 'F' || c == 'z' || c == 'K' || c == 't')
+                    return null;
+                // Literal segment -- to_char interprets 'Y'/'M'/'D' as tokens
+                // even outside its known patterns, so wrap literals in quotes.
+                if (c == '\'') sb.Append("''");
+                else if (char.IsLetter(c)) sb.Append('"').Append(c).Append('"');
+                else sb.Append(c);
+                i++;
+            }
+            return $"to_char({sql}, '{sb}')";
+        }
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

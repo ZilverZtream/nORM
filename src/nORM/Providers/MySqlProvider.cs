@@ -286,6 +286,36 @@ namespace nORM.Providers
         public override string FormatFixedDecimalSql(string sql, int digits)
             => $"REPLACE(FORMAT({sql}, {digits}), ',', '')";
 
+        /// <summary>
+        /// MySQL uses <c>DATE_FORMAT(x, '%Y-%m-%d')</c> with strftime-like
+        /// tokens but different minute token (%i, not %M which means month-name).
+        /// Converts the .NET pattern; returns null for unsupported tokens.
+        /// </summary>
+        public override string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
+        {
+            var sb = new System.Text.StringBuilder(dotNetFormat.Length + 4);
+            int i = 0;
+            while (i < dotNetFormat.Length)
+            {
+                if (i + 4 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 4).SequenceEqual("yyyy")) { sb.Append("%Y"); i += 4; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("yy")) { sb.Append("%y"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("MM")) { sb.Append("%m"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("dd")) { sb.Append("%d"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("HH")) { sb.Append("%H"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("mm")) { sb.Append("%i"); i += 2; continue; }
+                if (i + 2 <= dotNetFormat.Length && dotNetFormat.AsSpan(i, 2).SequenceEqual("ss")) { sb.Append("%s"); i += 2; continue; }
+                char c = dotNetFormat[i];
+                if (c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm' || c == 's' || c == 'y'
+                    || c == 'f' || c == 'F' || c == 'z' || c == 'K' || c == 't')
+                    return null;
+                if (c == '\'') sb.Append("''");
+                else if (c == '%') sb.Append("%%");
+                else sb.Append(c);
+                i++;
+            }
+            return $"DATE_FORMAT({sql}, '{sb}')";
+        }
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
