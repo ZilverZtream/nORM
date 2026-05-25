@@ -266,6 +266,10 @@ namespace nORM.Providers
             return $"({dateTimeSql} {op} {timeSpanColumnSql})";
         }
 
+        /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
+        public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
+            => $"({dateOnlySql} + {daysSqlFragment})";
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

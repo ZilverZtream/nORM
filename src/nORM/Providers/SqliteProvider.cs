@@ -183,6 +183,10 @@ namespace nORM.Providers
             return AddSecondsToDateTimeSql(dateTimeSql, seconds);
         }
 
+        /// <summary>SQLite uses strftime with a 'N days' modifier on the DateOnly TEXT column.</summary>
+        public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
+            => $"strftime('%Y-%m-%d', {dateOnlySql}, ({daysSqlFragment}) || ' days')";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

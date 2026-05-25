@@ -328,6 +328,10 @@ namespace nORM.Providers
             return $"DATEADD(SECOND, {sign}DATEDIFF(SECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}), {dateTimeSql})";
         }
 
+        /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
+        public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
+            => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

@@ -1217,6 +1217,27 @@ namespace nORM.Query
         }
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            // DateOnly.AddDays(N) -- routes through AddDaysToDateOnlySql so
+            // each provider uses its native date arithmetic (SQLite strftime,
+            // SqlServer DATEADD, Postgres `date + int`, MySQL DATE(DATE_ADD)).
+            if (node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateOnly)
+                && node.Method.Name == nameof(DateOnly.AddDays)
+                && node.Arguments.Count == 1)
+            {
+                var dateSql = GetSql(node.Object);
+                var daysSql = GetSql(node.Arguments[0]);
+                var arithSql = _provider.AddDaysToDateOnlySql(dateSql, daysSql);
+                if (arithSql != null)
+                {
+                    _sql.Append(arithSql);
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement AddDaysToDateOnlySql; " +
+                    "DateOnly.AddDays in WHERE requires this provider hook.");
+            }
+
             // string.Join(separator, params string[] values) -- mirror SCV's
             // handler (5f48dc3): the C# variadic form passes a NewArrayInit
             // as args[1] which the generic provider routing collapses to a

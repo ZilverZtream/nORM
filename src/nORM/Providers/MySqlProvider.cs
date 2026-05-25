@@ -333,6 +333,13 @@ namespace nORM.Providers
             return $"DATE_ADD({dateTimeSql}, INTERVAL {sign}TIME_TO_SEC({timeSpanColumnSql}) SECOND)";
         }
 
+        /// <summary>
+        /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
+        /// DATE so the materializer reads a DateOnly-compatible value.
+        /// </summary>
+        public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
+            => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({daysSqlFragment}) DAY))";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";

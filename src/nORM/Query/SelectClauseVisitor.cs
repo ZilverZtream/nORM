@@ -272,6 +272,26 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // DateOnly.AddDays(N) -- routes through AddDaysToDateOnlySql so
+            // each provider uses its native date arithmetic.
+            if (node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateOnly)
+                && node.Method.Name == nameof(DateOnly.AddDays)
+                && node.Arguments.Count == 1)
+            {
+                var dateSql = TranslateProjectionArg(node.Object);
+                var daysSql = TranslateProjectionArg(node.Arguments[0]);
+                var arithSql = _provider.AddDaysToDateOnlySql(dateSql, daysSql);
+                if (arithSql != null)
+                {
+                    sb.Append(arithSql);
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"{_provider.GetType().Name} does not implement AddDaysToDateOnlySql; " +
+                    "DateOnly.AddDays in projection requires this provider hook.");
+            }
+
             // string.Trim / TrimStart / TrimEnd with explicit char[] -- the
             // generic provider route would expand the char[] as multiple
             // SQL args and SQLite TRIM accepts only (s) or (s, trim_chars_str)
