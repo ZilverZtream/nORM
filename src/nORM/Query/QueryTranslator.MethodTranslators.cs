@@ -496,18 +496,28 @@ namespace nORM.Query
                     // `ORDER BY "T0"."A", "T0"."B"` rather than the comma-joined single
                     // SELECT-list shape that the projection visitor would emit naturally
                     // and that SQL rejects inside ORDER BY.
+                    // Decimal columns store as TEXT; SQLite ORDER BY does lex
+                    // compare which mis-orders mixed-magnitude values (10.5 <
+                    // 2 lex because '1' < '2'). Wrap decimal-typed keys with
+                    // CAST AS REAL to force numeric ordering. Sister to the
+                    // ETSV.VisitBinary CAST fix (8d795f4).
+                    static string CoerceDecimalKey(string sql, Type keyType)
+                    {
+                        var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
+                        return u == typeof(decimal) ? $"CAST({sql} AS REAL)" : sql;
+                    }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {
                         foreach (var member in newKey.Arguments)
                         {
                             var memberSql = visitor.Translate(member);
-                            t._orderBy.Add((memberSql, ascending));
+                            t._orderBy.Add((CoerceDecimalKey(memberSql, member.Type), ascending));
                         }
                     }
                     else
                     {
                         var sql = visitor.Translate(keySelector.Body);
-                        t._orderBy.Add((sql, ascending));
+                        t._orderBy.Add((CoerceDecimalKey(sql, keySelector.Body.Type), ascending));
                     }
                     // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
                     // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer
