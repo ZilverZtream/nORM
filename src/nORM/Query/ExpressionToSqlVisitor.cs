@@ -1325,17 +1325,42 @@ namespace nORM.Query
                     $"DateOnly.{node.Method.Name} in WHERE requires this provider hook.");
             }
 
-            // TimeOnly.Add(TimeSpan) -- routes through AddSecondsToTimeOnlySql
-            // for constant / closure-captured TimeSpan, OR
-            // AddTimeSpanColumnToTimeOnlySql for a column-typed TimeSpan.
-            // Sub-day arithmetic only on SQLite.
+            // TimeOnly.Add(TimeSpan) / AddHours(double) / AddMinutes(double)
+            // -- all reduce to the same per-provider AddSecondsToTimeOnlySql /
+            // AddTimeSpanColumnToTimeOnlySql hook by converting the argument
+            // to a literal-second count when constant, or scaling the column
+            // expression by 3600 / 60 otherwise. Sub-day arithmetic only on
+            // SQLite.
             if (node.Object != null
                 && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(TimeOnly)
-                && node.Method.Name == nameof(TimeOnly.Add)
                 && node.Arguments.Count == 1
-                && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
+                && ((node.Method.Name == nameof(TimeOnly.Add)
+                     && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
+                    || ((node.Method.Name == nameof(TimeOnly.AddHours) || node.Method.Name == nameof(TimeOnly.AddMinutes))
+                        && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(double))))
             {
                 var timeSql = GetSql(node.Object);
+                // For AddHours / AddMinutes a literal double argument folds
+                // into a literal second count; for the TimeSpan overload we
+                // already cover the constant path below.
+                if (node.Method.Name != nameof(TimeOnly.Add)
+                    && TryGetConstantValue(node.Arguments[0], out var scalarVal)
+                    && scalarVal is double scalar)
+                {
+                    if (node.Arguments[0] is MemberExpression)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
+                    double secondsPerUnit = node.Method.Name == nameof(TimeOnly.AddHours) ? 3600.0 : 60.0;
+                    var secondsLiteral = ((long)(scalar * secondsPerUnit)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var arithSql0 = _provider.AddSecondsToTimeOnlySql(timeSql, secondsLiteral);
+                    if (arithSql0 != null) { _sql.Append(arithSql0); return node; }
+                    throw new NormUnsupportedFeatureException(
+                        $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
+                        $"TimeOnly.{node.Method.Name} in WHERE requires this provider hook.");
+                }
                 if (TryGetConstantValue(node.Arguments[0], out var spanVal) && spanVal is TimeSpan span)
                 {
                     // Reserve a compiled-param placeholder slot if the TimeSpan
