@@ -313,6 +313,49 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // DateTime.Add(TimeSpan) / DateTime.Subtract(TimeSpan) /
+            // DateTimeOffset.Add(TimeSpan) / DateTimeOffset.Subtract(TimeSpan) --
+            // the instance-method forms route through the same provider hooks
+            // as the binary `dt +/- ts` operator (which lowers to MethodCall via
+            // op_Addition / op_Subtraction in some expression-tree shapes). Two
+            // shapes for the arg: a foldable constant TimeSpan (use seconds
+            // literal) or a TimeSpan column (use column-arg hook).
+            if (node.Object != null
+                && ((Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTime)
+                    || (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTimeOffset))
+                && (node.Method.Name == nameof(DateTime.Add) || node.Method.Name == nameof(DateTime.Subtract))
+                && node.Arguments.Count == 1
+                && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
+            {
+                var dtSql = TranslateProjectionArg(node.Object);
+                bool subtract = node.Method.Name == nameof(DateTime.Subtract);
+                // Use TryGetTimeSpanConstant so the TimeSpan.From*(constNum)
+                // factory MethodCall folds correctly — ExpressionValueExtractor
+                // refuses MethodCallExpression by design (RCE safety).
+                if (TryGetTimeSpanConstant(node.Arguments[0], out var tsConst))
+                {
+                    var seconds = tsConst.TotalSeconds;
+                    if (subtract) seconds = -seconds;
+                    var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                    var addSql = _provider.AddSecondsToDateTimeSql(dtSql, secondsLiteral);
+                    if (addSql != null)
+                    {
+                        sb.Append(addSql);
+                        return node;
+                    }
+                }
+                else
+                {
+                    var spanSql = TranslateProjectionArg(node.Arguments[0]);
+                    var addColSql = _provider.AddTimeSpanColumnToDateTimeSql(dtSql, spanSql, subtract);
+                    if (addColSql != null)
+                    {
+                        sb.Append(addColSql);
+                        return node;
+                    }
+                }
+            }
+
             // Generic Enum.Parse<T>(string) on a column. Emit a CASE-WHEN
             // cascade mapping each enum member's name to its underlying integer
             // (sister of the Enum.GetName(int) translation). Materialiser routes

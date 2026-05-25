@@ -148,6 +148,11 @@ namespace nORM.Query
                 nameof(DateOnly.AddMonths),
                 nameof(DateOnly.AddYears),
                 nameof(TimeOnly.Add),
+                // DateTime/DateTimeOffset.Add / .Subtract(TimeSpan) instance forms.
+                // The method names are also shared with several other types whose
+                // semantics differ; the SCV handler keys off the receiver type so
+                // adding them here only opens the translatable gate.
+                nameof(DateTime.Subtract),
                 nameof(DateOnly.FromDayNumber),
                 nameof(DateOnly.FromDateTime),
                 nameof(DateOnly.ToDateTime),
