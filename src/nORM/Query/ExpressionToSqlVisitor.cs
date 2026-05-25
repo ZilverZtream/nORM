@@ -1234,6 +1234,34 @@ namespace nORM.Query
                 }
             }
 
+            // 4-arg new TimeOnly(h, m, s, ms) with at least one column arg.
+            if (node.Type == typeof(TimeOnly)
+                && node.Arguments.Count == 4
+                && node.Constructor is { } to4Ctor
+                && to4Ctor.GetParameters() is { Length: 4 } to4Params
+                && to4Params[0].ParameterType == typeof(int)
+                && to4Params[1].ParameterType == typeof(int)
+                && to4Params[2].ParameterType == typeof(int)
+                && to4Params[3].ParameterType == typeof(int))
+            {
+                bool any4NonConst = false;
+                foreach (var arg in node.Arguments)
+                    if (arg is not ConstantExpression && !TryGetConstantValue(arg, out _))
+                    {
+                        any4NonConst = true;
+                        break;
+                    }
+                if (any4NonConst)
+                {
+                    var hSql4 = GetSql(node.Arguments[0]);
+                    var miSql4 = GetSql(node.Arguments[1]);
+                    var sSql4 = GetSql(node.Arguments[2]);
+                    var msSql4 = GetSql(node.Arguments[3]);
+                    _sql.Append(_provider.GetTimeOnlyFromPartsSql(hSql4, miSql4, sSql4, msSql4));
+                    return node;
+                }
+            }
+
             // 7-arg new DateTime(y, m, d, h, mi, s, ms) with at least one column arg.
             if (node.Type == typeof(DateTime)
                 && node.Arguments.Count == 7

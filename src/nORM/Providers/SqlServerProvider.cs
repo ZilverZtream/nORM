@@ -430,6 +430,10 @@ namespace nORM.Providers
         public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
             => $"TIMEFROMPARTS({hourSql}, {minuteSql}, {secondSql}, 0, 0)";
 
+        /// <summary>4-arg TIMEFROMPARTS: fractions=ms, precision=3.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => $"TIMEFROMPARTS({hourSql}, {minuteSql}, {secondSql}, {millisecondSql}, 3)";
+
         /// <summary>
         /// T-SQL has no native regex primitive. The supported workarounds are
         /// a CLR scalar function (sql_clr assembly providing RegExMatch) or

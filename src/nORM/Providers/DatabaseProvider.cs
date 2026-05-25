@@ -754,6 +754,15 @@ namespace nORM.Providers
                 $"TimeOnly(hour, minute, second) with column args is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// 4-arg TIME-from-parts variant covering
+        /// <c>new TimeOnly(hour, minute, second, millisecond)</c>. Default
+        /// throws; each provider overrides with its native primitive.
+        /// </summary>
+        public virtual string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => throw new NormUnsupportedFeatureException(
+                $"TimeOnly(hour, minute, second, millisecond) with column args is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///
