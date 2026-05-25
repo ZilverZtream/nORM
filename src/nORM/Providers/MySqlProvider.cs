@@ -463,6 +463,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) / 10) MICROSECOND)",
                     // MySQL DAYOFWEEK returns 1=Sun..7=Sat; .NET DayOfWeek is 0=Sun..6=Sat.
                     nameof(DateTime.DayOfWeek) => $"(DAYOFWEEK({args[0]}) - 1)",
+                    // Compare / CompareTo: signed -1/0/1 sentinel via CASE.
+                    nameof(DateTime.Compare) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
+                    nameof(DateTime.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
@@ -574,6 +579,36 @@ namespace nORM.Providers
                     // the int*int product so |a*b| > 2^31 doesn't overflow.
                     nameof(Math.BigMul) when args.Length == 2 =>
                         $"(CAST({args[0]} AS SIGNED) * {args[1]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(decimal))
+            {
+                return name switch
+                {
+                    nameof(decimal.Truncate) when args.Length == 1 => $"TRUNCATE({args[0]}, 0)",
+                    nameof(decimal.Floor) when args.Length == 1 => $"FLOOR({args[0]})",
+                    nameof(decimal.Ceiling) when args.Length == 1 => $"CEILING({args[0]})",
+                    nameof(decimal.Abs) when args.Length == 1 => $"ABS({args[0]})",
+                    nameof(decimal.Negate) when args.Length == 1 => $"(-({args[0]}))",
+                    nameof(decimal.Add) when args.Length == 2 => $"({args[0]} + {args[1]})",
+                    nameof(decimal.Subtract) when args.Length == 2 => $"({args[0]} - {args[1]})",
+                    nameof(decimal.Multiply) when args.Length == 2 => $"({args[0]} * {args[1]})",
+                    nameof(decimal.Divide) when args.Length == 2 => $"({args[0]} / {args[1]})",
+                    nameof(decimal.Remainder) when args.Length == 2 => $"({args[0]} % {args[1]})",
+                    _ => null
+                };
+            }
+
+            if (declaringType == typeof(TimeSpan))
+            {
+                return name switch
+                {
+                    nameof(TimeSpan.Compare) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
+                    nameof(TimeSpan.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
