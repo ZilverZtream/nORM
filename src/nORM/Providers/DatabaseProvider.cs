@@ -510,6 +510,20 @@ namespace nORM.Providers
         public virtual string GetCharFromCodeSql(string codePointSql) => $"CHAR({codePointSql})";
 
         /// <summary>
+        /// Adds N days (a SQL fragment / integer literal) to a DateOnly SQL
+        /// expression. Default returns null so callers can fall through to
+        /// the existing NormUnsupportedFeatureException pathway.
+        ///
+        /// SQLite: <c>strftime('%Y-%m-%d', col, '+N days')</c>
+        /// SQL Server: <c>DATEADD(DAY, N, col)</c>
+        /// PostgreSQL: <c>(col + N)</c> (date + int is native)
+        /// MySQL: <c>DATE(DATE_ADD(col, INTERVAL N DAY))</c>
+        ///   (DATE_ADD returns DATETIME; DATE() casts back to DATE so the
+        ///   materializer reads a DateOnly-compatible value.)
+        /// </summary>
+        public virtual string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment) => null;
+
+        /// <summary>
         /// Adds (or subtracts when <paramref name="subtract"/>) a TimeSpan-typed
         /// column expression to a DateTime SQL expression. Differs from
         /// <see cref="AddSecondsToDateTimeSql"/> which takes a numeric seconds

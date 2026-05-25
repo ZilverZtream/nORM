@@ -143,6 +143,7 @@ namespace nORM.Query
                 nameof(DateTime.IsLeapYear),
                 nameof(DateTime.DaysInMonth),
                 nameof(DateOnly.DayNumber),
+                nameof(DateOnly.AddDays),
                 nameof(DateOnly.FromDayNumber),
                 nameof(DateOnly.FromDateTime),
                 nameof(DateOnly.ToDateTime),
