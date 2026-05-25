@@ -340,6 +340,10 @@ namespace nORM.Providers
         public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
             => $"MAKE_TIME({hourSql}, {minuteSql}, {secondSql})";
 
+        /// <summary>4-arg variant: fold seconds + millisecond/1000.0 into the double seconds arg.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => $"MAKE_TIME({hourSql}, {minuteSql}, ({secondSql}) + ({millisecondSql}) / 1000.0)";
+
         /// <summary>PostgreSQL's `~` operator evaluates a POSIX regex match against a text column.</summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} ~ {patternLiteral})";

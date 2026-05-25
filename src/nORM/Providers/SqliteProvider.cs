@@ -427,6 +427,10 @@ namespace nORM.Providers
         public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
             => $"printf('%02d:%02d:%02d', {hourSql}, {minuteSql}, {secondSql})";
 
+        /// <summary>4-arg variant: append '.fff' millisecond tail.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => $"printf('%02d:%02d:%02d.%03d', {hourSql}, {minuteSql}, {secondSql}, {millisecondSql})";
+
         /// <summary>
         /// SQLite stores TimeOnly as 'HH:mm:ss[.fffffff]' text. Parse each side's
         /// HH/MM/SS components (the SS substring carries the fractional tail when

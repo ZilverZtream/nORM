@@ -429,6 +429,10 @@ namespace nORM.Providers
         public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
             => $"MAKETIME({hourSql}, {minuteSql}, {secondSql})";
 
+        /// <summary>4-arg variant: MAKETIME accepts double seconds.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => $"MAKETIME({hourSql}, {minuteSql}, ({secondSql}) + ({millisecondSql}) / 1000.0)";
+
         /// <summary>
         /// MySQL stores TimeOnly as TIME. TIMEDIFF returns a signed TIME diff;
         /// TIME_TO_SEC produces the integer-seconds form which can be negative.
