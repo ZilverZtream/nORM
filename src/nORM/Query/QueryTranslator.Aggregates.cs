@@ -104,6 +104,15 @@ namespace nORM.Query
                     foreach (var kvp in partVisitor.GetParameters())
                         AddLiteralParameter(kvp.Key, kvp.Value);
                     FastExpressionVisitorPool.Return(partVisitor);
+                    // Decimal columns store as TEXT; grouping on raw text treats
+                    // '10.5' / '10.50' as distinct keys. Coerce to REAL so
+                    // numerically-equal values land in the same group. Sister
+                    // to OrderBy fix (c8b8c6b). Same emit applied to both the
+                    // GROUP BY and the SELECT-side key-member so SQLite
+                    // matches the projection back to the grouped expression.
+                    var partType = Nullable.GetUnderlyingType(compositeKey.Arguments[i].Type) ?? compositeKey.Arguments[i].Type;
+                    if (partType == typeof(decimal))
+                        partSql = $"CAST({partSql} AS REAL)";
                     parts.Add(partSql);
                     _groupBy.Add(partSql);
                     var memberName = compositeKey.Members?[i]?.Name ?? $"Item{i + 1}";
@@ -125,6 +134,10 @@ namespace nORM.Query
                 foreach (var kvp in visitor.GetParameters())
                     AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(visitor);
+                // Decimal key: coerce to REAL (see composite-key path above).
+                var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
+                if (keyType == typeof(decimal))
+                    groupBySql = $"CAST({groupBySql} AS REAL)";
                 _groupBy.Add(groupBySql);
             }
 
