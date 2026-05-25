@@ -376,18 +376,41 @@ namespace nORM.Query
         {
             var methodName = methodCall.Method.Name;
 
-            // string.Join(separator, group.Select(x => member)) inside a GroupBy
-            // projection lowers to the provider's STRING_AGG / GROUP_CONCAT
-            // aggregate. The argument shape is the same for the variadic and
-            // IEnumerable<string> overloads after the group rewrite -- args[0]
-            // is the literal separator and args[1] is the Enumerable.Select
-            // call over the group element parameter.
-            if (methodCall.Method.DeclaringType == typeof(string)
-                && methodName == nameof(string.Join)
-                && methodCall.Arguments.Count == 2
-                && TryGetConstantValue(methodCall.Arguments[0], out var aggSepVal)
-                && aggSepVal is string aggSep
-                && methodCall.Arguments[1] is MethodCallExpression aggInner
+            // string.Join(separator, group.Select(x => member)) and the
+            // empty-separator companion string.Concat(group.Select(x => member))
+            // both lower to the provider's STRING_AGG / GROUP_CONCAT aggregate.
+            // Detect either method shape:
+            //  * Join: arg[0] is the literal separator, arg[1] is the Select call
+            //  * Concat(IEnumerable<string>): arg[0] is the Select call,
+            //    separator is implicitly empty.
+            MethodCallExpression? aggInner = null;
+            string? aggSep = null;
+            if (methodCall.Method.DeclaringType == typeof(string))
+            {
+                if (methodName == nameof(string.Join)
+                    && methodCall.Arguments.Count == 2
+                    && TryGetConstantValue(methodCall.Arguments[0], out var aggSepVal)
+                    && aggSepVal is string aggSepS
+                    && methodCall.Arguments[1] is MethodCallExpression aggInnerJ)
+                {
+                    aggInner = aggInnerJ;
+                    aggSep = aggSepS;
+                }
+                else if (methodName == nameof(string.Concat)
+                         && methodCall.Arguments.Count == 1
+                         && methodCall.Arguments[0] is MethodCallExpression aggInnerC
+                         // string.Concat has many overloads; only the
+                         // IEnumerable<string> form takes a single sequence arg.
+                         && methodCall.Method.GetParameters().Length == 1
+                         && methodCall.Method.GetParameters()[0].ParameterType.IsGenericType
+                         && methodCall.Method.GetParameters()[0].ParameterType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    aggInner = aggInnerC;
+                    aggSep = string.Empty;
+                }
+            }
+            if (aggInner != null
+                && aggSep != null
                 && aggInner.Method.DeclaringType == typeof(System.Linq.Enumerable)
                 && aggInner.Method.Name == nameof(System.Linq.Enumerable.Select)
                 && aggInner.Arguments.Count == 2
