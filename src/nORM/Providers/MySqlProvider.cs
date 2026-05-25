@@ -334,6 +334,13 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// MySQL stores TimeSpan as TIME. TIME_TO_SEC returns integer seconds;
+        /// the MICROSECOND() function adds sub-second precision back in.
+        /// </summary>
+        public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
+            => $"(TIME_TO_SEC({timeSpanColumnSql}) + MICROSECOND({timeSpanColumnSql}) / 1000000.0)";
+
+        /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
         /// DATE so the materializer reads a DateOnly-compatible value.
         /// </summary>

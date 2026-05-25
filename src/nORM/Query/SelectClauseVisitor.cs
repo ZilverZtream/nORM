@@ -1375,6 +1375,29 @@ namespace nORM.Query
                 sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
                 return node;
             }
+            // TimeSpan + TimeSpan and TimeSpan - TimeSpan between two column
+            // expressions (or sub-expressions of TimeSpan type) -> fractional
+            // seconds via the provider's GetTimeSpanColumnSecondsSql hook,
+            // then sum/diff. Materialiser converts the resulting numeric to
+            // TimeSpan via TimeSpan.FromSeconds.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeSpan)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan))
+            {
+                var tsLeftStart = sb.Length;
+                Visit(node.Left);
+                var tsLeftSql = sb.ToString(tsLeftStart, sb.Length - tsLeftStart);
+                sb.Length = tsLeftStart;
+                var tsRightStart = sb.Length;
+                Visit(node.Right);
+                var tsRightSql = sb.ToString(tsRightStart, sb.Length - tsRightStart);
+                sb.Length = tsRightStart;
+                var op = node.NodeType == ExpressionType.Add ? '+' : '-';
+                sb.Append('(').Append(_provider.GetTimeSpanColumnSecondsSql(tsLeftSql))
+                  .Append(' ').Append(op).Append(' ')
+                  .Append(_provider.GetTimeSpanColumnSecondsSql(tsRightSql)).Append(')');
+                return node;
+            }
             // TimeOnly - TimeOnly -> TimeSpan, wrapped to [0, 24h) per
             // .NET's TimeOnly.op_Subtraction. Each provider's hook emits the
             // wrapped form so the materializer's TimeSpan.FromSeconds path

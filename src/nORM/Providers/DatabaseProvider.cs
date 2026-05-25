@@ -911,6 +911,21 @@ namespace nORM.Providers
             => null;
 
         /// <summary>
+        /// Returns SQL that evaluates a TimeSpan column as fractional seconds (double).
+        /// Used by the LINQ projection-side translator to lower
+        /// <c>col1 + col2</c> / <c>col1 - col2</c> between two TimeSpan columns into
+        /// a portable scalar; the materialiser reads the resulting double and
+        /// reconstructs the TimeSpan via <c>TimeSpan.FromSeconds</c>.
+        ///
+        /// Default throws because providers store TimeSpan in dialect-specific
+        /// formats (SQLite TEXT, SqlServer TIME(7), Postgres INTERVAL, MySQL TIME);
+        /// each provider supplies its own emit.
+        /// </summary>
+        public virtual string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
+            => throw new NormUnsupportedFeatureException(
+                $"TimeSpan column arithmetic is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

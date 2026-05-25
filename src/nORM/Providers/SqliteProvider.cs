@@ -213,6 +213,15 @@ namespace nORM.Providers
                 $"END)";
         }
 
+        /// <inheritdoc/>
+        public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
+            // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER
+            // when the parsed span has no fractional component (the common
+            // 'HH:mm:ss' canonical 'c' format with no '.fffffff' suffix); the
+            // materialiser's ConvertToTimeSpan(long) path would then treat the
+            // value as ticks instead of seconds.
+            => $"({TimeSpanColumnTotalSecondsSql(timeSpanColumnSql)} * 1.0)";
+
         /// <summary>
         /// SQLite TimeSpan columns are canonical-c-format TEXT; parse into a
         /// fractional-seconds expression via <see cref="TimeSpanColumnTotalSecondsSql"/>
