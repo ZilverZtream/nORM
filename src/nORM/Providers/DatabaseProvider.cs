@@ -285,6 +285,34 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Shared helper for non-SQLite providers' <c>TimeSpan.From*</c> static
+        /// factories applied to a column expression (or any non-constant arg).
+        /// Emits REAL seconds; the materializer's
+        /// <c>double → TimeSpan.FromSeconds</c> path reconstructs the TimeSpan.
+        ///
+        /// SQLite has its own override that emits canonical 'c' format TEXT
+        /// because Microsoft.Data.Sqlite reads TimeSpan via TimeSpan.Parse;
+        /// the seconds-as-double shape used here would force a lossy parse.
+        /// </summary>
+        protected static string? TryTranslateTimeSpanFactory(
+            System.Linq.Expressions.MethodCallExpression node,
+            string[] args)
+        {
+            if (node.Method.DeclaringType != typeof(TimeSpan) || node.Object != null || args.Length != 1)
+                return null;
+            return node.Method.Name switch
+            {
+                nameof(TimeSpan.FromDays)         => $"(({args[0]}) * 86400.0)",
+                nameof(TimeSpan.FromHours)        => $"(({args[0]}) * 3600.0)",
+                nameof(TimeSpan.FromMinutes)      => $"(({args[0]}) * 60.0)",
+                nameof(TimeSpan.FromSeconds)      => $"(({args[0]}) * 1.0)",
+                nameof(TimeSpan.FromMilliseconds) => $"(({args[0]}) / 1000.0)",
+                nameof(TimeSpan.FromTicks)        => $"(({args[0]}) / 10000000.0)",
+                _ => null
+            };
+        }
+
+        /// <summary>
         /// Returns SQL that evaluates `end - start` as a fractional number of seconds. Used
         /// by the LINQ translator to lower `(end - start).TotalSeconds / TotalMinutes /
         /// TotalHours / Days / etc.` to a portable scalar expression. Both arguments are

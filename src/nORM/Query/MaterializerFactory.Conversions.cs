@@ -125,6 +125,10 @@ namespace nORM.Query
             // fractional component down to microseconds).
             if (value is double sec) return TimeSpan.FromSeconds(sec);
             if (value is float secF) return TimeSpan.FromSeconds(secF);
+            // SqlServer/Postgres return DECIMAL for `int / 1000.0` style REAL-seconds
+            // projections (numeric promotion rules differ from SQLite, which returns
+            // double). Treat decimal as fractional seconds the same way.
+            if (value is decimal secD) return TimeSpan.FromSeconds((double)secD);
             return (TimeSpan)Convert.ChangeType(value, typeof(TimeSpan), CultureInfo.InvariantCulture);
         }
 
@@ -235,6 +239,7 @@ namespace nORM.Query
                 if (dbValue is int ticks32) return new TimeSpan(ticks32);
                 if (dbValue is double sec) return TimeSpan.FromSeconds(sec);
                 if (dbValue is float secF) return TimeSpan.FromSeconds(secF);
+                if (dbValue is decimal secD) return TimeSpan.FromSeconds((double)secD);
             }
             // char: stored as single-character TEXT on TEXT-storage providers; numeric
             // storage isn't common but accept it via Convert.ToChar.

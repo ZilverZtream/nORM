@@ -449,7 +449,8 @@ namespace nORM.Providers
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x})" : $"ROUND({x}, {digits})",
                 truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})")
-            ?? TryTranslateIeee754Predicate(node, args);
+            ?? TryTranslateIeee754Predicate(node, args)
+            ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
         /// MySQL DOUBLE rejects NaN / Infinity at insert by default; the

@@ -477,7 +477,8 @@ namespace nORM.Providers
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x}, 0)" : $"ROUND({x}, {digits})",
                 truncateTowardZero: (x, digits) => digits == null ? $"ROUND({x}, 0, 1)" : $"ROUND({x}, {digits}, 1)")
-            ?? TryTranslateIeee754Predicate(node, args);
+            ?? TryTranslateIeee754Predicate(node, args)
+            ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
         /// double / float IEEE 754 predicates (IsNaN / IsInfinity / IsFinite /

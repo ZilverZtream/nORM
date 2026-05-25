@@ -386,7 +386,8 @@ namespace nORM.Providers
                 truncateTowardZero: (x, digits) => digits == null
                     ? $"TRUNC(({x})::numeric)"
                     : $"TRUNC(({x})::numeric, {digits})")
-            ?? TryTranslateIeee754Predicate(node, args);
+            ?? TryTranslateIeee754Predicate(node, args)
+            ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
         /// IEEE 754 predicates -- PostgreSQL stores Infinity / NaN in DOUBLE
