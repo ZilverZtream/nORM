@@ -332,6 +332,13 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
 
+        /// <summary>
+        /// SQL Server DATEADD on TIME returns DATETIME -- CAST back to TIME so
+        /// the materializer reads a TimeOnly-compatible value.
+        /// </summary>
+        public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
+            => $"CAST(DATEADD(SECOND, {secondsSqlFragment}, {timeOnlySql}) AS TIME)";
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

@@ -270,6 +270,10 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";
 
+        /// <summary>PostgreSQL TIME + INTERVAL returns TIME natively.</summary>
+        public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
+            => $"({timeOnlySql} + ({secondsSqlFragment} || ' seconds')::interval)";
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

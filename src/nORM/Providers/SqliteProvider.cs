@@ -187,6 +187,14 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({daysSqlFragment}) || ' days')";
 
+        /// <summary>
+        /// SQLite TimeOnly is 'HH:mm:ss' text. strftime needs a date prefix to
+        /// apply a seconds modifier; we inject '1900-01-01 ' and re-format to
+        /// 'HH:mm:ss' afterward. Sub-day only (overflow drops the day field).
+        /// </summary>
+        public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
+            => $"strftime('%H:%M:%S', '1900-01-01 ' || {timeOnlySql}, ({secondsSqlFragment}) || ' seconds')";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 
