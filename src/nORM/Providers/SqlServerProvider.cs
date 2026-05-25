@@ -604,6 +604,22 @@ namespace nORM.Providers
                         $"LOG(({args[0]}) + SQRT(POWER({args[0]}, 2) - 1))",
                     nameof(Math.Atanh) when args.Length == 1 =>
                         $"(0.5 * LOG((1 + ({args[0]})) / (1 - ({args[0]}))))",
+                    // Extended Math methods present on SQLite but not in T-SQL.
+                    // Cbrt: POWER(x, 1.0/3.0); for x >= 0 matches Math.Cbrt.
+                    nameof(Math.Cbrt) when args.Length == 1 => $"POWER({args[0]}, 1.0/3.0)",
+                    // T-SQL LOG(value, base): second arg is the base.
+                    nameof(Math.Log2) when args.Length == 1 => $"LOG({args[0]}, 2)",
+                    nameof(Math.MaxMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.MinMagnitude) when args.Length == 2 =>
+                        $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    nameof(Math.ScaleB) when args.Length == 2 =>
+                        $"({args[0]} * POWER(CAST(2 AS FLOAT), {args[1]}))",
+                    // BigMul(int, int) -> long. Widen one operand to BIGINT
+                    // before multiplying or the product overflows when
+                    // |a * b| > 2^31 - 1.
+                    nameof(Math.BigMul) when args.Length == 2 =>
+                        $"(CAST({args[0]} AS BIGINT) * {args[1]})",
                     _ => null
                 };
             }
