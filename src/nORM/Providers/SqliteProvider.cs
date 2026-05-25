@@ -664,6 +664,21 @@ namespace nORM.Providers
                     // hits exact-magnitude ties.
                     nameof(Math.MaxMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    // IEEERemainder(x, y) = x - y * round(x/y, ToEven). SQLite's
+                    // native ROUND() rounds half-away-from-zero, so we inline a
+                    // banker's-rounding equivalent on |x/y|: integer part via
+                    // CAST(... AS INTEGER) (truncates toward zero, so on a
+                    // non-negative value that's FLOOR); fractional part > 0.5 -> +1,
+                    // < 0.5 -> +0, == 0.5 -> add 1 only when the integer part is
+                    // odd (i.e. round to even). Sign reapplied via the leading
+                    // CASE, since the rounding is sign-symmetric.
+                    nameof(Math.IEEERemainder) when args.Length == 2 =>
+                        $"({args[0]} - {args[1]} * ((CASE WHEN ({args[0]})/({args[1]}) >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(CAST(ABS(({args[0]})/({args[1]})) AS INTEGER) + " +
+                        $"CASE " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS INTEGER) > 0.5 THEN 1 " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS INTEGER) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(ABS(({args[0]})/({args[1]})) AS INTEGER) % 2) END)))",
                     _ => null
                 };
             }

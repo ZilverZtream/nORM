@@ -77,6 +77,7 @@ namespace nORM.Query
                 nameof(Math.Atanh),
                 nameof(Math.MaxMagnitude),
                 nameof(Math.MinMagnitude),
+                nameof(Math.IEEERemainder),
 
                 // DateTime properties
                 nameof(DateTime.Year),
