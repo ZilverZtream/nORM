@@ -189,6 +189,10 @@ namespace nORM.Query
                 nameof(TimeSpan.FromMilliseconds),
                 nameof(TimeSpan.FromTicks),
                 nameof(TimeSpan.FromDays),
+                // TimeSpan.Negate() (no-arg instance) and TimeSpan.Duration() (abs).
+                // Both lower to (-1.0 * seconds_expr) / ABS(seconds_expr) per SCV.
+                nameof(TimeSpan.Negate),
+                nameof(TimeSpan.Duration),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),
