@@ -975,6 +975,8 @@ namespace nORM.Providers
                     // DayNumber, so we use the date('0001-01-01', '+N days')
                     // modifier which operates day-by-day on the symbolic date
                     // and yields the expected proleptic-Gregorian result.
+                    nameof(DateOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     nameof(DateOnly.FromDayNumber) when args.Length == 1 =>
                         $"date('0001-01-01', '+' || CAST({args[0]} AS TEXT) || ' days')",
                     // FromDateTime(dt) drops the time portion. SQLite's date()
@@ -1152,6 +1154,8 @@ namespace nORM.Providers
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
                         $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
+                    nameof(TimeOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     // Parse(string) -- Microsoft.Data.Sqlite stores TimeOnly
                     // as canonical 'HH:mm:ss[.fffffff]' text; source TEXT
                     // column already holds compatible text so SQL emission

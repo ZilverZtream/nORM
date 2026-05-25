@@ -652,6 +652,8 @@ namespace nORM.Providers
                     // T-SQL DATEPART(weekday) depends on @@DATEFIRST; subtract @@DATEFIRST
                     // so Sunday=0..Saturday=6 always, matching System.DayOfWeek.
                     nameof(DateOnly.DayOfWeek) => $"((DATEPART(weekday, {args[0]}) + @@DATEFIRST - 1) % 7)",
+                    nameof(DateOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     // DateOnly.DayNumber: days since DateOnly.MinValue (0001-01-01).
                     // SQL Server DATEDIFF(DAY, '0001-01-01', x) returns int days
                     // matching .NET's day-count semantics across the full range.
@@ -693,6 +695,8 @@ namespace nORM.Providers
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
                         $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
+                    nameof(TimeOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }

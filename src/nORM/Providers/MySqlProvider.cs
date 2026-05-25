@@ -571,6 +571,8 @@ namespace nORM.Providers
                     nameof(DateOnly.DayOfYear) => $"DAYOFYEAR({args[0]})",
                     // MySQL DAYOFWEEK returns 1=Sun..7=Sat; .NET DayOfWeek is 0=Sun..6=Sat.
                     nameof(DateOnly.DayOfWeek) => $"(DAYOFWEEK({args[0]}) - 1)",
+                    nameof(DateOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     // MySQL TO_DAYS uses proleptic Gregorian anchored at year 0;
                     // TO_DAYS('0001-01-01') == 366 (year 0 was 366 days). Subtract
                     // 366 so the result matches .NET DateOnly.MinValue == day 0.
@@ -608,6 +610,8 @@ namespace nORM.Providers
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
                         $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
+                    nameof(TimeOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
