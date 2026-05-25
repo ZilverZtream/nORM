@@ -75,6 +75,8 @@ namespace nORM.Query
                 nameof(Math.Asinh),
                 nameof(Math.Acosh),
                 nameof(Math.Atanh),
+                nameof(Math.MaxMagnitude),
+                nameof(Math.MinMagnitude),
 
                 // DateTime properties
                 nameof(DateTime.Year),
