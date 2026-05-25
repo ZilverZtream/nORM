@@ -664,6 +664,8 @@ namespace nORM.Providers
                     // hits exact-magnitude ties.
                     nameof(Math.MaxMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) >= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
+                    // ScaleB(x, n) = x * 2^n -- direct via SQLite POW.
+                    nameof(Math.ScaleB) when args.Length == 2 => $"({args[0]} * POW(2.0, {args[1]}))",
                     // IEEERemainder(x, y) = x - y * round(x/y, ToEven). SQLite's
                     // native ROUND() rounds half-away-from-zero, so we inline a
                     // banker's-rounding equivalent on |x/y|: integer part via
