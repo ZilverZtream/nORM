@@ -348,6 +348,10 @@ namespace nORM.Providers
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} REGEXP {patternLiteral})";
 
+        /// <summary>MySQL 8.0+ has REGEXP_REPLACE(input, pattern, replacement).</summary>
+        public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => $"REGEXP_REPLACE({inputSql}, {patternLiteral}, {replacementLiteral})";
+
         /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({monthsSqlFragment}) MONTH))";

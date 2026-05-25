@@ -321,6 +321,10 @@ namespace nORM.Providers
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} ~ {patternLiteral})";
 
+        /// <summary>PostgreSQL native regexp_replace(input, pattern, replacement).</summary>
+        public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral})";
+
         /// <summary>
         /// PostgreSQL TIME - TIME yields INTERVAL natively. EXTRACT(EPOCH FROM ...)
         /// returns fractional seconds preserving sub-second precision. Wrap with

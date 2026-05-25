@@ -592,6 +592,18 @@ namespace nORM.Providers
                 $"Regex.IsMatch is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Returns SQL evaluating <c>Regex.Replace(input, pattern, replacement)</c>.
+        /// PostgreSQL: <c>regexp_replace(input, pattern, replacement)</c>.
+        /// MySQL (8.0+): <c>REGEXP_REPLACE(input, pattern, replacement)</c>.
+        /// SQLite: <c>regexp_replace(input, pattern, replacement)</c> (requires a
+        ///   user-registered function; Microsoft.Data.Sqlite has no built-in).
+        /// SQL Server: throws -- no native regex primitive.
+        /// </summary>
+        public virtual string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => throw new NormUnsupportedFeatureException(
+                $"Regex.Replace is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///

@@ -244,6 +244,15 @@ namespace nORM.Providers
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} REGEXP {patternLiteral})";
 
+        /// <summary>
+        /// SQLite has no built-in regex_replace; callers must register a custom
+        /// function (e.g. via <c>SqliteConnection.CreateFunction</c>) before
+        /// executing queries that use this method. The emitted shape stays
+        /// portable with PostgreSQL's <c>regexp_replace</c>.
+        /// </summary>
+        public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral})";
+
         /// <summary>SQLite uses strftime with an 'N months' modifier on the DateOnly TEXT column.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({monthsSqlFragment}) || ' months')";
