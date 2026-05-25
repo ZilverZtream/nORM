@@ -66,6 +66,9 @@ namespace nORM.Query
                 nameof(Math.Cosh),
                 nameof(Math.Tanh),
                 nameof(Math.Atan2),
+                nameof(Math.Asinh),
+                nameof(Math.Acosh),
+                nameof(Math.Atanh),
 
                 // DateTime properties
                 nameof(DateTime.Year),
