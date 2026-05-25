@@ -604,6 +604,25 @@ namespace nORM.Providers
                 $"Regex.Replace is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Case-insensitive variant of <see cref="GetRegexMatchSql"/>. Default
+        /// falls back to wrapping both sides in LOWER() which is portable but
+        /// loses Unicode case-folding nuance; providers with a native case-
+        /// insensitive primitive override (e.g. PostgreSQL <c>~*</c>).
+        /// </summary>
+        public virtual string GetRegexMatchIgnoreCaseSql(string inputSql, string patternLiteral)
+            => GetRegexMatchSql($"LOWER({inputSql})", $"LOWER({patternLiteral})");
+
+        /// <summary>
+        /// Case-insensitive variant of <see cref="GetRegexReplaceSql"/>. Default
+        /// lowers both input and pattern; the replacement passes through
+        /// unchanged (case is preserved on the replacement text). Providers
+        /// with a flag-style override (PostgreSQL <c>regexp_replace(... 'gi')</c>,
+        /// MySQL <c>REGEXP_REPLACE(... 'i')</c>) can supersede.
+        /// </summary>
+        public virtual string GetRegexReplaceIgnoreCaseSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => GetRegexReplaceSql($"LOWER({inputSql})", $"LOWER({patternLiteral})", replacementLiteral);
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///
