@@ -407,30 +407,35 @@ namespace nORM.Query
             var resultType = typeof(TResult);
             var underlyingType = Nullable.GetUnderlyingType(resultType) ?? resultType;
 
-            // Fast path for common scalar types - avoids boxing
+            // Fast path for common scalar types - avoids boxing. Pass
+            // InvariantCulture explicitly so non-English locales (Swedish,
+            // German, etc.) don't parse '1.5' under comma-decimal rules and
+            // throw FormatException. The database stores numeric scalars
+            // using invariant formatting, so the read must use it too.
+            var ic = System.Globalization.CultureInfo.InvariantCulture;
             if (underlyingType == typeof(int))
-                return (TResult)(object)Convert.ToInt32(result);
+                return (TResult)(object)Convert.ToInt32(result, ic);
             if (underlyingType == typeof(long))
-                return (TResult)(object)Convert.ToInt64(result);
+                return (TResult)(object)Convert.ToInt64(result, ic);
             if (underlyingType == typeof(double))
-                return (TResult)(object)Convert.ToDouble(result);
+                return (TResult)(object)Convert.ToDouble(result, ic);
             if (underlyingType == typeof(decimal))
-                return (TResult)(object)Convert.ToDecimal(result);
+                return (TResult)(object)Convert.ToDecimal(result, ic);
             if (underlyingType == typeof(bool))
-                return (TResult)(object)Convert.ToBoolean(result);
+                return (TResult)(object)Convert.ToBoolean(result, ic);
             if (underlyingType == typeof(short))
-                return (TResult)(object)Convert.ToInt16(result);
+                return (TResult)(object)Convert.ToInt16(result, ic);
             if (underlyingType == typeof(byte))
-                return (TResult)(object)Convert.ToByte(result);
+                return (TResult)(object)Convert.ToByte(result, ic);
             if (underlyingType == typeof(float))
-                return (TResult)(object)Convert.ToSingle(result);
+                return (TResult)(object)Convert.ToSingle(result, ic);
             if (underlyingType == typeof(DateTime))
-                return (TResult)(object)Convert.ToDateTime(result);
+                return (TResult)(object)Convert.ToDateTime(result, ic);
             if (underlyingType == typeof(Guid))
                 return (TResult)(object)(Guid)result;
 
             // Fallback for other types (still better than ChangeType for common cases above)
-            return (TResult)Convert.ChangeType(result, underlyingType)!;
+            return (TResult)Convert.ChangeType(result, underlyingType, ic)!;
         }
         private Task<TResult> ExecuteInternalAsync<TResult>(Expression expression, CancellationToken ct)
         {

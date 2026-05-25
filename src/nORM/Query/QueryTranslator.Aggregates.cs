@@ -536,6 +536,17 @@ namespace nORM.Query
                 if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var sqlFunction))
                     sqlFunction = node.Method.Name.ToUpperInvariant();
 
+                // Decimal columns store as TEXT; SQL aggregates inherit storage
+                // class so MIN/MAX/SUM/AVG over a decimal column lex-compares
+                // mixed-magnitude values ('10.5' lex > '2.0'). Coerce to REAL
+                // before aggregating so the numeric semantics apply. CAST(int
+                // AS REAL) is identity-with-.0; non-decimal columns unaffected.
+                var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
+                if (selBodyType == typeof(decimal))
+                {
+                    columnSql = $"CAST({columnSql} AS REAL)";
+                }
+
                 // Build complete SELECT ... FROM ... so the sql-length guard in Generate()
                 // correctly skips the default SELECT/FROM assembly block.
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
