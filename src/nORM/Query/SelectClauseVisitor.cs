@@ -1131,6 +1131,28 @@ namespace nORM.Query
                   .Append(rightSql).Append(")) * 86400.0)");
                 return node;
             }
+            // Bitwise XOR on integer/enum operands -- SQLite has no `^`
+            // primitive; rewrite to (a | b) & ~(a & b), the standard bit-
+            // twiddling identity that holds for 64-bit signed two's-complement
+            // integers. Captures each operand's SQL once and inlines into the
+            // 4-position emit. Restricted to non-bool operand types since
+            // `^` on bool is logical XOR (rare; would need a separate CASE
+            // rewrite).
+            if (node.NodeType == ExpressionType.ExclusiveOr
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) != typeof(bool))
+            {
+                var xorLeftStart = sb.Length;
+                Visit(node.Left);
+                var xorLeftSql = sb.ToString(xorLeftStart, sb.Length - xorLeftStart);
+                sb.Length = xorLeftStart;
+                var xorRightStart = sb.Length;
+                Visit(node.Right);
+                var xorRightSql = sb.ToString(xorRightStart, sb.Length - xorRightStart);
+                sb.Length = xorRightStart;
+                sb.Append("((").Append(xorLeftSql).Append(" | ").Append(xorRightSql)
+                  .Append(") & ~(").Append(xorLeftSql).Append(" & ").Append(xorRightSql).Append("))");
+                return node;
+            }
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch
