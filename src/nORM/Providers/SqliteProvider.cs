@@ -252,12 +252,14 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
-            // DateTime.ParseExact(s, format[, provider]) -- restricted to a
-            // small set of constant format strings we can losslessly rewrite
-            // into the canonical 'yyyy-MM-dd HH:MM:SS' the materializer reads.
-            // The constant-format guard keeps the rewrite scope honest --
-            // arbitrary format strings can't be re-implemented in pure SQL.
-            if ((declType == typeof(DateTime) || declType == typeof(DateTimeOffset))
+            // DateTime/DateTimeOffset/DateOnly/TimeOnly.ParseExact(s, format
+            // [, provider[, style]]) -- restricted to a small set of constant
+            // format strings we can losslessly rewrite into the canonical
+            // 'yyyy-MM-dd HH:MM:SS' the materializer reads. The constant-
+            // format guard keeps the rewrite scope honest -- arbitrary format
+            // strings can't be re-implemented in pure SQL.
+            if ((declType == typeof(DateTime) || declType == typeof(DateTimeOffset)
+                 || declType == typeof(DateOnly) || declType == typeof(TimeOnly))
                 && node.Method.Name == "ParseExact"
                 && node.Arguments.Count >= 2
                 && node.Arguments[1] is System.Linq.Expressions.ConstantExpression fmtArg
