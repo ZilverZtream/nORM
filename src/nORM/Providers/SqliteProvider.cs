@@ -323,6 +323,15 @@ namespace nORM.Providers
                     // Emit the matching long format so Where round-trips; the
                     // materializer parses either form back to DateTime.
                     nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {args[0]})",
+                    // DateTime.Ticks: (julianday(col) - julianday('0001-01-01')) *
+                    // 86400 * 1e7 -- ticks since DateTime.MinValue. IEEE-754 double
+                    // gives ~15 significant digits which is enough for comparison
+                    // ranges within a few hundred years (precision loss starts at
+                    // sub-microsecond). Projection round-trip back to long ticks is
+                    // out of scope for this initial implementation; comparison is
+                    // the dominant use case.
+                    nameof(DateTime.Ticks) when declaringType == typeof(DateTime) =>
+                        $"((julianday({args[0]}) - 1721425.5) * 864000000000.0)",
                     // DateTimeOffset.UtcDateTime -- normalize to UTC instant. The
                     // stored format is 'yyyy-MM-dd HH:mm:ss[.FFFFFFF]zzz' where
                     // zzz is the trailing 6-char offset (+HH:MM / -HH:MM).
