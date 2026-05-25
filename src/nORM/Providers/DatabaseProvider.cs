@@ -478,6 +478,22 @@ namespace nORM.Providers
             => null;
 
         /// <summary>
+        /// Adds a number of seconds (expressed as a SQL fragment, e.g. "3600"
+        /// or "(CAST(substr(ts,1,2) AS INTEGER) * 3600 + ...)") to a DateTime
+        /// SQL expression. Used by ETSV/SCV for `Stamp + TimeSpan.FromHours(1)`
+        /// and constant-TimeSpan shift translation.
+        ///
+        /// SQLite: <c>RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', col, '+N seconds'), '0'), '.')</c>
+        /// SQL Server: <c>DATEADD(SECOND, N, col)</c>
+        /// PostgreSQL: <c>(col + (N || ' seconds')::interval)</c>
+        /// MySQL: <c>DATE_ADD(col, INTERVAL N SECOND)</c>
+        ///
+        /// Default returns null so callers can fall through to client-eval.
+        /// </summary>
+        public virtual string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
+            => null;
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

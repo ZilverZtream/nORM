@@ -316,6 +316,10 @@ namespace nORM.Providers
             return $"DATE_FORMAT({sql}, '{sb}')";
         }
 
+        /// <summary>MySQL uses <c>DATE_ADD(col, INTERVAL N SECOND)</c>.</summary>
+        public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
+            => $"DATE_ADD({dateTimeSql}, INTERVAL ({secondsSqlFragment}) SECOND)";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
