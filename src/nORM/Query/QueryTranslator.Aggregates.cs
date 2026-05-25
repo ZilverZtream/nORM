@@ -543,14 +543,16 @@ namespace nORM.Query
                 // semantics apply. CAST(int AS REAL) is identity-with-.0;
                 // non-decimal columns unaffected.
                 //
-                // PRECISION TRADEOFF: REAL is IEEE-754 double (~15-17 sig
-                // decimal digits). For values inside that window (typical
-                // app/business amounts: <= ~10-digit integer + 2-decimal
-                // fraction = currency cents through ~99 quadrillion) the
-                // round-trip is exact. For >15-significant-digit accounting
-                // values (very large balances, scientific quantities) the
-                // aggregate silently rounds. The SqlServer/Postgres/MySQL
-                // providers use native DECIMAL and don't have this caveat.
+                // PRECISION TRADEOFF: REAL is IEEE-754 binary double, so
+                // aggregate results are approximate -- numeric ordering and
+                // comparison are correct for practical magnitudes, but the
+                // returned sum/avg is subject to floating-point rounding
+                // (e.g. 0.01m is not exactly representable in binary, so a
+                // SUM of cents accumulates tiny rounding error). Tests should
+                // assert with tolerance. Exact decimal aggregate semantics on
+                // SQLite require a different storage/aggregate strategy --
+                // the SqlServer/Postgres/MySQL providers use native DECIMAL
+                // and preserve exact semantics without this caveat.
                 var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
                 if (selBodyType == typeof(decimal))
                 {

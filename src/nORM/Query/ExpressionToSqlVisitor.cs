@@ -558,13 +558,14 @@ namespace nORM.Query
             // comparison or numeric arithmetic. CAST(int AS REAL) is identity
             // with .0 so non-decimal pairings still round-trip.
             //
-            // PRECISION TRADEOFF: REAL is IEEE-754 double (~15-17 sig
-            // decimal digits). Comparisons of values inside that window
-            // (typical app/business amounts) are exact. For accounting
-            // values exceeding 15 significant digits the comparison would
-            // round, but the alternative -- TEXT lex compare -- is also
-            // wrong (and silently so). The SqlServer/Postgres/MySQL
-            // providers use native DECIMAL and don't have this caveat.
+            // PRECISION TRADEOFF: REAL is IEEE-754 binary double. Numeric
+            // ordering/comparison via CAST AS REAL is correct for practical
+            // magnitudes (the only alternative -- TEXT lex compare -- is
+            // silently wrong on every mixed-magnitude case). Arithmetic
+            // results carry floating-point rounding (e.g. 0.01m is not
+            // exactly representable in binary). Exact decimal semantics on
+            // SQLite would require a different storage/aggregate strategy;
+            // the SqlServer/Postgres/MySQL providers use native DECIMAL.
             bool isDecimalComparable = node.NodeType is
                     ExpressionType.Equal or ExpressionType.NotEqual
                     or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
