@@ -524,6 +524,23 @@ namespace nORM.Providers
         public virtual string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment) => null;
 
         /// <summary>
+        /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
+        /// Default returns null so callers can fall through.
+        ///
+        /// SQLite: strftime over a fake-date-prefixed time text + 'N seconds'
+        ///   modifier; result re-formatted to 'HH:mm:ss'.
+        /// SQL Server: CAST(DATEADD(SECOND, N, col) AS TIME) -- DATEADD on
+        ///   TIME promotes to DATETIME, the CAST brings it back to TIME.
+        /// PostgreSQL: (col + (N || ' seconds')::interval) -- TIME + INTERVAL
+        ///   = TIME natively.
+        /// MySQL: ADDTIME(col, SEC_TO_TIME(N)) -- stays TIME.
+        ///
+        /// Sub-day arithmetic only; wrap-around past 24h is provider-specific
+        /// (SQLite drops, SqlServer wraps via TIME range, etc.).
+        /// </summary>
+        public virtual string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment) => null;
+
+        /// <summary>
         /// Adds (or subtracts when <paramref name="subtract"/>) a TimeSpan-typed
         /// column expression to a DateTime SQL expression. Differs from
         /// <see cref="AddSecondsToDateTimeSql"/> which takes a numeric seconds

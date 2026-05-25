@@ -340,6 +340,10 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({daysSqlFragment}) DAY))";
 
+        /// <summary>MySQL ADDTIME(TIME, SEC_TO_TIME(N)) stays TIME (no DATETIME promotion).</summary>
+        public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
+            => $"ADDTIME({timeOnlySql}, SEC_TO_TIME({secondsSqlFragment}))";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
