@@ -28,5 +28,32 @@ namespace nORM.Query
         public static bool ILike(string value, string pattern)
             => throw new InvalidOperationException(
                 $"{nameof(NormFunctions)}.{nameof(ILike)} can only be used inside a LINQ query translated to SQL.");
+
+        /// <summary>
+        /// Server-side UTC timestamp. Differs from <see cref="DateTime.UtcNow"/>
+        /// (which the translator constant-folds to the client clock at translation
+        /// time): this stays as a SQL function call so each row evaluation sees
+        /// the database server's clock. Use when the database is the source of
+        /// truth for "now".
+        /// </summary>
+        public static DateTime ServerUtcNow()
+            => throw new InvalidOperationException(
+                $"{nameof(NormFunctions)}.{nameof(ServerUtcNow)} can only be used inside a LINQ query translated to SQL.");
+
+        /// <summary>
+        /// Server-side new GUID generation. Each row evaluation produces a
+        /// distinct UUID. Use for IDs / tokens minted at the database side.
+        /// </summary>
+        public static Guid ServerNewGuid()
+            => throw new InvalidOperationException(
+                $"{nameof(NormFunctions)}.{nameof(ServerNewGuid)} can only be used inside a LINQ query translated to SQL.");
+
+        /// <summary>
+        /// Server-side random number in <c>[0, 1)</c>. Use for sampling or
+        /// random ordering (<c>OrderBy(_ =&gt; NormFunctions.ServerRandom())</c>).
+        /// </summary>
+        public static double ServerRandom()
+            => throw new InvalidOperationException(
+                $"{nameof(NormFunctions)}.{nameof(ServerRandom)} can only be used inside a LINQ query translated to SQL.");
     }
 }

@@ -535,6 +535,12 @@ namespace nORM.Providers
                     // collations. Forcing LOWER on both sides guarantees consistent
                     // ILIKE semantics regardless of column collation.
                     nameof(NormFunctions.ILike) when args.Length == 2 => $"(LOWER({args[0]}) LIKE LOWER({args[1]}))",
+                    // MySQL UTC_TIMESTAMP returns DATETIME in UTC; UUID() yields
+                    // a 36-char hex-with-dashes string compatible with .NET Guid
+                    // via Guid.Parse on the reader; RAND() is double in [0, 1).
+                    nameof(NormFunctions.ServerUtcNow) when args.Length == 0 => "UTC_TIMESTAMP()",
+                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => "UUID()",
+                    nameof(NormFunctions.ServerRandom) when args.Length == 0 => "RAND()",
                     _ => null
                 };
             }

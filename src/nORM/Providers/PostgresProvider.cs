@@ -482,6 +482,12 @@ namespace nORM.Providers
                 return name switch
                 {
                     nameof(NormFunctions.ILike) when args.Length == 2 => $"({args[0]} ILIKE {args[1]})",
+                    // gen_random_uuid requires the pgcrypto extension (or the
+                    // pg-built-in available since v13). RANDOM() returns
+                    // double in [0, 1).
+                    nameof(NormFunctions.ServerUtcNow) when args.Length == 0 => "(NOW() AT TIME ZONE 'UTC')",
+                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => "gen_random_uuid()",
+                    nameof(NormFunctions.ServerRandom) when args.Length == 0 => "RANDOM()",
                     _ => null
                 };
             }
