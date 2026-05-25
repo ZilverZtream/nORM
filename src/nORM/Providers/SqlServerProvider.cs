@@ -678,6 +678,11 @@ namespace nORM.Providers
                     nameof(TimeOnly.Minute) => $"DATEPART(minute, {args[0]})",
                     nameof(TimeOnly.Second) => $"DATEPART(second, {args[0]})",
                     nameof(TimeOnly.Millisecond) => $"DATEPART(millisecond, {args[0]})",
+                    // CAST DATETIME2 -> TIME extracts the wall-clock TIME portion.
+                    nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"CAST({args[0]} AS TIME)",
+                    // TimeSpan is bound as TIME on SqlServer (column-side); the
+                    // CAST is a no-op for TIME but explicit for clarity.
+                    nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => $"CAST({args[0]} AS TIME)",
                     nameof(TimeOnly.Microsecond) => $"(DATEPART(microsecond, {args[0]}) % 1000)",
                     nameof(TimeOnly.Nanosecond) => $"(DATEPART(nanosecond, {args[0]}) % 1000)",
                     // Ticks = 100ns since midnight; DATEDIFF_BIG(NANOSECOND)

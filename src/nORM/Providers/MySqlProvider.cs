@@ -594,6 +594,10 @@ namespace nORM.Providers
                     nameof(TimeOnly.Minute) => $"MINUTE({args[0]})",
                     nameof(TimeOnly.Second) => $"SECOND({args[0]})",
                     nameof(TimeOnly.Millisecond) => $"(MICROSECOND({args[0]}) DIV 1000)",
+                    // MySQL TIME() extracts the TIME portion from a DATETIME
+                    // or coerces a TIME-typed expression.
+                    nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"TIME({args[0]})",
+                    nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => $"TIME({args[0]})",
                     nameof(TimeOnly.Microsecond) => $"(MICROSECOND({args[0]}) % 1000)",
                     nameof(TimeOnly.Nanosecond) => "0",
                     // TIME_TO_SEC returns the whole-second count; multiply by

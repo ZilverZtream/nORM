@@ -555,6 +555,9 @@ namespace nORM.Providers
                     nameof(TimeOnly.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
                     nameof(TimeOnly.Second) => $"EXTRACT(SECOND FROM {args[0]})",
                     nameof(TimeOnly.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
+                    // PostgreSQL cast TIMESTAMP -> TIME and INTERVAL -> TIME.
+                    nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"({args[0]})::time",
+                    nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => $"({args[0]})::time",
                     nameof(TimeOnly.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {args[0]}))::bigint % 1000)",
                     nameof(TimeOnly.Nanosecond) => "0",
                     // EXTRACT(EPOCH FROM time) returns seconds-since-midnight as
