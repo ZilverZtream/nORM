@@ -851,6 +851,13 @@ namespace nORM.Providers
                     // guards against FP truncation (e.g. 45.456 * 1000 = 45455.99...
                     // would truncate to 455 instead of 456).
                     nameof(DateTime.Millisecond) => $"(CAST(ROUND(strftime('%f', {args[0]}) * 1000) AS INTEGER) % 1000)",
+                    // DateTime text format includes 'yyyy-MM-dd HH:mm:ss[.fffffff]'.
+                    // The fractional 7-digit tail starts at position 21 (' ' at 11,
+                    // hh at 12-13, ':' at 14, mm at 15-16, ':' at 17, ss at 18-19,
+                    // '.' at 20, fffffff starts at 21). Digits 4..6 of the tail
+                    // are the microsecond-within-millisecond.
+                    nameof(DateTime.Microsecond) =>
+                        $"(CASE WHEN length({args[0]}) > 23 THEN CAST(substr({args[0]}, 24, 3) AS INTEGER) ELSE 0 END)",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
                     // SQLite's date modifier syntax accepts an unsigned-positive form
                     // ('7 days') and an explicitly-signed negative form ('-3 days'); the
@@ -1088,6 +1095,11 @@ namespace nORM.Providers
                     // ms portion of .NET's 7-digit ticks suffix.
                     nameof(TimeOnly.Millisecond) =>
                         $"(CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10, 3) AS INTEGER) ELSE 0 END)",
+                    // TimeOnly text 'HH:mm:ss[.fffffff]'. The 7-digit fractional
+                    // starts at position 10. Digits 4..6 (positions 13..15) are
+                    // the microsecond-within-millisecond.
+                    nameof(TimeOnly.Microsecond) =>
+                        $"(CASE WHEN length({args[0]}) > 12 THEN CAST(substr({args[0]}, 13, 3) AS INTEGER) ELSE 0 END)",
                     // FromDateTime(dt) / FromTimeSpan(ts) drop everything but
                     // the time portion. SQLite's time() emits 'HH:mm:ss'.
                     nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",
