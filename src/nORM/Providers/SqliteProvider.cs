@@ -262,6 +262,40 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
+            // TimeSpan.FromHours(d) / FromMinutes(m) / FromSeconds(s) -- static
+            // factory methods used in projection: emit a printf that produces the
+            // canonical 'HH:mm:ss' text the existing TimeSpan materializer parses.
+            // SQLite has no native TimeSpan type, but Microsoft.Data.Sqlite reads
+            // TEXT columns via TimeSpan.Parse for TimeSpan-typed projection slots.
+            //
+            // Sub-day precision only: the 'HH' field overflows past 99 hours and
+            // negative values aren't handled. Fractional seconds are truncated --
+            // FromHours(1/3.0) gives 00:20:00 not 00:20:00.0000001. These are
+            // documented limits matching the existing TimeSpan component-getter
+            // emit (sub-day only). Multi-day / negative spans should materialize
+            // the column raw and call .From* client-side.
+            if (declType == typeof(TimeSpan)
+                && node.Object == null
+                && args.Length == 1)
+            {
+                string? totalSecondsSql = node.Method.Name switch
+                {
+                    nameof(TimeSpan.FromHours) => $"({args[0]} * 3600.0)",
+                    nameof(TimeSpan.FromMinutes) => $"({args[0]} * 60.0)",
+                    nameof(TimeSpan.FromSeconds) => $"({args[0]} * 1.0)",
+                    _ => null
+                };
+                if (totalSecondsSql != null)
+                {
+                    // CAST the total seconds to INTEGER once (truncate fractional), then
+                    // derive hh/mm/ss via integer arithmetic. Use a CTE-like inline form
+                    // since SQLite has no LET binding -- evaluate the cast expression
+                    // three times; the SQL compiler folds the duplicate sub-expressions.
+                    var ts = $"CAST({totalSecondsSql} AS INTEGER)";
+                    return $"printf('%02d:%02d:%02d', ({ts}) / 3600, (({ts}) / 60) % 60, ({ts}) % 60)";
+                }
+            }
+
             // DateTime/DateTimeOffset/DateOnly/TimeOnly.ParseExact(s, format
             // [, provider[, style]]) -- restricted to a small set of constant
             // format strings we can losslessly rewrite into the canonical
