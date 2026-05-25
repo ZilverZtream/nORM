@@ -652,6 +652,10 @@ namespace nORM.Providers
                     nameof(Math.Cosh) when args.Length == 1 => $"COSH({args[0]})",
                     nameof(Math.Tanh) when args.Length == 1 => $"TANH({args[0]})",
                     nameof(Math.Atan2) when args.Length == 2 => $"ATAN2({args[0]}, {args[1]})",
+                    // Inverse hyperbolic -- SQLite math extension built-ins.
+                    nameof(Math.Asinh) when args.Length == 1 => $"ASINH({args[0]})",
+                    nameof(Math.Acosh) when args.Length == 1 => $"ACOSH({args[0]})",
+                    nameof(Math.Atanh) when args.Length == 1 => $"ATANH({args[0]})",
                     _ => null
                 };
             }
