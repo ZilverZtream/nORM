@@ -358,7 +358,28 @@ namespace nORM.Providers
                     : $"ROUND(({x})::numeric, {digits})",
                 truncateTowardZero: (x, digits) => digits == null
                     ? $"TRUNC(({x})::numeric)"
-                    : $"TRUNC(({x})::numeric, {digits})");
+                    : $"TRUNC(({x})::numeric, {digits})")
+            ?? TryTranslateIeee754Predicate(node, args);
+
+        /// <summary>
+        /// IEEE 754 predicates -- PostgreSQL stores Infinity / NaN in DOUBLE
+        /// PRECISION natively. Use native isnan() for IsNaN and the
+        /// 'Infinity'::float8 literal for IsInfinity.
+        /// </summary>
+        private static string? TryTranslateIeee754Predicate(System.Linq.Expressions.MethodCallExpression node, string[] args)
+        {
+            var dt = node.Method.DeclaringType;
+            if ((dt != typeof(double) && dt != typeof(float)) || args.Length != 1) return null;
+            return node.Method.Name switch
+            {
+                "IsNaN" => $"isnan({args[0]})",
+                "IsInfinity" => $"({args[0]} = 'Infinity'::float8 OR {args[0]} = '-Infinity'::float8)",
+                "IsFinite" => $"(NOT isnan({args[0]}) AND {args[0]} != 'Infinity'::float8 AND {args[0]} != '-Infinity'::float8)",
+                "IsPositiveInfinity" => $"({args[0]} = 'Infinity'::float8)",
+                "IsNegativeInfinity" => $"({args[0]} = '-Infinity'::float8)",
+                _ => null
+            };
+        }
 
         /// <summary>
         /// Attempts to translate a .NET method invocation into its PostgreSQL equivalent.

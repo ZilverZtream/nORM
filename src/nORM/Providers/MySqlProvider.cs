@@ -408,7 +408,32 @@ namespace nORM.Providers
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x})" : $"ROUND({x}, {digits})",
-                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})");
+                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})")
+            ?? TryTranslateIeee754Predicate(node, args);
+
+        /// <summary>
+        /// MySQL DOUBLE rejects NaN / Infinity at insert by default; the
+        /// predicate is typically false for stored values. The (x != x)
+        /// algebraic form remains correct for computed float expressions
+        /// such as division-by-zero columns.
+        /// </summary>
+        private static string? TryTranslateIeee754Predicate(System.Linq.Expressions.MethodCallExpression node, string[] args)
+        {
+            var dt = node.Method.DeclaringType;
+            if ((dt != typeof(double) && dt != typeof(float)) || args.Length != 1) return null;
+            return node.Method.Name switch
+            {
+                "IsNaN" => $"({args[0]} != {args[0]})",
+                // POW(10, 400) overflows to a DOUBLE that MySQL treats as the
+                // out-of-range marker -- emit the algebraic form that doesn't
+                // require a portable +Infinity literal.
+                "IsInfinity" => $"({args[0]} = {args[0]} AND ABS({args[0]}) > 1.7976931348623157E+307)",
+                "IsFinite" => $"({args[0]} = {args[0]} AND ABS({args[0]}) <= 1.7976931348623157E+307)",
+                "IsPositiveInfinity" => $"({args[0]} = {args[0]} AND {args[0]} > 1.7976931348623157E+307)",
+                "IsNegativeInfinity" => $"({args[0]} = {args[0]} AND {args[0]} < -1.7976931348623157E+307)",
+                _ => null
+            };
+        }
 
         /// <summary>
         /// Translates selected .NET methods to their MySQL SQL equivalents.
