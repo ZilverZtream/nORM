@@ -940,8 +940,13 @@ namespace nORM.Providers
                     // SQLite has no TRUNC; CAST drops the fractional part for finite reals and
                     // matches Math.Truncate semantics (truncate toward zero).
                     nameof(Math.Truncate) when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
-                    nameof(Math.Min) when args.Length == 2 => $"MIN({args[0]}, {args[1]})",
-                    nameof(Math.Max) when args.Length == 2 => $"MAX({args[0]}, {args[1]})",
+                    // Force numeric comparison via CAST AS REAL -- otherwise
+                    // TEXT-stored decimal columns get lex-compared and MIN(
+                    // '10.0', '5.5') wrongly returns '10.0' (since '1' < '5').
+                    // CAST(int AS REAL) is identity-with-decimal-zero so
+                    // integer pairings still round-trip correctly.
+                    nameof(Math.Min) when args.Length == 2 => $"MIN(CAST({args[0]} AS REAL), CAST({args[1]} AS REAL))",
+                    nameof(Math.Max) when args.Length == 2 => $"MAX(CAST({args[0]} AS REAL), CAST({args[1]} AS REAL))",
                     // SQLite 3.35+ exposes log2() and pow() as built-ins via the
                     // math extension. Cbrt has no direct function -- use pow(x, 1/3)
                     // which matches Math.Cbrt for non-negative reals (the .NET
