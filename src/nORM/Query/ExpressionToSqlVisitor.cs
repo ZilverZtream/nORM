@@ -1195,7 +1195,8 @@ namespace nORM.Query
                     || node.Method.Name == nameof(char.IsWhiteSpace)
                     || node.Method.Name == nameof(char.IsUpper)
                     || node.Method.Name == nameof(char.IsLower)
-                    || node.Method.Name == nameof(char.IsPunctuation)))
+                    || node.Method.Name == nameof(char.IsPunctuation)
+                    || node.Method.Name == nameof(char.IsSymbol)))
             {
                 var charSql = GetSql(node.Arguments[0]);
                 switch (node.Method.Name)
@@ -1223,6 +1224,15 @@ namespace nORM.Query
                             .Append("unicode(").Append(charSql).Append(") = 95 OR ")
                             .Append("unicode(").Append(charSql).Append(") = 123 OR ")
                             .Append("unicode(").Append(charSql).Append(") = 125)");
+                        return node;
+                    case nameof(char.IsSymbol):
+                        _sql.Append("(unicode(").Append(charSql).Append(") = 36 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 43 OR ")
+                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 60 AND 62) OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 94 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 96 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 124 OR ")
+                            .Append("unicode(").Append(charSql).Append(") = 126)");
                         return node;
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
