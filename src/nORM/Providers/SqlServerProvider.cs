@@ -407,6 +407,10 @@ namespace nORM.Providers
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
 
+        /// <summary>T-SQL DATETIME2FROMPARTS with precision 7 matches .NET DateTime ticks.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"DATETIME2FROMPARTS({yearSql}, {monthSql}, {daySql}, 0, 0, 0, 0, 7)";
+
         /// <summary>
         /// T-SQL has no native regex primitive. The supported workarounds are
         /// a CLR scalar function (sql_clr assembly providing RegExMatch) or

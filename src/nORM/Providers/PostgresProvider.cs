@@ -317,6 +317,10 @@ namespace nORM.Providers
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => $"EXTRACT(EPOCH FROM ({endSql} - {startSql}))";
 
+        /// <summary>PostgreSQL MAKE_TIMESTAMP builds a TIMESTAMP from int parts.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, 0, 0, 0)";
+
         /// <summary>PostgreSQL's `~` operator evaluates a POSIX regex match against a text column.</summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} ~ {patternLiteral})";

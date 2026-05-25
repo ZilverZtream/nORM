@@ -394,6 +394,13 @@ namespace nORM.Providers
             => $"CAST(TIMESTAMPDIFF(SECOND, {startSql}, {endSql}) AS DOUBLE)";
 
         /// <summary>
+        /// MySQL has no native date-from-parts; STR_TO_DATE on a zero-padded
+        /// concat round-trips through the DATETIME parser.
+        /// </summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d')";
+
+        /// <summary>
         /// MySQL stores TimeOnly as TIME. TIMEDIFF returns a signed TIME diff;
         /// TIME_TO_SEC produces the integer-seconds form which can be negative.
         /// Wrap +86400 MOD 86400 to match TimeOnly's [0, 24h) semantics.

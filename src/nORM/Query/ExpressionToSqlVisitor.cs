@@ -1168,6 +1168,34 @@ namespace nORM.Query
         protected override Expression VisitNew(NewExpression node)
         {
             if (node.Type == typeof(string)) return base.VisitNew(node);
+            // new DateTime(year, month, day) with at least one non-constant
+            // argument can't be folded but each provider has a native
+            // date-from-parts primitive. Route through the provider hook
+            // before the constant-fold loop below.
+            if (node.Type == typeof(DateTime)
+                && node.Arguments.Count == 3
+                && node.Constructor is { } dtCtor
+                && dtCtor.GetParameters().Length == 3
+                && dtCtor.GetParameters()[0].ParameterType == typeof(int)
+                && dtCtor.GetParameters()[1].ParameterType == typeof(int)
+                && dtCtor.GetParameters()[2].ParameterType == typeof(int))
+            {
+                bool anyNonConst = false;
+                foreach (var arg in node.Arguments)
+                    if (arg is not ConstantExpression && !TryGetConstantValue(arg, out _))
+                    {
+                        anyNonConst = true;
+                        break;
+                    }
+                if (anyNonConst)
+                {
+                    var ySql = GetSql(node.Arguments[0]);
+                    var mSql = GetSql(node.Arguments[1]);
+                    var dSql = GetSql(node.Arguments[2]);
+                    _sql.Append(_provider.GetDateTimeFromPartsSql(ySql, mSql, dSql));
+                    return node;
+                }
+            }
             foreach (var a in node.Arguments)
             {
                 if (a is not ConstantExpression && !TryGetConstantValue(a, out _))
