@@ -1164,7 +1164,9 @@ namespace nORM.Query
             foreach (var arg in body.Arguments)
             {
                 if (!IsAnonymousType(arg.Type)) continue;
-                if (arg is NewExpression) continue;
+                // Explicit nested anonymous payload: `Stats = new { Total = ..., Count = ... }`.
+                if (arg is NewExpression) return true;
+                // Composite key projected whole: `Key = g.Key`.
                 if (arg is MemberExpression me
                     && me.Member.Name == "Key"
                     && me.Expression is ParameterExpression mep
@@ -1173,6 +1175,7 @@ namespace nORM.Query
                 {
                     return true;
                 }
+                // Bare key parameter from 3-arg GroupBy result selector: `(k, g) => new { Key = k, ... }`.
                 if (arg is ParameterExpression pe && IsAnonymousType(pe.Type))
                 {
                     return true;
@@ -1196,8 +1199,28 @@ namespace nORM.Query
                 var arg = body.Arguments[i];
                 var paramType = parameters[i].ParameterType;
 
+                // Explicit nested anonymous payload: the projection itself has a `new {...}`
+                // sub-expression. The SQL side emitted one flat column per sub-arg with a
+                // prefixed alias; read them sequentially and call the inner anon ctor.
+                if (arg is NewExpression nestedNew && IsAnonymousType(arg.Type))
+                {
+                    var nestedCtor = nestedNew.Constructor ?? paramType.GetConstructors()[0];
+                    var nestedParams = nestedCtor.GetParameters();
+                    var nestedArgs = new Expression[nestedParams.Length];
+                    for (int j = 0; j < nestedParams.Length; j++)
+                    {
+                        var subType = nestedParams[j].ParameterType;
+                        var subRead = GetOptimizedReaderCall(reader, subType, cursor);
+                        var subDefault = Expression.Default(subType);
+                        var subIsNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
+                        nestedArgs[j] = Expression.Condition(subIsNull, subDefault, subRead);
+                        cursor++;
+                    }
+                    args[i] = Expression.New(nestedCtor, nestedArgs);
+                    continue;
+                }
+
                 bool isNestedAnonRef = IsAnonymousType(arg.Type)
-                    && arg is not NewExpression
                     && (
                         (arg is MemberExpression me
                          && me.Member.Name == "Key"
