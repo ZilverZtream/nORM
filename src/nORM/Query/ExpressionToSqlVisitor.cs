@@ -1365,6 +1365,20 @@ namespace nORM.Query
                 return node;
             }
 
+            // Regex.Replace(input, pattern, replacement) -- static 3-arg form.
+            // Same provider matrix as IsMatch; SqlServer throws.
+            if (node.Method.DeclaringType == typeof(System.Text.RegularExpressions.Regex)
+                && node.Method.Name == nameof(System.Text.RegularExpressions.Regex.Replace)
+                && node.Arguments.Count == 3
+                && node.Object == null)
+            {
+                var inputSql = GetSql(node.Arguments[0]);
+                var patternSql = GetSql(node.Arguments[1]);
+                var replSql = GetSql(node.Arguments[2]);
+                _sql.Append(_provider.GetRegexReplaceSql(inputSql, patternSql, replSql));
+                return node;
+            }
+
             // string.Join(separator, params string[] values) -- the C# variadic
             // form passes a NewArrayInit as args[1] which the generic provider
             // routing collapses to a single opaque entry. Detect early and

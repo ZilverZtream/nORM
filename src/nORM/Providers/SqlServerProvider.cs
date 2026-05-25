@@ -422,6 +422,16 @@ namespace nORM.Providers
                 "shape allows, or (c) materialise the rows first and filter in memory.");
 
         /// <summary>
+        /// T-SQL has no regexp_replace primitive. Same workarounds as GetRegexMatchSql.
+        /// </summary>
+        public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => throw new NormUnsupportedFeatureException(
+                "Regex.Replace is not translatable on SQL Server: T-SQL has no built-in regex " +
+                "primitive. Workarounds: (a) deploy a CLR scalar function (RegExReplace) and " +
+                "call it via [SqlFunction], (b) materialise the rows first and apply Regex.Replace " +
+                "in memory.");
+
+        /// <summary>
         /// SQL Server stores TimeOnly as TIME(7). DATEDIFF(SECOND, t1, t2) on
         /// two TIMEs returns the signed second diff in (-86400, 86400). Wrap
         /// with +86400 then % 86400 to match TimeOnly's [0, 24h) semantics.
