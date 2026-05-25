@@ -161,6 +161,65 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // string.Trim / TrimStart / TrimEnd with explicit char[] -- the
+            // generic provider route would expand the char[] as multiple
+            // SQL args and SQLite TRIM accepts only (s) or (s, trim_chars_str)
+            // -> 'wrong number of arguments to function TRIM()'. Detect the
+            // params-char[] overload, evaluate the array at translation time,
+            // and emit TRIM(s, 'concatenated_chars').
+            if ((node.Method.Name == nameof(string.Trim)
+                    || node.Method.Name == nameof(string.TrimStart)
+                    || node.Method.Name == nameof(string.TrimEnd))
+                && node.Method.DeclaringType == typeof(string)
+                && node.Object != null
+                && node.Arguments.Count == 1
+                && node.Arguments[0].Type == typeof(char[]))
+            {
+                // Extract the char[] manually. TryGetConstantValue refuses
+                // NewArrayInit / MethodCall (security-restricted to prevent
+                // RCE), so walk NewArrayInit elements ourselves; for foldable
+                // MemberExpression we re-use TryGetConstantValue.
+                char[]? chars = null;
+                if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
+                {
+                    var arr = new char[nae.Expressions.Count];
+                    bool allConst = true;
+                    for (int i = 0; i < nae.Expressions.Count; i++)
+                    {
+                        if (nae.Expressions[i] is ConstantExpression ec && ec.Value is char ch)
+                        {
+                            arr[i] = ch;
+                        }
+                        else
+                        {
+                            allConst = false;
+                            break;
+                        }
+                    }
+                    if (allConst) chars = arr;
+                }
+                else if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
+                {
+                    chars = capturedChars;
+                }
+                if (chars is { Length: > 0 })
+                {
+                    var sqlFn = node.Method.Name switch
+                    {
+                        nameof(string.TrimStart) => "LTRIM",
+                        nameof(string.TrimEnd) => "RTRIM",
+                        _ => "TRIM",
+                    };
+                    var receiverStart = sb.Length;
+                    Visit(node.Object);
+                    var receiverSql = sb.ToString(receiverStart, sb.Length - receiverStart);
+                    sb.Length = receiverStart;
+                    var trimSet = new string(chars).Replace("'", "''");
+                    sb.Append(sqlFn).Append('(').Append(receiverSql).Append(", '").Append(trimSet).Append("')");
+                    return node;
+                }
+            }
+
             // string.StartsWith / EndsWith / Contains -- the projection-time
             // shape needs LIKE-wildcard escaping the generic provider route
             // can't do (the provider only sees pre-rendered SQL fragments,
