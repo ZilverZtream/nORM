@@ -660,6 +660,28 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(Convert))
+            {
+                // Convert.ToXyz overloads from-string are the canonical sister
+                // of int.Parse / bool.Parse and emit identical SQL. The from-
+                // string shape is what tests pin here; the from-numeric
+                // overloads (ToInt32(double), etc.) would also be valid but
+                // require more careful semantics around rounding (Convert
+                // .ToInt32(double) rounds-to-even while CAST truncates).
+                return name switch
+                {
+                    "ToInt32" when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
+                    "ToInt64" when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
+                    "ToDouble" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
+                    "ToDecimal" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
+                    // Convert.ToBoolean(string) -- .NET semantics are case-
+                    // insensitive plus tolerant of surrounding whitespace.
+                    // Mirror bool.Parse emission with a TRIM wrap.
+                    "ToBoolean" when args.Length == 1 => $"(LOWER(TRIM({args[0]})) = 'true')",
+                    _ => null
+                };
+            }
+
             return null;
         }
 
