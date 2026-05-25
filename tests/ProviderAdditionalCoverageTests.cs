@@ -113,7 +113,7 @@ public class ProviderAdditionalCoverageTests
     public void MySqlProvider_TranslateFunction_Math_UnknownMethod_ReturnsNull()
     {
         var p = new MySqlProvider(new SqliteParameterFactory());
-        var result = p.TranslateFunction("Atan2", typeof(Math), "col", "col");
+        var result = p.TranslateFunction("NoSuchMathFunction", typeof(Math), "col", "col");
         Assert.Null(result);
     }
 
@@ -455,7 +455,7 @@ public class ProviderAdditionalCoverageTests
     public void SqlServerProvider_TranslateFunction_Math_UnknownMethod_ReturnsNull()
     {
         var p = new SqlServerProvider();
-        var result = p.TranslateFunction("Atan2", typeof(Math), "col", "col");
+        var result = p.TranslateFunction("NoSuchMathFunction", typeof(Math), "col", "col");
         Assert.Null(result);
     }
 
@@ -808,7 +808,7 @@ public class ProviderAdditionalCoverageTests
     public void PostgresProvider_TranslateFunction_Math_UnknownMethod_ReturnsNull()
     {
         var p = new PostgresProvider(new SqliteParameterFactory());
-        var result = p.TranslateFunction("Atan2", typeof(Math), "col", "col");
+        var result = p.TranslateFunction("NoSuchMathFunction", typeof(Math), "col", "col");
         Assert.Null(result);
     }
 
