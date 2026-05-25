@@ -1217,6 +1217,16 @@ namespace nORM.Query
                             var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                             cols.Add(new Column(memberName, pi2.PropertyType, mapping.Type, mapping.Provider, memberName));
                         }
+                        else
+                        {
+                            // Closure-captured local: compiler-generated DisplayClass
+                            // exposes locals as FIELDS, not properties. SCV.FormatLiteral
+                            // emits the canonical text for the value; reserve a column
+                            // slot here so the anonymous-type ctor lookup matches arity.
+                            // Covers DateTime/Guid/TimeSpan/etc constants from closures.
+                            var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                            cols.Add(new Column(memberName, m.Type, mapping.Type, mapping.Provider, memberName));
+                        }
                     }
                     else if (arg is ParameterExpression p)
                     {
@@ -1258,6 +1268,16 @@ namespace nORM.Query
                         // Primitive/enum cast: collapses to the operand at SQL level.
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, ue.Type, mapping.Type, mapping.Provider, memberName));
+                    }
+                    else if (arg is ConstantExpression || (arg is MemberExpression me2 && me2.Expression is ConstantExpression))
+                    {
+                        // Pure literal (true constant or closure-captured local) -- SCV.
+                        // FormatLiteral emits the canonical text; reserve a column slot
+                        // here so the anonymous-type ctor lookup matches arity. Covers
+                        // DateTime/Guid/TimeSpan/etc closure-captured locals that the
+                        // 9a7ca70 literal emit relies on.
+                        var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
+                        cols.Add(new Column(memberName, arg.Type, mapping.Type, mapping.Provider, memberName));
                     }
                 }
                 return cols.ToArray();
