@@ -35,6 +35,8 @@ namespace nORM.Query
                 nameof(string.Concat),
                 nameof(string.Compare),
                 nameof(string.CompareTo),
+                // CompareTo instance-form covered above; nameof(string.CompareTo)
+                // is the same string for all primitive receivers.
                 nameof(string.IsNullOrEmpty),
                 nameof(string.IsNullOrWhiteSpace),
                 nameof(string.Equals),
