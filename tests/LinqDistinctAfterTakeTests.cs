@@ -51,38 +51,18 @@ public class LinqDistinctAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Distinct_after_take_either_dedupes_window_or_throws_actionable_pin()
+    public async Task Distinct_after_take_dedupes_only_the_windowed_rows()
     {
-        System.Exception? caught = null;
-        string[]? result = null;
-        try
-        {
-            result = (await _ctx.Query<DatRow>()
-                .OrderBy(r => r.Id)
-                .Take(3)
-                .Select(r => r.Category)
-                .Distinct()
-                .ToListAsync()).ToArray();
-        }
-        catch (System.Exception ex)
-        {
-            caught = ex;
-        }
-
-        if (caught != null)
-        {
-            Assert.IsType<NormUnsupportedFeatureException>(caught);
-            Assert.Contains("Distinct", caught.Message, System.StringComparison.Ordinal);
-            Assert.Contains("Take", caught.Message, System.StringComparison.Ordinal);
-            return;
-        }
-
-        // Acceptable: correctly dedupes the windowed set — {A, B} from the first 3.
-        Assert.NotNull(result);
-        var ordered = result!.OrderBy(s => s).ToArray();
-        var dump = string.Join(",", ordered);
-        Assert.True(ordered.Length == 2 && ordered[0] == "A" && ordered[1] == "B",
-            $"Expected {{A, B}} from windowed distinct, got [{dump}] — likely the silent-wrongness bug (DISTINCT applied before LIMIT).");
+        // OrderBy(Id).Take(3) → {(1,'A'),(2,'A'),(3,'B')}. Project Category → ['A','A','B'].
+        // Distinct → {A, B}. Two rows.
+        // Pre-fix: full-table distinct yielded {A, B, C} (3 rows), violating the window.
+        var result = (await _ctx.Query<DatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Select(r => r.Category)
+            .Distinct()
+            .ToListAsync()).OrderBy(s => s).ToArray();
+        Assert.Equal(new[] { "A", "B" }, result);
     }
 
     [Table("DatRow")]
