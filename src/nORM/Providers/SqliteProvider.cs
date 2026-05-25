@@ -238,6 +238,80 @@ namespace nORM.Providers
             => $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
 
         /// <summary>
+        /// Overload-aware hook -- called by the visitors BEFORE
+        /// <see cref="TranslateFunction"/>. Used here to distinguish Math.Round
+        /// overloads that share arity but differ in semantics:
+        ///   * 1-arg  Math.Round(x)                   -> .NET default ToEven (banker's)
+        ///   * 2-arg  Math.Round(x, int)              -> default ToEven, rounded to N digits
+        ///   * 2-arg  Math.Round(x, MidpointRounding) -> mode-driven
+        ///   * 3-arg  Math.Round(x, int, MidpointRounding) -> mode-driven, N digits
+        /// SQLite's native ROUND uses AwayFromZero, so the default-mode paths
+        /// emit a banker's-rounding CASE (sister to the IEEERemainder emit).
+        /// </summary>
+        public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
+        {
+            if (node.Method.DeclaringType != typeof(Math) || node.Method.Name != nameof(Math.Round))
+                return null;
+
+            var ps = node.Method.GetParameters();
+            // Default is ToEven; AwayFromZero matches SQLite's native ROUND.
+            MidpointRounding mode = MidpointRounding.ToEven;
+            string? digitsArg = null;
+            if (ps.Length == 2 && ps[1].ParameterType == typeof(MidpointRounding))
+            {
+                if (node.Arguments[1] is System.Linq.Expressions.ConstantExpression c1 && c1.Value is MidpointRounding m1) mode = m1;
+            }
+            else if (ps.Length == 2)
+            {
+                digitsArg = args[1];
+            }
+            else if (ps.Length == 3)
+            {
+                digitsArg = args[1];
+                if (node.Arguments[2] is System.Linq.Expressions.ConstantExpression c2 && c2.Value is MidpointRounding m2) mode = m2;
+            }
+
+            var x = args[0];
+            // Scaled value for digit-aware rounding: round(x * 10^n) / 10^n.
+            // No POW10 in pure-SQL constants; use POW(10.0, n).
+            string scaled = digitsArg == null ? x : $"({x} * POW(10.0, {digitsArg}))";
+            string unscale(string s) => digitsArg == null ? s : $"({s} / POW(10.0, {digitsArg}))";
+
+            string roundCore;
+            switch (mode)
+            {
+                case MidpointRounding.AwayFromZero:
+                    // SQLite's native ROUND is already AwayFromZero.
+                    roundCore = digitsArg == null ? $"ROUND({x})" : $"ROUND({x}, {digitsArg})";
+                    return roundCore;
+                case MidpointRounding.ToZero:
+                    // Truncate toward zero -- CAST to INTEGER drops the fraction.
+                    roundCore = $"(CASE WHEN {scaled} >= 0 THEN 1 ELSE -1 END * CAST(ABS({scaled}) AS INTEGER))";
+                    return unscale(roundCore);
+                case MidpointRounding.ToNegativeInfinity:
+                    roundCore = $"FLOOR({scaled})";
+                    return unscale(roundCore);
+                case MidpointRounding.ToPositiveInfinity:
+                    roundCore = $"CEIL({scaled})";
+                    return unscale(roundCore);
+                case MidpointRounding.ToEven:
+                default:
+                    // Banker's rounding on |scaled|: integer part via CAST (truncates
+                    // toward zero, so on a non-negative value that's FLOOR); fractional
+                    // part > 0.5 -> +1, < 0.5 -> +0, == 0.5 -> add 1 only when the
+                    // integer part is odd. Sign reapplied via the leading CASE.
+                    roundCore =
+                        $"((CASE WHEN {scaled} >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(CAST(ABS({scaled}) AS INTEGER) + " +
+                        $"CASE " +
+                        $"WHEN ABS({scaled}) - CAST(ABS({scaled}) AS INTEGER) > 0.5 THEN 1 " +
+                        $"WHEN ABS({scaled}) - CAST(ABS({scaled}) AS INTEGER) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(ABS({scaled}) AS INTEGER) % 2) END))";
+                    return unscale(roundCore);
+            }
+        }
+
+        /// <summary>
         /// Attempts to translate a .NET method into its SQLite SQL equivalent.
         /// </summary>
         /// <param name="name">Name of the method being translated.</param>

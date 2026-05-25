@@ -538,6 +538,14 @@ namespace nORM.Query
                 int fnIdx = 0;
                 if (node.Object != null) fnArgs[fnIdx++] = TranslateProjectionArg(node.Object);
                 foreach (var a in node.Arguments) fnArgs[fnIdx++] = TranslateProjectionArg(a);
+                // Overload-aware hook first -- providers may dispatch on the
+                // full MethodInfo when the stringified args alone are ambiguous.
+                var overloadSql = _provider.TranslateMethodCall(node, fnArgs);
+                if (overloadSql != null)
+                {
+                    sb.Append(overloadSql);
+                    return node;
+                }
                 var fnSql = _provider.TranslateFunction(node.Method.Name, declType, fnArgs);
                 if (fnSql != null)
                 {

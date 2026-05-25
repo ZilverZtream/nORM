@@ -207,6 +207,19 @@ namespace nORM.Providers
         public abstract string? TranslateFunction(string name, Type declaringType, params string[] args);
 
         /// <summary>
+        /// Overload-aware translation hook with access to the original
+        /// <see cref="System.Linq.Expressions.MethodCallExpression"/>. Called by the visitors BEFORE
+        /// <see cref="TranslateFunction"/> so providers can dispatch on a
+        /// method's full signature (parameter types, enum constants) when the
+        /// stringified args alone are ambiguous -- e.g. distinguishing
+        /// <c>Math.Round(x, MidpointRounding)</c> from <c>Math.Round(x, int)</c>,
+        /// which have the same arity but different semantics. Default returns
+        /// null so providers without overload-specific handling fall through to
+        /// the existing <see cref="TranslateFunction"/> path unchanged.
+        /// </summary>
+        public virtual string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args) => null;
+
+        /// <summary>
         /// Returns SQL that evaluates `end - start` as a fractional number of seconds. Used
         /// by the LINQ translator to lower `(end - start).TotalSeconds / TotalMinutes /
         /// TotalHours / Days / etc.` to a portable scalar expression. Both arguments are
