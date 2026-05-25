@@ -1350,32 +1350,45 @@ namespace nORM.Query
                 }
             }
 
-            // Regex.IsMatch(input, pattern) -- static 2-arg form. Lowers to
-            // the provider's regex-match operator via GetRegexMatchSql; SQL
-            // Server throws a clear unsupported-feature message since T-SQL
-            // has no built-in regex primitive.
+            // Regex.IsMatch -- static 2-arg (input, pattern) or 3-arg
+            // (input, pattern, options) form. Lowers to the provider's
+            // regex-match operator; the IgnoreCase variant routes through
+            // the case-insensitive hook so providers with a native primitive
+            // (Postgres ~*) skip the LOWER-wrap fallback.
             if (node.Method.DeclaringType == typeof(System.Text.RegularExpressions.Regex)
                 && node.Method.Name == nameof(System.Text.RegularExpressions.Regex.IsMatch)
-                && node.Arguments.Count == 2
+                && (node.Arguments.Count == 2 || node.Arguments.Count == 3)
                 && node.Object == null)
             {
+                bool ignoreCase = node.Arguments.Count == 3
+                    && TryGetConstantValue(node.Arguments[2], out var optsRaw)
+                    && optsRaw is System.Text.RegularExpressions.RegexOptions opts
+                    && (opts & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0;
                 var inputSql = GetSql(node.Arguments[0]);
                 var patternSql = GetSql(node.Arguments[1]);
-                _sql.Append(_provider.GetRegexMatchSql(inputSql, patternSql));
+                _sql.Append(ignoreCase
+                    ? _provider.GetRegexMatchIgnoreCaseSql(inputSql, patternSql)
+                    : _provider.GetRegexMatchSql(inputSql, patternSql));
                 return node;
             }
 
-            // Regex.Replace(input, pattern, replacement) -- static 3-arg form.
-            // Same provider matrix as IsMatch; SqlServer throws.
+            // Regex.Replace -- static 3-arg (input, pattern, repl) or 4-arg
+            // (input, pattern, repl, options) form.
             if (node.Method.DeclaringType == typeof(System.Text.RegularExpressions.Regex)
                 && node.Method.Name == nameof(System.Text.RegularExpressions.Regex.Replace)
-                && node.Arguments.Count == 3
+                && (node.Arguments.Count == 3 || node.Arguments.Count == 4)
                 && node.Object == null)
             {
+                bool ignoreCase = node.Arguments.Count == 4
+                    && TryGetConstantValue(node.Arguments[3], out var optsR)
+                    && optsR is System.Text.RegularExpressions.RegexOptions optsR2
+                    && (optsR2 & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0;
                 var inputSql = GetSql(node.Arguments[0]);
                 var patternSql = GetSql(node.Arguments[1]);
                 var replSql = GetSql(node.Arguments[2]);
-                _sql.Append(_provider.GetRegexReplaceSql(inputSql, patternSql, replSql));
+                _sql.Append(ignoreCase
+                    ? _provider.GetRegexReplaceIgnoreCaseSql(inputSql, patternSql, replSql)
+                    : _provider.GetRegexReplaceSql(inputSql, patternSql, replSql));
                 return node;
             }
 

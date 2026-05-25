@@ -325,6 +325,18 @@ namespace nORM.Providers
         public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
             => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral})";
 
+        /// <summary>PostgreSQL's `~*` is the case-insensitive POSIX regex match operator.</summary>
+        public override string GetRegexMatchIgnoreCaseSql(string inputSql, string patternLiteral)
+            => $"({inputSql} ~* {patternLiteral})";
+
+        /// <summary>
+        /// PostgreSQL regexp_replace supports a flags argument; 'gi' = global + case-insensitive.
+        /// Matches .NET Regex.Replace(input, pattern, replacement, RegexOptions.IgnoreCase)
+        /// semantics: pattern case-folded, non-matched portions of the input preserved.
+        /// </summary>
+        public override string GetRegexReplaceIgnoreCaseSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral}, 'gi')";
+
         /// <summary>
         /// PostgreSQL TIME - TIME yields INTERVAL natively. EXTRACT(EPOCH FROM ...)
         /// returns fractional seconds preserving sub-second precision. Wrap with
