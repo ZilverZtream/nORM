@@ -313,6 +313,35 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            // Generic Enum.Parse<T>(string) on a column. Emit a CASE-WHEN
+            // cascade mapping each enum member's name to its underlying integer
+            // (sister of the Enum.GetName(int) translation). Materialiser routes
+            // the integer through ConvertToEnum<T>.
+            if (node.Method.Name == nameof(Enum.Parse)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Method.IsGenericMethod
+                && node.Arguments.Count == 1
+                && node.Method.GetGenericArguments() is { Length: 1 } scvParseGenericArgs
+                && scvParseGenericArgs[0].IsEnum)
+            {
+                var nameSql = TranslateProjectionArg(node.Arguments[0]);
+                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, scvParseGenericArgs[0]));
+                return node;
+            }
+            // Legacy Enum.Parse(Type, string).
+            if (node.Method.Name == nameof(Enum.Parse)
+                && node.Method.DeclaringType == typeof(Enum)
+                && !node.Method.IsGenericMethod
+                && node.Arguments.Count >= 2
+                && node.Arguments[0] is ConstantExpression scvParseTypeConst
+                && scvParseTypeConst.Value is Type scvParseEnumType
+                && scvParseEnumType.IsEnum)
+            {
+                var nameSql = TranslateProjectionArg(node.Arguments[1]);
+                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, scvParseEnumType));
+                return node;
+            }
+
             // DateTimeOffset.ToOffset(constTimeSpan) -- recompute the column at
             // the new offset. The UTC instant is invariant; only the wall clock
             // and trailing offset suffix change. Provider hook handles per-storage

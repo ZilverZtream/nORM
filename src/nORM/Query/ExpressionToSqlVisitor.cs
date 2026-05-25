@@ -1157,6 +1157,33 @@ namespace nORM.Query
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Sister of <see cref="BuildEnumToStringCase"/>: emits a CASE-WHEN cascade
+        /// mapping each enum member's name (case-sensitive, matching
+        /// <see cref="Enum.Parse{T}(string)"/>'s default) to its underlying integer
+        /// value. Used to translate <c>Enum.Parse&lt;T&gt;(stringColumn)</c> in
+        /// WHERE / projection. Result rows yielding NULL from the ELSE branch
+        /// would surface as a default(enum) — matches the behaviour callers tend
+        /// to expect when the data is dirty; strict Parse callers should sanitize
+        /// the column server-side first.
+        /// </summary>
+        internal static string BuildStringToEnumCase(string columnSql, Type enumType)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("(CASE");
+            var values = Enum.GetValues(enumType);
+            var underlyingType = Enum.GetUnderlyingType(enumType);
+            foreach (var value in values)
+            {
+                var name = Enum.GetName(enumType, value!) ?? value!.ToString()!;
+                var underlying = Convert.ChangeType(value, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
+                sb.Append(" WHEN ").Append(columnSql).Append(" = '")
+                  .Append(name.Replace("'", "''")).Append("' THEN ").Append(underlying);
+            }
+            sb.Append(" ELSE NULL END)");
+            return sb.ToString();
+        }
+
         // Fold a NewExpression whose arguments are all compile-time constants
         // (or evaluate to constants via Expression.Lambda().Compile()) into a
         // single bound parameter at translation time. Without this, an inline
@@ -2002,6 +2029,36 @@ namespace nORM.Query
             {
                 var valueSql = GetSql(node.Arguments[0]);
                 _sql.Append(BuildEnumToStringCase(_provider, valueSql, genericArgs[0]));
+                return node;
+            }
+            // Generic Enum.Parse<T>(string) -- .NET 5+ form. The arg is a string
+            // expression; the enum type is the method's generic argument. Reverse
+            // of GetName: map name → underlying integer.
+            if (node.Method.Name == nameof(Enum.Parse)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Method.IsGenericMethod
+                && node.Arguments.Count == 1
+                && node.Method.GetGenericArguments() is { Length: 1 } parseGenericArgs
+                && parseGenericArgs[0].IsEnum)
+            {
+                var nameSql = GetSql(node.Arguments[0]);
+                _sql.Append(BuildStringToEnumCase(nameSql, parseGenericArgs[0]));
+                return node;
+            }
+            // Legacy Enum.Parse(Type, string) -- non-generic .NET 1.x form, still
+            // common in older codebases. The runtime returns object; the result
+            // typically gets cast to the enum, which our visitor sees as a
+            // UnaryExpression{Convert} wrapping this call.
+            if (node.Method.Name == nameof(Enum.Parse)
+                && node.Method.DeclaringType == typeof(Enum)
+                && !node.Method.IsGenericMethod
+                && node.Arguments.Count >= 2
+                && node.Arguments[0] is ConstantExpression parseTypeConst
+                && parseTypeConst.Value is Type parseEnumType
+                && parseEnumType.IsEnum)
+            {
+                var nameSql = GetSql(node.Arguments[1]);
+                _sql.Append(BuildStringToEnumCase(nameSql, parseEnumType));
                 return node;
             }
 
