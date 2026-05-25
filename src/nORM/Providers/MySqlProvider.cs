@@ -365,6 +365,13 @@ namespace nORM.Providers
                 : $"DATE_ADD({dtoSql}, INTERVAL {totalSec} SECOND)";
         }
 
+        /// <inheritdoc/>
+        public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
+            // MySQL stores nORM DateTimeOffset columns as DATETIME(6) with the wall
+            // clock pre-normalised to UTC at write time, so UNIX_TIMESTAMP needs UTC
+            // session-tz interpretation. Wrap with CONVERT_TZ to be explicit.
+            => $"UNIX_TIMESTAMP(CONVERT_TZ({dtoSql}, '+00:00', '+00:00'))";
+
         /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
         /// DATE so the materializer reads a DateOnly-compatible value.
