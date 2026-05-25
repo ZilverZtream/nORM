@@ -1222,9 +1222,22 @@ namespace nORM.Query
             if (node.NodeType is ExpressionType.Not)
             {
                 var sb = EnsureBuilder();
-                sb.Append("NOT (");
-                Visit(node.Operand);
-                sb.Append(')');
+                // C# `!x` on bool and `~x` on integer/enum both compile to
+                // ExpressionType.Not -- dispatch on the operand type. SQLite
+                // uses NOT for logical and `~` for bitwise.
+                var notOperandType = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (notOperandType == typeof(bool))
+                {
+                    sb.Append("NOT (");
+                    Visit(node.Operand);
+                    sb.Append(')');
+                }
+                else
+                {
+                    sb.Append("~(");
+                    Visit(node.Operand);
+                    sb.Append(')');
+                }
                 return node;
             }
             return base.VisitUnary(node);

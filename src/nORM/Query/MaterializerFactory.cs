@@ -1244,7 +1244,16 @@ namespace nORM.Query
                         cols.Add(new Column(memberName, be.Type, mapping.Type, mapping.Provider, memberName));
                     }
                     else if (arg is UnaryExpression ue
-                             && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                             && (ue.NodeType == ExpressionType.Convert
+                                 || ue.NodeType == ExpressionType.ConvertChecked
+                                 // Unary minus / boolean NOT / bitwise NOT (~) produce a
+                                 // computed scalar of the operand's underlying type. SCV
+                                 // emits the operator-wrapped SQL; the materializer just
+                                 // needs a column slot for the result.
+                                 || ue.NodeType == ExpressionType.Negate
+                                 || ue.NodeType == ExpressionType.NegateChecked
+                                 || ue.NodeType == ExpressionType.Not
+                                 || ue.NodeType == ExpressionType.OnesComplement))
                     {
                         // Primitive/enum cast: collapses to the operand at SQL level.
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
