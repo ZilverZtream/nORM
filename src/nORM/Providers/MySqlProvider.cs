@@ -407,6 +407,25 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(DateTimeOffset))
+            {
+                // MySQL has no native DATETIMEOFFSET type. MySqlConnector
+                // stores DateTimeOffset as DATETIME / TIMESTAMP normalized
+                // to UTC, so the column represents a UTC instant and the
+                // offset portion is always TimeSpan.Zero from a query
+                // perspective.
+                var dtoMatch = name switch
+                {
+                    nameof(DateTimeOffset.UtcDateTime) => args[0],
+                    nameof(DateTimeOffset.DateTime) => args[0],
+                    // REAL-seconds emit for the materializer's double ->
+                    // TimeSpan.FromSeconds path, yielding TimeSpan.Zero.
+                    nameof(DateTimeOffset.Offset) => "CAST(0 AS DOUBLE)",
+                    _ => null
+                };
+                if (dtoMatch != null) return dtoMatch;
+            }
+
             if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
                 return name switch
