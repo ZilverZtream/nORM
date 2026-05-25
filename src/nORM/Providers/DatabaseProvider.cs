@@ -541,6 +541,19 @@ namespace nORM.Providers
         public virtual string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment) => null;
 
         /// <summary>
+        /// Adds (or subtracts) a TimeSpan-typed column to a TimeOnly SQL
+        /// expression. Sister of AddTimeSpanColumnToDateTimeSql. Each provider
+        /// uses its TIME storage primitive without parsing text.
+        ///
+        /// SQLite: extract seconds from TimeSpan-as-text via substr/CAST and
+        ///   feed to AddSecondsToTimeOnlySql.
+        /// SQL Server: CAST(DATEADD(SECOND, DATEDIFF(SECOND, '00:00:00', dur), time) AS TIME).
+        /// PostgreSQL: (time +/- dur) -- TIME + INTERVAL is native.
+        /// MySQL: ADDTIME / SUBTIME(time, dur) -- both stay TIME.
+        /// </summary>
+        public virtual string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract) => null;
+
+        /// <summary>
         /// Adds (or subtracts when <paramref name="subtract"/>) a TimeSpan-typed
         /// column expression to a DateTime SQL expression. Differs from
         /// <see cref="AddSecondsToDateTimeSql"/> which takes a numeric seconds

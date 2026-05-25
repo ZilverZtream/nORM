@@ -339,6 +339,17 @@ namespace nORM.Providers
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
             => $"CAST(DATEADD(SECOND, {secondsSqlFragment}, {timeOnlySql}) AS TIME)";
 
+        /// <summary>
+        /// SQL Server: convert TimeSpan column to seconds via DATEDIFF from
+        /// midnight, then DATEADD on the TIME. CAST back to TIME because
+        /// DATEADD promotes to DATETIME.
+        /// </summary>
+        public override string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-" : "";
+            return $"CAST(DATEADD(SECOND, {sign}DATEDIFF(SECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}), {timeOnlySql}) AS TIME)";
+        }
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal
