@@ -390,7 +390,24 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Detect OrderBy on the result of a set op (Union/Concat/Intersect/Except).
+                // After the set op runs the outer SELECT shape is the unioned projection,
+                // not the entity mapping -- so resolving `r.V` against `_mapping` throws
+                // "Member 'V' is not supported in this context". The correct SQL just
+                // references the projection's aliased column name, e.g.
+                // `SELECT V FROM Left UNION SELECT V FROM Right ORDER BY V`.
+                bool sourceIsSetOp = node.Arguments[0] is MethodCallExpression sourceMce
+                    && sourceMce.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
                 var source = t.Visit(node.Arguments[0]);
+                if (sourceIsSetOp
+                    && QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression setOpKeySel
+                    && setOpKeySel.Body is MemberExpression keyMember
+                    && keyMember.Expression is ParameterExpression)
+                {
+                    var ascendingSet = !node.Method.Name.Contains("Descending");
+                    t._orderBy.Add((t._provider.Escape(keyMember.Member.Name), ascendingSet));
+                    return source;
+                }
                 // Detect OrderBy applied AFTER a Take/Skip — LINQ semantics
                 // (`OrderBy(a).Take(n).OrderBy(b)`) require the outer OrderBy to resort
                 // the limited window, which SQL can only express via a subquery wrap.
