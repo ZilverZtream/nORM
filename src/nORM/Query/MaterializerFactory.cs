@@ -898,6 +898,20 @@ namespace nORM.Query
                 };
             }
 
+            // Composite GROUP BY key projected as a NESTED anonymous type:
+            //   `.Select(g => new { Key = g.Key, Count = g.Count() })`
+            // where g.Key is itself an anonymous type built from the composite key
+            // members. BuildGroupBySelectClause emits one flat column per nested key
+            // member; here we reconstruct the nested anonymous type from those flat
+            // columns before invoking the outer constructor.
+            if (projection?.Body is NewExpression projectionNewNested
+                && projectionNewNested.Type == targetType
+                && projectionNewNested.Constructor is { } projectionCtorNested
+                && HasNestedAnonymousProjectionArg(projectionNewNested))
+            {
+                return CreateNestedAnonymousProjectionMaterializer(projectionNewNested, projectionCtorNested, startOffset);
+            }
+
             var columns = projection == null
                 ? mapping.Columns
                 : ExtractColumnsFromProjection(mapping, projection);
@@ -1140,6 +1154,87 @@ namespace nORM.Query
             il.Emit(OpCodes.Ret);
 
             return (Func<object?[], object>)method.CreateDelegate(typeof(Func<object?[], object>));
+        }
+
+        private static bool IsAnonymousType(Type t)
+            => t.Namespace == null && t.Name.Contains("AnonymousType", StringComparison.Ordinal);
+
+        private static bool HasNestedAnonymousProjectionArg(NewExpression body)
+        {
+            foreach (var arg in body.Arguments)
+            {
+                if (!IsAnonymousType(arg.Type)) continue;
+                if (arg is NewExpression) continue;
+                if (arg is MemberExpression me
+                    && me.Member.Name == "Key"
+                    && me.Expression is ParameterExpression mep
+                    && mep.Type.IsGenericType
+                    && mep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>))
+                {
+                    return true;
+                }
+                if (arg is ParameterExpression pe && IsAnonymousType(pe.Type))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static Func<DbDataReader, object> CreateNestedAnonymousProjectionMaterializer(
+            NewExpression body,
+            ConstructorInfo ctor,
+            int startOffset)
+        {
+            var reader = Expression.Parameter(typeof(DbDataReader), "reader");
+            var parameters = ctor.GetParameters();
+            var args = new Expression[parameters.Length];
+            int cursor = startOffset;
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var arg = body.Arguments[i];
+                var paramType = parameters[i].ParameterType;
+
+                bool isNestedAnonRef = IsAnonymousType(arg.Type)
+                    && arg is not NewExpression
+                    && (
+                        (arg is MemberExpression me
+                         && me.Member.Name == "Key"
+                         && me.Expression is ParameterExpression mep
+                         && mep.Type.IsGenericType
+                         && mep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>))
+                        || (arg is ParameterExpression pe && IsAnonymousType(pe.Type))
+                    );
+
+                if (isNestedAnonRef)
+                {
+                    var nestedCtor = paramType.GetConstructors()[0];
+                    var nestedParams = nestedCtor.GetParameters();
+                    var nestedArgs = new Expression[nestedParams.Length];
+                    for (int j = 0; j < nestedParams.Length; j++)
+                    {
+                        var subType = nestedParams[j].ParameterType;
+                        var subRead = GetOptimizedReaderCall(reader, subType, cursor);
+                        var subDefault = Expression.Default(subType);
+                        var subIsNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
+                        nestedArgs[j] = Expression.Condition(subIsNull, subDefault, subRead);
+                        cursor++;
+                    }
+                    args[i] = Expression.New(nestedCtor, nestedArgs);
+                }
+                else
+                {
+                    var readValue = GetOptimizedReaderCall(reader, paramType, cursor);
+                    var defaultValue = Expression.Default(paramType);
+                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
+                    args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+                    cursor++;
+                }
+            }
+
+            var bodyExpr = Expression.Convert(Expression.New(ctor, args), typeof(object));
+            return Expression.Lambda<Func<DbDataReader, object>>(bodyExpr, reader).Compile();
         }
 
         private static Func<DbDataReader, object> CreateProjectionConstructorMaterializer(

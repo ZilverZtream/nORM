@@ -11,15 +11,12 @@ namespace nORM.Tests;
 
 /// <summary>
 /// Pins <c>GroupBy(s => new {…composite…}).Select(g => new {g.Key, Total=g.Sum(...)})</c>:
-/// the bare-<c>g.Key</c> projection of a COMPOSITE group key isn't supported because
-/// SQL has no way to materialise a single column into a nested anonymous type — the
-/// SELECT would have to emit multiple columns (one per composite member) and the
-/// outer materialiser would have to reconstruct the composite from them, which nORM
-/// doesn't yet plumb. Pre-fix, the SELECT was emitting all member columns aliased as
-/// the last one (`"T0"."Region", "T0"."Type" AS "Key"`), which produced an opaque
-/// `InvalidCastException: Unable to cast object of type 'System.String' to type
-/// '&lt;&gt;f__AnonymousType…'` deep inside the materialiser. Surface a clear exception
-/// with the supported flattened workaround.
+/// the bare-<c>g.Key</c> projection of a COMPOSITE group key emits one SELECT column
+/// per composite member and reconstructs the nested anonymous type at materialisation
+/// time. Pre-implementation, the translator threw because the SELECT would emit member
+/// columns aliased only as the last one and the materialiser couldn't fold the row
+/// back into the nested anon type; the implementation emits prefixed aliases
+/// (<c>Key__Region</c>, <c>Key__Type</c>) and a nested-construction materialiser.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqGroupByHavingCompositeKeyTests : IAsyncLifetime
@@ -52,19 +49,20 @@ public class LinqGroupByHavingCompositeKeyTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Bare_composite_key_projection_throws_with_flatten_workaround()
+    public async Task Bare_composite_key_projection_emits_per_member_columns_and_rebuilds_nested_anon()
     {
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<GhcSale>()
-                .GroupBy(s => new { s.Region, s.Type })
-                .Select(g => new { g.Key, Total = g.Sum(s => s.Amount) })
-                .ToListAsync();
-        });
-        Assert.Contains("composite", ex.Message, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Key", ex.Message, System.StringComparison.OrdinalIgnoreCase);
-        // Workaround must mention member-by-member flattening so the caller knows what to do.
-        Assert.Contains("g.Key.", ex.Message, System.StringComparison.OrdinalIgnoreCase);
+        var rows = (await _ctx.Query<GhcSale>()
+            .GroupBy(s => new { s.Region, s.Type })
+            .Select(g => new { g.Key, Total = g.Sum(s => s.Amount) })
+            .ToListAsync())
+            .OrderBy(r => r.Key.Region).ThenBy(r => r.Key.Type)
+            .ToArray();
+
+        Assert.Equal(4, rows.Length);
+        Assert.Equal(("EU", "Book", 30.0), (rows[0].Key.Region, rows[0].Key.Type, rows[0].Total));
+        Assert.Equal(("EU", "Game",  5.0), (rows[1].Key.Region, rows[1].Key.Type, rows[1].Total));
+        Assert.Equal(("US", "Book", 50.0), (rows[2].Key.Region, rows[2].Key.Type, rows[2].Total));
+        Assert.Equal(("US", "Game", 30.0), (rows[3].Key.Region, rows[3].Key.Type, rows[3].Total));
     }
 
     [Fact]
