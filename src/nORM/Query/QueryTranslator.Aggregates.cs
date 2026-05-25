@@ -536,11 +536,21 @@ namespace nORM.Query
                 if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var sqlFunction))
                     sqlFunction = node.Method.Name.ToUpperInvariant();
 
-                // Decimal columns store as TEXT; SQL aggregates inherit storage
-                // class so MIN/MAX/SUM/AVG over a decimal column lex-compares
-                // mixed-magnitude values ('10.5' lex > '2.0'). Coerce to REAL
-                // before aggregating so the numeric semantics apply. CAST(int
-                // AS REAL) is identity-with-.0; non-decimal columns unaffected.
+                // Decimal columns store as TEXT in SQLite; SQL aggregates
+                // inherit storage class so MIN/MAX/SUM/AVG over a decimal
+                // column lex-compares mixed-magnitude values ('10.5' lex >
+                // '2.0'). Coerce to REAL before aggregating so the numeric
+                // semantics apply. CAST(int AS REAL) is identity-with-.0;
+                // non-decimal columns unaffected.
+                //
+                // PRECISION TRADEOFF: REAL is IEEE-754 double (~15-17 sig
+                // decimal digits). For values inside that window (typical
+                // app/business amounts: <= ~10-digit integer + 2-decimal
+                // fraction = currency cents through ~99 quadrillion) the
+                // round-trip is exact. For >15-significant-digit accounting
+                // values (very large balances, scientific quantities) the
+                // aggregate silently rounds. The SqlServer/Postgres/MySQL
+                // providers use native DECIMAL and don't have this caveat.
                 var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
                 if (selBodyType == typeof(decimal))
                 {
