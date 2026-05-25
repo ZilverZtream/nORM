@@ -494,6 +494,15 @@ namespace nORM.Providers
             => null;
 
         /// <summary>
+        /// Returns SQL that converts a single-character expression to its
+        /// integer code point. Used by ETSV's <c>char.IsPunctuation/IsSymbol/
+        /// IsControl/GetNumericValue</c> handlers.
+        /// SQLite: <c>unicode(c)</c>; SQL Server: <c>UNICODE(c)</c>;
+        /// PostgreSQL: <c>ascii(c)</c>; MySQL: <c>ORD(c)</c>.
+        /// </summary>
+        public virtual string GetCharCodeSql(string charSql) => $"unicode({charSql})";
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

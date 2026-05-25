@@ -250,6 +250,9 @@ namespace nORM.Providers
         public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
             => $"({dateTimeSql} + ({secondsSqlFragment} || ' seconds')::interval)";
 
+        /// <summary>PostgreSQL uses ascii() (returns codepoint of first char).</summary>
+        public override string GetCharCodeSql(string charSql) => $"ascii({charSql})";
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

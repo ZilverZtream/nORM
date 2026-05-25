@@ -315,6 +315,9 @@ namespace nORM.Providers
         public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
             => $"DATEADD(SECOND, {secondsSqlFragment}, {dateTimeSql})";
 
+        /// <summary>SQL Server uses UNICODE() for the BMP code point.</summary>
+        public override string GetCharCodeSql(string charSql) => $"UNICODE({charSql})";
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

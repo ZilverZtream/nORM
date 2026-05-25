@@ -320,6 +320,9 @@ namespace nORM.Providers
         public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
             => $"DATE_ADD({dateTimeSql}, INTERVAL ({secondsSqlFragment}) SECOND)";
 
+        /// <summary>MySQL uses ORD() for the code point of the first char.</summary>
+        public override string GetCharCodeSql(string charSql) => $"ORD({charSql})";
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
