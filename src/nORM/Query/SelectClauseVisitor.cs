@@ -767,9 +767,21 @@ namespace nORM.Query
                 double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 float f => f.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 decimal m => m.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                // DateTime/DateTimeOffset/DateOnly/TimeOnly/TimeSpan/Guid -- emit
+                // a single-quoted text literal matching the canonical format
+                // Microsoft.Data.Sqlite uses for parameter binding, so the
+                // result round-trips through the materializer. DateTime uses
+                // 'yyyy-MM-dd HH:mm:ss.FFFFFFF' (variable trailing zeros).
+                DateTime dt => $"'{dt.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", System.Globalization.CultureInfo.InvariantCulture)}'",
+                DateTimeOffset dto => $"'{dto.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", System.Globalization.CultureInfo.InvariantCulture)}'",
+                DateOnly d => $"'{d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}'",
+                TimeOnly t => $"'{t.ToString("HH:mm:ss.fffffff", System.Globalization.CultureInfo.InvariantCulture)}'",
+                TimeSpan ts => $"'{ts.ToString("c", System.Globalization.CultureInfo.InvariantCulture)}'",
+                Guid g => $"'{g.ToString("D", System.Globalization.CultureInfo.InvariantCulture)}'",
                 _ => throw new InvalidOperationException(
                     $"Navigation filter literal of type '{value.GetType().Name}' isn't supported in a projection subquery. " +
-                    "Use int/long/short/byte/string/bool/double/decimal, or wrap with `ClientEvaluationPolicy.Allow`.")
+                    "Use int/long/short/byte/string/bool/double/decimal/DateTime/DateTimeOffset/DateOnly/TimeOnly/TimeSpan/Guid, " +
+                    "or wrap with `ClientEvaluationPolicy.Allow`.")
             };
         }
 
