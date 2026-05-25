@@ -412,28 +412,34 @@ public class SchemaSnapshotTests
     [Fact]
     public void SchemaSnapshotBuilder_OnlyScalarColumnsIncluded_ForEntityWithNavigations()
     {
- // Directly exercise SchemaSnapshotBuilder.Build with a controlled single-type snapshot
- // by scanning just the test types defined above
         var snapshot = SchemaSnapshotBuilder.Build(typeof(MG1Article).Assembly);
+
+        // Resolve each TableSchema to its source entity type via [Table]
+        // attribute or class name, then look up the property on THAT type.
+        // The prior global FirstOrDefault scan could pick up an unrelated
+        // entity's same-named property (e.g. two test entities both declare
+        // `[Table("WsccItem")]` -- one with scalar `Tags`, one with collection
+        // `Tags` -- and the scan matched the collection one first, failing
+        // the assertion for the scalar table's column).
+        var allEntityTypes = typeof(MG1Article).Assembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .ToList();
 
         foreach (var table in snapshot.Tables)
         {
+            var entityType = allEntityTypes.FirstOrDefault(t =>
+                (t.GetCustomAttribute<TableAttribute>()?.Name ?? t.Name) == table.Name);
+            if (entityType == null) continue;
+
             foreach (var col in table.Columns)
             {
- // Collection types should never appear
-                var colType = typeof(MG1Article).Assembly
-                    .GetTypes()
-                    .SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                    .FirstOrDefault(p => p.Name == col.Name)?.PropertyType;
-
-                if (colType != null)
-                {
- // If we found the property, verify it's not a collection (non-string IEnumerable)
-                    var isCollection = typeof(System.Collections.IEnumerable).IsAssignableFrom(colType)
-                                       && colType != typeof(string);
-                    Assert.False(isCollection,
-                        $"Column '{col.Name}' in table '{table.Name}' is a collection type and should have been excluded.");
-                }
+                var prop = entityType.GetProperty(col.Name, BindingFlags.Public | BindingFlags.Instance);
+                if (prop == null) continue;
+                var colType = prop.PropertyType;
+                var isCollection = typeof(System.Collections.IEnumerable).IsAssignableFrom(colType)
+                                   && colType != typeof(string);
+                Assert.False(isCollection,
+                    $"Column '{col.Name}' in table '{table.Name}' (entity {entityType.FullName}) is a collection type and should have been excluded.");
             }
         }
     }
