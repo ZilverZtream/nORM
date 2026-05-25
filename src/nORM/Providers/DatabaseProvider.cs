@@ -559,6 +559,23 @@ namespace nORM.Providers
         public virtual string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment) => null;
 
         /// <summary>
+        /// Emits the per-provider aggregate that concatenates the elements of
+        /// a group's string-typed column with a separator. Used to translate
+        /// <c>g =&gt; string.Join(sep, g.Select(x =&gt; x.Member))</c> inside a
+        /// <c>GroupBy</c> projection.
+        ///
+        /// SQLite: <c>GROUP_CONCAT(expr, sep)</c>
+        /// SQL Server (2017+): <c>STRING_AGG(expr, sep)</c>
+        /// PostgreSQL: <c>STRING_AGG(expr, sep)</c>
+        /// MySQL: <c>GROUP_CONCAT(expr SEPARATOR sep)</c>
+        ///
+        /// Default routes to STRING_AGG which is portable across SqlServer and
+        /// PostgreSQL; SQLite and MySQL override.
+        /// </summary>
+        public virtual string GetStringAggregateSql(string expr, string sepLiteral)
+            => $"STRING_AGG({expr}, {sepLiteral})";
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///

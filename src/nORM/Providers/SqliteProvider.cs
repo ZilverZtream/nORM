@@ -230,6 +230,10 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({daysSqlFragment}) || ' days')";
 
+        /// <summary>SQLite uses GROUP_CONCAT(expr, sep); the 2-arg form takes the separator directly.</summary>
+        public override string GetStringAggregateSql(string expr, string sepLiteral)
+            => $"GROUP_CONCAT({expr}, {sepLiteral})";
+
         /// <summary>SQLite uses strftime with an 'N months' modifier on the DateOnly TEXT column.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({monthsSqlFragment}) || ' months')";

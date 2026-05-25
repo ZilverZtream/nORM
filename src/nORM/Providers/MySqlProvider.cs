@@ -340,6 +340,10 @@ namespace nORM.Providers
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({daysSqlFragment}) DAY))";
 
+        /// <summary>MySQL uses GROUP_CONCAT(expr SEPARATOR sep); no separator arg defaults to ','.</summary>
+        public override string GetStringAggregateSql(string expr, string sepLiteral)
+            => $"GROUP_CONCAT({expr} SEPARATOR {sepLiteral})";
+
         /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({monthsSqlFragment}) MONTH))";
