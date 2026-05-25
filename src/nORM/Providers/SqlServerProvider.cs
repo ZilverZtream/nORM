@@ -408,6 +408,20 @@ namespace nORM.Providers
             => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
 
         /// <summary>
+        /// T-SQL has no native regex primitive. The supported workarounds are
+        /// a CLR scalar function (sql_clr assembly providing RegExMatch) or
+        /// a rewrite to LIKE for simple patterns. nORM cannot detect either
+        /// at translation time, so surface a clear unsupported-feature
+        /// exception rather than emitting broken SQL.
+        /// </summary>
+        public override string GetRegexMatchSql(string inputSql, string patternLiteral)
+            => throw new NormUnsupportedFeatureException(
+                "Regex.IsMatch is not translatable on SQL Server: T-SQL has no built-in regex " +
+                "primitive. Workarounds: (a) deploy a CLR scalar function (RegExMatch) and call " +
+                "it via [SqlFunction], (b) rewrite the predicate as a LIKE pattern when the " +
+                "shape allows, or (c) materialise the rows first and filter in memory.");
+
+        /// <summary>
         /// SQL Server stores TimeOnly as TIME(7). DATEDIFF(SECOND, t1, t2) on
         /// two TIMEs returns the signed second diff in (-86400, 86400). Wrap
         /// with +86400 then % 86400 to match TimeOnly's [0, 24h) semantics.

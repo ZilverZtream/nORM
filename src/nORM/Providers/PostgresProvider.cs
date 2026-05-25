@@ -317,6 +317,10 @@ namespace nORM.Providers
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => $"EXTRACT(EPOCH FROM ({endSql} - {startSql}))";
 
+        /// <summary>PostgreSQL's `~` operator evaluates a POSIX regex match against a text column.</summary>
+        public override string GetRegexMatchSql(string inputSql, string patternLiteral)
+            => $"({inputSql} ~ {patternLiteral})";
+
         /// <summary>
         /// PostgreSQL TIME - TIME yields INTERVAL natively. EXTRACT(EPOCH FROM ...)
         /// returns fractional seconds preserving sub-second precision. Wrap with

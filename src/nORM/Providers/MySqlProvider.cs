@@ -344,6 +344,10 @@ namespace nORM.Providers
         public override string GetStringAggregateSql(string expr, string sepLiteral)
             => $"GROUP_CONCAT({expr} SEPARATOR {sepLiteral})";
 
+        /// <summary>MySQL uses the REGEXP infix operator for regex match (synonym RLIKE).</summary>
+        public override string GetRegexMatchSql(string inputSql, string patternLiteral)
+            => $"({inputSql} REGEXP {patternLiteral})";
+
         /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({monthsSqlFragment}) MONTH))";
