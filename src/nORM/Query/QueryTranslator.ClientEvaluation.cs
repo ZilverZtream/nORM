@@ -118,6 +118,7 @@ namespace nORM.Query
                 nameof(DateTime.TimeOfDay),
                 nameof(DateTime.Millisecond),
                 nameof(DateTime.Ticks),
+                nameof(DateTime.Compare),
                 nameof(DateTimeOffset.UtcDateTime),
                 nameof(DateTimeOffset.DateTime),
                 nameof(DateTimeOffset.Offset),

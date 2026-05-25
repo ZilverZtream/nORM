@@ -494,6 +494,12 @@ namespace nORM.Providers
                     // converts text -> DateTime/DateTimeOffset via the column type
                     // affinity. Sister to the numeric Parse handler.
                     "Parse" when args.Length == 1 => args[0],
+                    // Compare(a, b) returns -1/0/1 indicating less/equal/greater.
+                    // Lift both to julianday so the subtraction is numeric and
+                    // SIGN yields the canonical triple. CAST settles the result
+                    // to INTEGER so the materializer hits int affinity.
+                    nameof(DateTime.Compare) when args.Length == 2 =>
+                        $"CAST(SIGN(julianday({args[0]}) - julianday({args[1]})) AS INTEGER)",
                     _ => null
                 };
             }
