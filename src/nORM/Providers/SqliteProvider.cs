@@ -252,6 +252,35 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
+            // 3-arg string.Replace(old, new, StringComparison) -- SQLite
+            // REPLACE is case-sensitive. Honour the case-sensitive modes
+            // (Ordinal/CurrentCulture/InvariantCulture) by emitting plain
+            // REPLACE; ignore-case modes require a substring-detection
+            // scheme SQLite doesn't have natively -- surface that as an
+            // explicit unsupported-feature rather than silently emitting
+            // a wrong-answer case-sensitive REPLACE.
+            if (declType == typeof(string)
+                && node.Method.Name == nameof(string.Replace)
+                && node.Object != null
+                && args.Length == 4   // receiver + old + new + comparison
+                && node.Arguments.Count == 3
+                && node.Arguments[2].Type == typeof(StringComparison)
+                && node.Arguments[2] is System.Linq.Expressions.ConstantExpression repCmpArg
+                && repCmpArg.Value is StringComparison repCmp)
+            {
+                bool ignoreCase = repCmp is StringComparison.OrdinalIgnoreCase
+                    or StringComparison.CurrentCultureIgnoreCase
+                    or StringComparison.InvariantCultureIgnoreCase;
+                if (ignoreCase)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "string.Replace(old, new, StringComparison) with an IgnoreCase mode is not supported -- " +
+                        "SQLite REPLACE is case-sensitive and there's no portable case-insensitive substring " +
+                        "rewrite. Use a case-sensitive mode or post-materialize the column and Replace client-side.");
+                }
+                return $"REPLACE({args[0]}, {args[1]}, {args[2]})";
+            }
+
             // 2-arg string.IndexOf with a StringComparison enum tail arg.
             // SQLite INSTR is BINARY by default; lower both sides for an
             // ignore-case variant. INSTR returns 1-based or 0-when-missing;
