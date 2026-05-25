@@ -541,6 +541,10 @@ namespace nORM.Providers
                     nameof(TimeOnly.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
                     nameof(TimeOnly.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {args[0]}))::bigint % 1000)",
                     nameof(TimeOnly.Nanosecond) => "0",
+                    // EXTRACT(EPOCH FROM time) returns seconds-since-midnight as
+                    // numeric (with sub-second fraction). x 10_000_000 yields
+                    // 100ns ticks; truncate via ::bigint for the long return.
+                    nameof(TimeOnly.Ticks) => $"((EXTRACT(EPOCH FROM {args[0]}) * 10000000)::bigint)",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +

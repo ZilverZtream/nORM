@@ -664,6 +664,9 @@ namespace nORM.Providers
                     nameof(TimeOnly.Millisecond) => $"DATEPART(millisecond, {args[0]})",
                     nameof(TimeOnly.Microsecond) => $"(DATEPART(microsecond, {args[0]}) % 1000)",
                     nameof(TimeOnly.Nanosecond) => $"(DATEPART(nanosecond, {args[0]}) % 1000)",
+                    // Ticks = 100ns since midnight; DATEDIFF_BIG(NANOSECOND)
+                    // returns ns count, /100 yields ticks.
+                    nameof(TimeOnly.Ticks) => $"(DATEDIFF_BIG(NANOSECOND, CAST('00:00:00' AS TIME), {args[0]}) / 100)",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     // Matches .NET's TimeOnly.IsBetween semantics.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
