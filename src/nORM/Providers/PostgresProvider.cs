@@ -465,6 +465,14 @@ namespace nORM.Providers
                     nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
                     nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
                     nameof(Math.Atan2) when args.Length == 2 => $"ATAN2({args[0]}, {args[1]})",
+                    // Hyperbolic + inverse hyperbolic: PostgreSQL exposes
+                    // them all as built-ins with .NET-matching names.
+                    nameof(Math.Sinh) when args.Length == 1 => $"SINH({args[0]})",
+                    nameof(Math.Cosh) when args.Length == 1 => $"COSH({args[0]})",
+                    nameof(Math.Tanh) when args.Length == 1 => $"TANH({args[0]})",
+                    nameof(Math.Asinh) when args.Length == 1 => $"ASINH({args[0]})",
+                    nameof(Math.Acosh) when args.Length == 1 => $"ACOSH({args[0]})",
+                    nameof(Math.Atanh) when args.Length == 1 => $"ATANH({args[0]})",
                     _ => null
                 };
             }

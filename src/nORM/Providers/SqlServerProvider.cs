@@ -579,6 +579,31 @@ namespace nORM.Providers
                     nameof(Math.Acos) when args.Length == 1 => $"ACOS({args[0]})",
                     nameof(Math.Atan) when args.Length == 1 => $"ATAN({args[0]})",
                     nameof(Math.Atan2) when args.Length == 2 => $"ATN2({args[0]}, {args[1]})",
+                    // Hyperbolic + inverse hyperbolic: T-SQL has no native
+                    // functions for these. Emit the algebraic identities via
+                    // EXP / LOG (natural log) / SQRT. Identical math to .NET's
+                    // managed implementation; precision matches double for the
+                    // safe input domain.
+                    //   sinh(x) = (exp(x) - exp(-x)) / 2
+                    //   cosh(x) = (exp(x) + exp(-x)) / 2
+                    //   tanh(x) = (exp(2x) - 1) / (exp(2x) + 1)
+                    //     (cleaner than sinh/cosh ratio; avoids cosh-divide
+                    //     numerical instability for large |x|).
+                    //   asinh(x) = ln(x + sqrt(x^2 + 1))
+                    //   acosh(x) = ln(x + sqrt(x^2 - 1))  (domain x >= 1)
+                    //   atanh(x) = 0.5 * ln((1+x) / (1-x))  (domain |x| < 1)
+                    nameof(Math.Sinh) when args.Length == 1 =>
+                        $"((EXP({args[0]}) - EXP(-({args[0]}))) / 2)",
+                    nameof(Math.Cosh) when args.Length == 1 =>
+                        $"((EXP({args[0]}) + EXP(-({args[0]}))) / 2)",
+                    nameof(Math.Tanh) when args.Length == 1 =>
+                        $"((EXP(2 * ({args[0]})) - 1) / (EXP(2 * ({args[0]})) + 1))",
+                    nameof(Math.Asinh) when args.Length == 1 =>
+                        $"LOG(({args[0]}) + SQRT(POWER({args[0]}, 2) + 1))",
+                    nameof(Math.Acosh) when args.Length == 1 =>
+                        $"LOG(({args[0]}) + SQRT(POWER({args[0]}, 2) - 1))",
+                    nameof(Math.Atanh) when args.Length == 1 =>
+                        $"(0.5 * LOG((1 + ({args[0]})) / (1 - ({args[0]}))))",
                     _ => null
                 };
             }
