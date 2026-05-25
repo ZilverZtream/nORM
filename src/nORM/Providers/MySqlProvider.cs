@@ -411,6 +411,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddHours) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) HOUR)",
                     nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MINUTE)",
                     nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) SECOND)",
+                    // MySQL DATETIME(6) supports microsecond precision; ms*1000 = microseconds.
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) * 1000) MICROSECOND)",
+                    // 1 tick = 100ns. MySQL's smallest interval unit is MICROSECOND so
+                    // ticks/10 gives microseconds (sub-microsecond truncates).
+                    nameof(DateTime.AddTicks) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) / 10) MICROSECOND)",
                     // MySQL DAYOFWEEK returns 1=Sun..7=Sat; .NET DayOfWeek is 0=Sun..6=Sat.
                     nameof(DateTime.DayOfWeek) => $"(DAYOFWEEK({args[0]}) - 1)",
                     _ => null

@@ -349,6 +349,11 @@ namespace nORM.Providers
                     nameof(DateTime.AddHours) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 hour')",
                     nameof(DateTime.AddMinutes) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 minute')",
                     nameof(DateTime.AddSeconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 second')",
+                    // PostgreSQL supports millisecond interval natively.
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 millisecond')",
+                    // PostgreSQL TIMESTAMP precision is microseconds; 1 tick = 100ns, so
+                    // ticks/10 gives microseconds (truncating sub-microsecond precision).
+                    nameof(DateTime.AddTicks) when args.Length == 2 => $"({args[0]} + (({args[1]}) / 10) * INTERVAL '1 microsecond')",
                     // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
                     nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
                     _ => null

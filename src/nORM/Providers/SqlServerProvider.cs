@@ -441,6 +441,15 @@ namespace nORM.Providers
                     nameof(DateTime.AddHours) when args.Length == 2 => $"DATEADD(hour, {args[1]}, {args[0]})",
                     nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATEADD(minute, {args[1]}, {args[0]})",
                     nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATEADD(second, {args[1]}, {args[0]})",
+                    // AddMilliseconds: DATEADD supports the `millisecond` datepart.
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"DATEADD(millisecond, {args[1]}, {args[0]})",
+                    // AddTicks: a tick = 100ns. SqlServer DATEADD(NANOSECOND, ...) exists
+                    // in 2008+ but the underlying DATETIME2 has 100ns precision so sub-tick
+                    // precision is dropped. The argument range matters: ticks * 100 can
+                    // overflow long. Split into seconds (whole ticks/1e7) + nanosecond
+                    // remainder ((ticks % 1e7) * 100) so each component stays in int32 range.
+                    nameof(DateTime.AddTicks) when args.Length == 2 =>
+                        $"DATEADD(nanosecond, (({args[1]}) % 10000000) * 100, DATEADD(second, ({args[1]}) / 10000000, {args[0]}))",
                     // T-SQL DATEPART(weekday) depends on @@DATEFIRST; subtract @@DATEFIRST so that
                     // Sunday=0..Saturday=6 always, matching System.DayOfWeek.
                     nameof(DateTime.DayOfWeek) => $"((DATEPART(weekday, {args[0]}) + @@DATEFIRST - 1) % 7)",
