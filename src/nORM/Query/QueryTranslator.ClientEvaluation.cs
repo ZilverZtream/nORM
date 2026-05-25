@@ -149,6 +149,17 @@ namespace nORM.Query
                 // Check if this is a method that can be translated to SQL
                 var declaringType = node.Method.DeclaringType;
 
+                // entity.GetType() folds in SCV.VisitMember when wrapped by a
+                // Type.<member> access (Name/FullName/Namespace/...) -- accept
+                // it here so the analyzer doesn't pre-flag the whole projection
+                // as client-eval before the per-visitor folder runs.
+                if (node.Method.Name == "GetType"
+                    && node.Arguments.Count == 0
+                    && node.Object != null)
+                {
+                    return base.VisitMethodCall(node);
+                }
+
                 // No-arg ToString() on a non-string receiver lowers to the provider's
                 // CAST AS TEXT (primitives) or a CASE-WHEN-per-name expansion (enums) --
                 // both handled by SelectClauseVisitor and ExpressionToSqlVisitor. Admit
