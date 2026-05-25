@@ -1851,6 +1851,29 @@ namespace nORM.Query
             // is the value to test (column, int cast, or closure). Common
             // validation pattern for filtering rows whose enum-int column
             // matches a defined member (excluding wire/legacy 'invalid' ints).
+            // Enum.GetName(typeof(T), value) -- return the enum member name as
+            // string, or NULL when the value isn't defined. Reuse the existing
+            // BuildEnumToStringCase helper so emit shape matches enum.ToString().
+            // The helper falls through to GetToStringSql for undefined values --
+            // for .NET-exact null semantics callers can wrap in a CASE WHEN
+            // EnumIsDefined ELSE NULL, but the default ToString-shaped emit is
+            // pragmatic and matches EF Core.
+            if (node.Method.Name == nameof(Enum.GetName)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Arguments.Count == 2
+                && node.Arguments[0] is ConstantExpression getNameTypeConst
+                && getNameTypeConst.Value is Type getNameEnumType
+                && getNameEnumType.IsEnum)
+            {
+                // Args[1] is the value to look up. Unwrap Convert(x, object)
+                // so the column's enum type stays visible.
+                var raw = node.Arguments[1];
+                if (raw is UnaryExpression u && u.NodeType == ExpressionType.Convert) raw = u.Operand;
+                var valueSql = GetSql(raw);
+                _sql.Append(BuildEnumToStringCase(_provider, valueSql, getNameEnumType));
+                return node;
+            }
+
             if (node.Method.Name == nameof(Enum.IsDefined)
                 && node.Method.DeclaringType == typeof(Enum)
                 && node.Arguments.Count == 2
