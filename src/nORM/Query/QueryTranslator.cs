@@ -540,17 +540,41 @@ namespace nORM.Query
                     && _t._methodName is "Count" or "LongCount")
                 {
                     var sqlStr = _t._sql.ToSqlString();
-                    var fromIdx = sqlStr.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
-                    if (fromIdx > 0)
+                    // If the source produced a set-op SELECT (Union/Intersect/Except/
+                    // Concat -> UNION ALL), the existing _sql is already a full statement
+                    // like `SELECT V FROM L UNION SELECT V FROM R`. Rewriting the first
+                    // SELECT to COUNT(*) breaks the UNION (arms must have the same column
+                    // count and SQLite returns the COUNT of the first arm only). Wrap the
+                    // whole thing in a subquery instead so we count rows of the unioned
+                    // set: `SELECT COUNT(*) FROM (<set-op>) AS T0`.
+                    bool isSetOpSql = sqlStr.Contains(" UNION ", StringComparison.OrdinalIgnoreCase)
+                                   || sqlStr.Contains(" INTERSECT ", StringComparison.OrdinalIgnoreCase)
+                                   || sqlStr.Contains(" EXCEPT ", StringComparison.OrdinalIgnoreCase);
+                    if (isSetOpSql)
                     {
-                        var afterFrom = sqlStr.Substring(fromIdx);
+                        var subqueryAlias = _t.EscapeAlias("T0");
                         _t._sql.Clear();
-                        _t._sql.Append("SELECT COUNT(*)").Append(afterFrom);
+                        _t._sql.Append("SELECT COUNT(*) FROM (").Append(sqlStr).Append(") AS ").Append(subqueryAlias);
                         _t._orderBy.Clear();
                         _t._take = null;
                         _t._takeParam = null;
                         _t._skip = null;
                         _t._skipParam = null;
+                    }
+                    else
+                    {
+                        var fromIdx = sqlStr.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+                        if (fromIdx > 0)
+                        {
+                            var afterFrom = sqlStr.Substring(fromIdx);
+                            _t._sql.Clear();
+                            _t._sql.Append("SELECT COUNT(*)").Append(afterFrom);
+                            _t._orderBy.Clear();
+                            _t._take = null;
+                            _t._takeParam = null;
+                            _t._skip = null;
+                            _t._skipParam = null;
+                        }
                     }
                 }
                 if (_t._sql.Length == 0)
