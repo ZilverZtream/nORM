@@ -1327,6 +1327,34 @@ namespace nORM.Query
                 _sql.Append('(').Append(receiverSql).Append(" & ").Append(flagSql).Append(") = ").Append(flagSql);
                 return node;
             }
+            // Enum.IsDefined(typeof(T), value) -- enumerate the enum's defined
+            // values at translation time and emit `value IN (n1, n2, ...)`. The
+            // first arg is typeof(T) (ConstantExpression of Type); the second
+            // is the value to test (column, int cast, or closure). Common
+            // validation pattern for filtering rows whose enum-int column
+            // matches a defined member (excluding wire/legacy 'invalid' ints).
+            if (node.Method.Name == nameof(Enum.IsDefined)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Arguments.Count == 2
+                && node.Arguments[0] is ConstantExpression typeConst
+                && typeConst.Value is Type enumType
+                && enumType.IsEnum)
+            {
+                var valueSql = GetSql(node.Arguments[1]);
+                var defined = Enum.GetValues(enumType);
+                var underlyingType = Enum.GetUnderlyingType(enumType);
+                _sql.Append('(').Append(valueSql).Append(" IN (");
+                bool first = true;
+                foreach (var v in defined)
+                {
+                    if (!first) _sql.Append(", ");
+                    var underlying = Convert.ChangeType(v, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
+                    _sql.Append(Convert.ToString(underlying, System.Globalization.CultureInfo.InvariantCulture)!);
+                    first = false;
+                }
+                _sql.Append("))");
+                return node;
+            }
             if (!IsTranslatableMethod(node.Method))
                 // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
                 // The {0} argument below is a detail message, not a duplicate prefix.
