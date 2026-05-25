@@ -1340,18 +1340,21 @@ namespace nORM.Query
                         || underlying == typeof(DateOnly)
                         || underlying == typeof(TimeOnly))
                     {
-                        if (SelectClauseVisitor.TryConvertDotNetDateFormatToStrftime(dateFmt, out var strftimeFmt))
+                        // Closure-captured format-string placeholder slot
+                        // (same pattern as the numeric handler above).
+                        if (node.Arguments[0] is MemberExpression)
                         {
-                            // Closure-captured format-string placeholder slot
-                            // (same pattern as the numeric handler above).
-                            if (node.Arguments[0] is MemberExpression)
-                            {
-                                var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
-                                _params[placeholder] = DBNull.Value;
-                                _compiledParams.Add(placeholder);
-                            }
-                            var inner = GetSql(node.Object);
-                            _sql.Append("strftime('").Append(strftimeFmt).Append("', ").Append(inner).Append(')');
+                            var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                            _params[placeholder] = DBNull.Value;
+                            _compiledParams.Add(placeholder);
+                        }
+                        var inner = GetSql(node.Object);
+                        // Route through provider hook: SqliteProvider uses strftime;
+                        // SqlServer FORMAT('en-US'); Postgres to_char; MySQL DATE_FORMAT.
+                        var formattedSql = _provider.FormatDateUsingDotNetPattern(inner, dateFmt);
+                        if (formattedSql != null)
+                        {
+                            _sql.Append(formattedSql);
                             return node;
                         }
                         throw new NormUnsupportedFeatureException(

@@ -298,6 +298,19 @@ namespace nORM.Providers
         public override string FormatFixedDecimalSql(string sql, int digits)
             => $"FORMAT({sql}, 'F{digits}', 'en-US')";
 
+        /// <summary>
+        /// SQL Server's <c>FORMAT(x, fmt, 'en-US')</c> accepts .NET-style date
+        /// patterns directly. The 'en-US' culture forces invariant separators
+        /// regardless of server locale. Returns null if the format contains a
+        /// single-quote that would need escaping in an unusual way -- the
+        /// common yyyy/MM/dd/HH/mm/ss patterns escape cleanly.
+        /// </summary>
+        public override string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
+        {
+            var escaped = dotNetFormat.Replace("'", "''");
+            return $"FORMAT({sql}, '{escaped}', 'en-US')";
+        }
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal
