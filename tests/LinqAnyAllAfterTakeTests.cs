@@ -46,43 +46,31 @@ public class LinqAnyAllAfterTakeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Composed_take_where_any_chain_throws_actionable_pin_via_one_of_the_two_pins()
+    public async Task Composed_take_where_any_chain_evaluates_predicate_only_inside_window()
     {
-        // Chain `Take.Where.Any` has Take inside Any's source, so either the
-        // HandleSetOperation pin (this commit) catches it on the way in or
-        // 47acc83's WhereTranslator pin catches the Where-after-Take leg —
-        // both are correct actionable throws. Accept either pin's message,
-        // require Take + an actionable hint somewhere in the text.
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<AatRow>()
-                .OrderBy(r => r.Id)
-                .Take(2)
-                .Where(r => r.Active == 1)
-                .AnyAsync();
-        });
-        Assert.IsType<NormUnsupportedFeatureException>(ex);
-        Assert.Contains("Take", ex.Message, System.StringComparison.Ordinal);
-        var mentionsAnyOrWhere = ex.Message.Contains("Any", System.StringComparison.Ordinal)
-                              || ex.Message.Contains("Where", System.StringComparison.Ordinal);
-        Assert.True(mentionsAnyOrWhere, $"Message should call out Any or Where as the operator that hit the pin: {ex.Message}");
+        // First 2 rows (1,0), (2,0) — both have Active=0, none match Active==1. The
+        // windowed Any returns false. Full-table Any(Active==1) would be true.
+        Assert.False(await _ctx.Query<AatRow>()
+            .OrderBy(r => r.Id)
+            .Take(2)
+            .Where(r => r.Active == 1)
+            .AnyAsync());
     }
 
     [Fact]
-    public async Task Bare_any_after_take_throws_with_workaround_hint_avoiding_invalid_sql()
+    public async Task Bare_any_after_take_returns_true_when_window_non_empty()
     {
-        // Without the new pin, this emitted `… LIMIT 2 LIMIT 1` and SQLite errored
-        // with `near "LIMIT": syntax error`. The pin now throws
-        // NormUnsupportedFeatureException explaining that for N>=1 `Take(N).Any()`
-        // is equivalent to `Any()` and pointing at the materialize workaround.
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<AatRow>().OrderBy(r => r.Id).Take(2).AnyAsync();
-        });
-        Assert.IsType<NormUnsupportedFeatureException>(ex);
-        Assert.Contains("Any", ex.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Take", ex.Message, System.StringComparison.Ordinal);
-        Assert.Contains("Drop the Take", ex.Message, System.StringComparison.Ordinal);
+        // Take(2) yields 2 rows; bare Any (no predicate) returns true.
+        Assert.True(await _ctx.Query<AatRow>().OrderBy(r => r.Id).Take(2).AnyAsync());
+    }
+
+    [Fact]
+    public async Task All_after_take_evaluates_only_windowed_rows_matching_predicate()
+    {
+        // First 2 rows are Active=0 → All(Active==0) is TRUE.
+        Assert.True(await _ctx.Query<AatRow>().OrderBy(r => r.Id).Take(2).AllAsync(r => r.Active == 0));
+        // Full-table All would be false (rows 3,4 are Active=1).
+        Assert.False(await _ctx.Query<AatRow>().OrderBy(r => r.Id).AllAsync(r => r.Active == 0));
     }
 
 
