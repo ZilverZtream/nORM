@@ -119,6 +119,38 @@ namespace nORM.Query
         private sealed class WhereTranslator : IMethodCallTranslator
         {
             /// <summary>
+            /// Windowed-source branch extracted into its own method so the common-path
+            /// <see cref="Translate"/> stays stack-frame lean — matters under deeply
+            /// nested Where chains where deep recursion can otherwise stack-overflow
+            /// (see <c>GlobalFilterConcurrencyTests</c>).
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanW = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapW);
+                t._mapping = subMapW;
+                t.MergeSubPlanParameters(subPlanW);
+                var winAliasW = t.EscapeAlias("__wht" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT * FROM (").Append(subPlanW.Sql).AppendFragment(") AS ").Append(winAliasW);
+                if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
+                {
+                    lambda = t.ExpandProjection(lambda);
+                    var lp = lambda.Parameters[0];
+                    t._correlatedParams[lp] = (subMapW, winAliasW);
+                    var vctxW = new VisitorContext(t._ctx, subMapW, t._provider, lp, winAliasW, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxW);
+                    var predSql = visitor.Translate(lambda.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
+                    if (t._where.Length > 0) t._where.Append(" AND ");
+                    t._where.Append('(').Append(predSql).Append(')');
+                }
+                return node;
+            }
+
+            /// <summary>
             /// Translates a LINQ <c>Where</c> call into an equivalent SQL <c>WHERE</c> clause.
             /// </summary>
             /// <param name="t">The active <see cref="QueryTranslator"/>.</param>
@@ -126,6 +158,19 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Where after a Take/Skip-windowed source — wrap as derived table so the
+                // predicate filters inside the window. Sister of the post-Take/Skip fixes
+                // in 3040f49 / e0f1397 / 99a02ce. Restricted to the case where the
+                // IMMEDIATE source is a Take/Skip MethodCall — peeling further would
+                // recurse into ourselves on nested Where chains. Routed to a helper so
+                // the common-path Translate stays stack-frame lean (matters under deep
+                // global-filter chaining; see GlobalFilterConcurrencyTests).
+                if (node.Arguments[0] is MethodCallExpression directSrc
+                    && directSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
+
                 // Where after a set-op (Union / Concat / Intersect / Except) needs a subquery
                 // wrap so the predicate applies to the unified rows rather than just the
                 // right side of the set op. Visit the set-op source (fills _sql with
@@ -147,14 +192,6 @@ namespace nORM.Query
                 }
 
                 var source = wrappedSetOp ? node.Arguments[0] : t.Visit(node.Arguments[0]);
-                // Sister of bca0523 for Where: Where applied AFTER a Take/Skip would
-                // silently filter the FULL table before the LIMIT applies (SQL appends
-                // WHERE to the flat query), instead of filtering inside the windowed
-                // result as LINQ semantics demand. Detect and pin with the same
-                // materialize-then-filter workaround pattern. Note: Where BEFORE Take is
-                // the common pre-paging filter pattern and stays untouched — this only
-                // fires when `_take`/`_skip` is already set by the time Where translates,
-                // i.e. the chain order is `…Take(n).Where(p)`.
                 if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
