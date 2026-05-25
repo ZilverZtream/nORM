@@ -560,6 +560,15 @@ namespace nORM.Providers
                     // source column already holds compatible text, so SQL
                     // emission is identity and GetFieldValue<TimeSpan> parses.
                     "Parse" when args.Length == 1 => args[0],
+                    // Compare(a, b) -- TimeSpan binds as canonical 'HH:mm:ss
+                    // [.fffffff]' text which is lexicographically sortable
+                    // within a single day (sub-day spans). CASE on < > = on
+                    // the text yields the standard -1/0/1 sign. Multi-day
+                    // 'd.HH:mm:ss' prefixes are documented as out-of-scope
+                    // for the component getters above and the same caveat
+                    // applies here.
+                    nameof(TimeSpan.Compare) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
