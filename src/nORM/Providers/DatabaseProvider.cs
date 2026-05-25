@@ -709,6 +709,17 @@ namespace nORM.Providers
                $"END)";
 
         /// <summary>
+        /// Emits the per-provider DATETIME-from-parts primitive used to
+        /// translate <c>new DateTime(year, month, day)</c> on column args.
+        /// Default throws so each provider opts in with its native function.
+        /// Hours / minutes / seconds default to 0 -- the 7-arg DateTime
+        /// ctor variants are handled by the same hook with more SQL args.
+        /// </summary>
+        public virtual string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTime(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///

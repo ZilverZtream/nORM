@@ -397,6 +397,16 @@ namespace nORM.Providers
             => $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
 
         /// <summary>
+        /// SQLite has no DATEFROMPARTS; build the canonical 'yyyy-MM-dd HH:mm:ss'
+        /// text with zero-padded components via strftime. printf gives us %02d
+        /// padding (4-digit year is the standard; -1 to 9999 range covers .NET
+        /// DateTime).
+        /// </summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"strftime('%Y-%m-%d 00:00:00', " +
+               $"printf('%04d-%02d-%02d', {yearSql}, {monthSql}, {daySql}))";
+
+        /// <summary>
         /// SQLite stores TimeOnly as 'HH:mm:ss[.fffffff]' text. Parse each side's
         /// HH/MM/SS components (the SS substring carries the fractional tail when
         /// present, so CAST(... AS REAL) preserves sub-second precision) into total
