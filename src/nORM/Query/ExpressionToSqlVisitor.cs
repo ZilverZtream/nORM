@@ -1101,6 +1101,33 @@ namespace nORM.Query
         }
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
+            // string.Join(separator, params string[] values) -- mirror SCV's
+            // handler (5f48dc3): the C# variadic form passes a NewArrayInit
+            // as args[1] which the generic provider routing collapses to a
+            // single opaque entry. Detect early and emit interleaved || with
+            // a literal separator.
+            if (node.Method.DeclaringType == typeof(string)
+                && node.Method.Name == nameof(string.Join)
+                && node.Arguments.Count == 2
+                && node.Arguments[1] is NewArrayExpression joinArr
+                && TryGetConstantValue(node.Arguments[0], out var joinSepVal)
+                && joinSepVal is string joinSep)
+            {
+                var sepLit = $"'{joinSep.Replace("'", "''")}'";
+                if (joinArr.Expressions.Count == 0)
+                {
+                    _sql.Append("''");
+                    return node;
+                }
+                _sql.Append('(');
+                for (int i = 0; i < joinArr.Expressions.Count; i++)
+                {
+                    if (i > 0) _sql.Append(" || ").Append(sepLit).Append(" || ");
+                    _sql.Append(GetSql(joinArr.Expressions[i]));
+                }
+                _sql.Append(')');
+                return node;
+            }
             // Fast path: common string methods (Contains, StartsWith, EndsWith) are handled
             // directly via pre-built delegates, bypassing the general method translation pipeline.
             if (_fastMethodHandlers.TryGetValue(node.Method, out var handler))
