@@ -193,23 +193,29 @@ namespace nORM.Query
             public readonly string? Literal;
             public readonly int ArgIndex;
             public readonly string? FormatSpec;
-            public FormatSegment(string literal) { IsLiteral = true; Literal = literal; ArgIndex = -1; FormatSpec = null; }
-            public FormatSegment(int argIndex, string? formatSpec)
+            // Alignment width: positive = right-align (pad-left), negative =
+            // left-align (pad-right), zero = no alignment.
+            public readonly int Alignment;
+            public FormatSegment(string literal)
             {
-                IsLiteral = false; Literal = null; ArgIndex = argIndex; FormatSpec = formatSpec;
+                IsLiteral = true; Literal = literal; ArgIndex = -1; FormatSpec = null; Alignment = 0;
+            }
+            public FormatSegment(int argIndex, string? formatSpec, int alignment)
+            {
+                IsLiteral = false; Literal = null; ArgIndex = argIndex; FormatSpec = formatSpec; Alignment = alignment;
             }
         }
 
         /// <summary>
         /// Splits a <c>string.Format</c> template into literal / placeholder segments.
-        /// Placeholders may include an optional format spec after a colon
-        /// (<c>{0:F2}</c>, <c>{0:yyyy-MM-dd}</c>); the spec is preserved on the
-        /// segment so the emit can route it through the provider's
-        /// FormatFixedDecimalSql / FormatDateUsingDotNetPattern hooks.
-        /// Returns null if the template contains alignment (<c>{0,5}</c>) -- SQL
-        /// has no portable text-padding equivalent at projection time -- so the
-        /// caller defers to client-evaluation. Escaped braces (<c>{{</c>,
-        /// <c>}}</c>) are recognized and emitted as literal single braces.
+        /// Placeholders may include an optional alignment width after a comma
+        /// (<c>{0,5}</c>, <c>{0,-5}</c>) and an optional format spec after a colon
+        /// (<c>{0:F2}</c>, <c>{0,10:F2}</c>, <c>{0:yyyy-MM-dd}</c>); the spec and
+        /// alignment are preserved on the segment so the emit can route them
+        /// through the provider's FormatFixedDecimalSql /
+        /// FormatDateUsingDotNetPattern hooks and PadLeft / PadRight wrap.
+        /// Escaped braces (<c>{{</c>, <c>}}</c>) are recognized and emitted
+        /// as literal single braces.
         /// </summary>
         private static List<FormatSegment>? TryParseSimpleFormatSegments(string template)
         {
@@ -227,18 +233,28 @@ namespace nORM.Query
                     if (end < 0) return null;
                     var inner = template.Substring(i + 1, end - i - 1);
                     if (inner.Length == 0) return null;
-                    if (inner.IndexOf(',') >= 0) return null; // alignment not portable to SQL
                     string indexPart = inner;
+                    string? alignmentPart = null;
                     string? spec = null;
                     int colon = inner.IndexOf(':');
                     if (colon >= 0)
                     {
-                        indexPart = inner.Substring(0, colon);
                         spec = inner.Substring(colon + 1);
                         if (spec.Length == 0) return null;
+                        indexPart = inner.Substring(0, colon);
+                    }
+                    int comma = indexPart.IndexOf(',');
+                    if (comma >= 0)
+                    {
+                        alignmentPart = indexPart.Substring(comma + 1);
+                        indexPart = indexPart.Substring(0, comma);
+                        if (alignmentPart.Length == 0) return null;
                     }
                     if (!int.TryParse(indexPart, out var argIdx) || argIdx < 0) return null;
-                    segments.Add(new FormatSegment(argIdx, spec));
+                    int alignment = 0;
+                    if (alignmentPart != null && !int.TryParse(alignmentPart, out alignment))
+                        return null;
+                    segments.Add(new FormatSegment(argIdx, spec, alignment));
                     i = end + 1;
                 }
                 else if (c == '}')
@@ -1966,6 +1982,7 @@ namespace nORM.Query
                                 }
                                 var argSql = GetSql(rawArg);
                                 var argType = rawArg.Type;
+                                string emitted;
                                 if (seg.FormatSpec != null)
                                 {
                                     var formatted = ApplyFormatSpecToArg(argSql, argType, seg.FormatSpec);
@@ -1974,14 +1991,28 @@ namespace nORM.Query
                                         clientEvalFallback = true;
                                         break;
                                     }
-                                    parts.Add(formatted);
+                                    emitted = formatted;
                                 }
                                 else
                                 {
-                                    if (argType != typeof(string))
-                                        argSql = _provider.GetToStringSql(argSql);
-                                    parts.Add(argSql);
+                                    emitted = argType != typeof(string) ? _provider.GetToStringSql(argSql) : argSql;
                                 }
+                                if (seg.Alignment != 0)
+                                {
+                                    // Positive alignment = right-align (pad-left to width);
+                                    // negative = left-align (pad-right to abs width).
+                                    var width = Math.Abs(seg.Alignment).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                    var padded = seg.Alignment > 0
+                                        ? _provider.TranslateFunction(nameof(string.PadLeft), typeof(string), emitted, width)
+                                        : _provider.TranslateFunction(nameof(string.PadRight), typeof(string), emitted, width);
+                                    if (padded == null)
+                                    {
+                                        clientEvalFallback = true;
+                                        break;
+                                    }
+                                    emitted = padded;
+                                }
+                                parts.Add(emitted);
                             }
                         }
                         if (clientEvalFallback)
