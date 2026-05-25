@@ -533,6 +533,8 @@ namespace nORM.Providers
                     nameof(DateOnly.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
                     // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
                     nameof(DateOnly.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
+                    nameof(DateOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     // PostgreSQL `date - date` returns int (days). Anchor on
                     // DATE '0001-01-01' to match .NET DateOnly.MinValue == day 0.
                     nameof(DateOnly.DayNumber) => $"({args[0]} - DATE '0001-01-01')",
@@ -568,6 +570,8 @@ namespace nORM.Providers
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
                         $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
+                    nameof(TimeOnly.CompareTo) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
