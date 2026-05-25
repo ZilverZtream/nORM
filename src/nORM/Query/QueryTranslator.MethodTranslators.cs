@@ -1237,6 +1237,66 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // First/Single with predicate over a Take/Skip-windowed source — the
+                // predicate must evaluate only against the windowed rows. The default
+                // path appends WHERE pred to _where and the SQL pipeline emits
+                // `WHERE pred ORDER BY … LIMIT N` against the full table (WHERE
+                // evaluates before LIMIT), silently returning rows OUTSIDE the
+                // window. Wrap the windowed source as a derived table so the
+                // predicate runs inside it. Sister of HandleSetOperation's
+                // Any/All/Contains-after-Take windowed branch. Two predicate
+                // shapes: 2-arg `First(source, pred)` and 1-arg
+                // `First(Where(source, pred))` (the latter emitted by
+                // NormAsyncExtensions.FirstAsync/FirstOrDefaultAsync(predicate)).
+                LambdaExpression? winPred = null;
+                Expression? winSource = null;
+                if (node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression wp2
+                    && QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0]))
+                {
+                    winPred = wp2;
+                    winSource = node.Arguments[0];
+                }
+                else if (node.Arguments.Count == 1
+                    && node.Arguments[0] is MethodCallExpression wrapWhere
+                    && wrapWhere.Method.Name == nameof(Queryable.Where)
+                    && wrapWhere.Arguments.Count == 2
+                    && StripQuotes(wrapWhere.Arguments[1]) is LambdaExpression wp1
+                    && QueryTranslator.SourceHasTakeOrSkip(wrapWhere.Arguments[0]))
+                {
+                    winPred = wp1;
+                    winSource = wrapWhere.Arguments[0];
+                }
+                if (winPred != null && winSource != null)
+                {
+                    var subPlan = t.TranslateInSubContext(winSource, t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMappingFs);
+                    t._mapping = subMappingFs;
+                    t.MergeSubPlanParameters(subPlan);
+                    var winParam = winPred.Parameters[0];
+                    var winAlias = t.EscapeAlias("__wfs" + t._joinCounter++);
+                    if (!t._correlatedParams.ContainsKey(winParam))
+                        t._correlatedParams[winParam] = (subMappingFs, winAlias);
+                    var vctxWin = new VisitorContext(t._ctx, subMappingFs, t._provider, winParam, winAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var winVisitor = FastExpressionVisitorPool.Get(in vctxWin);
+                    var winPredSql = winVisitor.Translate(winPred.Body);
+                    foreach (var kvp in winVisitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(winVisitor);
+                    t._sql.Append("SELECT * FROM (").Append(subPlan.Sql)
+                          .Append(") AS ").Append(winAlias);
+                    if (t._where.Length > 0) t._where.Append(" AND ");
+                    t._where.Append('(').Append(winPredSql).Append(')');
+                    var isSingleW = t._methodName == "Single" || t._methodName == "SingleOrDefault";
+                    t._take = isSingleW ? 2 : 1;
+                    var pNameW = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                    t._params[pNameW] = t._take;
+                    t._takeParam = pNameW;
+                    t._takeSetByTerminal = true;
+                    t._singleResult = t._methodName == "First" || t._methodName == "Single";
+                    return node;
+                }
                 if (node.Arguments.Count > 1)
                 {
                     var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
