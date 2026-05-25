@@ -858,6 +858,11 @@ namespace nORM.Providers
                     // are the microsecond-within-millisecond.
                     nameof(DateTime.Microsecond) =>
                         $"(CASE WHEN length({args[0]}) > 23 THEN CAST(substr({args[0]}, 24, 3) AS INTEGER) ELSE 0 END)",
+                    // Digit 7 of the 7-digit fractional tail (position 27 of
+                    // 'yyyy-MM-dd HH:mm:ss.fffffff') is the 100ns tick offset;
+                    // multiply by 100 to get the .NET 0..900 Nanosecond.
+                    nameof(DateTime.Nanosecond) =>
+                        $"(CASE WHEN length({args[0]}) > 26 THEN CAST(substr({args[0]}, 27, 1) AS INTEGER) * 100 ELSE 0 END)",
                     // AddDays/AddMonths/AddYears accept a delta in the second argument.
                     // SQLite's date modifier syntax accepts an unsigned-positive form
                     // ('7 days') and an explicitly-signed negative form ('-3 days'); the
@@ -1100,6 +1105,10 @@ namespace nORM.Providers
                     // the microsecond-within-millisecond.
                     nameof(TimeOnly.Microsecond) =>
                         $"(CASE WHEN length({args[0]}) > 12 THEN CAST(substr({args[0]}, 13, 3) AS INTEGER) ELSE 0 END)",
+                    // TimeOnly text 'HH:mm:ss[.fffffff]'. Digit 7 is at position 16;
+                    // value times 100 yields the .NET Nanosecond 0..900.
+                    nameof(TimeOnly.Nanosecond) =>
+                        $"(CASE WHEN length({args[0]}) > 15 THEN CAST(substr({args[0]}, 16, 1) AS INTEGER) * 100 ELSE 0 END)",
                     // FromDateTime(dt) / FromTimeSpan(ts) drop everything but
                     // the time portion. SQLite's time() emits 'HH:mm:ss'.
                     nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",

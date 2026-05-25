@@ -519,6 +519,9 @@ namespace nORM.Providers
                     // 0..999999; integer-divide by 1000 to get the ms component.
                     nameof(DateTime.Millisecond) => $"(MICROSECOND({args[0]}) DIV 1000)",
                     nameof(DateTime.Microsecond) => $"(MICROSECOND({args[0]}) % 1000)",
+                    // MySQL DATETIME(6) has microsecond precision; the sub-
+                    // microsecond Nanosecond is always zero.
+                    nameof(DateTime.Nanosecond) => "0",
                     // 1 tick = 100ns. MySQL's smallest interval unit is MICROSECOND so
                     // ticks/10 gives microseconds (sub-microsecond truncates).
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) / 10) MICROSECOND)",
@@ -569,6 +572,7 @@ namespace nORM.Providers
                     nameof(TimeOnly.Second) => $"SECOND({args[0]})",
                     nameof(TimeOnly.Millisecond) => $"(MICROSECOND({args[0]}) DIV 1000)",
                     nameof(TimeOnly.Microsecond) => $"(MICROSECOND({args[0]}) % 1000)",
+                    nameof(TimeOnly.Nanosecond) => "0",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
