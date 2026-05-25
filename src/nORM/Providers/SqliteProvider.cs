@@ -792,6 +792,21 @@ namespace nORM.Providers
                 };
             }
 
+            // decimal static math: direct mirrors of Math.* equivalents.
+            // SQLite REAL handles the underlying arithmetic; the materializer
+            // converts the result back to decimal via column-type affinity.
+            if (declaringType == typeof(decimal))
+            {
+                return name switch
+                {
+                    nameof(decimal.Truncate) when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
+                    nameof(decimal.Floor) when args.Length == 1 => $"FLOOR({args[0]})",
+                    nameof(decimal.Ceiling) when args.Length == 1 => $"CEIL({args[0]})",
+                    nameof(decimal.Abs) when args.Length == 1 => $"ABS({args[0]})",
+                    _ => null
+                };
+            }
+
             if (declaringType == typeof(Convert))
             {
                 // Convert.ToXyz overloads from-string are the canonical sister
