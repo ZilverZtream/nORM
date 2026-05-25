@@ -192,16 +192,24 @@ namespace nORM.Query
             public readonly bool IsLiteral;
             public readonly string? Literal;
             public readonly int ArgIndex;
-            public FormatSegment(string literal) { IsLiteral = true; Literal = literal; ArgIndex = -1; }
-            public FormatSegment(int argIndex) { IsLiteral = false; Literal = null; ArgIndex = argIndex; }
+            public readonly string? FormatSpec;
+            public FormatSegment(string literal) { IsLiteral = true; Literal = literal; ArgIndex = -1; FormatSpec = null; }
+            public FormatSegment(int argIndex, string? formatSpec)
+            {
+                IsLiteral = false; Literal = null; ArgIndex = argIndex; FormatSpec = formatSpec;
+            }
         }
 
         /// <summary>
-        /// Splits a <c>string.Format</c> template into literal/placeholder segments.
-        /// Returns null if the template contains alignment (<c>{0,5}</c>) or format
-        /// specifiers (<c>{0:N2}</c>) — those have no portable SQL equivalent and
-        /// belong on the client-evaluation path. Escaped braces (<c>{{</c>, <c>}}</c>)
-        /// are recognized and emitted as literal single braces.
+        /// Splits a <c>string.Format</c> template into literal / placeholder segments.
+        /// Placeholders may include an optional format spec after a colon
+        /// (<c>{0:F2}</c>, <c>{0:yyyy-MM-dd}</c>); the spec is preserved on the
+        /// segment so the emit can route it through the provider's
+        /// FormatFixedDecimalSql / FormatDateUsingDotNetPattern hooks.
+        /// Returns null if the template contains alignment (<c>{0,5}</c>) -- SQL
+        /// has no portable text-padding equivalent at projection time -- so the
+        /// caller defers to client-evaluation. Escaped braces (<c>{{</c>,
+        /// <c>}}</c>) are recognized and emitted as literal single braces.
         /// </summary>
         private static List<FormatSegment>? TryParseSimpleFormatSegments(string template)
         {
@@ -218,9 +226,19 @@ namespace nORM.Query
                     int end = template.IndexOf('}', i + 1);
                     if (end < 0) return null;
                     var inner = template.Substring(i + 1, end - i - 1);
-                    if (inner.Length == 0 || inner.IndexOfAny(new[] { ',', ':' }) >= 0) return null;
-                    if (!int.TryParse(inner, out var argIdx) || argIdx < 0) return null;
-                    segments.Add(new FormatSegment(argIdx));
+                    if (inner.Length == 0) return null;
+                    if (inner.IndexOf(',') >= 0) return null; // alignment not portable to SQL
+                    string indexPart = inner;
+                    string? spec = null;
+                    int colon = inner.IndexOf(':');
+                    if (colon >= 0)
+                    {
+                        indexPart = inner.Substring(0, colon);
+                        spec = inner.Substring(colon + 1);
+                        if (spec.Length == 0) return null;
+                    }
+                    if (!int.TryParse(indexPart, out var argIdx) || argIdx < 0) return null;
+                    segments.Add(new FormatSegment(argIdx, spec));
                     i = end + 1;
                 }
                 else if (c == '}')
@@ -236,6 +254,41 @@ namespace nORM.Query
             }
             if (literal.Length > 0) segments.Add(new FormatSegment(literal.ToString()));
             return segments;
+        }
+
+        /// <summary>
+        /// Applies a .NET format spec to an already-translated SQL argument
+        /// fragment by routing through the appropriate provider hook. Returns
+        /// null when the spec cannot be portably represented (caller falls
+        /// back to client-eval). Currently supports:
+        ///  * F&lt;N&gt;  -- fixed decimal with N fractional digits (any numeric arg)
+        ///  * Custom date pattern (any arg whose CLR type is DateTime /
+        ///    DateTimeOffset / DateOnly / TimeOnly).
+        /// </summary>
+        private string? ApplyFormatSpecToArg(string argSql, Type argType, string spec)
+        {
+            var underlying = Nullable.GetUnderlyingType(argType) ?? argType;
+
+            // Numeric F<N>: fixed-decimal text. Provider hook produces e.g.
+            // printf('%.2f', x) on SQLite, FORMAT(x, 'F2') on SqlServer, etc.
+            if (spec.Length >= 2 && (spec[0] == 'F' || spec[0] == 'f')
+                && int.TryParse(spec.AsSpan(1), out var digits) && digits >= 0 && digits <= 28)
+            {
+                return _provider.FormatFixedDecimalSql(argSql, digits);
+            }
+
+            // Date / time custom patterns. Route through FormatDateUsingDotNetPattern;
+            // null means the provider can't translate this pattern -> caller
+            // defers to client-eval.
+            if (underlying == typeof(DateTime)
+                || underlying == typeof(DateTimeOffset)
+                || underlying == typeof(DateOnly)
+                || underlying == typeof(TimeOnly))
+            {
+                return _provider.FormatDateUsingDotNetPattern(argSql, spec);
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -1848,6 +1901,7 @@ namespace nORM.Query
                             else argExprs.Add(a);
                         }
                         var parts = new List<string>();
+                        bool clientEvalFallback = false;
                         foreach (var seg in segments)
                         {
                             if (seg.IsLiteral)
@@ -1859,13 +1913,37 @@ namespace nORM.Query
                             {
                                 if (seg.ArgIndex >= argExprs.Count)
                                     return base.VisitMethodCall(node); // bad template, defer
-                                var argSql = GetSql(argExprs[seg.ArgIndex]);
-                                var argType = argExprs[seg.ArgIndex].Type;
-                                if (argType != typeof(string))
-                                    argSql = _provider.GetToStringSql(argSql);
-                                parts.Add(argSql);
+                                var rawArg = argExprs[seg.ArgIndex];
+                                // string.Format takes object args; unwrap a Convert(x, typeof(object))
+                                // so the underlying CLR type stays visible for format-spec dispatch.
+                                if (rawArg is UnaryExpression u
+                                    && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked)
+                                    && u.Type == typeof(object))
+                                {
+                                    rawArg = u.Operand;
+                                }
+                                var argSql = GetSql(rawArg);
+                                var argType = rawArg.Type;
+                                if (seg.FormatSpec != null)
+                                {
+                                    var formatted = ApplyFormatSpecToArg(argSql, argType, seg.FormatSpec);
+                                    if (formatted == null)
+                                    {
+                                        clientEvalFallback = true;
+                                        break;
+                                    }
+                                    parts.Add(formatted);
+                                }
+                                else
+                                {
+                                    if (argType != typeof(string))
+                                        argSql = _provider.GetToStringSql(argSql);
+                                    parts.Add(argSql);
+                                }
                             }
                         }
+                        if (clientEvalFallback)
+                            return base.VisitMethodCall(node);
                         if (parts.Count == 0)
                         {
                             _sql.Append("''");
