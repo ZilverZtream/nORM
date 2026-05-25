@@ -568,6 +568,10 @@ namespace nORM.Providers
                     // T-SQL DATEPART(microsecond) returns 0..999999; modulo
                     // 1000 yields the microsecond-within-millisecond.
                     nameof(DateTime.Microsecond) => $"(DATEPART(microsecond, {args[0]}) % 1000)",
+                    // SQL Server DATEPART(nanosecond) returns 0..999999900 with
+                    // 100ns precision; modulo 1000 yields the 100ns-within-
+                    // microsecond, matching .NET's 0..900 in 100 steps.
+                    nameof(DateTime.Nanosecond) => $"(DATEPART(nanosecond, {args[0]}) % 1000)",
                     nameof(DateTime.Year) => $"YEAR({args[0]})",
                     nameof(DateTime.Month) => $"MONTH({args[0]})",
                     nameof(DateTime.Day) => $"DAY({args[0]})",
@@ -659,6 +663,7 @@ namespace nORM.Providers
                     nameof(TimeOnly.Second) => $"DATEPART(second, {args[0]})",
                     nameof(TimeOnly.Millisecond) => $"DATEPART(millisecond, {args[0]})",
                     nameof(TimeOnly.Microsecond) => $"(DATEPART(microsecond, {args[0]}) % 1000)",
+                    nameof(TimeOnly.Nanosecond) => $"(DATEPART(nanosecond, {args[0]}) % 1000)",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     // Matches .NET's TimeOnly.IsBetween semantics.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
