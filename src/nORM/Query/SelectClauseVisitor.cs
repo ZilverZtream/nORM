@@ -261,23 +261,40 @@ namespace nORM.Query
             // intentionally embed wildcards.
             if (node.Object != null
                 && node.Method.DeclaringType == typeof(string)
-                && node.Arguments.Count == 1
+                && (node.Arguments.Count == 1
+                    || (node.Arguments.Count == 2 && node.Arguments[1].Type == typeof(StringComparison)))
                 && (node.Method.Name == nameof(string.StartsWith)
                     || node.Method.Name == nameof(string.EndsWith)
                     || node.Method.Name == nameof(string.Contains))
                 && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var rawPattern)
                 && rawPattern is string patternStr)
             {
+                // 2-arg overload: extract the StringComparison and lower both
+                // sides for ignore-case variants -- SQLite LIKE is BINARY by
+                // default but LOWER/LIKE-LOWER is the portable equivalent. The
+                // ETSV side does the same.
+                bool ignoreCase = false;
+                if (node.Arguments.Count == 2
+                    && QueryTranslator.TryGetConstantValue(node.Arguments[1], out var cmpVal)
+                    && cmpVal is StringComparison cmpMode
+                    && cmpMode is StringComparison.OrdinalIgnoreCase
+                        or StringComparison.CurrentCultureIgnoreCase
+                        or StringComparison.InvariantCultureIgnoreCase)
+                {
+                    ignoreCase = true;
+                }
                 var receiverSql = TranslateProjectionArg(node.Object);
                 var escapeChar = nORM.Core.NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
-                var escaped = _provider.EscapeLikePattern(patternStr);
+                var effectivePattern = ignoreCase ? patternStr.ToLowerInvariant() : patternStr;
+                var escaped = _provider.EscapeLikePattern(effectivePattern);
                 var wrapped = node.Method.Name switch
                 {
                     nameof(string.StartsWith) => $"{escaped}%",
                     nameof(string.EndsWith) => $"%{escaped}",
                     _ => $"%{escaped}%",
                 };
-                sb.Append('(').Append(receiverSql).Append(" LIKE '")
+                var lhs = ignoreCase ? $"LOWER({receiverSql})" : receiverSql;
+                sb.Append('(').Append(lhs).Append(" LIKE '")
                   .Append(wrapped.Replace("'", "''"))
                   .Append("' ESCAPE '").Append(escapeChar).Append("')");
                 return node;
