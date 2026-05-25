@@ -489,6 +489,18 @@ namespace nORM.Query
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
 
+            // Mirror the HandleDirectAggregate REAL coercion for decimal
+            // aggregate selectors. SQLite decimal columns are stored as TEXT,
+            // so SUM/AVG/MIN/MAX inherit text storage class and lex-compare
+            // ('10.5' < '2.0'). The same precision tradeoff applies — REAL is
+            // IEEE-754 binary double so aggregate results are approximate;
+            // SqlServer/Postgres/MySQL use native DECIMAL and are unaffected.
+            var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
+            if (selBodyType == typeof(decimal))
+            {
+                columnSql = $"CAST({columnSql} AS REAL)";
+            }
+
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
             if (whereFilter == null) return $"{sqlAgg}({columnSql})";
 
