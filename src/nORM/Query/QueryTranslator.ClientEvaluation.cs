@@ -131,6 +131,7 @@ namespace nORM.Query
                 nameof(DateOnly.ToDateTime),
                 nameof(TimeOnly.FromDateTime),
                 nameof(TimeOnly.FromTimeSpan),
+                nameof(TimeOnly.IsBetween),
                 nameof(DateTimeOffset.UtcDateTime),
                 nameof(DateTimeOffset.DateTime),
                 nameof(DateTimeOffset.Offset),

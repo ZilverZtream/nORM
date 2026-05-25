@@ -828,6 +828,14 @@ namespace nORM.Providers
                     // the time portion. SQLite's time() emits 'HH:mm:ss'.
                     nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",
                     nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => args[0],
+                    // IsBetween(start, end): .NET defines this as
+                    //   if (start <= end) start <= this < end
+                    //   else (wraps midnight) this >= start OR this < end
+                    // Both cases unified with a CASE on the comparison. Args
+                    // are TEXT 'HH:mm:ss[.fffffff]' which sorts lex-correctly.
+                    nameof(TimeOnly.IsBetween) when args.Length == 3 =>
+                        $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
+                        $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
                     // Parse(string) -- Microsoft.Data.Sqlite stores TimeOnly
                     // as canonical 'HH:mm:ss[.fffffff]' text; source TEXT
                     // column already holds compatible text so SQL emission
