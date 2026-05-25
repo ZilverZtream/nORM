@@ -2402,6 +2402,32 @@ namespace nORM.Query
                     return node;
                 }
             }
+            // Convert.ChangeType(value, typeof(T)) — sister of the single-arg
+            // Convert.ToXxx path; the target type is a Type constant in the
+            // expression tree so we can pattern-match it at build time.
+            if (node.Method.DeclaringType == typeof(Convert)
+                && node.Method.Name == nameof(Convert.ChangeType)
+                && node.Arguments.Count == 2
+                && node.Arguments[1] is ConstantExpression ctTypeConst
+                && ctTypeConst.Value is Type ctTargetType)
+            {
+                var inner = GetSql(node.Arguments[0]);
+                var ctSqlType = ctTargetType switch
+                {
+                    var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => "INTEGER",
+                    var t when t == typeof(long) => "BIGINT",
+                    var t when t == typeof(string) => "TEXT",
+                    var t when t == typeof(double) || t == typeof(float) => "REAL",
+                    var t when t == typeof(decimal) => "DECIMAL",
+                    var t when t == typeof(bool) => "BOOLEAN",
+                    _ => null
+                };
+                if (ctSqlType != null)
+                {
+                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(ctSqlType).Append(')');
+                    return node;
+                }
+            }
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
             {
                 // Detect nested aggregates on a mapped navigation collection in a predicate context,
