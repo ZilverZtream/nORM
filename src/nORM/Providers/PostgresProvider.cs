@@ -253,6 +253,9 @@ namespace nORM.Providers
         /// <summary>PostgreSQL uses ascii() (returns codepoint of first char).</summary>
         public override string GetCharCodeSql(string charSql) => $"ascii({charSql})";
 
+        /// <summary>PostgreSQL uses chr() (lowercase, single-argument int).</summary>
+        public override string GetCharFromCodeSql(string codePointSql) => $"chr({codePointSql})";
+
         /// <summary>
         /// PostgreSQL TimeSpan maps to INTERVAL; native +/- operators on
         /// (timestamp, interval) preserve precision without text parsing.
