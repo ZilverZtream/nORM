@@ -383,6 +383,16 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"EXTRACT(MONTH FROM {args[0]})",
                     nameof(DateOnly.Day) => $"EXTRACT(DAY FROM {args[0]})",
                     nameof(DateOnly.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
+                    // PostgreSQL `date - date` returns int (days). Anchor on
+                    // DATE '0001-01-01' to match .NET DateOnly.MinValue == day 0.
+                    nameof(DateOnly.DayNumber) => $"({args[0]} - DATE '0001-01-01')",
+                    nameof(DateOnly.FromDayNumber) when args.Length == 1 =>
+                        $"(DATE '0001-01-01' + ({args[0]}))",
+                    nameof(DateOnly.FromDateTime) when args.Length == 1 =>
+                        $"({args[0]})::date",
+                    // PostgreSQL date + time = timestamp natively (no cast needed).
+                    nameof(DateOnly.ToDateTime) when args.Length == 2 =>
+                        $"({args[0]} + {args[1]})",
                     _ => null
                 };
             }

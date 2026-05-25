@@ -484,6 +484,20 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"MONTH({args[0]})",
                     nameof(DateOnly.Day) => $"DAY({args[0]})",
                     nameof(DateOnly.DayOfYear) => $"DATEPART(dayofyear, {args[0]})",
+                    // DateOnly.DayNumber: days since DateOnly.MinValue (0001-01-01).
+                    // SQL Server DATEDIFF(DAY, '0001-01-01', x) returns int days
+                    // matching .NET's day-count semantics across the full range.
+                    nameof(DateOnly.DayNumber) => $"DATEDIFF(DAY, CAST('0001-01-01' AS DATE), {args[0]})",
+                    nameof(DateOnly.FromDayNumber) when args.Length == 1 =>
+                        $"DATEADD(DAY, {args[0]}, CAST('0001-01-01' AS DATE))",
+                    nameof(DateOnly.FromDateTime) when args.Length == 1 =>
+                        $"CAST({args[0]} AS DATE)",
+                    // DateOnly.ToDateTime(TimeOnly) combines the two parts into a
+                    // wall-clock DATETIME2. Add the time-as-seconds to a midnight
+                    // datetime built from the date portion. SQL Server doesn't
+                    // accept native (DATE + TIME) addition, so use DATEADD.
+                    nameof(DateOnly.ToDateTime) when args.Length == 2 =>
+                        $"DATEADD(SECOND, DATEDIFF(SECOND, CAST('00:00:00' AS TIME), {args[1]}), CAST({args[0]} AS DATETIME2))",
                     _ => null
                 };
             }
