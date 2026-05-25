@@ -60,12 +60,19 @@ public class LinqWhereDecimalTruncateFloorCeilingTests : IAsyncLifetime
         Assert.Equal(new[] { 1 }, ids.Select(x => x.Id).ToArray());
     }
 
-    // NOTE: decimal.Abs(col) > decimal-literal returns no rows under the
-    // current ParameterManager + SQLite decimal-as-TEXT binding interaction.
-    // ABS(col) is numeric but the closure-folded decimal literal binds as
-    // TEXT, and SQLite's affinity rules then perform a textual comparison
-    // that gives the wrong answer. Separate iteration; the Truncate verify
-    // pin above documents the working path.
+    [Fact]
+    public async Task Where_decimal_Abs_greater_than_threshold_filters_correct_rows()
+    {
+        // Now passes after the binary-comparison CAST AS REAL fix: ABS(V)
+        // and the decimal-literal threshold are both coerced to REAL so
+        // SQLite does numeric comparison instead of lex.
+        var ids = await _ctx.Query<WdtfcItem>()
+            .Where(p => decimal.Abs(p.V) > 1m)
+            .OrderBy(p => p.Id)
+            .Select(p => new { p.Id })
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2, 3 }, ids.Select(x => x.Id).ToArray());
+    }
 
     [Table("WdtfcItem")]
     public sealed class WdtfcItem

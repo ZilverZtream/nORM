@@ -551,6 +551,47 @@ namespace nORM.Query
                 return node;
             }
 
+            // Decimal comparisons / arithmetic on TEXT-stored decimal columns
+            // must coerce both operands to REAL or SQLite performs lex compare
+            // ('10.5' < '2' because '1' < '2'). Wrap both sides with CAST AS
+            // REAL when either operand is decimal-typed and the op is a
+            // comparison or numeric arithmetic. CAST(int AS REAL) is identity
+            // with .0 so non-decimal pairings still round-trip.
+            bool isDecimalComparable = node.NodeType is
+                    ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                    or ExpressionType.Add or ExpressionType.Subtract
+                    or ExpressionType.Multiply or ExpressionType.Divide
+                    or ExpressionType.Modulo;
+            bool leftIsDecimal = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(decimal);
+            bool rightIsDecimal = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
+            if (isDecimalComparable && (leftIsDecimal || rightIsDecimal))
+            {
+                _sql.Append("(CAST(");
+                Visit(node.Left);
+                _sql.Append(" AS REAL)");
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => " = ",
+                    ExpressionType.NotEqual => " <> ",
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    ExpressionType.Add => " + ",
+                    ExpressionType.Subtract => " - ",
+                    ExpressionType.Multiply => " * ",
+                    ExpressionType.Divide => " / ",
+                    ExpressionType.Modulo => " % ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append("CAST(");
+                Visit(node.Right);
+                _sql.Append(" AS REAL))");
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
