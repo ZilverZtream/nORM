@@ -242,6 +242,14 @@ namespace nORM.Providers
             return $"to_char({sql}, '{sb}')";
         }
 
+        /// <summary>
+        /// PostgreSQL uses interval arithmetic: <c>(col + (N || ' seconds')::interval)</c>.
+        /// The double-pipe-cast form lets the seconds count be a SQL fragment
+        /// (constant literal or expression) rather than embedded in the literal.
+        /// </summary>
+        public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
+            => $"({dateTimeSql} + ({secondsSqlFragment} || ' seconds')::interval)";
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

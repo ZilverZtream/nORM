@@ -511,12 +511,24 @@ namespace nORM.Query
             {
                 var lhsSql = GetSql(node.Left);
                 var rhsSql = GetSql(node.Right);
-                var sign = node.NodeType == ExpressionType.Add ? "+" : "-";
-                _sql.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(lhsSql)
-                    .Append(", '").Append(sign).Append("' || (CAST(substr(").Append(rhsSql).Append(", 1, 2) AS INTEGER) * 3600 + ")
-                    .Append("CAST(substr(").Append(rhsSql).Append(", 4, 2) AS INTEGER) * 60 + ")
-                    .Append("CAST(substr(").Append(rhsSql).Append(", 7, 2) AS INTEGER)) || ' seconds'), '0'), '.')");
-                return node;
+                // Route through provider hook. Build a seconds-count fragment
+                // from the TimeSpan column's 'HH:mm:ss' TEXT (sub-day spans
+                // only per the b17440e scope); the hook applies provider-
+                // specific date arithmetic on the DateTime column.
+                var sign = node.NodeType == ExpressionType.Add ? "" : "-";
+                var secondsFragment =
+                    $"{sign}(CAST(substr({rhsSql}, 1, 2) AS INTEGER) * 3600 + " +
+                    $"CAST(substr({rhsSql}, 4, 2) AS INTEGER) * 60 + " +
+                    $"CAST(substr({rhsSql}, 7, 2) AS INTEGER))";
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(lhsSql, secondsFragment);
+                if (dateArithSql != null)
+                {
+                    _sql.Append(dateArithSql);
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + TimeSpan column arithmetic in WHERE requires this provider hook.");
             }
             // DateTime + TimeSpan / DateTime - TimeSpan shift with constant
             // TimeSpan -- mirror SelectClauseVisitor's projection emission so
@@ -546,9 +558,15 @@ namespace nORM.Query
                 var seconds = span.TotalSeconds;
                 if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
                 var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-                _sql.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
-                    .Append(", '").Append(secondsLiteral).Append(" seconds'), '0'), '.')");
-                return node;
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsLiteral);
+                if (dateArithSql != null)
+                {
+                    _sql.Append(dateArithSql);
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + constant TimeSpan arithmetic requires this provider hook.");
             }
 
             // Decimal comparisons / arithmetic on TEXT-stored decimal columns

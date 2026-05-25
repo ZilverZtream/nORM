@@ -311,6 +311,10 @@ namespace nORM.Providers
             return $"FORMAT({sql}, '{escaped}', 'en-US')";
         }
 
+        /// <summary>SQL Server uses <c>DATEADD(SECOND, N, col)</c> for date arithmetic.</summary>
+        public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
+            => $"DATEADD(SECOND, {secondsSqlFragment}, {dateTimeSql})";
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

@@ -160,6 +160,15 @@ namespace nORM.Providers
             return $"strftime('{strftimeFmt}', {sql})";
         }
 
+        /// <summary>
+        /// SQLite emits <c>strftime(..., col, modifier)</c> with a sign-prefixed
+        /// seconds modifier; the RTRIM trim strips trailing fractional-second
+        /// zeros so the result matches the canonical TEXT-stored DateTime form
+        /// the materializer reads.
+        /// </summary>
+        public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
+            => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {dateTimeSql}, ({secondsSqlFragment}) || ' seconds'), '0'), '.')";
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

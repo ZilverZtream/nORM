@@ -1229,12 +1229,20 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                var sign = node.NodeType == ExpressionType.Add ? "+" : "-";
-                sb.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
-                  .Append(", '").Append(sign).Append("' || (CAST(substr(").Append(rightSql).Append(", 1, 2) AS INTEGER) * 3600 + ")
-                  .Append("CAST(substr(").Append(rightSql).Append(", 4, 2) AS INTEGER) * 60 + ")
-                  .Append("CAST(substr(").Append(rightSql).Append(", 7, 2) AS INTEGER)) || ' seconds'), '0'), '.')");
-                return node;
+                var sign = node.NodeType == ExpressionType.Add ? "" : "-";
+                var secondsFragment =
+                    $"{sign}(CAST(substr({rightSql}, 1, 2) AS INTEGER) * 3600 + " +
+                    $"CAST(substr({rightSql}, 4, 2) AS INTEGER) * 60 + " +
+                    $"CAST(substr({rightSql}, 7, 2) AS INTEGER))";
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsFragment);
+                if (dateArithSql != null)
+                {
+                    sb.Append(dateArithSql);
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + TimeSpan column arithmetic in projection requires this provider hook.");
             }
             // DateTime + TimeSpan / DateTime - TimeSpan -> DateTime. The
             // TimeSpan operand folds via TryGetConstantValue; emit
@@ -1253,9 +1261,15 @@ namespace nORM.Query
                 var seconds = span.TotalSeconds;
                 if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
                 var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-                sb.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(leftSql)
-                  .Append(", '").Append(secondsLiteral).Append(" seconds'), '0'), '.')");
-                return node;
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsLiteral);
+                if (dateArithSql != null)
+                {
+                    sb.Append(dateArithSql);
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + constant TimeSpan arithmetic in projection requires this provider hook.");
             }
             // DateTime - DateTime in projection -> TimeSpan. SQL '-' on TEXT
             // columns returns 0 (silent-wrongness); convert via julianday math
