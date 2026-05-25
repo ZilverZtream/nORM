@@ -52,6 +52,7 @@ namespace nORM.Query
                 nameof(char.IsSymbol),
                 nameof(char.IsControl),
                 nameof(char.GetNumericValue),
+                nameof(int.Parse),
                 nameof(Enum.HasFlag),
 
                 // Math methods
