@@ -32,6 +32,15 @@ namespace nORM.Query
         /// <summary>SQL aggregate function name for COUNT operations.</summary>
         private const string CountFunctionName = "COUNT";
 
+        // When set, decimal column references in projection are emitted as
+        // CAST(col AS REAL). Used by the DISTINCT projection path because
+        // SQLite stores decimals as TEXT and DISTINCT dedups lexically
+        // ('10.5' vs '10.50' compare unequal as strings but equal numerically).
+        // Same precision tradeoff as the rest of the decimal-cluster: REAL is
+        // IEEE-754 binary, so results are approximate; SqlServer/Postgres/MySQL
+        // use native DECIMAL and don't need this coercion.
+        public bool CoerceDecimalProjectionsToReal { get; set; }
+
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
@@ -196,7 +205,15 @@ namespace nORM.Query
 
             if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
             {
-                sb.Append(col.EscCol);
+                var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
+                if (CoerceDecimalProjectionsToReal && memberType == typeof(decimal))
+                {
+                    sb.Append("CAST(").Append(col.EscCol).Append(" AS REAL)");
+                }
+                else
+                {
+                    sb.Append(col.EscCol);
+                }
                 return node;
             }
 
