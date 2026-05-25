@@ -80,6 +80,12 @@ namespace nORM.Query
                 nameof(Math.IEEERemainder),
                 nameof(Math.ScaleB),
                 nameof(Math.Clamp),
+                // IEEE 754 predicates on double/float (same name on both).
+                nameof(double.IsNaN),
+                nameof(double.IsInfinity),
+                nameof(double.IsFinite),
+                nameof(double.IsNegativeInfinity),
+                nameof(double.IsPositiveInfinity),
 
                 // DateTime properties
                 nameof(DateTime.Year),
