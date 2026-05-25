@@ -379,6 +379,12 @@ namespace nORM.Providers
                     // SQLite INSTR returns 1-based position or 0 if not found; .NET IndexOf returns
                     // 0-based position or -1, so subtract 1 unconditionally.
                     nameof(string.IndexOf) when args.Length == 2 => $"(INSTR({args[0]}, {args[1]}) - 1)",
+                    // Compare(a, b) -- .NET only guarantees the sign of the
+                    // result, so emit a CASE producing -1/0/1. SQLite's < > =
+                    // on TEXT use BINARY collation by default which matches
+                    // the ordinal comparison most callers expect.
+                    nameof(string.Compare) when args.Length == 2 =>
+                        $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
                     _ => null
                 };
             }
