@@ -48,6 +48,7 @@ namespace nORM.Query
                 nameof(char.IsWhiteSpace),
                 nameof(char.IsUpper),
                 nameof(char.IsLower),
+                nameof(char.IsPunctuation),
                 nameof(Enum.HasFlag),
 
                 // Math methods

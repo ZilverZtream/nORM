@@ -484,6 +484,22 @@ namespace nORM.Providers
                     // ASCII-range predicates matching the existing IsDigit/IsLetter shape.
                     nameof(char.IsUpper) when args.Length == 1 => $"({args[0]} BETWEEN 'A' AND 'Z')",
                     nameof(char.IsLower) when args.Length == 1 => $"({args[0]} BETWEEN 'a' AND 'z')",
+                    // ASCII punctuation per .NET char.IsPunctuation: codepoints
+                    // 33-35, 37-42, 44-47, 58-59, 63-64, 91-93, 95, 123, 125.
+                    // (! " # / % & ' ( ) * / , - . / / : ; / ? @ / [ \ ] / _ /
+                    //  { } -- excludes $, +, <, =, >, |, ~, ^, ` which .NET
+                    // classifies as Symbols.) Sub-ASCII only; full Unicode P*
+                    // category is not portable.
+                    nameof(char.IsPunctuation) when args.Length == 1 =>
+                        $"((unicode({args[0]}) BETWEEN 33 AND 35) OR " +
+                        $"(unicode({args[0]}) BETWEEN 37 AND 42) OR " +
+                        $"(unicode({args[0]}) BETWEEN 44 AND 47) OR " +
+                        $"(unicode({args[0]}) BETWEEN 58 AND 59) OR " +
+                        $"(unicode({args[0]}) BETWEEN 63 AND 64) OR " +
+                        $"(unicode({args[0]}) BETWEEN 91 AND 93) OR " +
+                        $"unicode({args[0]}) = 95 OR " +
+                        $"unicode({args[0]}) = 123 OR " +
+                        $"unicode({args[0]}) = 125)",
                     _ => null
                 };
             }
