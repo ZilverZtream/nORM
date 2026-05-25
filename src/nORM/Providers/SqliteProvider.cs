@@ -671,6 +671,13 @@ namespace nORM.Providers
                     // half-day offset since julianday('0001-01-01') returns
                     // 1721425.5 for that date at 00:00 UTC).
                     nameof(DateOnly.DayNumber) => $"CAST((julianday({args[0]}) - 1721425.5) AS INTEGER)",
+                    // FromDayNumber(n): inverse of DayNumber. SQLite's
+                    // julianday baseline differs from .NET's proleptic-Gregorian
+                    // DayNumber, so we use the date('0001-01-01', '+N days')
+                    // modifier which operates day-by-day on the symbolic date
+                    // and yields the expected proleptic-Gregorian result.
+                    nameof(DateOnly.FromDayNumber) when args.Length == 1 =>
+                        $"date('0001-01-01', '+' || CAST({args[0]} AS TEXT) || ' days')",
                     // Parse(string) -- Microsoft.Data.Sqlite stores DateOnly
                     // as canonical 'yyyy-MM-dd' text; source TEXT column
                     // already holds compatible text so SQL emission is
