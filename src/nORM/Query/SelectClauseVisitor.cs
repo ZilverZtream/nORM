@@ -854,7 +854,7 @@ namespace nORM.Query
         /// in literal segments are doubled per SQL string-literal rules so the
         /// caller can wrap the result in '...'. Strftime % is escaped as %%.
         /// </summary>
-        private static bool TryConvertDotNetDateFormatToStrftime(string fmt, out string strftime)
+        internal static bool TryConvertDotNetDateFormatToStrftime(string fmt, out string strftime)
         {
             var sb = new StringBuilder(fmt.Length + 4);
             int i = 0;

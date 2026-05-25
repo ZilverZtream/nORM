@@ -1201,10 +1201,43 @@ namespace nORM.Query
                     _sql.Append("printf('%.").Append(digits).Append("f', ").Append(inner).Append(')');
                     return node;
                 }
+
+                // DateTime / DateTimeOffset / DateOnly / TimeOnly format strings
+                // -- mirror the SCV translator from cd66470 so WHERE accepts the
+                // same shape projection does. Locale-aware tokens (MMM month
+                // name, dddd day name, etc.) are not supported.
+                if (TryGetConstantValue(node.Arguments[0], out var rawDateFmt)
+                    && rawDateFmt is string dateFmt)
+                {
+                    var underlying = Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type;
+                    if (underlying == typeof(DateTime)
+                        || underlying == typeof(DateTimeOffset)
+                        || underlying == typeof(DateOnly)
+                        || underlying == typeof(TimeOnly))
+                    {
+                        if (SelectClauseVisitor.TryConvertDotNetDateFormatToStrftime(dateFmt, out var strftimeFmt))
+                        {
+                            // Closure-captured format-string placeholder slot
+                            // (same pattern as the numeric handler above).
+                            if (node.Arguments[0] is MemberExpression)
+                            {
+                                var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                                _params[placeholder] = DBNull.Value;
+                                _compiledParams.Add(placeholder);
+                            }
+                            var inner = GetSql(node.Object);
+                            _sql.Append("strftime('").Append(strftimeFmt).Append("', ").Append(inner).Append(')');
+                            return node;
+                        }
+                        throw new NormUnsupportedFeatureException(
+                            $"DateTime ToString(\"{dateFmt}\") in Where supports tokens yyyy yy MM dd HH mm ss " +
+                            "with literal characters in between. Locale-aware tokens (MMM/MMMM/dddd/ddd) and " +
+                            "fractional/offset tokens are unavailable; materialize first and filter after .ToList().");
+                    }
+                }
                 throw new NormUnsupportedFeatureException(
-                    "Numeric ToString(formatString) in Where supports only the \"F<N>\" / \"f<N>\" " +
-                    "fixed-decimal subset. For other formats, materialize the rows first and filter " +
-                    "after .ToList().");
+                    "ToString(formatString) in Where supports numeric \"F<N>\"/\"f<N>\" and DateTime tokens " +
+                    "yyyy/yy/MM/dd/HH/mm/ss. Materialize first and filter after .ToList() for other shapes.");
             }
 
             // char.IsDigit(c) / char.IsLetter(c) / char.IsWhiteSpace(c) — static methods on
