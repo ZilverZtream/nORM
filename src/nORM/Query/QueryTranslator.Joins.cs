@@ -433,6 +433,30 @@ namespace nORM.Query
                         wroteColumns = true;
                     }
                 }
+                // Bare member-access result selector: `(p, c) => c.Tag`. Emit just the
+                // matching column from the correct alias. Without this branch the
+                // fallback path selects ALL columns and the scalar materialiser reads
+                // column 0 — returning the outer's first column instead of the child's.
+                else if (resultSelector.Body is MemberExpression memberSel
+                         && memberSel.Expression is ParameterExpression memParam)
+                {
+                    TableMapping? selMapping = null;
+                    string? selAlias = null;
+                    if (resultSelector.Parameters.Count > 0 && memParam == resultSelector.Parameters[0])
+                    {
+                        selMapping = outerMapping; selAlias = outerAlias;
+                    }
+                    else if (resultSelector.Parameters.Count > 1 && memParam == resultSelector.Parameters[1])
+                    {
+                        selMapping = innerMapping; selAlias = innerAlias;
+                    }
+                    if (selMapping != null && selAlias != null
+                        && selMapping.ColumnsByName.TryGetValue(memberSel.Member.Name, out var memCol))
+                    {
+                        _sql.Append(selAlias).Append('.').Append(memCol.EscCol);
+                        wroteColumns = true;
+                    }
+                }
 
                 if (!wroteColumns)
                 {
