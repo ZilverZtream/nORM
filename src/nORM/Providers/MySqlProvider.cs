@@ -356,6 +356,15 @@ namespace nORM.Providers
             return $"CONCAT(DATE_FORMAT({fmtArg}, '%Y-%m-%dT%H:%i:%s'), '{suffix}')";
         }
 
+        /// <inheritdoc/>
+        public override string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
+        {
+            var totalSec = (long)localOffset.TotalSeconds;
+            return totalSec == 0
+                ? $"CAST({dtoSql} AS DATETIME)"
+                : $"DATE_ADD({dtoSql}, INTERVAL {totalSec} SECOND)";
+        }
+
         /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
         /// DATE so the materializer reads a DateOnly-compatible value.

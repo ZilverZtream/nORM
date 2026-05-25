@@ -163,6 +163,7 @@ namespace nORM.Query
                 nameof(TimeOnly.IsBetween),
                 nameof(Nullable<int>.GetValueOrDefault),
                 nameof(DateTimeOffset.UtcDateTime),
+                nameof(DateTimeOffset.LocalDateTime),
                 nameof(DateTimeOffset.DateTime),
                 nameof(DateTimeOffset.Offset),
                 nameof(DateTimeOffset.ToOffset),

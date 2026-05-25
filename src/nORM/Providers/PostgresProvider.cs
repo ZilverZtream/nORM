@@ -285,6 +285,13 @@ namespace nORM.Providers
             return $"(to_char({dtoSql} AT TIME ZONE INTERVAL '{totalSec} seconds', 'YYYY-MM-DD\"T\"HH24:MI:SS') || '{suffix}')";
         }
 
+        /// <inheritdoc/>
+        public override string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
+        {
+            var totalSec = (long)localOffset.TotalSeconds;
+            return $"(({dtoSql} AT TIME ZONE INTERVAL '{totalSec} seconds')::timestamp)";
+        }
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";

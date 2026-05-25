@@ -344,6 +344,10 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
             => $"SWITCHOFFSET({dtoSql}, '{FormatOffsetSuffix(offset)}')";
 
+        /// <inheritdoc/>
+        public override string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
+            => $"CAST(SWITCHOFFSET({dtoSql}, '{FormatOffsetSuffix(localOffset)}') AS DATETIME2)";
+
         /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
