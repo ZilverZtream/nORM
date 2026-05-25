@@ -1181,6 +1181,14 @@ namespace nORM.Providers
                     case "IsFinite": return $"({args[0]} = {args[0]} AND ABS({args[0]}) != 1e999)";
                     case "IsNegativeInfinity": return $"({args[0]} = -1e999)";
                     case "IsPositiveInfinity": return $"({args[0]} = 1e999)";
+                    // IsNormal: finite, non-zero, |x| >= smallest normal positive double.
+                    // The IEEE 754 boundary is 2^-1022 = 2.2250738585072014E-308.
+                    case "IsNormal":
+                        return $"({args[0]} = {args[0]} AND ABS({args[0]}) != 1e999 " +
+                               $"AND {args[0]} != 0 AND ABS({args[0]}) >= 2.2250738585072014E-308)";
+                    // IsSubnormal: non-zero AND |x| < min normal positive.
+                    case "IsSubnormal":
+                        return $"({args[0]} != 0 AND ABS({args[0]}) < 2.2250738585072014E-308)";
                 }
             }
 
@@ -1246,6 +1254,11 @@ namespace nORM.Providers
                     nameof(Math.MinMagnitude) when args.Length == 2 => $"CASE WHEN ABS({args[0]}) <= ABS({args[1]}) THEN {args[0]} ELSE {args[1]} END",
                     // ScaleB(x, n) = x * 2^n -- direct via SQLite POW.
                     nameof(Math.ScaleB) when args.Length == 2 => $"({args[0]} * POW(2.0, {args[1]}))",
+                    // CopySign(x, y): returns x with the sign of y. ABS(x) * SIGN(y)
+                    // is portable but loses the sign-of-zero distinction (SIGN(0) = 0,
+                    // so CopySign(x, 0) emits 0 instead of x); acceptable since real
+                    // column values rarely encounter signed zero.
+                    nameof(Math.CopySign) when args.Length == 2 => $"(ABS({args[0]}) * SIGN({args[1]}))",
                     // BigMul(int, int) widens to long. SQLite INTEGER is 64-bit
                     // so the natural product never overflows for the int*int
                     // range -- emit the plain multiply; materializer reads the
