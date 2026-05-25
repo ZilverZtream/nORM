@@ -665,6 +665,12 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
+                    // DayNumber: days since DateOnly.MinValue (0001-01-01).
+                    // .NET stores DayNumber as a 0-based int -- subtract the
+                    // Julian Day of 0001-01-01 (1721425.5; the .5 is the JD
+                    // half-day offset since julianday('0001-01-01') returns
+                    // 1721425.5 for that date at 00:00 UTC).
+                    nameof(DateOnly.DayNumber) => $"CAST((julianday({args[0]}) - 1721425.5) AS INTEGER)",
                     // Parse(string) -- Microsoft.Data.Sqlite stores DateOnly
                     // as canonical 'yyyy-MM-dd' text; source TEXT column
                     // already holds compatible text so SQL emission is
