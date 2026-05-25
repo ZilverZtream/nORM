@@ -400,6 +400,14 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d')";
 
+        /// <summary>6-arg STR_TO_DATE with full 'YYYY-MM-DD HH:MM:SS' shape.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
+            => $"STR_TO_DATE(CONCAT(" +
+               $"CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), " +
+               $"' ', " +
+               $"CONCAT_WS(':', LPAD({hourSql}, 2, '0'), LPAD({minuteSql}, 2, '0'), LPAD({secondSql}, 2, '0'))), " +
+               $"'%Y-%m-%d %H:%i:%s')";
+
         /// <summary>MySQL DATE() wrapper around the STR_TO_DATE text shape ensures DATE return type.</summary>
         public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATE(STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d'))";

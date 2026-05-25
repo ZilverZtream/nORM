@@ -406,6 +406,11 @@ namespace nORM.Providers
             => $"strftime('%Y-%m-%d 00:00:00', " +
                $"printf('%04d-%02d-%02d', {yearSql}, {monthSql}, {daySql}))";
 
+        /// <summary>6-arg SQLite date-from-parts with full 'yyyy-MM-dd HH:mm:ss' shape.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
+            => $"strftime('%Y-%m-%d %H:%M:%S', " +
+               $"printf('%04d-%02d-%02d %02d:%02d:%02d', {yearSql}, {monthSql}, {daySql}, {hourSql}, {minuteSql}, {secondSql}))";
+
         /// <summary>SQLite printf yields the canonical DateOnly text 'yyyy-MM-dd'.</summary>
         public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"printf('%04d-%02d-%02d', {yearSql}, {monthSql}, {daySql})";

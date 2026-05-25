@@ -411,6 +411,10 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATETIME2FROMPARTS({yearSql}, {monthSql}, {daySql}, 0, 0, 0, 0, 7)";
 
+        /// <summary>6-arg DATETIME2FROMPARTS with non-zero h/m/s and 0 fractional.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
+            => $"DATETIME2FROMPARTS({yearSql}, {monthSql}, {daySql}, {hourSql}, {minuteSql}, {secondSql}, 0, 7)";
+
         /// <summary>T-SQL DATEFROMPARTS builds a DATE from int parts.</summary>
         public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATEFROMPARTS({yearSql}, {monthSql}, {daySql})";
