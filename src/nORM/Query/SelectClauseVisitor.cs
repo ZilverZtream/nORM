@@ -248,6 +248,31 @@ namespace nORM.Query
                 }
             }
 
+            // string.Join(separator, params string[] values) -- the C# variadic
+            // form compiles to a MethodCall with a NewArrayInit second arg
+            // holding the value expressions. The args array passed to the
+            // provider's TranslateFunction collapses the NewArrayInit into a
+            // single opaque entry, so this handler lives in SCV where we can
+            // pull each element directly and call TranslateProjectionArg per
+            // element, then interleave a constant separator literal.
+            if (node.Method.DeclaringType == typeof(string)
+                && node.Method.Name == nameof(string.Join)
+                && node.Arguments.Count == 2
+                && node.Arguments[1] is NewArrayExpression joinArr
+                && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var joinSepVal)
+                && joinSepVal is string joinSep)
+            {
+                var sepLit = $"'{joinSep.Replace("'", "''")}'";
+                if (joinArr.Expressions.Count == 0)
+                {
+                    sb.Append("''");
+                    return node;
+                }
+                var elemSqls = joinArr.Expressions.Select(e => TranslateProjectionArg(e)).ToList();
+                sb.Append('(').Append(string.Join($" || {sepLit} || ", elemSqls)).Append(')');
+                return node;
+            }
+
             // string.StartsWith / EndsWith / Contains -- the projection-time
             // shape needs LIKE-wildcard escaping the generic provider route
             // can't do (the provider only sees pre-rendered SQL fragments,
