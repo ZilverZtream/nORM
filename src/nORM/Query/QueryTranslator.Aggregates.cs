@@ -376,6 +376,37 @@ namespace nORM.Query
         {
             var methodName = methodCall.Method.Name;
 
+            // string.Join(separator, group.Select(x => member)) inside a GroupBy
+            // projection lowers to the provider's STRING_AGG / GROUP_CONCAT
+            // aggregate. The argument shape is the same for the variadic and
+            // IEnumerable<string> overloads after the group rewrite -- args[0]
+            // is the literal separator and args[1] is the Enumerable.Select
+            // call over the group element parameter.
+            if (methodCall.Method.DeclaringType == typeof(string)
+                && methodName == nameof(string.Join)
+                && methodCall.Arguments.Count == 2
+                && TryGetConstantValue(methodCall.Arguments[0], out var aggSepVal)
+                && aggSepVal is string aggSep
+                && methodCall.Arguments[1] is MethodCallExpression aggInner
+                && aggInner.Method.DeclaringType == typeof(System.Linq.Enumerable)
+                && aggInner.Method.Name == nameof(System.Linq.Enumerable.Select)
+                && aggInner.Arguments.Count == 2
+                && aggInner.Arguments[0] is ParameterExpression aggGroupParam
+                && aggGroupParam.Type.IsGenericType
+                && (aggGroupParam.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>)
+                    || aggGroupParam.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                && StripQuotes(aggInner.Arguments[1]) is LambdaExpression aggLambda)
+            {
+                var vctxAgg = new VisitorContext(_ctx, _mapping, _provider, aggLambda.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                var aggVisitor = FastExpressionVisitorPool.Get(in vctxAgg);
+                var memberSql = aggVisitor.Translate(aggLambda.Body);
+                foreach (var kvp in aggVisitor.GetParameters())
+                    AddLiteralParameter(kvp.Key, kvp.Value);
+                FastExpressionVisitorPool.Return(aggVisitor);
+                var sepLit = $"'{aggSep.Replace("'", "''")}'";
+                return _provider.GetStringAggregateSql(memberSql, sepLit);
+            }
+
             // Handle IGrouping<TKey, TElement> methods
             switch (methodName)
             {
