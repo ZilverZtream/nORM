@@ -1339,6 +1339,37 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Walks back through a source expression chain collecting OrderBy /
+        /// OrderByDescending / ThenBy / ThenByDescending lambdas in primary-first
+        /// order. Used by <see cref="LastTranslator"/> to mirror the source's
+        /// ordering on the outer derived-table SELECT (reversed for "last"
+        /// semantics).
+        /// </summary>
+        private static System.Collections.Generic.List<(LambdaExpression KeySelector, bool Ascending)> ExtractOrderByKeys(Expression source)
+        {
+            var result = new System.Collections.Generic.List<(LambdaExpression, bool)>();
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                bool? asc = mce.Method.Name switch
+                {
+                    nameof(Queryable.OrderBy) or nameof(Queryable.ThenBy) => true,
+                    nameof(Queryable.OrderByDescending) or nameof(Queryable.ThenByDescending) => false,
+                    _ => null
+                };
+                if (asc.HasValue
+                    && mce.Arguments.Count == 2
+                    && StripQuotes(mce.Arguments[1]) is LambdaExpression k)
+                {
+                    result.Insert(0, (k, asc.Value));
+                }
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return result;
+        }
+
         private sealed class LastTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -1349,6 +1380,87 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Last with predicate over a Take/Skip-windowed source — the predicate
+                // must evaluate only against the windowed rows, and "last" must be the
+                // last row of the window matching pred (not the last of the full table).
+                // Sister of FirstSingleTranslator's windowed branch (commit e0f1397).
+                // To preserve "last" semantics across derived-table wrap, lift the
+                // source's OrderBy keys and emit them DESCENDING on the outer SELECT.
+                LambdaExpression? lastWinPred = null;
+                Expression? lastWinSource = null;
+                if (node.Arguments.Count > 1
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression lwp2
+                    && QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0]))
+                {
+                    lastWinPred = lwp2;
+                    lastWinSource = node.Arguments[0];
+                }
+                else if (node.Arguments.Count == 1
+                    && node.Arguments[0] is MethodCallExpression lastWhereWrap
+                    && lastWhereWrap.Method.Name == nameof(Queryable.Where)
+                    && lastWhereWrap.Arguments.Count == 2
+                    && StripQuotes(lastWhereWrap.Arguments[1]) is LambdaExpression lwp1
+                    && QueryTranslator.SourceHasTakeOrSkip(lastWhereWrap.Arguments[0]))
+                {
+                    lastWinPred = lwp1;
+                    lastWinSource = lastWhereWrap.Arguments[0];
+                }
+                if (lastWinSource != null)
+                {
+                    var lastSubPlan = t.TranslateInSubContext(lastWinSource, t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var lastSubMap);
+                    t._mapping = lastSubMap;
+                    t.MergeSubPlanParameters(lastSubPlan);
+                    var lastAlias = t.EscapeAlias("__wlast" + t._joinCounter++);
+                    t._sql.Append("SELECT * FROM (").Append(lastSubPlan.Sql)
+                          .Append(") AS ").Append(lastAlias);
+                    if (lastWinPred != null)
+                    {
+                        var lwParam = lastWinPred.Parameters[0];
+                        if (!t._correlatedParams.ContainsKey(lwParam))
+                            t._correlatedParams[lwParam] = (lastSubMap, lastAlias);
+                        var vctxLW = new VisitorContext(t._ctx, lastSubMap, t._provider, lwParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                        var lwVisitor = FastExpressionVisitorPool.Get(in vctxLW);
+                        var lwSql = lwVisitor.Translate(lastWinPred.Body);
+                        foreach (var kvp in lwVisitor.GetParameters())
+                            t._params[kvp.Key] = kvp.Value;
+                        if (t._params.Count > t._parameterManager.Index)
+                            t._parameterManager.Index = t._params.Count;
+                        FastExpressionVisitorPool.Return(lwVisitor);
+                        if (t._where.Length > 0) t._where.Append(" AND ");
+                        t._where.Append('(').Append(lwSql).Append(')');
+                    }
+                    // Reverse the source's OrderBy onto the outer SELECT so we pick
+                    // the LAST row of the matched window. If the source has no
+                    // explicit OrderBy, fall back to the mapping's key columns
+                    // ordered descending, matching the unwindowed-Last default.
+                    var orderKeys = ExtractOrderByKeys(lastWinSource);
+                    if (orderKeys.Count > 0)
+                    {
+                        foreach (var (keyLambda, asc) in orderKeys)
+                        {
+                            var okParam = keyLambda.Parameters[0];
+                            if (!t._correlatedParams.ContainsKey(okParam))
+                                t._correlatedParams[okParam] = (lastSubMap, lastAlias);
+                            var vctxOk = new VisitorContext(t._ctx, lastSubMap, t._provider, okParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                            var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
+                            var okSql = okVisitor.Translate(keyLambda.Body);
+                            FastExpressionVisitorPool.Return(okVisitor);
+                            t._orderBy.Add((okSql, !asc));
+                        }
+                    }
+                    else
+                    {
+                        foreach (var key in lastSubMap.KeyColumns)
+                            t._orderBy.Add(($"{lastAlias}.{key.EscCol}", false));
+                    }
+                    t._take = 1;
+                    var pNameLW = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                    t._params[pNameLW] = 1;
+                    t._takeParam = pNameLW;
+                    t._takeSetByTerminal = true;
+                    t._singleResult = t._methodName == "Last";
+                    return node;
+                }
                 if (node.Arguments.Count > 1)
                 {
                     var lastPredicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
