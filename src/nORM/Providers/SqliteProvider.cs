@@ -636,6 +636,19 @@ namespace nORM.Providers
                     // to INTEGER so the materializer hits int affinity.
                     nameof(DateTime.Compare) when args.Length == 2 =>
                         $"CAST(SIGN(julianday({args[0]}) - julianday({args[1]})) AS INTEGER)",
+                    // IsLeapYear(y) -- Gregorian rule: div by 4, but not
+                    // centuries unless also div by 400.
+                    nameof(DateTime.IsLeapYear) when args.Length == 1 =>
+                        $"((({args[0]}) % 4 = 0 AND ({args[0]}) % 100 != 0) OR ({args[0]}) % 400 = 0)",
+                    // DaysInMonth(year, month) -- month-length table with the
+                    // leap-year exception for February. Pure CASE expression.
+                    nameof(DateTime.DaysInMonth) when args.Length == 2 =>
+                        $"(CASE ({args[1]}) " +
+                        $"WHEN 1 THEN 31 WHEN 3 THEN 31 WHEN 5 THEN 31 WHEN 7 THEN 31 " +
+                        $"WHEN 8 THEN 31 WHEN 10 THEN 31 WHEN 12 THEN 31 " +
+                        $"WHEN 4 THEN 30 WHEN 6 THEN 30 WHEN 9 THEN 30 WHEN 11 THEN 30 " +
+                        $"WHEN 2 THEN (CASE WHEN ({args[0]}) % 4 = 0 AND (({args[0]}) % 100 != 0 OR ({args[0]}) % 400 = 0) THEN 29 ELSE 28 END) " +
+                        $"END)",
                     // Instance CompareTo -- same emit pattern, args[0] is the
                     // receiver instance pushed through TranslateFunction.
                     nameof(DateTime.CompareTo) when args.Length == 2 =>
