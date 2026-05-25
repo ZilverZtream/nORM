@@ -19,7 +19,17 @@ public abstract class TestBase
         var visitorType = typeof(DbContext).Assembly.GetType("nORM.Query.ExpressionToSqlVisitor", true)!;
         var visitor = Activator.CreateInstance(visitorType, ctx, mapping, ctx.Provider, expr.Parameters[0], provider.Escape("T0"), null, null, null)!;
         var sql = (string)visitorType.GetMethod("Translate")!.Invoke(visitor, new object[] { expr.Body })!;
-        var parameters = (Dictionary<string, object>)visitorType.GetMethod("GetParameters")!.Invoke(visitor, null)!;
+        var rawParameters = (Dictionary<string, object>)visitorType.GetMethod("GetParameters")!.Invoke(visitor, null)!;
+        // Strip "_unused" placeholder slots -- these are alignment artifacts
+        // for the compiled-query ParameterValueExtractor that walks every
+        // closure MemberExpression in document order and expects a matching
+        // slot in _params (so subsequent @cp bindings line up). They're never
+        // referenced by the generated SQL and aren't bound to the DbCommand.
+        // Test assertions on parameter count should reflect real runtime
+        // bindings, not the compiled-query alignment shadow.
+        var parameters = rawParameters
+            .Where(kv => !kv.Key.EndsWith("_unused", StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
         return (sql, parameters);
     }
 
@@ -54,9 +64,14 @@ public abstract class TestBase
         var translator = Activator.CreateInstance(translatorType, ctx)!;
         var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr })!;
         var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
-        var parameters = (IReadOnlyDictionary<string, object>)plan.GetType().GetProperty("Parameters")!.GetValue(plan)!;
+        var rawParameters = (IReadOnlyDictionary<string, object>)plan.GetType().GetProperty("Parameters")!.GetValue(plan)!;
         var elementType = (Type)plan.GetType().GetProperty("ElementType")!.GetValue(plan)!;
-        return (sql, new Dictionary<string, object>(parameters), elementType);
+        // Strip "_unused" placeholder slots (compiled-query alignment artifacts,
+        // not real DB bindings) -- see comment on the other Translate helper above.
+        var parameters = rawParameters
+            .Where(kv => !kv.Key.EndsWith("_unused", StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        return (sql, parameters, elementType);
     }
 }
 
