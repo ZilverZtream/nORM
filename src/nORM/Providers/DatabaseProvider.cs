@@ -220,6 +220,71 @@ namespace nORM.Providers
         public virtual string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args) => null;
 
         /// <summary>
+        /// Shared helper for non-SQLite providers' Math.Round / decimal.Round
+        /// with MidpointRounding handling. SQLite has its own override because
+        /// its default ROUND is AwayFromZero rather than banker's, and the
+        /// emit shapes diverge enough that sharing is awkward. Providers that
+        /// call this supply the truncate-toward-zero primitive and any
+        /// AwayFromZero override; the rest (FLOOR / CEILING / ToEven via
+        /// formula) is shared.
+        /// </summary>
+        protected string? TryTranslateMathRoundWithMode(
+            System.Linq.Expressions.MethodCallExpression node,
+            string[] args,
+            Func<string, string?, string> awayFromZero,
+            Func<string, string?, string> truncateTowardZero)
+        {
+            var declType = node.Method.DeclaringType;
+            if (!((declType == typeof(Math) && node.Method.Name == nameof(Math.Round))
+                  || (declType == typeof(decimal) && node.Method.Name == nameof(decimal.Round))))
+                return null;
+            var ps = node.Method.GetParameters();
+            System.MidpointRounding mode = System.MidpointRounding.ToEven; // .NET default
+            string? digitsArg = null;
+            if (ps.Length == 2 && ps[1].ParameterType == typeof(System.MidpointRounding))
+            {
+                if (node.Arguments[1] is System.Linq.Expressions.ConstantExpression c1 && c1.Value is System.MidpointRounding m1)
+                    mode = m1;
+            }
+            else if (ps.Length == 2)
+            {
+                digitsArg = args[1];
+            }
+            else if (ps.Length == 3)
+            {
+                digitsArg = args[1];
+                if (node.Arguments[2] is System.Linq.Expressions.ConstantExpression c2 && c2.Value is System.MidpointRounding m2)
+                    mode = m2;
+            }
+            var x = args[0];
+            string scaled = digitsArg == null ? x : $"({x} * POWER(10.0, {digitsArg}))";
+            string unscale(string s) => digitsArg == null ? s : $"({s} / POWER(10.0, {digitsArg}))";
+            switch (mode)
+            {
+                case System.MidpointRounding.AwayFromZero:
+                    return awayFromZero(x, digitsArg);
+                case System.MidpointRounding.ToZero:
+                    return truncateTowardZero(x, digitsArg);
+                case System.MidpointRounding.ToNegativeInfinity:
+                    return unscale($"FLOOR({scaled})");
+                case System.MidpointRounding.ToPositiveInfinity:
+                    return unscale($"CEILING({scaled})");
+                case System.MidpointRounding.ToEven:
+                default:
+                    // Banker's: integer-part-via-truncate plus +1 only when the
+                    // half-tie's integer part is odd. Sign reapplied via the
+                    // leading CASE so negatives round symmetrically.
+                    return unscale(
+                        $"((CASE WHEN {scaled} >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(FLOOR(ABS({scaled})) + " +
+                        $"CASE " +
+                        $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) > 0.5 THEN 1 " +
+                        $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(FLOOR(ABS({scaled})) AS BIGINT) % 2) END))");
+            }
+        }
+
+        /// <summary>
         /// Returns SQL that evaluates `end - start` as a fractional number of seconds. Used
         /// by the LINQ translator to lower `(end - start).TotalSeconds / TotalMinutes /
         /// TotalHours / Days / etc.` to a portable scalar expression. Both arguments are

@@ -402,6 +402,15 @@ namespace nORM.Providers
             => $"CAST(((TIME_TO_SEC(TIMEDIFF({endSql}, {startSql})) + 86400) MOD 86400) AS DOUBLE)";
 
         /// <summary>
+        /// Overload-aware Math.Round / decimal.Round handling. MySQL ROUND(x [, n])
+        /// is AwayFromZero; TRUNCATE(x, n) truncates toward zero.
+        /// </summary>
+        public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
+            => TryTranslateMathRoundWithMode(node, args,
+                awayFromZero: (x, digits) => digits == null ? $"ROUND({x})" : $"ROUND({x}, {digits})",
+                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})");
+
+        /// <summary>
         /// Translates selected .NET methods to their MySQL SQL equivalents.
         /// </summary>
         public override string? TranslateFunction(string name, Type declaringType, params string[] args)

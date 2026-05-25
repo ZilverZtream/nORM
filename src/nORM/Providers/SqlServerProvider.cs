@@ -440,6 +440,18 @@ namespace nORM.Providers
             => $"CAST(((DATEDIFF(SECOND, {startSql}, {endSql}) + 86400) % 86400) AS FLOAT)";
 
         /// <summary>
+        /// Overload-aware Math.Round / decimal.Round handling so MidpointRounding
+        /// arguments dispatch to the correct emit instead of being silently
+        /// coerced to a digit-count integer (the int value of the enum).
+        /// SqlServer-native ROUND(x [, n]) is AwayFromZero; ROUND(x, n, 1) is
+        /// the truncate-toward-zero form via the truncate flag.
+        /// </summary>
+        public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
+            => TryTranslateMathRoundWithMode(node, args,
+                awayFromZero: (x, digits) => digits == null ? $"ROUND({x}, 0)" : $"ROUND({x}, {digits})",
+                truncateTowardZero: (x, digits) => digits == null ? $"ROUND({x}, 0, 1)" : $"ROUND({x}, {digits}, 1)");
+
+        /// <summary>
         /// Translates a subset of .NET methods into their SQL Server equivalents.
         /// </summary>
         /// <param name="name">Name of the method being translated.</param>
