@@ -282,9 +282,8 @@ namespace nORM.Providers
             // precision for non-representable values (e.g. FromHours(1.0/3.0)) --
             // documented limitation matching .NET's IEEE-754 semantics.
             //
-            // Positive spans only: negative values produce malformed '-N.HH:..'
-            // output. Negative spans should materialize the column raw and call
-            // .From* client-side.
+            // Negative spans are handled via abs(ticks) + '-' prefix per the
+            // canonical 'c' format ("-01:00:00" for TimeSpan.FromHours(-1)).
             if (declType == typeof(TimeSpan)
                 && node.Object == null
                 && args.Length == 1)
@@ -317,23 +316,33 @@ namespace nORM.Providers
                     //   0 days, frac:    HH:mm:ss.fffffff
                     //   >0 days, 0 frac: d.HH:mm:ss
                     //   >0 days, frac:   d.HH:mm:ss.fffffff
+                    // For negative spans, 'c' prefixes the whole span with '-' on
+                    // top of the same field layout: e.g. TimeSpan.FromHours(-0.5)
+                    // -> "-00:30:00". SQLite's signed modulo embeds the sign in
+                    // individual fields ("00:-30:00") -- WRONG, TimeSpan.Parse
+                    // rejects it. Compute on abs(ticks) and prepend '-' via a
+                    // sign-aware outer CASE.
                     // Without exact format match, WHERE comparisons of
                     // TimeSpan.FromHours(col) > parameter fail lexically because
                     // '0.02:00:00.0000000' (column with day prefix) sorts before
                     // '01:00:00' (parameter without).
-                    var daysExpr = $"(({totalTicksSql}) / 864000000000)";
-                    var hExpr    = $"((({totalTicksSql}) / 36000000000) % 24)";
-                    var mExpr    = $"((({totalTicksSql}) / 600000000) % 60)";
-                    var sExpr    = $"((({totalTicksSql}) / 10000000) % 60)";
-                    var fExpr    = $"(({totalTicksSql}) % 10000000)";
-                    return "(CASE " +
-                           $"WHEN ({totalTicksSql}) >= 864000000000 AND ({totalTicksSql}) % 10000000 != 0 " +
+                    var absTicks = $"abs({totalTicksSql})";
+                    var daysExpr = $"(({absTicks}) / 864000000000)";
+                    var hExpr    = $"((({absTicks}) / 36000000000) % 24)";
+                    var mExpr    = $"((({absTicks}) / 600000000) % 60)";
+                    var sExpr    = $"((({absTicks}) / 10000000) % 60)";
+                    var fExpr    = $"(({absTicks}) % 10000000)";
+                    var signExpr = $"(CASE WHEN ({totalTicksSql}) < 0 THEN '-' ELSE '' END)";
+                    var bodyExpr =
+                        "(CASE " +
+                           $"WHEN ({absTicks}) >= 864000000000 AND ({absTicks}) % 10000000 != 0 " +
                                 $"THEN printf('%d.%02d:%02d:%02d.%07d', {daysExpr}, {hExpr}, {mExpr}, {sExpr}, {fExpr}) " +
-                           $"WHEN ({totalTicksSql}) >= 864000000000 " +
+                           $"WHEN ({absTicks}) >= 864000000000 " +
                                 $"THEN printf('%d.%02d:%02d:%02d', {daysExpr}, {hExpr}, {mExpr}, {sExpr}) " +
-                           $"WHEN ({totalTicksSql}) % 10000000 != 0 " +
+                           $"WHEN ({absTicks}) % 10000000 != 0 " +
                                 $"THEN printf('%02d:%02d:%02d.%07d', {hExpr}, {mExpr}, {sExpr}, {fExpr}) " +
                            $"ELSE printf('%02d:%02d:%02d', {hExpr}, {mExpr}, {sExpr}) END)";
+                    return $"({signExpr} || {bodyExpr})";
                 }
             }
 
