@@ -1219,8 +1219,11 @@ namespace nORM.Query
             // sub-day 'HH:mm:ss' text per b17440e. Sub-day only -- multi-day
             // TimeSpan columns are out of scope (same scope cap as memory
             // item TimeSpan handler).
+            // DateTime AND DateTimeOffset use the same arithmetic emit path.
+            static bool ScvIsDateTimeOrOffset(Type t)
+                => t == typeof(DateTime) || t == typeof(DateTimeOffset);
             if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
-                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && ScvIsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
                 && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
                 && !QueryTranslator.TryGetConstantValue(node.Right, out _))
             {
@@ -1241,14 +1244,13 @@ namespace nORM.Query
                 }
                 throw new InvalidOperationException(
                     $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
-                    "DateTime +/- TimeSpan column arithmetic in projection requires this provider hook.");
+                    "DateTime/Offset +/- TimeSpan column arithmetic in projection requires this provider hook.");
             }
-            // DateTime + TimeSpan / DateTime - TimeSpan -> DateTime. The
-            // TimeSpan operand folds via TryGetConstantValue; emit
-            // strftime + RTRIM to match Microsoft.Data.Sqlite's FFFFFFF
-            // binding so the result round-trips for downstream comparisons.
+            // DateTime/DateTimeOffset + constant TimeSpan -> same type. Folds via
+            // TryGetConstantValue; AddSecondsToDateTimeSql handles provider-native
+            // date arithmetic.
             if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
-                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && ScvIsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
                 && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
                 && QueryTranslator.TryGetConstantValue(node.Right, out var rhsTs)
                 && rhsTs is TimeSpan span)
