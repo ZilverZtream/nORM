@@ -62,6 +62,10 @@ namespace nORM.Query
                 nameof(Math.Round),
                 nameof(Math.Log2),
                 nameof(Math.Cbrt),
+                nameof(Math.Sinh),
+                nameof(Math.Cosh),
+                nameof(Math.Tanh),
+                nameof(Math.Atan2),
 
                 // DateTime properties
                 nameof(DateTime.Year),
