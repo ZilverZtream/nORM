@@ -158,6 +158,7 @@ namespace nORM.Query
                 nameof(TimeSpan.FromSeconds),
                 nameof(TimeSpan.FromMilliseconds),
                 nameof(TimeSpan.FromTicks),
+                nameof(TimeSpan.FromDays),
 
                 // LINQ aggregate methods (when used in proper context)
                 nameof(Enumerable.Count),

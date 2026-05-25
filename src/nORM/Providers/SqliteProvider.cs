@@ -262,38 +262,43 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
-            // TimeSpan factory static methods (FromHours/FromMinutes/FromSeconds/
-            // FromMilliseconds/FromTicks) -- emit printf that produces canonical
-            // 'HH:mm:ss.fffffff' text the existing TimeSpan materializer parses.
+            // TimeSpan factory static methods (FromDays/FromHours/FromMinutes/
+            // FromSeconds/FromMilliseconds/FromTicks) -- emit printf producing the
+            // canonical 'd.HH:mm:ss.fffffff' text the TimeSpan materializer parses.
             // SQLite has no native TimeSpan type, so Microsoft.Data.Sqlite reads
             // TEXT columns via TimeSpan.Parse for TimeSpan-typed projection slots.
             //
+            // Day-prefix `d.` is REQUIRED for hour fields >= 24 (e.g. FromHours(48)).
+            // TimeSpan.Parse("48:00:00") throws OverflowException because the first
+            // segment is constrained to [0,23] when no day prefix is present. Always
+            // emitting `0.` for sub-day spans is parser-compatible: Parse accepts
+            // both "0.02:30:00" and "02:30:00" as 2h30m.
+            //
             // Unified total-ticks reduction: every factory has an integer multiplier
             // to ticks (1 sec = 10_000_000 ticks). Computing the integer tick count
-            // once and splitting into hh/mm/ss/frac via integer arithmetic preserves
-            // sub-second precision for FromMilliseconds (1500 -> 15_000_000 ticks ->
-            // '00:00:01.5000000') and FromTicks. For float-arg factories
-            // (FromHours / FromMinutes / FromSeconds) the multiplier-times-double may
-            // lose 1 tick of precision for non-representable values (e.g.
-            // FromHours(1.0/3.0)) -- documented limitation matching .NET's IEEE-754
-            // semantics.
+            // once and splitting into d/hh/mm/ss/frac via integer arithmetic
+            // preserves sub-second precision for FromMilliseconds / FromTicks. For
+            // float-arg factories the multiplier-times-double may lose 1 tick of
+            // precision for non-representable values (e.g. FromHours(1.0/3.0)) --
+            // documented limitation matching .NET's IEEE-754 semantics.
             //
-            // Sub-day positive spans only: 'HH' field overflows past 99 hours and
-            // negative values produce malformed '-1:00:00.0000000' output. Multi-day
-            // / negative spans should materialize the column raw and call .From*
-            // client-side.
+            // Positive spans only: negative values produce malformed '-N.HH:..'
+            // output. Negative spans should materialize the column raw and call
+            // .From* client-side.
             if (declType == typeof(TimeSpan)
                 && node.Object == null
                 && args.Length == 1)
             {
                 // Tick multiplier per factory:
-                //   FromHours        = arg * 36_000_000_000
-                //   FromMinutes      = arg *    600_000_000
-                //   FromSeconds      = arg *     10_000_000
-                //   FromMilliseconds = arg *         10_000
+                //   FromDays         = arg * 864_000_000_000
+                //   FromHours        = arg *  36_000_000_000
+                //   FromMinutes      = arg *     600_000_000
+                //   FromSeconds      = arg *      10_000_000
+                //   FromMilliseconds = arg *          10_000
                 //   FromTicks        = arg
                 string? totalTicksSql = node.Method.Name switch
                 {
+                    nameof(TimeSpan.FromDays)         => $"CAST(({args[0]}) * 864000000000.0 AS INTEGER)",
                     nameof(TimeSpan.FromHours)        => $"CAST(({args[0]}) * 36000000000.0 AS INTEGER)",
                     nameof(TimeSpan.FromMinutes)      => $"CAST(({args[0]}) * 600000000.0 AS INTEGER)",
                     nameof(TimeSpan.FromSeconds)      => $"CAST(({args[0]}) * 10000000.0 AS INTEGER)",
@@ -303,13 +308,32 @@ namespace nORM.Providers
                 };
                 if (totalTicksSql != null)
                 {
-                    // Inline the cast expression 4 times; SQLite's optimizer folds
-                    // the duplicate sub-expressions in a single pass.
-                    return $"printf('%02d:%02d:%02d.%07d', " +
-                           $"({totalTicksSql}) / 36000000000, " +
-                           $"(({totalTicksSql}) / 600000000) % 60, " +
-                           $"(({totalTicksSql}) / 10000000) % 60, " +
-                           $"({totalTicksSql}) % 10000000)";
+                    // 4-way CASE matching TimeSpan.ToString("c") exactly so the
+                    // column-side text lex-compares against parameter-side binding
+                    // (Microsoft.Data.Sqlite uses 'c' format). The 'c' format omits
+                    // the day prefix for sub-day spans and the fractional suffix
+                    // when ticks are an integer-second boundary -- four shapes:
+                    //   0 days, 0 frac:  HH:mm:ss
+                    //   0 days, frac:    HH:mm:ss.fffffff
+                    //   >0 days, 0 frac: d.HH:mm:ss
+                    //   >0 days, frac:   d.HH:mm:ss.fffffff
+                    // Without exact format match, WHERE comparisons of
+                    // TimeSpan.FromHours(col) > parameter fail lexically because
+                    // '0.02:00:00.0000000' (column with day prefix) sorts before
+                    // '01:00:00' (parameter without).
+                    var daysExpr = $"(({totalTicksSql}) / 864000000000)";
+                    var hExpr    = $"((({totalTicksSql}) / 36000000000) % 24)";
+                    var mExpr    = $"((({totalTicksSql}) / 600000000) % 60)";
+                    var sExpr    = $"((({totalTicksSql}) / 10000000) % 60)";
+                    var fExpr    = $"(({totalTicksSql}) % 10000000)";
+                    return "(CASE " +
+                           $"WHEN ({totalTicksSql}) >= 864000000000 AND ({totalTicksSql}) % 10000000 != 0 " +
+                                $"THEN printf('%d.%02d:%02d:%02d.%07d', {daysExpr}, {hExpr}, {mExpr}, {sExpr}, {fExpr}) " +
+                           $"WHEN ({totalTicksSql}) >= 864000000000 " +
+                                $"THEN printf('%d.%02d:%02d:%02d', {daysExpr}, {hExpr}, {mExpr}, {sExpr}) " +
+                           $"WHEN ({totalTicksSql}) % 10000000 != 0 " +
+                                $"THEN printf('%02d:%02d:%02d.%07d', {hExpr}, {mExpr}, {sExpr}, {fExpr}) " +
+                           $"ELSE printf('%02d:%02d:%02d', {hExpr}, {mExpr}, {sExpr}) END)";
                 }
             }
 
