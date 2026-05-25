@@ -723,6 +723,19 @@ namespace nORM.Providers
                         $"(CAST({args[0]} AS SIGNED) * {args[1]})",
                     nameof(Math.CopySign) when args.Length == 2 =>
                         $"(ABS({args[0]}) * SIGN({args[1]}))",
+                    // Math.Clamp = LEAST(GREATEST(v, min), max). MySQL has both.
+                    nameof(Math.Clamp) when args.Length == 3 =>
+                        $"LEAST(GREATEST({args[0]}, {args[1]}), {args[2]})",
+                    // IEEERemainder via banker's-rounding CASE. MySQL ROUND is
+                    // half-away-from-zero by default, so we inline the same
+                    // algebra used by SQLite/SqlServer/Postgres.
+                    nameof(Math.IEEERemainder) when args.Length == 2 =>
+                        $"({args[0]} - {args[1]} * ((CASE WHEN ({args[0]})/({args[1]}) >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(CAST(ABS(({args[0]})/({args[1]})) AS SIGNED) + " +
+                        $"CASE " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS SIGNED) > 0.5 THEN 1 " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS SIGNED) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(ABS(({args[0]})/({args[1]})) AS SIGNED) % 2) END)))",
                     _ => null
                 };
             }

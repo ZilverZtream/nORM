@@ -803,6 +803,21 @@ namespace nORM.Providers
                         $"(CAST({args[0]} AS BIGINT) * {args[1]})",
                     nameof(Math.CopySign) when args.Length == 2 =>
                         $"(ABS({args[0]}) * SIGN({args[1]}))",
+                    // Math.Clamp(value, min, max) = MIN(MAX(value, min), max).
+                    // T-SQL has no scalar Min/Max so emit nested CASE.
+                    nameof(Math.Clamp) when args.Length == 3 =>
+                        $"(CASE WHEN (CASE WHEN {args[0]} > {args[1]} THEN {args[0]} ELSE {args[1]} END) < {args[2]} " +
+                        $"THEN (CASE WHEN {args[0]} > {args[1]} THEN {args[0]} ELSE {args[1]} END) ELSE {args[2]} END)",
+                    // IEEERemainder(x, y) = x - y * round(x/y, ToEven). Same banker's
+                    // CASE algebra as SQLite's emit since T-SQL's ROUND is also
+                    // half-away-from-zero, not ToEven.
+                    nameof(Math.IEEERemainder) when args.Length == 2 =>
+                        $"({args[0]} - {args[1]} * ((CASE WHEN ({args[0]})/({args[1]}) >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) + " +
+                        $"CASE " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) > 0.5 THEN 1 " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) % 2) END)))",
                     _ => null
                 };
             }
