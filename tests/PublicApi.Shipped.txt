@@ -497,6 +497,7 @@ M:nORM.Providers.DatabaseProvider.GetTagLookupSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection):System.Void
 M:nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task
@@ -561,6 +562,7 @@ M:nORM.Providers.MySqlProvider.GetStringAggregateSql(System.String,System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.MySqlProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.MySqlProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
@@ -606,6 +608,7 @@ M:nORM.Providers.PostgresProvider.GetRegexReplaceSql(System.String,System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.PostgresProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.PostgresProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
@@ -655,6 +658,7 @@ M:nORM.Providers.SqlServerProvider.GetRegexReplaceSql(System.String,System.Strin
 M:nORM.Providers.SqlServerProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.SqlServerProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.SqlServerProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
@@ -700,6 +704,7 @@ M:nORM.Providers.SqliteProvider.GetStringAggregateSql(System.String,System.Strin
 M:nORM.Providers.SqliteProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.SqliteProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.SqliteProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnection):System.Void
 M:nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task

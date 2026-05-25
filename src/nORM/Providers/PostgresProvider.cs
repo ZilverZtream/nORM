@@ -266,6 +266,10 @@ namespace nORM.Providers
             return $"({dateTimeSql} {op} {timeSpanColumnSql})";
         }
 
+        /// <summary>PostgreSQL stores TimeSpan as INTERVAL; EXTRACT(EPOCH FROM col) returns fractional seconds.</summary>
+        public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
+            => $"EXTRACT(EPOCH FROM {timeSpanColumnSql})";
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";

@@ -328,6 +328,14 @@ namespace nORM.Providers
             return $"DATEADD(SECOND, {sign}DATEDIFF(SECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}), {dateTimeSql})";
         }
 
+        /// <summary>
+        /// SQL Server stores TimeSpan as TIME(7). DATEDIFF_BIG with microsecond
+        /// granularity returns the count from midnight, divided by 1e6 to get
+        /// fractional seconds.
+        /// </summary>
+        public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
+            => $"(CAST(DATEDIFF_BIG(MICROSECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}) AS FLOAT) / 1000000.0)";
+
         /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
