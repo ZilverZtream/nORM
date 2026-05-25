@@ -649,6 +649,11 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"DATEPART(hour, {args[0]})",
                     nameof(TimeOnly.Minute) => $"DATEPART(minute, {args[0]})",
                     nameof(TimeOnly.Second) => $"DATEPART(second, {args[0]})",
+                    // IsBetween(start, end) wraps around midnight when start > end.
+                    // Matches .NET's TimeOnly.IsBetween semantics.
+                    nameof(TimeOnly.IsBetween) when args.Length == 3 =>
+                        $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
+                        $"ELSE ({args[0]} >= {args[1]} OR {args[0]} < {args[2]}) END)",
                     _ => null
                 };
             }
