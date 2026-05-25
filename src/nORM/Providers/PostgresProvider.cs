@@ -655,6 +655,20 @@ namespace nORM.Providers
                         $"(CAST({args[0]} AS BIGINT) * {args[1]})",
                     nameof(Math.CopySign) when args.Length == 2 =>
                         $"(ABS({args[0]}) * SIGN({args[1]}))",
+                    // Math.Clamp = LEAST(GREATEST(v, min), max). Postgres has both
+                    // GREATEST and LEAST as variadic functions.
+                    nameof(Math.Clamp) when args.Length == 3 =>
+                        $"LEAST(GREATEST({args[0]}, {args[1]}), {args[2]})",
+                    // IEEERemainder via banker's-rounding CASE. Postgres ROUND on
+                    // double-precision is half-away-from-zero, not ToEven, so we
+                    // inline the same algebra used by SQLite/SqlServer.
+                    nameof(Math.IEEERemainder) when args.Length == 2 =>
+                        $"({args[0]} - {args[1]} * ((CASE WHEN ({args[0]})/({args[1]}) >= 0 THEN 1 ELSE -1 END) * " +
+                        $"(CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) + " +
+                        $"CASE " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) > 0.5 THEN 1 " +
+                        $"WHEN ABS(({args[0]})/({args[1]})) - CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) < 0.5 THEN 0 " +
+                        $"ELSE (CAST(ABS(({args[0]})/({args[1]})) AS BIGINT) % 2) END)))",
                     _ => null
                 };
             }
