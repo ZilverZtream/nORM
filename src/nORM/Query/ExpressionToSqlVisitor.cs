@@ -1422,33 +1422,47 @@ namespace nORM.Query
                         _sql.Append('(').Append(charSql).Append(" BETWEEN 'a' AND 'z')");
                         return node;
                     case nameof(char.IsPunctuation):
-                        _sql.Append("((unicode(").Append(charSql).Append(") BETWEEN 33 AND 35) OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 37 AND 42) OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 44 AND 47) OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 58 AND 59) OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 63 AND 64) OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 91 AND 93) OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 95 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 123 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 125)");
+                    {
+                        // Provider hook: GetCharCodeSql -> unicode (SQLite),
+                        // UNICODE (SqlServer), ascii (Postgres), ORD (MySQL).
+                        var code = _provider.GetCharCodeSql(charSql);
+                        _sql.Append("((").Append(code).Append(" BETWEEN 33 AND 35) OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 37 AND 42) OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 44 AND 47) OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 58 AND 59) OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 63 AND 64) OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 91 AND 93) OR ")
+                            .Append(code).Append(" = 95 OR ")
+                            .Append(code).Append(" = 123 OR ")
+                            .Append(code).Append(" = 125)");
                         return node;
+                    }
                     case nameof(char.IsSymbol):
-                        _sql.Append("(unicode(").Append(charSql).Append(") = 36 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 43 OR ")
-                            .Append("(unicode(").Append(charSql).Append(") BETWEEN 60 AND 62) OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 94 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 96 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 124 OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 126)");
+                    {
+                        var code = _provider.GetCharCodeSql(charSql);
+                        _sql.Append('(').Append(code).Append(" = 36 OR ")
+                            .Append(code).Append(" = 43 OR ")
+                            .Append('(').Append(code).Append(" BETWEEN 60 AND 62) OR ")
+                            .Append(code).Append(" = 94 OR ")
+                            .Append(code).Append(" = 96 OR ")
+                            .Append(code).Append(" = 124 OR ")
+                            .Append(code).Append(" = 126)");
                         return node;
+                    }
                     case nameof(char.IsControl):
-                        _sql.Append("((unicode(").Append(charSql).Append(") BETWEEN 0 AND 31) OR ")
-                            .Append("unicode(").Append(charSql).Append(") = 127)");
+                    {
+                        var code = _provider.GetCharCodeSql(charSql);
+                        _sql.Append("((").Append(code).Append(" BETWEEN 0 AND 31) OR ")
+                            .Append(code).Append(" = 127)");
                         return node;
+                    }
                     case nameof(char.GetNumericValue):
-                        _sql.Append("(CASE WHEN unicode(").Append(charSql).Append(") BETWEEN 48 AND 57 ")
-                            .Append("THEN CAST(unicode(").Append(charSql).Append(") - 48 AS REAL) ELSE -1.0 END)");
+                    {
+                        var code = _provider.GetCharCodeSql(charSql);
+                        _sql.Append("(CASE WHEN ").Append(code).Append(" BETWEEN 48 AND 57 ")
+                            .Append("THEN CAST(").Append(code).Append(" - 48 AS REAL) ELSE -1.0 END)");
                         return node;
+                    }
                     case nameof(char.IsWhiteSpace):
                         // ASCII whitespace: space, tab, LF, CR. Matches CLR IsWhiteSpace for the
                         // characters that actually appear in textual database content.
