@@ -496,6 +496,28 @@ namespace nORM.Query
                 return node;
             }
 
+            // DateTime + TimeSpan COLUMN shift in Where -- mirror of
+            // SCV's 7f91efc branch. Without this SQL '+' on TEXT coerces
+            // both operands to numeric (returning garbage like 2027 from
+            // "2026-05-24 09:00:00.0000000" + "01:00:00") and the predicate
+            // evaluates against nonsense. Parse the sub-day 'HH:mm:ss'
+            // TimeSpan-column text via SUBSTR + CAST and construct the
+            // strftime modifier dynamically. Sub-day TimeSpan only per
+            // memory item b17440e.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && !TryGetConstantValue(node.Right, out _))
+            {
+                var lhsSql = GetSql(node.Left);
+                var rhsSql = GetSql(node.Right);
+                var sign = node.NodeType == ExpressionType.Add ? "+" : "-";
+                _sql.Append("RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', ").Append(lhsSql)
+                    .Append(", '").Append(sign).Append("' || (CAST(substr(").Append(rhsSql).Append(", 1, 2) AS INTEGER) * 3600 + ")
+                    .Append("CAST(substr(").Append(rhsSql).Append(", 4, 2) AS INTEGER) * 60 + ")
+                    .Append("CAST(substr(").Append(rhsSql).Append(", 7, 2) AS INTEGER)) || ' seconds'), '0'), '.')");
+                return node;
+            }
             // DateTime + TimeSpan / DateTime - TimeSpan shift with constant
             // TimeSpan -- mirror SelectClauseVisitor's projection emission so
             // Where predicates filtering on a shifted column produce the same
