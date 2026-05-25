@@ -1227,6 +1227,44 @@ namespace nORM.Query
                   .Append(") & ~(").Append(xorLeftSql).Append(" & ").Append(xorRightSql).Append("))");
                 return node;
             }
+            // Decimal comparisons / arithmetic on TEXT-stored decimal columns
+            // must coerce both operands to REAL or SQLite performs lex compare
+            // ('10.5' < '2' because '1' < '2'). Mirror of ETSV's bilateral
+            // CAST AS REAL wrap (8d795f4). See ETSV.VisitBinary for the
+            // precision-tradeoff comment.
+            bool isDecCmpArith = node.NodeType is
+                    ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                    or ExpressionType.Add or ExpressionType.Subtract
+                    or ExpressionType.Multiply or ExpressionType.Divide
+                    or ExpressionType.Modulo;
+            bool leftIsDec = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(decimal);
+            bool rightIsDec = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
+            if (isDecCmpArith && (leftIsDec || rightIsDec))
+            {
+                sb.Append("(CAST(");
+                Visit(node.Left);
+                sb.Append(" AS REAL) ").Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => "=",
+                    ExpressionType.NotEqual => "<>",
+                    ExpressionType.LessThan => "<",
+                    ExpressionType.LessThanOrEqual => "<=",
+                    ExpressionType.GreaterThan => ">",
+                    ExpressionType.GreaterThanOrEqual => ">=",
+                    ExpressionType.Add => "+",
+                    ExpressionType.Subtract => "-",
+                    ExpressionType.Multiply => "*",
+                    ExpressionType.Divide => "/",
+                    ExpressionType.Modulo => "%",
+                    _ => throw new InvalidOperationException()
+                }).Append(" CAST(");
+                Visit(node.Right);
+                sb.Append(" AS REAL))");
+                return node;
+            }
+
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch
