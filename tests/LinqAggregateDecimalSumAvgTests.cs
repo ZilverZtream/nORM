@@ -23,10 +23,14 @@ namespace nORM.Tests;
 ///
 /// PRECISION CAVEAT: SQLite has no native DECIMAL storage; nORM stores
 /// decimal as TEXT and aggregates via CAST AS REAL (8d795f4 / 2002200).
-/// REAL is IEEE-754 double -- roughly 15-17 significant decimal digits.
-/// Values OUTSIDE that window (e.g. 19-digit accounting totals) will
-/// silently round on aggregate. For money-grade precision, use the
-/// SqlServer/Postgres providers which have native DECIMAL.
+/// REAL is IEEE-754 binary double. Numeric ordering and comparison are
+/// correct for practical magnitudes, but aggregate results carry
+/// floating-point rounding -- 0.01m is not exactly representable in
+/// binary, so a sum of cents accumulates tiny rounding error. The
+/// asserts below use precision-tolerant `Assert.Equal(expected, actual,
+/// precision: N)` for that reason. Exact decimal aggregate semantics on
+/// SQLite would require a different storage/aggregate strategy; the
+/// SqlServer/Postgres/MySQL providers use native DECIMAL.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqAggregateDecimalSumAvgTests : IAsyncLifetime
@@ -89,10 +93,12 @@ public class LinqAggregateDecimalSumAvgTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SumAsync_decimal_with_large_magnitude_inside_double_window_is_exact()
+    public async Task SumAsync_decimal_with_large_magnitude_round_trips_within_double_precision()
     {
-        // 10-digit integer + 2-digit fraction stays well inside double's
-        // ~15-17 significant decimal digits. Pin documents the safe range.
+        // 10-digit integer + 2-digit fraction round-trips through double
+        // within precision: 2 (penny-level tolerance). The single-row
+        // case here doesn't accumulate floating-point error from repeated
+        // addition; multi-row sums of fractional cents would.
         await using var c = _cn.CreateCommand();
         c.CommandText = "INSERT INTO AdsaItem VALUES (100, '1234567890.12', NULL, 'big');";
         await c.ExecuteNonQueryAsync();
