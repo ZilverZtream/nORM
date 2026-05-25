@@ -803,6 +803,16 @@ namespace nORM.Providers
                     nameof(decimal.Floor) when args.Length == 1 => $"FLOOR({args[0]})",
                     nameof(decimal.Ceiling) when args.Length == 1 => $"CEIL({args[0]})",
                     nameof(decimal.Abs) when args.Length == 1 => $"ABS({args[0]})",
+                    // Static method-form arithmetic -- equivalent to the
+                    // operator-form (which already routes through binary
+                    // expression nodes). Generated code sometimes emits the
+                    // static form via the Expression API.
+                    nameof(decimal.Add) when args.Length == 2 => $"({args[0]} + {args[1]})",
+                    nameof(decimal.Subtract) when args.Length == 2 => $"({args[0]} - {args[1]})",
+                    nameof(decimal.Multiply) when args.Length == 2 => $"({args[0]} * {args[1]})",
+                    nameof(decimal.Divide) when args.Length == 2 => $"({args[0]} * 1.0 / {args[1]})",
+                    nameof(decimal.Remainder) when args.Length == 2 => $"({args[0]} % {args[1]})",
+                    nameof(decimal.Negate) when args.Length == 1 => $"(-({args[0]}))",
                     _ => null
                 };
             }
