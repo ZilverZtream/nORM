@@ -128,6 +128,7 @@ namespace nORM.Query
                 nameof(DateOnly.DayNumber),
                 nameof(DateOnly.FromDayNumber),
                 nameof(DateOnly.FromDateTime),
+                nameof(DateOnly.ToDateTime),
                 nameof(TimeOnly.FromDateTime),
                 nameof(TimeOnly.FromTimeSpan),
                 nameof(DateTimeOffset.UtcDateTime),

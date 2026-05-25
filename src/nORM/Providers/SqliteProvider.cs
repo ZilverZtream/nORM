@@ -682,6 +682,12 @@ namespace nORM.Providers
                     // emits 'YYYY-MM-DD' which the materializer parses to DateOnly.
                     nameof(DateOnly.FromDateTime) when args.Length == 1 =>
                         $"date({args[0]})",
+                    // ToDateTime(timeOnly) combines a 'YYYY-MM-DD' DateOnly
+                    // text with an 'HH:mm:ss[.fffffff]' TimeOnly text via
+                    // string concat. The materializer parses the resulting
+                    // canonical 'YYYY-MM-DD HH:mm:ss' to DateTime.
+                    nameof(DateOnly.ToDateTime) when args.Length == 2 =>
+                        $"({args[0]} || ' ' || {args[1]})",
                     // Parse(string) -- Microsoft.Data.Sqlite stores DateOnly
                     // as canonical 'yyyy-MM-dd' text; source TEXT column
                     // already holds compatible text so SQL emission is
