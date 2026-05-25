@@ -427,6 +427,47 @@ namespace nORM.Query
         private sealed class OrderByTranslator : IMethodCallTranslator
         {
             /// <summary>
+            /// Windowed-source branch — wraps the source as a derived table and emits
+            /// the new OrderBy against the wrap alias. Replaces a throw-pin with the
+            /// LINQ-correct behaviour: outer OrderBy resorts only the windowed rows.
+            /// Lives in its own method so the common-path Translate stays
+            /// stack-frame lean (same reason as <see cref="WhereTranslator"/>).
+            /// </summary>
+            private static Expression TranslateAfterTakeSkipWindow(QueryTranslator t, MethodCallExpression node)
+            {
+                var subPlanO = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMapO);
+                t._mapping = subMapO;
+                t.MergeSubPlanParameters(subPlanO);
+                var winAliasO = t.EscapeAlias("__wob" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT * FROM (").Append(subPlanO.Sql).AppendFragment(") AS ").Append(winAliasO);
+                // The inner ORDER BY is consumed by the derived table; the outer SELECT
+                // must define its own ordering. For OrderBy/OrderByDescending this is
+                // the new primary order; for ThenBy/ThenByDescending it appends to whatever
+                // _orderBy already holds (which is empty here since we cleared the source's
+                // order by wrapping). The outer key gets translated against the wrap alias.
+                bool isTopLevel = node.Method.Name is nameof(Queryable.OrderBy)
+                                                   or nameof(Queryable.OrderByDescending);
+                if (isTopLevel) t._orderBy.Clear();
+                if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySel)
+                {
+                    keySel = t.ExpandProjection(keySel);
+                    var kp = keySel.Parameters[0];
+                    t._correlatedParams[kp] = (subMapO, winAliasO);
+                    var vctxO = new VisitorContext(t._ctx, subMapO, t._provider, kp, winAliasO, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxO);
+                    var keySql = visitor.Translate(keySel.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
+                    var ascending = !node.Method.Name.Contains("Descending");
+                    t._orderBy.Add((keySql, ascending));
+                }
+                return node;
+            }
+
+            /// <summary>
             /// Translates <c>OrderBy</c> and related ordering methods into SQL <c>ORDER BY</c> clauses.
             /// </summary>
             /// <param name="t">The <see cref="QueryTranslator"/> orchestrating translation.</param>
@@ -434,6 +475,18 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // OrderBy after a Take/Skip-windowed source — wrap the windowed source
+                // as a derived table so the new ordering applies to the LIMITed window,
+                // not the full table. Sister of the WhereTranslator's windowed branch
+                // (commit a1eb69e). Restricted to the immediate-source-is-Take/Skip
+                // case for the same recursion-avoidance reason and routed through a
+                // helper to keep the common-path Translate stack-frame lean.
+                if (node.Arguments[0] is MethodCallExpression directOrderSrc
+                    && directOrderSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
+
                 // Detect OrderBy on the result of a set op (Union/Concat/Intersect/Except).
                 // After the set op runs the outer SELECT shape is the unioned projection,
                 // not the entity mapping -- so resolving `r.V` against `_mapping` throws
