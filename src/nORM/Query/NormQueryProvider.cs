@@ -1411,6 +1411,25 @@ namespace nORM.Query
             var parameters = new Dictionary<string, object>(plan.Parameters);
             if (parameterValues != null)
             {
+                // The audit pattern (407e03d / eeff6e7 / cf39b61 / 04a0003 /
+                // 7d6d7ac / c6c4710) repeatedly surfaced a silent-wrongness bug
+                // where ETSV inline-folds consumed a closure MemberExpression's
+                // value without reserving a compiled-param slot. ParameterValue
+                // Extractor walks every closure unconditionally, so the value
+                // array can drift longer than the compiled-param list -- and
+                // Math.Min silently truncated, producing the wrong row set.
+                // Assert equal counts in Debug so any future inline-fold that
+                // forgets to reserve a placeholder surfaces immediately during
+                // tests instead of as a hard-to-trace silent wrong-rows return.
+                // Release stays with the Math.Min fallback so production users
+                // get best-effort behavior rather than an assertion crash.
+                System.Diagnostics.Debug.Assert(
+                    parameterValues.Count == plan.CompiledParameters.Count,
+                    $"ParameterValueExtractor produced {parameterValues.Count} values but plan has " +
+                    $"{plan.CompiledParameters.Count} compiled-param slots. An ETSV inline-fold consumed a " +
+                    $"closure MemberExpression without calling ReserveCompiledParamSlotIfClosure -- see " +
+                    $"the audit thread (407e03d, eeff6e7, cf39b61, 04a0003, 7d6d7ac, c6c4710) for the fix " +
+                    $"shape.");
                 var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Count);
                 for (int i = 0; i < count; i++)
                 {
