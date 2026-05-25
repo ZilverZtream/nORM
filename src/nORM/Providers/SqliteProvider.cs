@@ -617,6 +617,29 @@ namespace nORM.Providers
                 };
             }
 
+            // IEEE 754 predicates on double/float. Same emit shape for all
+            // numeric receivers so we match by name+arity regardless of which
+            // primitive type owns the static. Notes on the SQL idioms:
+            //   IsNaN(x):      (x != x)               -- NaN is the only IEEE
+            //                                            value not equal to itself.
+            //   IsInfinity(x): (ABS(x) = 1e999)       -- ABS strips sign; the
+            //                                            literal 1e999 parses to +Inf.
+            //   IsFinite(x):   (x = x AND ABS(x) != 1e999) -- not NaN AND not +/-Inf.
+            //   IsNegativeInfinity(x): (x = -1e999)
+            //   IsPositiveInfinity(x): (x =  1e999)
+            if ((declaringType == typeof(double) || declaringType == typeof(float))
+                && args.Length == 1)
+            {
+                switch (name)
+                {
+                    case "IsNaN": return $"({args[0]} != {args[0]})";
+                    case "IsInfinity": return $"(ABS({args[0]}) = 1e999)";
+                    case "IsFinite": return $"({args[0]} = {args[0]} AND ABS({args[0]}) != 1e999)";
+                    case "IsNegativeInfinity": return $"({args[0]} = -1e999)";
+                    case "IsPositiveInfinity": return $"({args[0]} = 1e999)";
+                }
+            }
+
             if (declaringType == typeof(Math))
             {
                 return name switch
