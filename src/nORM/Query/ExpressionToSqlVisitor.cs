@@ -1929,7 +1929,17 @@ namespace nORM.Query
                 args.Add(GetSql(node.Object));
             foreach (var a in node.Arguments)
                 args.Add(GetSql(a));
-            var fnSql = _provider.TranslateFunction(node.Method.Name, node.Method.DeclaringType!, args.ToArray());
+            // Try overload-aware hook first -- providers can dispatch on the
+            // full MethodInfo (e.g. Math.Round(x, MidpointRounding) vs
+            // Math.Round(x, int) which share arity but mean different things).
+            var argsArr = args.ToArray();
+            var overloadSql = _provider.TranslateMethodCall(node, argsArr);
+            if (overloadSql != null)
+            {
+                _sql.Append(overloadSql);
+                return node;
+            }
+            var fnSql = _provider.TranslateFunction(node.Method.Name, node.Method.DeclaringType!, argsArr);
             if (fnSql != null)
             {
                 _sql.Append(fnSql);
@@ -1938,7 +1948,7 @@ namespace nORM.Query
             var custom = node.Method.GetCustomAttribute<SqlFunctionAttribute>();
             if (custom != null)
             {
-                var formatted = string.Format(custom.Format, args.ToArray());
+                var formatted = string.Format(custom.Format, argsArr);
                 _sql.Append(formatted);
                 return node;
             }
