@@ -323,6 +323,16 @@ namespace nORM.Providers
         /// <summary>MySQL uses ORD() for the code point of the first char.</summary>
         public override string GetCharCodeSql(string charSql) => $"ORD({charSql})";
 
+        /// <summary>
+        /// MySQL TimeSpan maps to TIME. TIME_TO_SEC extracts the seconds
+        /// count; DATE_ADD applies the interval to the DateTime.
+        /// </summary>
+        public override string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-" : "";
+            return $"DATE_ADD({dateTimeSql}, INTERVAL {sign}TIME_TO_SEC({timeSpanColumnSql}) SECOND)";
+        }
+
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
