@@ -2274,7 +2274,12 @@ namespace nORM.Query
         {
             typeof(string), typeof(Math), typeof(DateTime), typeof(Convert),
             typeof(Enumerable), typeof(Queryable), typeof(Json),
-            typeof(NormFunctions)
+            typeof(NormFunctions),
+            // IEEE 754 predicates (IsNaN, IsInfinity, IsFinite, IsNegativeInfinity,
+            // IsPositiveInfinity) live as statics on double/float. Admitting the
+            // declaring types lets the generic TranslateFunction routing pick
+            // them up via SqliteProvider's typeof(double)/typeof(float) switch.
+            typeof(double), typeof(float)
         }.ToFrozenSet();
 
         /// <summary>
