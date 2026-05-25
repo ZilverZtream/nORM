@@ -406,6 +406,14 @@ namespace nORM.Providers
             => $"strftime('%Y-%m-%d 00:00:00', " +
                $"printf('%04d-%02d-%02d', {yearSql}, {monthSql}, {daySql}))";
 
+        /// <summary>SQLite printf yields the canonical DateOnly text 'yyyy-MM-dd'.</summary>
+        public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
+            => $"printf('%04d-%02d-%02d', {yearSql}, {monthSql}, {daySql})";
+
+        /// <summary>SQLite printf yields the canonical TimeOnly text 'HH:mm:ss'.</summary>
+        public override string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
+            => $"printf('%02d:%02d:%02d', {hourSql}, {minuteSql}, {secondSql})";
+
         /// <summary>
         /// SQLite stores TimeOnly as 'HH:mm:ss[.fffffff]' text. Parse each side's
         /// HH/MM/SS components (the SS substring carries the fractional tail when
