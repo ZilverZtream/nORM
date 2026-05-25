@@ -537,6 +537,28 @@ namespace nORM.Providers
         public virtual string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment) => null;
 
         /// <summary>
+        /// Adds N months (a SQL fragment / integer literal) to a DateOnly SQL
+        /// expression. Default returns null so callers can fall through.
+        ///
+        /// SQLite: <c>strftime('%Y-%m-%d', col, '+N months')</c>
+        /// SQL Server: <c>DATEADD(MONTH, N, col)</c>
+        /// PostgreSQL: <c>(col + N * INTERVAL '1 month')::date</c>
+        /// MySQL: <c>DATE(DATE_ADD(col, INTERVAL N MONTH))</c>
+        /// </summary>
+        public virtual string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment) => null;
+
+        /// <summary>
+        /// Adds N years (a SQL fragment / integer literal) to a DateOnly SQL
+        /// expression. Default returns null so callers can fall through.
+        ///
+        /// SQLite: <c>strftime('%Y-%m-%d', col, '+N years')</c>
+        /// SQL Server: <c>DATEADD(YEAR, N, col)</c>
+        /// PostgreSQL: <c>(col + N * INTERVAL '1 year')::date</c>
+        /// MySQL: <c>DATE(DATE_ADD(col, INTERVAL N YEAR))</c>
+        /// </summary>
+        public virtual string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment) => null;
+
+        /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
         /// Default returns null so callers can fall through.
         ///
