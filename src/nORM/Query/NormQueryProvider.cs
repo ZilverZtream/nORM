@@ -626,6 +626,12 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
+                // LINQ-to-Objects Sum returns 0 for empty / all-null source — even for
+                // nullable element types (`Enumerable.Sum(IEnumerable<decimal?>)` returns 0,
+                // not null). SQL `SUM(col)` returns NULL on the same input, so map NULL to
+                // zero-of-target so the materialized result matches LINQ semantics.
+                if (plan.MethodName == "Sum")
+                    return GetZeroOfTargetType<TResult>();
                 return default(TResult)!;
             }
             return ConvertScalarResult<TResult>(scalarResult)!;
@@ -642,9 +648,25 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
+                if (plan.MethodName == "Sum")
+                    return Task.FromResult(GetZeroOfTargetType<TResult>());
                 return Task.FromResult(default(TResult)!);
             }
             return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
+        }
+
+        // Returns the LINQ-Sum "empty source" value for TResult: 0 for value types
+        // (including nullable wrappers like decimal? / int?), and default for reference
+        // types (uncommon for Sum, but defensive).
+        private static TResult GetZeroOfTargetType<TResult>()
+        {
+            var underlying = Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult);
+            if (!underlying.IsValueType)
+                return default(TResult)!;
+            // Activator.CreateInstance on a primitive value type yields the numeric zero;
+            // boxing then casting to TResult (decimal / decimal? / int / int? / etc.) gives
+            // back the correctly-typed zero, including the nullable wrapper case.
+            return (TResult)Activator.CreateInstance(underlying)!;
         }
 
         /// <summary>PERF: List&lt;object&gt; materialization path — avoids covariant copy.</summary>
