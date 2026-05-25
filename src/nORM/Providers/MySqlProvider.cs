@@ -408,6 +408,19 @@ namespace nORM.Providers
                $"CONCAT_WS(':', LPAD({hourSql}, 2, '0'), LPAD({minuteSql}, 2, '0'), LPAD({secondSql}, 2, '0'))), " +
                $"'%Y-%m-%d %H:%i:%s')";
 
+        /// <summary>
+        /// 7-arg STR_TO_DATE with 'yyyy-MM-dd HH:mm:ss.fff' shape; %f in MySQL
+        /// is microseconds (0..999999); LPAD ms to 3 digits then append '000' so
+        /// MySQL parses the fractional tail as microseconds and rounds correctly.
+        /// </summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql, string millisecondSql)
+            => $"STR_TO_DATE(CONCAT(" +
+               $"CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), " +
+               $"' ', " +
+               $"CONCAT_WS(':', LPAD({hourSql}, 2, '0'), LPAD({minuteSql}, 2, '0'), LPAD({secondSql}, 2, '0')), " +
+               $"'.', LPAD({millisecondSql}, 3, '0'), '000'), " +
+               $"'%Y-%m-%d %H:%i:%s.%f')";
+
         /// <summary>MySQL DATE() wrapper around the STR_TO_DATE text shape ensures DATE return type.</summary>
         public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATE(STR_TO_DATE(CONCAT_WS('-', {yearSql}, LPAD({monthSql}, 2, '0'), LPAD({daySql}, 2, '0')), '%Y-%m-%d'))";

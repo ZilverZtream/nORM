@@ -1233,6 +1233,40 @@ namespace nORM.Query
                     return node;
                 }
             }
+
+            // 7-arg new DateTime(y, m, d, h, mi, s, ms) with at least one column arg.
+            if (node.Type == typeof(DateTime)
+                && node.Arguments.Count == 7
+                && node.Constructor is { } dt7Ctor
+                && dt7Ctor.GetParameters() is { Length: 7 } dt7Params
+                && dt7Params[0].ParameterType == typeof(int)
+                && dt7Params[1].ParameterType == typeof(int)
+                && dt7Params[2].ParameterType == typeof(int)
+                && dt7Params[3].ParameterType == typeof(int)
+                && dt7Params[4].ParameterType == typeof(int)
+                && dt7Params[5].ParameterType == typeof(int)
+                && dt7Params[6].ParameterType == typeof(int))
+            {
+                bool any7NonConst = false;
+                foreach (var arg in node.Arguments)
+                    if (arg is not ConstantExpression && !TryGetConstantValue(arg, out _))
+                    {
+                        any7NonConst = true;
+                        break;
+                    }
+                if (any7NonConst)
+                {
+                    var ySql = GetSql(node.Arguments[0]);
+                    var mSql = GetSql(node.Arguments[1]);
+                    var dSql = GetSql(node.Arguments[2]);
+                    var hSql = GetSql(node.Arguments[3]);
+                    var miSql = GetSql(node.Arguments[4]);
+                    var sSql = GetSql(node.Arguments[5]);
+                    var msSql = GetSql(node.Arguments[6]);
+                    _sql.Append(_provider.GetDateTimeFromPartsSql(ySql, mSql, dSql, hSql, miSql, sSql, msSql));
+                    return node;
+                }
+            }
             foreach (var a in node.Arguments)
             {
                 if (a is not ConstantExpression && !TryGetConstantValue(a, out _))
