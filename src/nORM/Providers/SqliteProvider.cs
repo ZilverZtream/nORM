@@ -262,37 +262,54 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
-            // TimeSpan.FromHours(d) / FromMinutes(m) / FromSeconds(s) -- static
-            // factory methods used in projection: emit a printf that produces the
-            // canonical 'HH:mm:ss' text the existing TimeSpan materializer parses.
-            // SQLite has no native TimeSpan type, but Microsoft.Data.Sqlite reads
+            // TimeSpan factory static methods (FromHours/FromMinutes/FromSeconds/
+            // FromMilliseconds/FromTicks) -- emit printf that produces canonical
+            // 'HH:mm:ss.fffffff' text the existing TimeSpan materializer parses.
+            // SQLite has no native TimeSpan type, so Microsoft.Data.Sqlite reads
             // TEXT columns via TimeSpan.Parse for TimeSpan-typed projection slots.
             //
-            // Sub-day precision only: the 'HH' field overflows past 99 hours and
-            // negative values aren't handled. Fractional seconds are truncated --
-            // FromHours(1/3.0) gives 00:20:00 not 00:20:00.0000001. These are
-            // documented limits matching the existing TimeSpan component-getter
-            // emit (sub-day only). Multi-day / negative spans should materialize
-            // the column raw and call .From* client-side.
+            // Unified total-ticks reduction: every factory has an integer multiplier
+            // to ticks (1 sec = 10_000_000 ticks). Computing the integer tick count
+            // once and splitting into hh/mm/ss/frac via integer arithmetic preserves
+            // sub-second precision for FromMilliseconds (1500 -> 15_000_000 ticks ->
+            // '00:00:01.5000000') and FromTicks. For float-arg factories
+            // (FromHours / FromMinutes / FromSeconds) the multiplier-times-double may
+            // lose 1 tick of precision for non-representable values (e.g.
+            // FromHours(1.0/3.0)) -- documented limitation matching .NET's IEEE-754
+            // semantics.
+            //
+            // Sub-day positive spans only: 'HH' field overflows past 99 hours and
+            // negative values produce malformed '-1:00:00.0000000' output. Multi-day
+            // / negative spans should materialize the column raw and call .From*
+            // client-side.
             if (declType == typeof(TimeSpan)
                 && node.Object == null
                 && args.Length == 1)
             {
-                string? totalSecondsSql = node.Method.Name switch
+                // Tick multiplier per factory:
+                //   FromHours        = arg * 36_000_000_000
+                //   FromMinutes      = arg *    600_000_000
+                //   FromSeconds      = arg *     10_000_000
+                //   FromMilliseconds = arg *         10_000
+                //   FromTicks        = arg
+                string? totalTicksSql = node.Method.Name switch
                 {
-                    nameof(TimeSpan.FromHours) => $"({args[0]} * 3600.0)",
-                    nameof(TimeSpan.FromMinutes) => $"({args[0]} * 60.0)",
-                    nameof(TimeSpan.FromSeconds) => $"({args[0]} * 1.0)",
+                    nameof(TimeSpan.FromHours)        => $"CAST(({args[0]}) * 36000000000.0 AS INTEGER)",
+                    nameof(TimeSpan.FromMinutes)      => $"CAST(({args[0]}) * 600000000.0 AS INTEGER)",
+                    nameof(TimeSpan.FromSeconds)      => $"CAST(({args[0]}) * 10000000.0 AS INTEGER)",
+                    nameof(TimeSpan.FromMilliseconds) => $"CAST(({args[0]}) * 10000.0 AS INTEGER)",
+                    nameof(TimeSpan.FromTicks)        => $"CAST(({args[0]}) AS INTEGER)",
                     _ => null
                 };
-                if (totalSecondsSql != null)
+                if (totalTicksSql != null)
                 {
-                    // CAST the total seconds to INTEGER once (truncate fractional), then
-                    // derive hh/mm/ss via integer arithmetic. Use a CTE-like inline form
-                    // since SQLite has no LET binding -- evaluate the cast expression
-                    // three times; the SQL compiler folds the duplicate sub-expressions.
-                    var ts = $"CAST({totalSecondsSql} AS INTEGER)";
-                    return $"printf('%02d:%02d:%02d', ({ts}) / 3600, (({ts}) / 60) % 60, ({ts}) % 60)";
+                    // Inline the cast expression 4 times; SQLite's optimizer folds
+                    // the duplicate sub-expressions in a single pass.
+                    return $"printf('%02d:%02d:%02d.%07d', " +
+                           $"({totalTicksSql}) / 36000000000, " +
+                           $"(({totalTicksSql}) / 600000000) % 60, " +
+                           $"(({totalTicksSql}) / 10000000) % 60, " +
+                           $"({totalTicksSql}) % 10000000)";
                 }
             }
 
