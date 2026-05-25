@@ -71,10 +71,44 @@ namespace nORM.Query
                 // Method calls are explicitly NOT supported. Allowing MethodCallExpression
                 // would enable arbitrary user code execution via Compile().DynamicInvoke().
                 // Method calls must be translated to SQL (e.g., string.Contains -> LIKE) or rejected.
+
+                case NewExpression ne when IsPureValueTypeConstructor(ne.Type):
+                    // Constructor calls are NewExpression, not MethodCallExpression. Allowing
+                    // them broadly would enable RCE via user-defined ctors; restrict to a fixed
+                    // allowlist of side-effect-free value-type constructors (DateTime, DateOnly,
+                    // TimeOnly, TimeSpan, DateTimeOffset, Guid, decimal). All arguments must
+                    // themselves resolve to constants. Without this, ternary projections that
+                    // embed a `new DateTime(2020,1,1)` literal emit malformed SQL because the
+                    // NewExpression falls through to the visitor and produces no operand text.
+                    var ctorArgs = new object?[ne.Arguments.Count];
+                    for (int i = 0; i < ne.Arguments.Count; i++)
+                    {
+                        if (!TryGetConstantValue(ne.Arguments[i], out var argVal, visited))
+                        {
+                            value = null;
+                            return false;
+                        }
+                        ctorArgs[i] = argVal;
+                    }
+                    value = ne.Constructor!.Invoke(ctorArgs);
+                    return true;
             }
 
             value = null;
             return false;
+        }
+
+        // RCE-safe allowlist: only side-effect-free value-type constructors are
+        // permitted via TryGetConstantValue's NewExpression branch.
+        private static bool IsPureValueTypeConstructor(Type t)
+        {
+            return t == typeof(DateTime)
+                || t == typeof(DateTimeOffset)
+                || t == typeof(TimeSpan)
+                || t == typeof(DateOnly)
+                || t == typeof(TimeOnly)
+                || t == typeof(Guid)
+                || t == typeof(decimal);
         }
 
         /// <summary>

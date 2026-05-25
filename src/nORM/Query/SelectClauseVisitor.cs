@@ -87,6 +87,16 @@ namespace nORM.Query
         protected override Expression VisitNew(NewExpression node)
         {
             var sb = EnsureBuilder();
+            // Embedded pure-value-type constructor (e.g. `new DateTime(2020,1,1)` inside
+            // a ternary or comparison). Constant-fold via ExpressionValueExtractor and
+            // emit as a SQL literal — without this the anonymous-type projection logic
+            // below kicks in and emits `2020 AS Year, 1 AS Month, 1 AS Day` producing
+            // "near AS: syntax error" inside the CASE WHEN.
+            if (ExpressionValueExtractor.TryGetConstantValue(node, out var ctorValue))
+            {
+                sb.Append(FormatLiteral(ctorValue));
+                return node;
+            }
             bool firstColumn = true;
             for (int i = 0; i < node.Arguments.Count; i++)
             {
