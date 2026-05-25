@@ -318,6 +318,16 @@ namespace nORM.Providers
         /// <summary>SQL Server uses UNICODE() for the BMP code point.</summary>
         public override string GetCharCodeSql(string charSql) => $"UNICODE({charSql})";
 
+        /// <summary>
+        /// SQL Server TimeSpan columns map to TIME(7). Convert to seconds via
+        /// DATEDIFF from midnight, then DATEADD to the DateTime.
+        /// </summary>
+        public override string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-" : "";
+            return $"DATEADD(SECOND, {sign}DATEDIFF(SECOND, CAST('00:00:00' AS TIME), {timeSpanColumnSql}), {dateTimeSql})";
+        }
+
         /// <summary>SQL Server uses FLOAT for double-precision and DECIMAL(38,10) for fixed-precision.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false)
             => asDecimal

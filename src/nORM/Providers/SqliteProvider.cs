@@ -169,6 +169,20 @@ namespace nORM.Providers
         public override string? AddSecondsToDateTimeSql(string dateTimeSql, string secondsSqlFragment)
             => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {dateTimeSql}, ({secondsSqlFragment}) || ' seconds'), '0'), '.')";
 
+        /// <summary>
+        /// SQLite TimeSpan columns are 'HH:mm:ss' text; parse via substr/CAST
+        /// into a seconds count and feed to AddSecondsToDateTimeSql. Sub-day
+        /// scope per memory item b17440e.
+        /// </summary>
+        public override string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-" : "";
+            var seconds = $"{sign}(CAST(substr({timeSpanColumnSql}, 1, 2) AS INTEGER) * 3600 + " +
+                          $"CAST(substr({timeSpanColumnSql}, 4, 2) AS INTEGER) * 60 + " +
+                          $"CAST(substr({timeSpanColumnSql}, 7, 2) AS INTEGER))";
+            return AddSecondsToDateTimeSql(dateTimeSql, seconds);
+        }
+
         /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 

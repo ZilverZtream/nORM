@@ -503,6 +503,26 @@ namespace nORM.Providers
         public virtual string GetCharCodeSql(string charSql) => $"unicode({charSql})";
 
         /// <summary>
+        /// Adds (or subtracts when <paramref name="subtract"/>) a TimeSpan-typed
+        /// column expression to a DateTime SQL expression. Differs from
+        /// <see cref="AddSecondsToDateTimeSql"/> which takes a numeric seconds
+        /// fragment; this one takes the TimeSpan column directly and the
+        /// implementation handles the storage format (SQLite stores 'HH:mm:ss'
+        /// text and parses; SqlServer / Postgres / MySQL have native
+        /// TIME/INTERVAL types).
+        ///
+        /// SQLite: parse 'HH:mm:ss' substring via substr/CAST and feed to
+        /// strftime modifier.
+        /// SQL Server: <c>DATEADD(SECOND, [+/-]DATEDIFF(SECOND, '00:00:00', col), dt)</c>
+        /// PostgreSQL: <c>(dt + col)</c> / <c>(dt - col)</c> (native interval)
+        /// MySQL: <c>DATE_ADD(dt, INTERVAL [+/-]TIME_TO_SEC(col) SECOND)</c>
+        ///
+        /// Default returns null so callers can fall through.
+        /// </summary>
+        public virtual string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
+            => null;
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

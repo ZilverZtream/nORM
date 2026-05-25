@@ -253,6 +253,16 @@ namespace nORM.Providers
         /// <summary>PostgreSQL uses ascii() (returns codepoint of first char).</summary>
         public override string GetCharCodeSql(string charSql) => $"ascii({charSql})";
 
+        /// <summary>
+        /// PostgreSQL TimeSpan maps to INTERVAL; native +/- operators on
+        /// (timestamp, interval) preserve precision without text parsing.
+        /// </summary>
+        public override string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
+        {
+            var op = subtract ? "-" : "+";
+            return $"({dateTimeSql} {op} {timeSpanColumnSql})";
+        }
+
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 

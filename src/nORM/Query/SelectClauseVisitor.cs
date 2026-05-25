@@ -1232,20 +1232,16 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                var sign = node.NodeType == ExpressionType.Add ? "" : "-";
-                var secondsFragment =
-                    $"{sign}(CAST(substr({rightSql}, 1, 2) AS INTEGER) * 3600 + " +
-                    $"CAST(substr({rightSql}, 4, 2) AS INTEGER) * 60 + " +
-                    $"CAST(substr({rightSql}, 7, 2) AS INTEGER))";
-                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsFragment);
+                var subtract = node.NodeType == ExpressionType.Subtract;
+                var dateArithSql = _provider.AddTimeSpanColumnToDateTimeSql(leftSql, rightSql, subtract);
                 if (dateArithSql != null)
                 {
                     sb.Append(dateArithSql);
                     return node;
                 }
                 throw new InvalidOperationException(
-                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
-                    "DateTime + TimeSpan column arithmetic in projection requires this provider hook.");
+                    $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
+                    "DateTime +/- TimeSpan column arithmetic in projection requires this provider hook.");
             }
             // DateTime + TimeSpan / DateTime - TimeSpan -> DateTime. The
             // TimeSpan operand folds via TryGetConstantValue; emit

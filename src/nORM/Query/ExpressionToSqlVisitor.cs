@@ -511,24 +511,20 @@ namespace nORM.Query
             {
                 var lhsSql = GetSql(node.Left);
                 var rhsSql = GetSql(node.Right);
-                // Route through provider hook. Build a seconds-count fragment
-                // from the TimeSpan column's 'HH:mm:ss' TEXT (sub-day spans
-                // only per the b17440e scope); the hook applies provider-
-                // specific date arithmetic on the DateTime column.
-                var sign = node.NodeType == ExpressionType.Add ? "" : "-";
-                var secondsFragment =
-                    $"{sign}(CAST(substr({rhsSql}, 1, 2) AS INTEGER) * 3600 + " +
-                    $"CAST(substr({rhsSql}, 4, 2) AS INTEGER) * 60 + " +
-                    $"CAST(substr({rhsSql}, 7, 2) AS INTEGER))";
-                var dateArithSql = _provider.AddSecondsToDateTimeSql(lhsSql, secondsFragment);
+                // Provider hook handles TimeSpan storage format per provider:
+                // SQLite parses 'HH:mm:ss' text; SqlServer / Postgres / MySQL
+                // use native TIME/INTERVAL operators (no text parsing). Avoids
+                // emitting SQLite-specific substr() on non-SQLite providers.
+                var subtract = node.NodeType == ExpressionType.Subtract;
+                var dateArithSql = _provider.AddTimeSpanColumnToDateTimeSql(lhsSql, rhsSql, subtract);
                 if (dateArithSql != null)
                 {
                     _sql.Append(dateArithSql);
                     return node;
                 }
                 throw new NormUnsupportedFeatureException(
-                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
-                    "DateTime + TimeSpan column arithmetic in WHERE requires this provider hook.");
+                    $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
+                    "DateTime +/- TimeSpan column arithmetic in WHERE requires this provider hook.");
             }
             // DateTime + TimeSpan / DateTime - TimeSpan shift with constant
             // TimeSpan -- mirror SelectClauseVisitor's projection emission so
