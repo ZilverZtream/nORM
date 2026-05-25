@@ -1081,6 +1081,13 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    // TimeOnly text format is 'HH:mm:ss[.fffffff]'. When the
+                    // fractional tail is present (length > 9) parse the first
+                    // 3 digits past the '.' as the millisecond component;
+                    // when absent return 0. The 3-digit substring is the
+                    // ms portion of .NET's 7-digit ticks suffix.
+                    nameof(TimeOnly.Millisecond) =>
+                        $"(CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10, 3) AS INTEGER) ELSE 0 END)",
                     // FromDateTime(dt) / FromTimeSpan(ts) drop everything but
                     // the time portion. SQLite's time() emits 'HH:mm:ss'.
                     nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",

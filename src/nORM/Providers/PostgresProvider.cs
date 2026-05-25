@@ -470,6 +470,9 @@ namespace nORM.Providers
                     nameof(DateTime.AddSeconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 second')",
                     // PostgreSQL supports millisecond interval natively.
                     nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 millisecond')",
+                    // Postgres EXTRACT(MILLISECONDS FROM ts) returns SS*1000+ms;
+                    // modulo 1000 yields the millisecond component matching .NET.
+                    nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
                     // PostgreSQL TIMESTAMP precision is microseconds; 1 tick = 100ns, so
                     // ticks/10 gives microseconds (truncating sub-microsecond precision).
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"({args[0]} + (({args[1]}) / 10) * INTERVAL '1 microsecond')",
@@ -529,6 +532,7 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
                     nameof(TimeOnly.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
                     nameof(TimeOnly.Second) => $"EXTRACT(SECOND FROM {args[0]})",
+                    nameof(TimeOnly.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
                     // IsBetween(start, end) wraps around midnight when start > end.
                     nameof(TimeOnly.IsBetween) when args.Length == 3 =>
                         $"(CASE WHEN {args[1]} <= {args[2]} THEN ({args[0]} >= {args[1]} AND {args[0]} < {args[2]}) " +
