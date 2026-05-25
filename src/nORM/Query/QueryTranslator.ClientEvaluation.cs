@@ -84,6 +84,11 @@ namespace nORM.Query
                 // own static (and analyzer is name-based not type-based, so
                 // Math.Round's entry doesn't cover it).
                 nameof(decimal.Round),
+                // decimal sister statics for the Math.* math primitives.
+                nameof(decimal.Truncate),
+                nameof(decimal.Floor),
+                nameof(decimal.Ceiling),
+                nameof(decimal.Abs),
                 // IEEE 754 predicates on double/float (same name on both).
                 nameof(double.IsNaN),
                 nameof(double.IsInfinity),
