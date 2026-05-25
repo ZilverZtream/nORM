@@ -1632,6 +1632,19 @@ namespace nORM.Query
             if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
             {
                 var sb = EnsureBuilder();
+                // TimeSpan column negation: route through the seconds-as-REAL hook so
+                // the materialiser reconstructs via TimeSpan.FromSeconds(-sec) instead
+                // of coercing the column text to a numeric prefix and negating.
+                var opTypeNeg = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (opTypeNeg == typeof(TimeSpan))
+                {
+                    var tsStart = sb.Length;
+                    Visit(node.Operand);
+                    var tsColSql = sb.ToString(tsStart, sb.Length - tsStart);
+                    sb.Length = tsStart;
+                    sb.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(tsColSql)).Append(')');
+                    return node;
+                }
                 sb.Append("-(");
                 Visit(node.Operand);
                 sb.Append(')');
