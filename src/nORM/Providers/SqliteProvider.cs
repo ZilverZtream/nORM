@@ -500,6 +500,16 @@ namespace nORM.Providers
                         $"unicode({args[0]}) = 95 OR " +
                         $"unicode({args[0]}) = 123 OR " +
                         $"unicode({args[0]}) = 125)",
+                    // ASCII symbols per .NET char.IsSymbol: $, +, <, =, >, ^,
+                    // `, |, ~. Distinct from Punctuation (5bb7520).
+                    nameof(char.IsSymbol) when args.Length == 1 =>
+                        $"(unicode({args[0]}) = 36 OR " +
+                        $"unicode({args[0]}) = 43 OR " +
+                        $"(unicode({args[0]}) BETWEEN 60 AND 62) OR " +
+                        $"unicode({args[0]}) = 94 OR " +
+                        $"unicode({args[0]}) = 96 OR " +
+                        $"unicode({args[0]}) = 124 OR " +
+                        $"unicode({args[0]}) = 126)",
                     _ => null
                 };
             }
