@@ -805,6 +805,8 @@ namespace nORM.Providers
                     nameof(string.Contains) when args.Length == 2 => $"({args[0]} LIKE '%' || {args[1]} || '%')",
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
+                    nameof(string.ToUpperInvariant) => $"UPPER({args[0]})",
+                    nameof(string.ToLowerInvariant) => $"LOWER({args[0]})",
                     nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
                     nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]})",
                     nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
@@ -1105,8 +1107,12 @@ namespace nORM.Providers
                     nameof(char.IsWhiteSpace) when args.Length == 1 => $"({args[0]} = ' ' OR {args[0]} = CHAR(9) OR {args[0]} = CHAR(10) OR {args[0]} = CHAR(13))",
                     // SQLite UPPER / LOWER work on single-char text the same way
                     // they work on strings, so the static char form maps cleanly.
+                    // Invariant overloads share the same emit on SQLite because
+                    // UPPER/LOWER are already ASCII-only (no locale awareness).
                     nameof(char.ToUpper) when args.Length == 1 => $"UPPER({args[0]})",
                     nameof(char.ToLower) when args.Length == 1 => $"LOWER({args[0]})",
+                    nameof(char.ToUpperInvariant) when args.Length == 1 => $"UPPER({args[0]})",
+                    nameof(char.ToLowerInvariant) when args.Length == 1 => $"LOWER({args[0]})",
                     // ASCII-range predicates matching the existing IsDigit/IsLetter shape.
                     nameof(char.IsUpper) when args.Length == 1 => $"({args[0]} BETWEEN 'A' AND 'Z')",
                     nameof(char.IsLower) when args.Length == 1 => $"({args[0]} BETWEEN 'a' AND 'z')",
