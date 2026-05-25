@@ -955,18 +955,27 @@ namespace nORM.Query
                     return node;
                 }
             }
-            // TimeSpan member access whose receiver is a DateTime subtraction lowers to a
-            // fractional-seconds scalar via the provider, then a unit-conversion divide.
-            // Examples: (end - start).TotalHours, .TotalMinutes, .TotalSeconds, .TotalDays,
-            // .Days, .Hours, .Minutes, .Seconds. Both nullable and non-nullable receivers.
+            // TimeSpan member access whose receiver is a DateTime or TimeOnly
+            // subtraction lowers to a fractional-seconds scalar via the provider, then
+            // a unit-conversion divide. Examples: (end - start).TotalHours,
+            // .TotalMinutes, .TotalSeconds, .TotalDays, .Days, .Hours, .Minutes,
+            // .Seconds. Both nullable and non-nullable receivers.
             if (node.Expression is BinaryExpression timeSpanBinary
                 && timeSpanBinary.NodeType == ExpressionType.Subtract
-                && IsDateTimeLike(timeSpanBinary.Left.Type)
-                && IsDateTimeLike(timeSpanBinary.Right.Type)
-                && node.Expression.Type == typeof(TimeSpan)
-                && TryEmitTimeSpanMember(node.Member.Name, GetSql(timeSpanBinary.Left), GetSql(timeSpanBinary.Right)))
+                && node.Expression.Type == typeof(TimeSpan))
             {
-                return node;
+                if (IsDateTimeLike(timeSpanBinary.Left.Type)
+                    && IsDateTimeLike(timeSpanBinary.Right.Type)
+                    && TryEmitTimeSpanMember(node.Member.Name, GetSql(timeSpanBinary.Left), GetSql(timeSpanBinary.Right), useTimeOnly: false))
+                {
+                    return node;
+                }
+                if (IsTimeOnly(timeSpanBinary.Left.Type)
+                    && IsTimeOnly(timeSpanBinary.Right.Type)
+                    && TryEmitTimeSpanMember(node.Member.Name, GetSql(timeSpanBinary.Left), GetSql(timeSpanBinary.Right), useTimeOnly: true))
+                {
+                    return node;
+                }
             }
 
             // Nullable<T> structural members: HasValue -> IS NOT NULL, Value -> operand itself.
@@ -2617,14 +2626,21 @@ namespace nORM.Query
             return underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset);
         }
 
+        private static bool IsTimeOnly(Type t)
+            => (Nullable.GetUnderlyingType(t) ?? t) == typeof(TimeOnly);
+
         /// <summary>
         /// Emits the SQL for a TimeSpan member access on a `(end - start)` subtraction.
         /// Returns true when the member name maps to a unit conversion; false otherwise
         /// (the caller falls through to the normal member-resolution path).
+        /// When <paramref name="useTimeOnly"/> is true the wrapped TimeOnly-diff hook
+        /// is used so the result stays in [0, 24h) matching .NET's TimeOnly subtraction.
         /// </summary>
-        private bool TryEmitTimeSpanMember(string memberName, string endSql, string startSql)
+        private bool TryEmitTimeSpanMember(string memberName, string endSql, string startSql, bool useTimeOnly = false)
         {
-            var secondsSql = _provider.GetDateTimeDifferenceSecondsSql(endSql, startSql);
+            var secondsSql = useTimeOnly
+                ? _provider.GetTimeOnlyDifferenceSecondsSql(endSql, startSql)
+                : _provider.GetDateTimeDifferenceSecondsSql(endSql, startSql);
             // Total* return fractional values; Days/Hours/Minutes/Seconds are the integer
             // component matching System.TimeSpan's semantics (truncate toward zero).
             switch (memberName)

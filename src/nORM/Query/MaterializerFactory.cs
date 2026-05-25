@@ -866,6 +866,38 @@ namespace nORM.Query
                 };
             }
 
+            // Bare-scalar projection of a non-simple value type:
+            // `Select(p => p.A - p.B)` returning TimeSpan, or any computed
+            // single value (BinaryExpression / member on a subtraction / etc.).
+            // ExtractColumnsFromProjection only knows how to expand NewExpression
+            // and MemberInit; everything else falls back to mapping.Columns
+            // which materializes the entity rather than the scalar. Route
+            // through ConvertDbValue (which already handles TimeSpan from REAL
+            // seconds, DateTime from string, etc.) so the single SELECT
+            // expression round-trips correctly.
+            if (projection != null
+                && (projection.Body is BinaryExpression
+                    || projection.Body is ConditionalExpression
+                    || (projection.Body is MemberExpression mb
+                        && mb.Expression is BinaryExpression mbBin
+                        && mbBin.NodeType == ExpressionType.Subtract))
+                && targetType != mapping.Type)
+            {
+                var convertTarget = targetType;
+                return reader =>
+                {
+                    if (reader.IsDBNull(startOffset))
+                    {
+                        if (Nullable.GetUnderlyingType(convertTarget) != null) return null!;
+                        if (convertTarget.IsValueType)
+                            return Activator.CreateInstance(convertTarget)!;
+                        return null!;
+                    }
+                    var raw = reader.GetValue(startOffset);
+                    return ConvertDbValue(raw, convertTarget)!;
+                };
+            }
+
             var columns = projection == null
                 ? mapping.Columns
                 : ExtractColumnsFromProjection(mapping, projection);

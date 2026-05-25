@@ -230,6 +230,19 @@ namespace nORM.Providers
                 $"DateTime subtraction is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Returns SQL evaluating `end - start` (both TimeOnly) as fractional seconds
+        /// wrapped to the half-open interval [0, 86400). Matches .NET's
+        /// <c>TimeOnly.op_Subtraction</c>, which adds 24h to the raw difference when
+        /// the result would be negative (so 01:00 - 23:00 yields +02:00, not -22:00).
+        /// The materializer converts the REAL seconds back to <see cref="TimeSpan"/>
+        /// via <c>TimeSpan.FromSeconds</c> -- same path used by DateTime subtraction.
+        /// Default throws so each provider must opt in.
+        /// </summary>
+        public virtual string GetTimeOnlyDifferenceSecondsSql(string endSql, string startSql)
+            => throw new NormUnsupportedFeatureException(
+                $"TimeOnly subtraction is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Translates a JSON path access expression for the provider.
         /// </summary>
         /// <param name="columnName">The name of the JSON column.</param>
