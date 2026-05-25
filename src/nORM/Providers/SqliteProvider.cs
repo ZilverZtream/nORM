@@ -510,6 +510,9 @@ namespace nORM.Providers
                         $"unicode({args[0]}) = 96 OR " +
                         $"unicode({args[0]}) = 124 OR " +
                         $"unicode({args[0]}) = 126)",
+                    // ASCII control chars: codepoints 0-31 plus 127 (DEL).
+                    nameof(char.IsControl) when args.Length == 1 =>
+                        $"((unicode({args[0]}) BETWEEN 0 AND 31) OR unicode({args[0]}) = 127)",
                     _ => null
                 };
             }
