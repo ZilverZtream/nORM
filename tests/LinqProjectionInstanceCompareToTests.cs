@@ -38,9 +38,9 @@ public class LinqProjectionInstanceCompareToTests : IAsyncLifetime
                 Tv TEXT NOT NULL DEFAULT ''
             );
             INSERT INTO PictItem VALUES
-                (1, 5, '3.0', 'banana', ''),
-                (2, 4, '4.0', 'cherry', ''),
-                (3, 1, '7.5', 'apple',  '');
+                (1, 5, '3.0', 'banana', '2026-05-25 12:00:00'),
+                (2, 4, '4.0', 'cherry', '2026-05-25 12:00:00'),
+                (3, 1, '7.5', 'apple',  '2026-05-26 12:00:00');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider(), new DbContextOptions
@@ -88,12 +88,19 @@ public class LinqProjectionInstanceCompareToTests : IAsyncLifetime
         Assert.True(r[2].C < 0);    // apple < banana
     }
 
-    // NOTE: DateTime CompareTo with a closure-captured DateTime constant is
-    // not pinned here -- SelectClauseVisitor.FormatLiteral doesn't yet emit
-    // a literal for DateTime in projection (separate limitation from
-    // CompareTo translation). The provider has the DateTime CompareTo emit
-    // wired (julianday-based, sister to DateTime.Compare) and would work
-    // once the literal-formatter gap closes.
+    [Fact]
+    public async Task Select_DateTime_CompareTo_other_DateTime_returns_sign_per_row()
+    {
+        var pivot = new DateTime(2026, 5, 25, 12, 0, 0);
+        var r = await _ctx.Query<PictItem>().OrderBy(p => p.Id)
+            .Select(p => new { p.Id, C = DateTime.Parse(p.Tv).CompareTo(pivot) }).ToListAsync();
+        Assert.Equal(3, r.Count);
+        // After-fix Tv is stored as the same 2026-05-25 timestamp for rows 1/2
+        // and 2026-05-26 for row 3 (see seed); equal returns 0, later returns >0.
+        Assert.Equal(0, r[0].C);
+        Assert.Equal(0, r[1].C);
+        Assert.True(r[2].C > 0);
+    }
 
     [Table("PictItem")]
     public sealed class PictItem
