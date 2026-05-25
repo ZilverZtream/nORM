@@ -144,6 +144,25 @@ namespace nORM.Query
                 return node;
             }
 
+            // Nullable<T>.HasValue / .Value -- structural members. HasValue
+            // lowers to IS NOT NULL (boolean column); Value passes through to
+            // the underlying expression. Mirror of ETSV's VisitMember branch.
+            if (node.Expression != null
+                && node.Expression.Type.IsGenericType
+                && node.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                if (node.Member.Name == "HasValue")
+                {
+                    sb.Append('(').Append(TranslateProjectionArg(node.Expression)).Append(" IS NOT NULL)");
+                    return node;
+                }
+                if (node.Member.Name == "Value")
+                {
+                    sb.Append(TranslateProjectionArg(node.Expression));
+                    return node;
+                }
+            }
+
             if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
             {
                 sb.Append(col.EscCol);
