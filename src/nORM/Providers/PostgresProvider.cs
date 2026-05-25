@@ -321,6 +321,10 @@ namespace nORM.Providers
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, 0, 0, 0)";
 
+        /// <summary>6-arg PostgreSQL MAKE_TIMESTAMP with hour / minute / second columns.</summary>
+        public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
+            => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, {hourSql}, {minuteSql}, {secondSql})";
+
         /// <summary>PostgreSQL MAKE_DATE builds a DATE from int parts.</summary>
         public override string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"MAKE_DATE({yearSql}, {monthSql}, {daySql})";

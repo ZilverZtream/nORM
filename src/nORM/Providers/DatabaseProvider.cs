@@ -720,6 +720,15 @@ namespace nORM.Providers
                 $"DateTime(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// 6-arg DATETIME-from-parts variant covering
+        /// <c>new DateTime(year, month, day, hour, minute, second)</c>. Default
+        /// throws; each provider overrides with its native primitive.
+        /// </summary>
+        public virtual string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
+            => throw new NormUnsupportedFeatureException(
+                $"DateTime(year, month, day, hour, minute, second) with column args is not supported by provider '{GetType().Name}'.");
+
+        /// <summary>
         /// Per-provider DATE-from-parts primitive for translating
         /// <c>new DateOnly(year, month, day)</c> with column args.
         /// </summary>
