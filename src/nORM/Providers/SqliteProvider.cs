@@ -170,16 +170,59 @@ namespace nORM.Providers
             => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {dateTimeSql}, ({secondsSqlFragment}) || ' seconds'), '0'), '.')";
 
         /// <summary>
-        /// SQLite TimeSpan columns are 'HH:mm:ss' text; parse via substr/CAST
-        /// into a seconds count and feed to AddSecondsToDateTimeSql. Sub-day
-        /// scope per memory item b17440e.
+        /// Parses a TimeSpan TEXT column (canonical "c" format
+        /// <c>[-][d.]HH:mm:ss[.fffffff]</c>) into a fractional-seconds REAL
+        /// expression. SQLite has no string-split primitive so this builds a
+        /// CASE selecting on shape: signed-vs-unsigned crossed with has-day-
+        /// prefix-vs-not. The day prefix is detected by the position of the
+        /// first '.' relative to the first ':' (a day-separator dot precedes
+        /// the hours colon; a fractional-seconds dot follows it).
+        ///
+        /// Sub-day spans like "05:30:00" use the simple HH:mm:ss substring
+        /// slice; multi-day spans like "3.05:30:00" peel the day count off
+        /// the leading digits before slicing the time portion. Negative spans
+        /// drop the leading '-' and negate the final seconds value.
+        /// </summary>
+        internal static string TimeSpanColumnTotalSecondsSql(string col)
+        {
+            // Time-only parse (after any sign + day prefix have been stripped).
+            // s already starts at the 'HH' position.
+            static string ParseTimeOnly(string s) =>
+                $"(CAST(substr({s}, 1, 2) AS INTEGER) * 3600 + " +
+                $"CAST(substr({s}, 4, 2) AS INTEGER) * 60 + " +
+                $"CAST(substr({s}, 7, 2) AS INTEGER) + " +
+                $"CASE WHEN length({s}) > 9 THEN CAST(substr({s}, 10) AS REAL) / 10000000.0 ELSE 0 END)";
+
+            // Day + time parse: leading digits up to '.' are the day count;
+            // everything after the '.' is the time portion.
+            static string ParseWithDays(string s) =>
+                $"(CAST(substr({s}, 1, INSTR({s}, '.') - 1) AS INTEGER) * 86400 + " +
+                $"{ParseTimeOnly($"substr({s}, INSTR({s}, '.') + 1)")})";
+
+            // True when s contains a 'd.' day prefix.
+            static string HasDays(string s) =>
+                $"(INSTR({s}, '.') > 0 AND INSTR({s}, '.') < INSTR({s}, ':'))";
+
+            var unsigned = $"substr({col}, 2)";
+            return
+                $"(CASE " +
+                $"WHEN substr({col}, 1, 1) = '-' AND {HasDays(unsigned)} THEN -1.0 * {ParseWithDays(unsigned)} " +
+                $"WHEN substr({col}, 1, 1) = '-' THEN -1.0 * {ParseTimeOnly(unsigned)} " +
+                $"WHEN {HasDays(col)} THEN {ParseWithDays(col)} " +
+                $"ELSE {ParseTimeOnly(col)} " +
+                $"END)";
+        }
+
+        /// <summary>
+        /// SQLite TimeSpan columns are canonical-c-format TEXT; parse into a
+        /// fractional-seconds expression via <see cref="TimeSpanColumnTotalSecondsSql"/>
+        /// (which handles multi-day spans and signed values) and feed to
+        /// AddSecondsToDateTimeSql.
         /// </summary>
         public override string? AddTimeSpanColumnToDateTimeSql(string dateTimeSql, string timeSpanColumnSql, bool subtract)
         {
-            var sign = subtract ? "-" : "";
-            var seconds = $"{sign}(CAST(substr({timeSpanColumnSql}, 1, 2) AS INTEGER) * 3600 + " +
-                          $"CAST(substr({timeSpanColumnSql}, 4, 2) AS INTEGER) * 60 + " +
-                          $"CAST(substr({timeSpanColumnSql}, 7, 2) AS INTEGER))";
+            var sign = subtract ? "-1.0 * " : "";
+            var seconds = $"{sign}{TimeSpanColumnTotalSecondsSql(timeSpanColumnSql)}";
             return AddSecondsToDateTimeSql(dateTimeSql, seconds);
         }
 
@@ -202,10 +245,8 @@ namespace nORM.Providers
         /// </summary>
         public override string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract)
         {
-            var sign = subtract ? "-" : "";
-            var seconds = $"{sign}(CAST(substr({timeSpanColumnSql}, 1, 2) AS INTEGER) * 3600 + " +
-                          $"CAST(substr({timeSpanColumnSql}, 4, 2) AS INTEGER) * 60 + " +
-                          $"CAST(substr({timeSpanColumnSql}, 7, 2) AS INTEGER))";
+            var sign = subtract ? "-1.0 * " : "";
+            var seconds = $"{sign}{TimeSpanColumnTotalSecondsSql(timeSpanColumnSql)}";
             return AddSecondsToTimeOnlySql(timeOnlySql, seconds);
         }
 
@@ -889,32 +930,25 @@ namespace nORM.Providers
 
             if (declaringType == typeof(TimeSpan))
             {
-                // Microsoft.Data.Sqlite binds TimeSpan as canonical 'HH:mm:ss'
-                // text (TimeSpan.ToString 'c' format) for sub-day spans. The
-                // component getters are fixed-position string slices into that
-                // text. Multi-day spans bind with a 'd.' prefix and would shift
-                // these offsets -- documented as out-of-scope for v1; a future
-                // iteration can detect/handle the prefix via INSTR.
+                // Microsoft.Data.Sqlite binds TimeSpan as canonical
+                // <c>[-][d.]HH:mm:ss[.fffffff]</c> text (TimeSpan.ToString 'c'
+                // format). The TimeSpanColumnTotalSecondsSql helper handles
+                // all four shape combinations of sign x day-prefix; the
+                // component accessors below derive from it via integer
+                // arithmetic that preserves .NET's truncate-toward-zero
+                // semantics for negative spans.
+                var totalSecondsSql = TimeSpanColumnTotalSecondsSql(args[0]);
                 return name switch
                 {
-                    nameof(TimeSpan.Hours) => $"CAST(substr({args[0]}, 1, 2) AS INTEGER)",
-                    nameof(TimeSpan.Minutes) => $"CAST(substr({args[0]}, 4, 2) AS INTEGER)",
-                    nameof(TimeSpan.Seconds) => $"CAST(substr({args[0]}, 7, 2) AS INTEGER)",
-                    // Total* return double, so divide by a REAL literal (60.0 / 3600.0)
-                    // rather than INTEGER to force fractional arithmetic. Sum is integer
-                    // seconds: H*3600 + M*60 + S.
-                    nameof(TimeSpan.TotalSeconds) => $"(CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER))",
-                    nameof(TimeSpan.TotalMinutes) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 60.0)",
-                    nameof(TimeSpan.TotalHours) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) / 3600.0)",
-                    // TotalMilliseconds needs the fractional-seconds component. The
-                    // canonical 'c' format emits 7-digit ticks past position 9 when
-                    // nonzero (TimeSpan keeps trailing zeros unlike DateTime's
-                    // FFFFFFF). Each tick is 100ns, so the 7-digit value divided by
-                    // 10000 gives milliseconds. The CASE guards the length-8
-                    // 'HH:mm:ss' shape (no fractional present); without it substr
-                    // returns an empty string which CASTs to 0 anyway but the CASE
-                    // makes the intent explicit.
-                    nameof(TimeSpan.TotalMilliseconds) => $"((CAST(substr({args[0]}, 1, 2) AS INTEGER) * 3600 + CAST(substr({args[0]}, 4, 2) AS INTEGER) * 60 + CAST(substr({args[0]}, 7, 2) AS INTEGER)) * 1000.0 + CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10) AS REAL) / 10000.0 ELSE 0 END)",
+                    nameof(TimeSpan.Hours) => $"(CAST({totalSecondsSql} / 3600 AS INTEGER) % 24)",
+                    nameof(TimeSpan.Minutes) => $"(CAST({totalSecondsSql} / 60 AS INTEGER) % 60)",
+                    nameof(TimeSpan.Seconds) => $"(CAST({totalSecondsSql} AS INTEGER) % 60)",
+                    nameof(TimeSpan.Days) => $"CAST({totalSecondsSql} / 86400 AS INTEGER)",
+                    nameof(TimeSpan.TotalSeconds) => totalSecondsSql,
+                    nameof(TimeSpan.TotalMinutes) => $"({totalSecondsSql} / 60.0)",
+                    nameof(TimeSpan.TotalHours) => $"({totalSecondsSql} / 3600.0)",
+                    nameof(TimeSpan.TotalDays) => $"({totalSecondsSql} / 86400.0)",
+                    nameof(TimeSpan.TotalMilliseconds) => $"({totalSecondsSql} * 1000.0)",
                     // Parse(string) -- Microsoft.Data.Sqlite round-trips
                     // TimeSpan via canonical 'HH:mm:ss[.fffffff]' text. The
                     // source column already holds compatible text, so SQL
