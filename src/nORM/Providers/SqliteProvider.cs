@@ -252,6 +252,30 @@ namespace nORM.Providers
         {
             var declType = node.Method.DeclaringType;
 
+            // 2-arg string.IndexOf with a StringComparison enum tail arg.
+            // SQLite INSTR is BINARY by default; lower both sides for an
+            // ignore-case variant. INSTR returns 1-based or 0-when-missing;
+            // subtract 1 for .NET's 0-based-or--1 contract. LastIndexOf is
+            // intentionally NOT handled here -- SQLite has no last-occurrence
+            // primitive and INSTR's first-occurrence position would be a
+            // silently-wrong answer for a LastIndexOf caller.
+            if (declType == typeof(string)
+                && node.Method.Name == nameof(string.IndexOf)
+                && node.Object != null
+                && args.Length == 3   // receiver + needle + comparison
+                && node.Arguments.Count == 2
+                && node.Arguments[1].Type == typeof(StringComparison)
+                && node.Arguments[1] is System.Linq.Expressions.ConstantExpression idxCmpArg
+                && idxCmpArg.Value is StringComparison idxCmp)
+            {
+                bool ignoreCase = idxCmp is StringComparison.OrdinalIgnoreCase
+                    or StringComparison.CurrentCultureIgnoreCase
+                    or StringComparison.InvariantCultureIgnoreCase;
+                var hay = ignoreCase ? $"LOWER({args[0]})" : args[0];
+                var needle = ignoreCase ? $"LOWER({args[1]})" : args[1];
+                return $"(INSTR({hay}, {needle}) - 1)";
+            }
+
             // 3-arg string.Compare/CompareTo with a StringComparison enum tail
             // arg. SQLite's BINARY collation matches Ordinal (byte-wise); NOCASE
             // matches OrdinalIgnoreCase well for ASCII data. The 2-arg overload
