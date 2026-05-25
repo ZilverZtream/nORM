@@ -428,6 +428,11 @@ namespace nORM.Providers
                     nameof(DateOnly.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
                     nameof(DateOnly.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
+                    // Parse(string) -- Microsoft.Data.Sqlite stores DateOnly
+                    // as canonical 'yyyy-MM-dd' text; source TEXT column
+                    // already holds compatible text so SQL emission is
+                    // identity and GetFieldValue<DateOnly> round-trips.
+                    "Parse" when args.Length == 1 => args[0],
                     _ => null
                 };
             }
@@ -550,6 +555,11 @@ namespace nORM.Providers
                     nameof(TimeOnly.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
                     nameof(TimeOnly.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
+                    // Parse(string) -- Microsoft.Data.Sqlite stores TimeOnly
+                    // as canonical 'HH:mm:ss[.fffffff]' text; source TEXT
+                    // column already holds compatible text so SQL emission
+                    // is identity and GetFieldValue<TimeOnly> round-trips.
+                    "Parse" when args.Length == 1 => args[0],
                     _ => null
                 };
             }
