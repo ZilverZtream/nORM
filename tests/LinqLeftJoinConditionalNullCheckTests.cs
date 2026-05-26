@@ -10,14 +10,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the parked silent-wrongness bug from 5b6605e: in a query-syntax LEFT JOIN
-/// (<c>GroupJoin + SelectMany + DefaultIfEmpty</c>), a projection that
-/// defensively null-checks the inner entity — <c>c == null ? null : c.Tag</c>
-/// — mis-binds the projected column to the inner's first column (Id) rather
-/// than the named property (Tag). Idiomatic equivalent <c>c.Tag</c> alone
-/// works (LEFT JOIN naturally NULLs unmatched columns, so the null-check is
-/// semantically redundant) and is the recommended workaround until the
-/// conditional path is fixed.
+/// Exercises LEFT JOIN (GroupJoin + SelectMany + DefaultIfEmpty) projections that
+/// contain idiomatic null-guards on the inner entity: <c>c == null ? null : c.Tag</c>.
+///
+/// SQL LEFT JOIN already NULLs unmatched right-side columns, making the guard
+/// semantically redundant. The rewriter strips it so ExtractNeededColumns can
+/// resolve the column and the materializer correctly reads the right ordinal.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqLeftJoinConditionalNullCheckTests : IAsyncLifetime
@@ -47,21 +45,39 @@ public class LinqLeftJoinConditionalNullCheckTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Left_join_projection_with_inner_null_check_throws_with_workaround_hint()
+    public async Task Left_join_projection_with_inner_null_check_returns_correct_rows()
     {
-        // Until the conditional-on-inner-entity translation is fixed, this shape
-        // must surface a clear NormUnsupportedFeatureException pointing at the
-        // bare-`c.Tag` workaround — silent miscolumn binding is unacceptable.
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await (from p in _ctx.Query<LjcParent>()
-                   join c in _ctx.Query<LjcChild>() on p.Id equals c.ParentId into g
-                   from c in g.DefaultIfEmpty()
-                   select new { Parent = p.Name, Tag = c == null ? null : c.Tag })
-                  .ToListAsync();
-        });
-        Assert.Contains("LEFT JOIN", ex.Message, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("c.Tag", ex.Message, System.StringComparison.Ordinal);
+        // c == null ? null : c.Tag is the idiomatic EF-style null-guard.
+        // LEFT JOIN already NULLs the right side for unmatched rows, so the
+        // guard is redundant — the translator strips it so the query works.
+        var rows = (await (from p in _ctx.Query<LjcParent>()
+                           join c in _ctx.Query<LjcChild>() on p.Id equals c.ParentId into g
+                           from c in g.DefaultIfEmpty()
+                           select new { Parent = p.Name, Tag = c == null ? null : c.Tag })
+                          .ToListAsync())
+                  .OrderBy(r => r.Parent).ThenBy(r => r.Tag).ToArray();
+
+        Assert.Equal(4, rows.Length);
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a1");
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a2");
+        Assert.Contains(rows, r => r.Parent == "Bob"   && r.Tag == "b1");
+        Assert.Contains(rows, r => r.Parent == "Carol" && r.Tag == null);
+    }
+
+    [Fact]
+    public async Task Left_join_projection_with_reversed_null_check_returns_correct_rows()
+    {
+        // c != null ? c.Tag : null — same semantics, reversed order.
+        var rows = (await (from p in _ctx.Query<LjcParent>()
+                           join c in _ctx.Query<LjcChild>() on p.Id equals c.ParentId into g
+                           from c in g.DefaultIfEmpty()
+                           select new { Parent = p.Name, Tag = c != null ? c.Tag : null })
+                          .ToListAsync())
+                  .OrderBy(r => r.Parent).ThenBy(r => r.Tag).ToArray();
+
+        Assert.Equal(4, rows.Length);
+        Assert.Contains(rows, r => r.Parent == "Carol" && r.Tag == null);
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a1");
     }
 
     [Table("LjcParent")]
