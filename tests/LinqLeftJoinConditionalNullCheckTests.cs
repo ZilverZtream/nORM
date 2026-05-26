@@ -80,6 +80,41 @@ public class LinqLeftJoinConditionalNullCheckTests : IAsyncLifetime
         Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a1");
     }
 
+    [Fact]
+    public async Task Left_join_non_null_fallback_c_eq_null_uses_coalesce()
+    {
+        // `c == null ? "NONE" : c.Tag` — non-null fallback rewrites to COALESCE(c.Tag, 'NONE').
+        // Carol (Id=3) has no child, so the right side is unmatched → Tag should be "NONE".
+        var rows = (await (from p in _ctx.Query<LjcParent>()
+                           join c in _ctx.Query<LjcChild>() on p.Id equals c.ParentId into g
+                           from c in g.DefaultIfEmpty()
+                           select new { Parent = p.Name, Tag = c == null ? "NONE" : c.Tag })
+                          .ToListAsync())
+                  .OrderBy(r => r.Parent).ThenBy(r => r.Tag).ToArray();
+
+        Assert.Equal(4, rows.Length);
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a1");
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a2");
+        Assert.Contains(rows, r => r.Parent == "Bob"   && r.Tag == "b1");
+        Assert.Contains(rows, r => r.Parent == "Carol" && r.Tag == "NONE");
+    }
+
+    [Fact]
+    public async Task Left_join_non_null_fallback_c_neq_null_uses_coalesce()
+    {
+        // `c != null ? c.Tag : "NONE"` — same semantics, reversed condition.
+        var rows = (await (from p in _ctx.Query<LjcParent>()
+                           join c in _ctx.Query<LjcChild>() on p.Id equals c.ParentId into g
+                           from c in g.DefaultIfEmpty()
+                           select new { Parent = p.Name, Tag = c != null ? c.Tag : "NONE" })
+                          .ToListAsync())
+                  .OrderBy(r => r.Parent).ThenBy(r => r.Tag).ToArray();
+
+        Assert.Equal(4, rows.Length);
+        Assert.Contains(rows, r => r.Parent == "Carol" && r.Tag == "NONE");
+        Assert.Contains(rows, r => r.Parent == "Alice" && r.Tag == "a1");
+    }
+
     [Table("LjcParent")]
     public sealed class LjcParent
     {

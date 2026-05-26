@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using nORM.Mapping;
@@ -258,10 +259,50 @@ namespace nORM.Query
 
             protected override Expression VisitBinary(BinaryExpression node)
             {
+                if (node.NodeType == ExpressionType.Coalesce
+                    && TryGetMemberColumnSql(node.Left, out var colSql)
+                    && node.Right is ConstantExpression constExpr)
+                {
+                    var literalSql = FormatLiteral(constExpr.Value);
+                    if (literalSql != null)
+                    {
+                        var fragment = $"COALESCE({colSql}, {literalSql})";
+                        if (_processedColumns.Add(fragment))
+                            _neededColumns.Add(fragment);
+                        return node;
+                    }
+                }
                 Visit(node.Left);
                 Visit(node.Right);
                 return node;
             }
+
+            private bool TryGetMemberColumnSql(Expression expr, out string colSql)
+            {
+                colSql = string.Empty;
+                if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ue)
+                    expr = ue.Operand;
+                if (expr is not MemberExpression mem || mem.Expression is not ParameterExpression param)
+                    return false;
+                var mapping = ResolveMapping(param.Type, out var alias);
+                if (mapping == null) return false;
+                if (!mapping.ColumnsByName.TryGetValue(mem.Member.Name, out var col)) return false;
+                colSql = $"{alias}.{col.EscCol}";
+                return true;
+            }
+
+            private static string? FormatLiteral(object? value) => value switch
+            {
+                null           => "NULL",
+                string s       => "'" + s.Replace("'", "''") + "'",
+                bool b         => b ? "1" : "0",
+                int or long or short or byte or sbyte or uint or ulong or ushort
+                               => Convert.ToString(value, CultureInfo.InvariantCulture),
+                double d       => d.ToString(CultureInfo.InvariantCulture),
+                float f        => f.ToString(CultureInfo.InvariantCulture),
+                decimal dec    => dec.ToString(CultureInfo.InvariantCulture),
+                _              => null
+            };
 
             protected override Expression VisitUnary(UnaryExpression node)
             {
