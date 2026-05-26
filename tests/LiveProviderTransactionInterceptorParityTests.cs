@@ -111,7 +111,7 @@ public class LiveProviderTransactionInterceptorParityTests
                 await tx.CommitAsync();
 
                 Assert.Equal(1L, await CountRowsAsync(ctx));
-                var rows = ctx.Query<TxpRow>().ToList();
+                var rows = await ctx.Query<TxpRow>().ToListAsync();
                 Assert.Single(rows);
                 Assert.Equal("committed", rows[0].Label);
             }
@@ -267,7 +267,7 @@ public class LiveProviderTransactionInterceptorParityTests
                 await tx.CommitAsync();
 
                 Assert.Equal(1L, await CountRowsAsync(ctx));
-                var rows = ctx.Query<TxpRow>().ToList();
+                var rows = await ctx.Query<TxpRow>().ToListAsync();
                 Assert.Single(rows);
                 Assert.Equal("real", rows[0].Label);
                 Assert.Equal(2, rows[0].Id);
