@@ -509,6 +509,7 @@ M:nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConn
 M:nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.DatabaseProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
+M:nORM.Providers.DatabaseProvider.IsNullOrEmptySql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.DatabaseProvider.LiveColumnInfo.#ctor(System.String,System.String,System.Boolean)
 M:nORM.Providers.DatabaseProvider.LiveColumnInfo.<Clone>$():nORM.Providers.DatabaseProvider.LiveColumnInfo
@@ -682,6 +683,7 @@ M:nORM.Providers.SqlServerProvider.GetTimeSpanColumnSecondsSql(System.String):Sy
 M:nORM.Providers.SqlServerProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.SqlServerProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
+M:nORM.Providers.SqlServerProvider.IsNullOrEmptySql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.SqlServerProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqlServerProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String

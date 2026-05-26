@@ -92,7 +92,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `string` methods (Contains, StartsWith, EndsWith, Substring, Trim*, Concat, Compare, ToUpper/Lower, char.ToUpperInvariant) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `TypeConversionParityTests` |
 | `char.IsDigit` / `char.IsLetter` / `char.IsWhiteSpace` on column character | ✅ | ✅ | ✅ | ✅ | ✅ | — | ASCII-range BETWEEN comparisons; Unicode characters outside ASCII are not matched. | `LiveProviderCharStringPredicateParityTests` |
-| `string.IsNullOrEmpty` / `string.IsNullOrWhiteSpace` on nullable column | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `(col IS NULL OR col = '')` and `(col IS NULL OR LTRIM(RTRIM(col)) = '')` respectively. | `LiveProviderCharStringPredicateParityTests` |
+| `string.IsNullOrEmpty` / `string.IsNullOrWhiteSpace` on nullable column | ✅ | ✅ | ✅ | ✅ | ✅ | — | `IsNullOrEmpty` uses `DATALENGTH(col) = 0` on SQL Server (trailing-space equality rule makes `'   ' = ''` TRUE on SQL Server). All others use `col = ''`. `IsNullOrWhiteSpace` uses `LTRIM(RTRIM(col)) = ''` on all providers. | `LiveProviderCharStringPredicateParityTests`, `LinqWhereStringIsNullOrEmptyTests` |
 | `string.Length` comparison (`col.Length > N`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite/Postgres: `LENGTH`; SQL Server: `LEN`; MySQL: `CHAR_LENGTH`. | `LiveProviderCharStringPredicateParityTests` |
 | `DateTime` arithmetic, parts, AddDays/Months/Years/Hours/Minutes/Seconds | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
 | `DateOnly` / `TimeOnly` arithmetic + parts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |

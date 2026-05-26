@@ -889,6 +889,16 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// SQL Server ignores trailing spaces in equality comparisons, so
+        /// <c>'   ' = ''</c> is TRUE. <c>DATALENGTH</c> counts raw bytes and is
+        /// not affected by padding, making it the reliable empty-string test.
+        /// For NVARCHAR an empty string has DATALENGTH = 0; a whitespace-only
+        /// string has DATALENGTH > 0.
+        /// </summary>
+        public override string IsNullOrEmptySql(string colSql) =>
+            $"({colSql} IS NULL OR DATALENGTH({colSql}) = 0)";
+
+        /// <summary>
         /// SQL Server does not support CREATE TABLE IF NOT EXISTS.
         /// Uses an OBJECT_ID check to create the tags table only when absent.
         /// Uses NVARCHAR (not TEXT) and DATETIME2 (not TEXT) for correct SQL Server types.

@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -104,6 +105,59 @@ public class LinqWhereStringIsNullOrEmptyTests : IAsyncLifetime
             .OrderBy(i => i.Id)
             .ToListAsync();
         Assert.Equal(new[] { 2, 3, 4 }, result.Select(r => r.Id).ToArray());
+    }
+
+    // ── SQL Server shape: DATALENGTH instead of = '' ─────────────────────────
+    // SQL Server ignores trailing spaces in equality comparisons, so
+    // '   ' = '' is TRUE. The fix uses DATALENGTH(col) = 0 which counts raw
+    // bytes and treats '   ' as non-empty.
+
+    [Fact]
+    public void IsNullOrEmpty_SqlServer_generates_DATALENGTH_not_equality()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqlServerProvider());
+
+        var q = ctx.Query<WsneItem>().Where(i => string.IsNullOrEmpty(i.Name));
+        var plan = ctx.GetQueryProvider().GetPlan(q.Expression, out _, out _);
+
+        Assert.NotNull(plan.Sql);
+        // Must use DATALENGTH so '   ' is NOT matched.
+        Assert.Contains("DATALENGTH", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        // Must NOT use the naive equality that SQL Server elides trailing spaces for.
+        Assert.DoesNotContain("= ''", plan.Sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void IsNullOrEmpty_SqlServer_negated_generates_DATALENGTH()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqlServerProvider());
+
+        var q = ctx.Query<WsneItem>().Where(i => !string.IsNullOrEmpty(i.Name));
+        var plan = ctx.GetQueryProvider().GetPlan(q.Expression, out _, out _);
+
+        Assert.NotNull(plan.Sql);
+        Assert.Contains("DATALENGTH", plan.Sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void IsNullOrWhiteSpace_SqlServer_uses_LTRIM_RTRIM_not_DATALENGTH()
+    {
+        // IsNullOrWhiteSpace intentionally does NOT use DATALENGTH: it trims
+        // first, so '   ' becomes '' before the comparison, which is correct.
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqlServerProvider());
+
+        var q = ctx.Query<WsneItem>().Where(i => string.IsNullOrWhiteSpace(i.Name));
+        var plan = ctx.GetQueryProvider().GetPlan(q.Expression, out _, out _);
+
+        Assert.NotNull(plan.Sql);
+        Assert.Contains("LTRIM", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RTRIM", plan.Sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Table("WsneItem")]
