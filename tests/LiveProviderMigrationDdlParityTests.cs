@@ -315,12 +315,24 @@ public class LiveProviderMigrationDdlParityTests
         _           => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
-    private static long HistoryCount(DbConnection cn, long version)
+    private static long HistoryCount(DbConnection cn, long version, string kind)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}";
+        cmd.CommandText = kind switch
+        {
+            "mysql"    => $"SELECT COUNT(*) FROM `__NormMigrationsHistory` WHERE `Version` = {version}",
+            "postgres" => $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE \"Version\" = {version}",
+            _          => $"SELECT COUNT(*) FROM \"__NormMigrationsHistory\" WHERE Version = {version}"
+        };
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
+
+    private static string HistoryDeleteSql(string kind, string versionClause) => kind switch
+    {
+        "mysql"    => $"DELETE FROM `__NormMigrationsHistory` WHERE `Version` {versionClause}",
+        "postgres" => $"DELETE FROM \"__NormMigrationsHistory\" WHERE \"Version\" {versionClause}",
+        _          => $"DELETE FROM \"__NormMigrationsHistory\" WHERE Version {versionClause}"
+    };
 
     // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — ADD COLUMN: nullable int added to existing table
@@ -650,21 +662,22 @@ public class LiveProviderMigrationDdlParityTests
             var ex = await Assert.ThrowsAnyAsync<Exception>(() => runner.ApplyMigrationsAsync());
             Assert.Contains("simulated migration fault", ex.ToString(), StringComparison.OrdinalIgnoreCase);
 
-            // SQLite wraps all pending migrations in ONE transaction: when the bad migration
-            // throws, the full batch is rolled back — the good migration's history is also gone.
-            // Per-migration runners (MySQL, SQL Server, PostgreSQL) commit each migration
-            // individually, so the good migration's history survives the bad one's failure.
-            var expectGoodPresent = kind != "sqlite";
-            Assert.True(HistoryCount(db, goodVer) == (expectGoodPresent ? 1L : 0L),
-                $"[{kind}] Good migration history must {(expectGoodPresent ? "be present" : "be absent (SQLite batch rollback)")} after failure.");
+            // SQLite, SQL Server, and PostgreSQL wrap all pending migrations in a single
+            // atomic transaction: when the bad migration throws, the full batch rolls back —
+            // the good migration's DDL and history row are gone too.
+            // MySQL commits each migration individually (DDL implicitly auto-commits), so the
+            // good migration's history survives the bad one's failure.
+            var expectGoodPresent = kind == "mysql";
+            Assert.True(HistoryCount(db, goodVer, kind) == (expectGoodPresent ? 1L : 0L),
+                $"[{kind}] Good migration history must {(expectGoodPresent ? "be present" : "be absent (batch rollback)")} after failure.");
             // The bad migration threw; its history row must NOT appear on any provider.
-            Assert.True(HistoryCount(db, badVer) == 0L,
+            Assert.True(HistoryCount(db, badVer, kind) == 0L,
                 $"[{kind}] Bad migration history entry must NOT be present after failure.");
         }
         finally
         {
             ExecSafe(db, DropTableDdl(kind, table));
-            ExecSafe(db, $"DELETE FROM \"__NormMigrationsHistory\" WHERE Version IN ({goodVer}, {badVer})");
+            ExecSafe(db, HistoryDeleteSql(kind, $"IN ({goodVer}, {badVer})"));
             db.Dispose();
         }
     }
@@ -689,7 +702,7 @@ public class LiveProviderMigrationDdlParityTests
         try
         {
             ExecSafe(db, DropTableDdl(kind, table));
-            ExecSafe(db, $"DELETE FROM \"__NormMigrationsHistory\" WHERE Version = {ver}");
+            ExecSafe(db, HistoryDeleteSql(kind, $"= {ver}"));
 
             // First apply: the migration throws.
             var faultAb  = AssemblyBuilder.DefineDynamicAssembly(
@@ -703,14 +716,14 @@ public class LiveProviderMigrationDdlParityTests
             faultTb.CreateType();
 
             await Assert.ThrowsAnyAsync<Exception>(() => MigRunner(kind, db, faultAb).ApplyMigrationsAsync());
-            Assert.True(HistoryCount(db, ver) == 0L,
+            Assert.True(HistoryCount(db, ver, kind) == 0L,
                 $"[{kind}] History must be absent after failed migration.");
 
             // Second apply: a good migration at the same version — succeeds.
             var goodDdl = CreateBaseDdl(kind, table);
             await MigRunner(kind, db, GoodAssembly(ver, goodDdl)).ApplyMigrationsAsync();
 
-            Assert.True(HistoryCount(db, ver) == 1L,
+            Assert.True(HistoryCount(db, ver, kind) == 1L,
                 $"[{kind}] History must be present after successful re-apply.");
             Assert.True(TableExists(db, table),
                 $"[{kind}] Table must exist after successful re-apply.");
@@ -718,7 +731,7 @@ public class LiveProviderMigrationDdlParityTests
         finally
         {
             ExecSafe(db, DropTableDdl(kind, table));
-            ExecSafe(db, $"DELETE FROM \"__NormMigrationsHistory\" WHERE Version = {ver}");
+            ExecSafe(db, HistoryDeleteSql(kind, $"= {ver}"));
             db.Dispose();
         }
     }

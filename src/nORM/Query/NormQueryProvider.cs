@@ -1112,19 +1112,7 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, null);
-            try
-            {
-                cmd.Prepare();
-            }
-            catch (NotSupportedException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
-            }
-            catch (DbException)
-            {
-            }
+            try { cmd.Prepare(); } catch (Exception) { }
             return new PooledPlanCommand(cmd);
         }
 
