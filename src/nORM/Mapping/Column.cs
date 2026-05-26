@@ -245,6 +245,7 @@ namespace nORM.Mapping
         /// </summary>
         /// <param name="property">The property for which to generate a getter.</param>
         /// <returns>A delegate that returns the property's value for a supplied object.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateGetterDelegate uses DynamicMethod which is not supported under NativeAOT.")]
         public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)
         {
             var dm = new DynamicMethod("get_" + property.Name, typeof(object), new[] { typeof(object) }, property.DeclaringType!.Module, true);
@@ -266,6 +267,7 @@ namespace nORM.Mapping
         /// <returns>
         /// An <see cref="Action{T1,T2}"/> that assigns a value to the provided object's property.
         /// </returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateSetterDelegate uses DynamicMethod which is not supported under NativeAOT.")]
         private static Action<object, object?> CreateSetterDelegate(PropertyInfo property)
         {
             var dm = new DynamicMethod("set_" + property.Name, null, new[] { typeof(object), typeof(object) }, property.DeclaringType!.Module, true);

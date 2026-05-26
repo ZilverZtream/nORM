@@ -85,18 +85,6 @@ namespace nORM.Query
         /// </summary>
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
 
-        /// <summary>
-        /// Pre-compiled regex for redacting single-quoted and N-prefixed string literals from SQL.
-        /// Covers ANSI SQL <c>'...'</c>, SQL Server <c>N'...'</c>, and escaped <c>''</c> pairs.
-        /// Static compilation avoids re-parsing the pattern on every log call.
-        /// </summary>
-        private static readonly Regex SingleQuoteLiteralRegex = new(@"N?'(?:[^']|'')*'", RegexOptions.Compiled);
-
-        /// <summary>
-        /// Pre-compiled regex for redacting PostgreSQL dollar-quoted string literals from SQL.
-        /// Handles both bare <c>$$...$$</c> and tagged <c>$tag$...$tag$</c> forms via backreference.
-        /// </summary>
-        private static readonly Regex DollarQuoteLiteralRegex = new(@"\$(\w*)\$.*?\$\1\$", RegexOptions.Compiled | RegexOptions.Singleline);
 
         public QueryExecutor(DbContext ctx, IncludeProcessor includeProcessor, ILogger<QueryExecutor>? logger = null)
         {
@@ -107,25 +95,12 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// S1: Redacts string literals from SQL before it is written to logs,
-        /// preventing sensitive literal values from appearing in log sinks.
-        /// Covers:
-        ///   'standard single-quoted literals' (ANSI SQL, SQLite, PostgreSQL, MySQL)
-        ///   N'national string literals' (SQL Server)
-        ///   $$dollar-quoted blocks$$ (PostgreSQL bare dollar-quoting)
-        ///   $tag$...$tag$ (PostgreSQL tagged dollar-quoting, e.g. $func$...$func$)
-        /// Identifiers, parameter placeholders (@p0), and SQL keywords are preserved.
+        /// Redacts SQL string literals for safe logging. Delegates to
+        /// <see cref="nORM.Internal.SqlRedaction.RedactForLogging"/> which is not annotated with
+        /// RequiresDynamicCode so it may be called from non-annotated interceptor paths.
         /// </summary>
-        // I1: internal so BaseDbCommandInterceptor can apply the same redaction policy.
-        internal static string RedactSqlForLogging(string sql)
-        {
-            if (string.IsNullOrEmpty(sql)) return sql;
-            // N'...' (SQL Server national strings) and '...' (ANSI SQL, including escaped '' pairs).
-            var step1 = SingleQuoteLiteralRegex.Replace(sql, "'[redacted]'");
-            // Dollar-quote redaction covers both bare $$...$$ (empty tag captured by \w*) and
-            // named tags ($func$...$func$, $body$...$body$, etc.) via the backreference \1.
-            return DollarQuoteLiteralRegex.Replace(step1, "'[redacted]'");
-        }
+        internal static string RedactSqlForLogging(string sql) =>
+            nORM.Internal.SqlRedaction.RedactForLogging(sql);
 
         /// <summary>
         /// Creates a list using a cached compiled delegate instead of Activator.CreateInstance,

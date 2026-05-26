@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using nORM.Core;
-using nORM.Query;
+using nORM.Internal;
 
 #nullable enable
 
@@ -150,7 +150,7 @@ namespace nORM.Enterprise
         {
             // I1: use the same SQL redaction policy applied by QueryExecutor to prevent
             // credential / literal data leakage through log sinks.
-            Logger.LogInformation("Executing non-query: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
+            Logger.LogInformation("Executing non-query: {CommandText}", SqlRedaction.RedactForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<int>.Continue());
         }
 
@@ -165,7 +165,7 @@ namespace nORM.Enterprise
         public virtual Task<InterceptionResult<object?>> ScalarExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
         {
             // I1: redact SQL before logging.
-            Logger.LogInformation("Executing scalar: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
+            Logger.LogInformation("Executing scalar: {CommandText}", SqlRedaction.RedactForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<object?>.Continue());
         }
 
@@ -180,7 +180,7 @@ namespace nORM.Enterprise
         public virtual Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
         {
             // I1: redact SQL before logging.
-            Logger.LogInformation("Executing reader: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
+            Logger.LogInformation("Executing reader: {CommandText}", SqlRedaction.RedactForLogging(command.CommandText));
             return Task.FromResult(InterceptionResult<DbDataReader>.Continue());
         }
 
@@ -195,7 +195,7 @@ namespace nORM.Enterprise
         public virtual Task CommandFailedAsync(DbCommand command, DbContext context, Exception exception, CancellationToken cancellationToken)
         {
             // I1: redact SQL before logging to prevent credential leakage in error logs.
-            Logger.LogError(exception, "Command failed: {CommandText}", QueryExecutor.RedactSqlForLogging(command.CommandText));
+            Logger.LogError(exception, "Command failed: {CommandText}", SqlRedaction.RedactForLogging(command.CommandText));
             return Task.CompletedTask;
         }
 

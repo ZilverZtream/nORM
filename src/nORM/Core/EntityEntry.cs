@@ -413,6 +413,10 @@ namespace nORM.Core
         /// Detaches the entity from the context and removes any navigation property
         /// references that were established for change tracking or lazy loading.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no reflection paths are exercised.")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Aot", "IL3050:RequiresDynamicCode",
+            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no dynamic code paths are exercised.")]
         internal void DetachEntity()
         {
             State = EntityState.Detached;
