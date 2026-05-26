@@ -35,6 +35,7 @@ namespace nORM.Query
             { "ExceptBy", new ExceptByTranslator() },
             { "IntersectBy", new IntersectByTranslator() },
             { "UnionBy", new UnionByTranslator() },
+            { "DefaultIfEmpty", new DefaultIfEmptyTranslator() },
             { "Reverse", new ReverseTranslator() },
             { "Union", new SetOperationTranslator() },
             { "Concat", new SetOperationTranslator() },
@@ -922,6 +923,39 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
                 => InstallKeyedSetOp(t, node, KeyedSetOp.Union);
+        }
+
+        /// <summary>
+        /// Implements DefaultIfEmpty standalone (not via GroupJoin left-join).
+        /// Post-materialize transform: if the materialized list is empty, append
+        /// null (no-arg form) or the provided default value (1-arg form).
+        /// Mirrors LINQ-to-Objects semantics exactly.
+        /// </summary>
+        private sealed class DefaultIfEmptyTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                // Determine the default element: null for no-arg, provided value for 1-arg.
+                object? defaultVal = null;
+                if (node.Arguments.Count >= 2)
+                {
+                    if (TryGetConstantValue(node.Arguments[1], out var dv))
+                        defaultVal = dv;
+                    else
+                        defaultVal = Expression.Lambda(node.Arguments[1]).Compile().DynamicInvoke();
+                }
+
+                var captured = defaultVal;
+                System.Collections.IList ApplyDefault(System.Collections.IList list)
+                {
+                    if (list.Count == 0)
+                        list.Add(captured);
+                    return list;
+                }
+
+                t._postMaterializeTransform = ApplyDefault;
+                return t.Visit(node.Arguments[0]);
+            }
         }
 
         private enum KeyedSetOp { Except, Intersect, Union }
