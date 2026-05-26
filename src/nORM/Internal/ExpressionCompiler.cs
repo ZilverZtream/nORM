@@ -360,7 +360,7 @@ namespace nORM.Internal
                             p.Value = DBNull.Value;
                             cmd.Parameters.Add(p);
                         }
-                        try { cmd.Prepare(); } catch (DbException) { /* Prepare is a performance optimization; failure is non-fatal */ }
+                        try { cmd.Prepare(); } catch (Exception) { /* Prepare is a performance optimization; failure is non-fatal */ }
                         state.FixedParamCount = fixedCount;
                     }
 

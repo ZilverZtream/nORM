@@ -476,7 +476,7 @@ namespace nORM.Query
             // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
             // Prepare() is optional — some providers (e.g., in-memory) throw NotSupportedException.
             ApplyPreparedParameterSizeHints(cmd);
-            try { cmd.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { } catch (DbException) { }
+            try { cmd.Prepare(); } catch (Exception) { }
 
             state.FixedParamCount = fixedCount;
             return cmd;
