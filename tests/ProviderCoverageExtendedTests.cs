@@ -1844,7 +1844,7 @@ public class ProviderCoverageExtendedTests
     {
         var p = new MySqlProvider(new SqliteParameterFactory());
         var result = p.EscapeLikePattern("50%off");
-        Assert.Contains(@"\%", result);
+        Assert.Contains("!%", result); // MySQL uses '!' as LIKE escape to avoid backslash string-literal issues
     }
 
     [Fact]
@@ -1852,7 +1852,7 @@ public class ProviderCoverageExtendedTests
     {
         var p = new MySqlProvider(new SqliteParameterFactory());
         var result = p.EscapeLikePattern("some_thing");
-        Assert.Contains(@"\_", result);
+        Assert.Contains("!_", result); // MySQL uses '!' as LIKE escape to avoid backslash string-literal issues
     }
 
     [Fact]
