@@ -2087,6 +2087,42 @@ namespace nORM.Query
                 return node;
             }
 
+            // Enum.TryParse<T>(stringCol, out T result) — used as a WHERE
+            // predicate "is parseable" check. Lower to col IN ('Name1', ...).
+            // The out parameter is ignored at the SQL level; callers wanting
+            // the parsed value should use Enum.Parse<T> or write
+            // `col == "Active"` directly. Case sensitivity: SQLite TEXT
+            // comparison is binary by default which matches Enum.Parse's
+            // case-sensitive overload; the 3-arg ignoreCase form is not
+            // recognised here (use upper(col) IN (...) for case-insensitive).
+            if (node.Method.Name == nameof(Enum.TryParse)
+                && node.Method.DeclaringType == typeof(Enum)
+                && node.Method.IsGenericMethod
+                && node.Method.GetGenericArguments() is { Length: 1 } tryParseGenericArgs
+                && tryParseGenericArgs[0].IsEnum
+                // 2-arg form: TryParse<T>(string, out T). 3-arg ignoreCase form
+                // not supported — fall through.
+                && node.Arguments.Count == 2)
+            {
+                var nameSql = GetSql(node.Arguments[0]);
+                var names = Enum.GetNames(tryParseGenericArgs[0]);
+                if (names.Length == 0)
+                {
+                    _sql.Append("0");
+                }
+                else
+                {
+                    _sql.Append("(").Append(nameSql).Append(" IN (");
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        if (i > 0) _sql.Append(", ");
+                        _sql.Append('\'').Append(names[i].Replace("'", "''")).Append('\'');
+                    }
+                    _sql.Append("))");
+                }
+                return node;
+            }
+
             if (node.Method.Name == nameof(Enum.IsDefined)
                 && node.Method.DeclaringType == typeof(Enum)
                 && node.Arguments.Count == 2
