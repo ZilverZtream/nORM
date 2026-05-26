@@ -74,9 +74,9 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
 | `GroupBy` composite anon key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqCompositeGroupByTests`, `LinqGroupMultiAggregateTests` |
 | `GroupBy` HAVING (`Where(g => agg)`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqHavingTests` |
-| `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `CompiledJoinDiagnosticTest` |
-| `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. | `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
-| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
+| `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderJoinSelectManyParityTests`, `CompiledJoinDiagnosticTest` |
+| `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. `CommandBehavior.SequentialAccess` replaced with `Default` to avoid backward-seek on Npgsql when innerKeyIndex > first inner col. | `LiveProviderJoinSelectManyParityTests`, `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
+| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
 | `Union` / `Intersect` / `Except` / `Concat` (incl. ordered/paged tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Trailing `Where` wraps as derived table. | `QueryTranslatorCrossProviderTests`, `LinqSetOpCompositionTests` |
 
 ### Post-Take/Skip family (silent-wrongness pins)

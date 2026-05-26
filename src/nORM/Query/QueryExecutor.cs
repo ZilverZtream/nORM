@@ -552,7 +552,10 @@ namespace nORM.Query
                         $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
-                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
+                // access would cause a backward seek (Npgsql ThrowInvalidSequentialSeek).
+                // GroupJoin result sets are bounded by MaxGroupJoinSize so buffered reads are safe.
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default | CommandBehavior.SingleResult, ct)
                     .ConfigureAwait(false);
 
                 object? currentOuter = null;
@@ -690,7 +693,10 @@ namespace nORM.Query
                         $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
-                using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
+                // access would cause a backward seek (Npgsql ThrowInvalidSequentialSeek).
+                // GroupJoin result sets are bounded by MaxGroupJoinSize so buffered reads are safe.
+                using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.Default | CommandBehavior.SingleResult);
 
                 object? currentOuter = null;
                 object? currentKey = null;
