@@ -391,19 +391,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
-            foreach (var (rel, map) in include.Path.Zip(pathMappings))
-                if (map.KeyColumns.Length > 1)
-                    throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
-                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
-                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
-                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
-                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
-                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
-                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
-                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 
@@ -482,19 +470,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
-            foreach (var (rel, map) in include.Path.Zip(pathMappings))
-                if (map.KeyColumns.Length > 1)
-                    throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
-                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
-                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
-                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
-                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
-                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
-                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
-                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 
@@ -641,12 +617,19 @@ namespace nORM.Query
                     if (i < path.Count - 1)
                         sb.Append(';');
 
-                    // Include all key columns (composite PK support for multi-level traversal).
-                    var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
-                    var tenantPart = (tenantId != null && tenantCol != null)
-                        ? $" AND {tenantCol.EscCol} = {_ctx.Provider.ParamPrefix}tkn{i}"
-                        : string.Empty;
-                    current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
+                    // Build the subquery that feeds the NEXT level's IN clause.
+                    // Select only the single column that the next relation's FK references (the
+                    // next relation's PrincipalKey), not all PK columns of the current mapping.
+                    // Selecting composite PK columns would produce a multi-column subquery that
+                    // the next level's single-column IN cannot consume.
+                    if (i + 1 < path.Count)
+                    {
+                        var nextPrincipalKey = path[i + 1].PrincipalKey.EscCol;
+                        var tenantPart = (tenantId != null && tenantCol != null)
+                            ? $" AND {tenantCol.EscCol} = {_ctx.Provider.ParamPrefix}tkn{i}"
+                            : string.Empty;
+                        current = $"(SELECT {nextPrincipalKey} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
+                    }
                 }
 
                 return sb.ToString();

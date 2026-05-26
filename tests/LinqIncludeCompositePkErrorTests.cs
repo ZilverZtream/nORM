@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -13,14 +12,9 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the deterministic error message for Include on a dependent type
-/// that has a composite primary key. The IN-batched parent-key fetch
-/// nORM uses for eager loading hardcodes single-column key matching;
-/// composite-PK dependents would need either a tuple-IN predicate or a
-/// JOIN-then-projection emit that the loader doesn't wire today. The
-/// throw must point at the supported workarounds — manual JOIN with
-/// projection, or a separate child query — instead of leaving the user
-/// guessing at "manual loading".
+/// Include on a dependent entity with a composite primary key works: the FK is
+/// a single column even though the dependent PK is composite, so the standard
+/// IN-batched parent-key fetch loads children correctly.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqIncludeCompositePkErrorTests : IAsyncLifetime
@@ -47,7 +41,6 @@ public class LinqIncludeCompositePkErrorTests : IAsyncLifetime
             OnModelCreating = mb =>
             {
                 mb.Entity<IcpkOrder>().HasKey(o => o.Id);
-                // Composite PK on the dependent — (OrderId, LineNo).
                 mb.Entity<IcpkLine>().HasKey(l => new { l.OrderId, l.LineNo });
                 mb.Entity<IcpkOrder>().HasMany(o => o.Lines).WithOne()
                     .HasForeignKey(l => l.OrderId, o => o.Id);
@@ -63,18 +56,35 @@ public class LinqIncludeCompositePkErrorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Include_on_composite_pk_dependent_throws_with_actionable_message()
+    public async Task Include_on_composite_pk_dependent_loads_children()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await ((INormQueryable<IcpkOrder>)_ctx.Query<IcpkOrder>())
-                .Include(o => o.Lines)
-                .AsSplitQuery()
-                .ToListAsync();
-        });
-        // Message must identify the constraint and point at the supported workarounds.
-        Assert.Contains("composite",  ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("join",       ex.Message, StringComparison.OrdinalIgnoreCase);
+        var orders = await ((INormQueryable<IcpkOrder>)_ctx.Query<IcpkOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Lines)
+            .ToListAsync();
+
+        Assert.Equal(2, orders.Count);
+
+        var alice = orders.First(o => o.Customer == "Alice");
+        Assert.Equal(2, alice.Lines.Count);
+        Assert.Contains(alice.Lines, l => l.LineNo == 1 && l.Amount == 100);
+        Assert.Contains(alice.Lines, l => l.LineNo == 2 && l.Amount == 50);
+
+        var bob = orders.First(o => o.Customer == "Bob");
+        Assert.Single(bob.Lines);
+        Assert.Equal(200, bob.Lines.First().Amount);
+    }
+
+    [Fact]
+    public async Task Include_composite_pk_dependent_foreign_keys_correct()
+    {
+        var orders = await ((INormQueryable<IcpkOrder>)_ctx.Query<IcpkOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Lines)
+            .ToListAsync();
+
+        foreach (var order in orders)
+            Assert.All(order.Lines, l => Assert.Equal(order.Id, l.OrderId));
     }
 
     [Table("IcpkOrder")]
