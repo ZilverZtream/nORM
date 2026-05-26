@@ -97,6 +97,14 @@ namespace nORM.Providers
         internal virtual object? GetCommandGeneratedKey(DbCommand command, TableMapping mapping) => null;
 
         /// <summary>
+        /// MySQL rejects <c>DELETE FROM t WHERE pk IN (SELECT pk FROM t JOIN ...)</c> with
+        /// "You can't specify target table for update in FROM clause". The fix is to wrap the
+        /// inner subquery in another SELECT so the optimizer doesn't see a direct self-reference.
+        /// All other providers handle the single-wrap IN subquery correctly.
+        /// </summary>
+        internal virtual bool CudWhereInSubqueryNeedsDoubleWrap => false;
+
+        /// <summary>
         /// Returns true when bare boolean predicates such as <c>WHERE IsActive</c> and
         /// <c>WHERE NOT IsActive</c> are valid and preferred over equality-to-literal forms.
         /// </summary>

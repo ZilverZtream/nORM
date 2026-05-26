@@ -1720,26 +1720,25 @@ namespace nORM.Query
         /// <returns>The count of rows removed from the database.</returns>
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
-            // Only allocate Stopwatch when logger is active
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException(
-                    "ExecuteDeleteAsync only supports queries against a single table. The current " +
-                    "expression touches multiple tables (typically via a Join) and SQL DELETE has no " +
-                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
-                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteDeleteAsync()` " +
-                    "or materialize the matching keys first and feed them through Contains: " +
-                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
-                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteDeleteAsync()`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+            string finalSql;
+            if (plan.Tables.Count != 1)
+            {
+                ValidateJoinedCudShape(plan.BulkCudShape);
+                finalSql = BuildJoinedCudWhereInSql("DELETE FROM " + mapping.EscTable, null, plan.Sql, mapping);
+            }
+            else
+            {
+                _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+            }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-            var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
             BindPlanParameters(cmd, plan, paramValues);
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -1747,35 +1746,67 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             return affected;
         }
+
+        private static void ValidateJoinedCudShape(BulkCudQueryShape? shape)
+        {
+            if (shape == null)
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
+            if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasDistinct || shape.HasPaging)
+                throw new NormUnsupportedFeatureException(
+                    "ExecuteUpdate/Delete with a join does not support grouped, ordered, distinct, or paged queries.");
+        }
+
+        private string BuildJoinedCudWhereInSql(string prefix, string? setSql, string planSql, TableMapping mapping)
+        {
+            if (mapping.KeyColumns.Length != 1)
+                throw new NormUnsupportedFeatureException(
+                    $"ExecuteDelete/UpdateAsync with a join requires a single-column primary key on {mapping.EscTable}. " +
+                    "For composite-key entities use a correlated WHERE: " +
+                    "`ctx.Query<T>().Where(t => ctx.Query<Other>().Any(o => o.Fk == t.Pk)).ExecuteDeleteAsync()`.");
+            var fromIdx = planSql.IndexOf(" FROM ", StringComparison.Ordinal);
+            if (fromIdx < 0)
+                throw new InvalidOperationException("Cannot locate FROM clause in join SQL.");
+            var pk = mapping.KeyColumns[0].EscCol;
+            var subquery = "SELECT T0." + pk + planSql[fromIdx..];
+            string whereIn;
+            if (_ctx.Provider.CudWhereInSubqueryNeedsDoubleWrap)
+                whereIn = pk + " IN (SELECT " + pk + " FROM (" + subquery + ") AS __nm_cud)";
+            else
+                whereIn = pk + " IN (" + subquery + ")";
+            return setSql == null
+                ? prefix + " WHERE " + whereIn
+                : prefix + " SET " + setSql + " WHERE " + whereIn;
+        }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
-            // Only allocate Stopwatch when logger is active
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException(
-                    "ExecuteUpdateAsync only supports queries against a single table. The current " +
-                    "expression touches multiple tables (typically via a Join) and SQL UPDATE has no " +
-                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
-                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteUpdateAsync(...)` " +
-                    "or materialize the matching keys first and feed them through Contains: " +
-                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
-                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteUpdateAsync(...)`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
-            var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
+            string finalSql;
+            Dictionary<string, object> setParams;
+            if (plan.Tables.Count != 1)
+            {
+                ValidateJoinedCudShape(plan.BulkCudShape);
+                var (setClauseJ, setParamsJ) = _cudBuilder.BuildSetClause(mapping, set);
+                setParams = setParamsJ;
+                finalSql = BuildJoinedCudWhereInSql("UPDATE " + mapping.EscTable, setClauseJ, plan.Sql, mapping);
+            }
+            else
+            {
+                _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                var (setClause, setParamsSingle) = _cudBuilder.BuildSetClause(mapping, set);
+                setParams = setParamsSingle;
+                finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
+            }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-            var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
             BindPlanParameters(cmd, plan, paramValues);
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-            // EnsureParameterDictionary returns a new Dictionary when compiled params exist,
-            // or the plan's own Parameters dict when there are none. Only copy when needed.
             var baseDict = EnsureParameterDictionary(plan, paramValues);
             var allParams = baseDict is Dictionary<string, object> mutableDict && !ReferenceEquals(baseDict, plan.Parameters)
                 ? mutableDict
