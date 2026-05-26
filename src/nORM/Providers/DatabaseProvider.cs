@@ -626,6 +626,18 @@ namespace nORM.Providers
         public virtual string NormalizeDecimalForCompare(string sql) => sql;
 
         /// <summary>
+        /// Wraps a SQL operand for numeric TimeSpan comparison. SQL Server / Postgres /
+        /// MySQL store TimeSpan in native TIME / INTERVAL types whose comparison operators
+        /// already use numeric ordering — the default is identity. SQLite stores TimeSpan
+        /// as canonical 'c' TEXT (<c>"d.hh:mm:ss.fffffff"</c>) and lex-compares, which
+        /// silently mis-orders multi-day durations ("10.00:00:00" &lt; "9.23:59:59"
+        /// lexicographically but 10 days &gt; 9 days 23 hours). SqliteProvider overrides
+        /// to convert the column to fractional seconds via
+        /// <see cref="SqliteProvider.TimeSpanColumnTotalSecondsSql"/>.
+        /// </summary>
+        public virtual string NormalizeTimeSpanForCompare(string sql) => sql;
+
+        /// <summary>
         /// Formats a numeric SQL expression as a fixed-decimal text with exactly
         /// <paramref name="digits"/> fractional digits, matching .NET's
         /// <c>ToString("F{digits}")</c>. Each provider has a different primitive:

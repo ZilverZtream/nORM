@@ -141,6 +141,15 @@ namespace nORM.Providers
         public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
 
         /// <summary>
+        /// SQLite stores TimeSpan as canonical 'c' TEXT ("d.hh:mm:ss.fffffff").
+        /// Lex-comparison of the TEXT column gives wrong order for multi-day durations
+        /// ("10.00:00:00" &lt; "9.23:59:59" lex but 10 days &gt; 9 days 23 hours).
+        /// Convert to fractional seconds so numeric ordering applies.
+        /// </summary>
+        public override string NormalizeTimeSpanForCompare(string sql)
+            => TimeSpanColumnTotalSecondsSql(sql);
+
+        /// <summary>
         /// SQLite uses <c>printf('%.Nf', col)</c> to produce a fixed-decimal text
         /// matching .NET's <c>ToString("F{digits}")</c>.
         /// </summary>

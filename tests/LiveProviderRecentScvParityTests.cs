@@ -767,4 +767,119 @@ public class LiveProviderRecentScvParityTests
         [Key] public int Id { get; set; }
         public string Name { get; set; } = "";
     }
+
+    // ------------------------------------------------------------------ test 11: TimeSpan column < column
+
+    private const string TsCmpTable = "TsCmpParity";
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task TimeSpan_cross_column_comparison_uses_numeric_ordering_on_all_providers(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupTsCmpTableAsync(ctx, kind);
+            try
+            {
+                // Rows 1 (10min < 20min) and, for providers supporting multi-day spans,
+                // row 3 (1day < 2days). Row 4 is the lex-ordering trap: "10.00:00:00" <
+                // "9.23:00:00" lexicographically, but 10 days > 9 days 23 hours numerically.
+                var loLtHi = (await ctx.Query<TsCmpParityRow>()
+                    .Where(r => r.Lo < r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                var loGtHi = (await ctx.Query<TsCmpParityRow>()
+                    .Where(r => r.Lo > r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                var loEqHi = (await ctx.Query<TsCmpParityRow>()
+                    .Where(r => r.Lo == r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                bool multiDay = kind != ProviderKind.SqlServer;
+
+                Assert.Equal(multiDay ? new[] { 1, 3 } : new[] { 1 }, loLtHi);
+                Assert.Equal(multiDay ? new[] { 2, 4 } : new[] { 2 }, loGtHi);
+                Assert.Equal(new[] { 5 }, loEqHi);
+            }
+            finally { await Teardown(ctx, TsCmpTable); }
+        }
+    }
+
+    private static string TimeSpanLiteralSql(ProviderKind kind, string hms) => kind switch
+    {
+        ProviderKind.SqlServer => $"CAST('{hms}' AS TIME)",
+        ProviderKind.Postgres  => $"INTERVAL '{hms}'",
+        ProviderKind.MySql     => $"'{hms}'",
+        ProviderKind.Sqlite    => $"'{hms}'",
+        _ => throw new NotSupportedException()
+    };
+
+    private static async Task SetupTsCmpTableAsync(DbContext ctx, ProviderKind kind)
+    {
+        var t  = ctx.Provider.Escape(TsCmpTable);
+        var id = EscapeCol(kind, "Id");
+        var lo = EscapeCol(kind, "Lo");
+        var hi = EscapeCol(kind, "Hi");
+        var tsType = TimeSpanCol(kind);
+        var ddl = DropTable(kind, TsCmpTable, t) +
+                  $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {lo} {tsType} NOT NULL, {hi} {tsType} NOT NULL)";
+        await ExecuteAsync(ctx, ddl);
+
+        // Rows 1-2 and row 5 (equal) work on all providers.
+        // Rows 3-4 (multi-day) require INTERVAL/MySQL multi-hour TIME — skipped for SQL Server TIME.
+        // Row 4 is the lex-ordering trap: '10.00:00:00' < '9.23:00:00' lexicographically
+        // but 10 days > 9 days 23 hours numerically.
+        string L(string hms) => TimeSpanLiteralSql(kind, hms);
+
+        string baseRows = $"INSERT INTO {t} ({id},{lo},{hi}) VALUES " +
+                          $"(1,{L("00:10:00")},{L("00:20:00")})," +   // Lo < Hi ✓
+                          $"(2,{L("00:20:00")},{L("00:10:00")})," +   // Lo > Hi ✓
+                          $"(5,{L("01:00:00")},{L("01:00:00")})";     // Lo == Hi ✓
+        await ExecuteAsync(ctx, baseRows);
+
+        if (kind != ProviderKind.SqlServer)
+        {
+            // Multi-day rows: SQL Server TIME cannot exceed 23:59:59.
+            string multiDayLo3, multiDayHi3, multiDayLo4, multiDayHi4;
+            if (kind == ProviderKind.Postgres)
+            {
+                multiDayLo3 = "1 day";      multiDayHi3 = "2 days";
+                multiDayLo4 = "10 days";    multiDayHi4 = "9 days 23 hours";
+            }
+            else if (kind == ProviderKind.MySql)
+            {
+                multiDayLo3 = "24:00:00";   multiDayHi3 = "48:00:00";
+                multiDayLo4 = "240:00:00";  multiDayHi4 = "239:00:00";
+            }
+            else // SQLite — canonical 'c' TEXT
+            {
+                multiDayLo3 = "1.00:00:00"; multiDayHi3 = "2.00:00:00";
+                multiDayLo4 = "10.00:00:00"; multiDayHi4 = "9.23:00:00";
+            }
+            await ExecuteAsync(ctx,
+                $"INSERT INTO {t} ({id},{lo},{hi}) VALUES " +
+                $"(3,{TimeSpanLiteralSql(kind, multiDayLo3)},{TimeSpanLiteralSql(kind, multiDayHi3)})," +
+                $"(4,{TimeSpanLiteralSql(kind, multiDayLo4)},{TimeSpanLiteralSql(kind, multiDayHi4)})");
+        }
+    }
+
+    [Table(TsCmpTable)]
+    public sealed class TsCmpParityRow
+    {
+        [Key] public int Id { get; set; }
+        public TimeSpan Lo { get; set; }
+        public TimeSpan Hi { get; set; }
+    }
 }
