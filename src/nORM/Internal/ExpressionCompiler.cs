@@ -406,6 +406,14 @@ namespace nORM.Internal
                         state.CommandPool.Enqueue(cmd);
                     }
 
+                    if (cachedPlan.PostReverse) Query.QueryExecutor.ReverseListInPlace(list);
+                    if (cachedPlan.PostMaterializeTransform != null)
+                    {
+                        var transformed = cachedPlan.PostMaterializeTransform(list);
+                        var rebuilt = new List<T>(transformed.Count);
+                        foreach (var item in transformed) rebuilt.Add((T)item!);
+                        list = rebuilt;
+                    }
                     return Task.FromResult(list);
                 }
 
