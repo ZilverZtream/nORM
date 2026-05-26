@@ -739,6 +739,31 @@ namespace nORM.Providers
             => $"STRING_AGG({expr}, {sepLiteral})";
 
         /// <summary>
+        /// Ordered variant: STRING_AGG with an ORDER BY clause inside the aggregate.
+        /// SQL Server uses <c>WITHIN GROUP (ORDER BY …)</c>; Postgres puts ORDER BY
+        /// inside the function; MySQL differs — those providers override.
+        /// </summary>
+        public virtual string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
+            => $"STRING_AGG({expr}, {sepLiteral}) WITHIN GROUP (ORDER BY {orderBySql})";
+
+        /// <summary>
+        /// When true, the translator routes an ordered string-concat aggregate fold
+        /// through <see cref="GetStringAggregateSql(string,string,string)"/> and
+        /// removes the ORDER BY from the outer SELECT. When false (SQLite &lt; 3.44),
+        /// the unordered aggregate form is used and the ORDER BY stays on the outer
+        /// SELECT so the query planner's index selection determines GROUP_CONCAT order.
+        /// </summary>
+        public virtual bool SupportsNativeOrderedStringAggregate => true;
+
+        /// <summary>
+        /// Returns SQL that casts <paramref name="innerSql"/> to a boolean.
+        /// Default emits <c>CAST(x AS BOOLEAN)</c> which works on Postgres and SQLite.
+        /// SQL Server overrides to <c>BIT</c>; MySQL overrides to a comparison.
+        /// </summary>
+        public virtual string GetBoolCastSql(string innerSql)
+            => $"CAST({innerSql} AS BOOLEAN)";
+
+        /// <summary>
         /// Returns SQL that evaluates the .NET <c>Regex.IsMatch(input, pattern)</c>
         /// where <paramref name="patternLiteral"/> is the already-emitted SQL
         /// fragment for the pattern (typically a single-quoted literal or @-param).

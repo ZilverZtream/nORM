@@ -62,9 +62,9 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Sum` / `Average` / `Min` / `Max` (scalar + selector) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Decimal coerced to REAL on SQLite — small float drift. | `LinqGroupAggregateComputedSelectorTests`, `LiveProviderShapeParityTests` |
 | `Sum`/`Min`/`Max`/`Avg` over decimal column | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite: REAL coercion. | `LiveProviderShapeParityTests` |
 | `Sum`/`Min`/`Max`/`Avg` over nullable columns | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Throws "no elements" when result is null & TResult is non-nullable value (commit 57). | `LinqOperatorCardinalityTests` |
-| LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests` (SQLite) |
-| LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests` (SQLite) |
-| LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Lowers to `GroupBy(_=>1).Select(g => string.Join(sep, g.Select(...)))` so STRING_AGG / GROUP_CONCAT runs on the server. | `LinqAggregateStringConcatTests` (SQLite) |
+| LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests`, `LiveProviderRecentScvParityTests` |
+| LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests`, `LiveProviderRecentScvParityTests` |
+| LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQL Server/Postgres/MySQL use native ordered aggregate (WITHIN GROUP / inline ORDER BY). SQLite uses outer ORDER BY to guide index scan order for GROUP_CONCAT. | `LinqAggregateStringConcatTests`, `LiveProviderRecentScvParityTests` |
 
 ### GroupBy / joins / set ops
 
@@ -94,16 +94,16 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `DateOnly` / `TimeOnly` arithmetic + parts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
 | `TimeSpan` column ops (Total*, components, Negate/Duration/unary-negate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqTimeSpanInstanceNegateAndAbsTests` (SQLite); cross-provider via `ProviderParityDepthTests` |
 | `DateTime` - `DateTime` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Julianday delta on SQLite (sub-second precision). | `ProviderParityDepthTests` |
-| `DateTimeOffset.UtcDateTime` / `.LocalDateTime` / `.ToOffset` | ✅ (Local: ⚠️ DST snapshot) | 🚧 | 🚧 | 🚧 | ✅ | — | LocalDateTime uses snapshot offset, not per-instant historical TZ. | `LinqDateTimeOffsetLocalDateTimeTests`, `LinqDateTimeOffsetLocalDateTimeInWhereTests` (SQLite) |
+| `DateTimeOffset.UtcDateTime` / `.LocalDateTime` / `.ToOffset` | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ | — | LocalDateTime uses snapshot offset, not per-instant historical TZ. | `LinqDateTimeOffsetLocalDateTimeTests`, `LinqDateTimeOffsetLocalDateTimeInWhereTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTimeOffset` col `==` / `!=` DateTime literal (UTC-instant equality) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Second-resolution; sub-second fidelity is future work. MySQL hook uses `TIMESTAMPDIFF(SECOND,'1970-01-01',col)` to avoid session-TZ dependence of `UNIX_TIMESTAMP`. | `LinqDateTimeOffsetEqualsDateTimeLiteralTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTimeOffset` col >/</>=/<= DateTime literal | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Existing `NormalizeDateTimeForCompare` covers it. | `ProviderParityDepthTests` |
-| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Integer epoch-seconds diff for second-resolution accuracy. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite) |
-| `DateTimeOffset` col +/- `TimeSpan` col | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | SQLite preserves original offset via substr-suffix hook. | `LinqDateTimeOffsetPlusTimeSpanColumnTests` (SQLite) |
+| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | — | Integer epoch-seconds diff for second-resolution accuracy. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTimeOffset` col +/- `TimeSpan` col | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite preserves original offset via substr-suffix hook. | `LinqDateTimeOffsetPlusTimeSpanColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `decimal` comparisons, ordering, aggregates, distinct, set ops | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite REAL coercion documented. | `TypeConversionParityTests`, `LiveProviderShapeParityTests` |
 | `Guid` comparisons, equality, IN | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqGuidAndDistinctTests`, `TypeConversionParityTests` |
 | `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests` |
-| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Lowers to `(col IN ('Name1', ...))`. | `LinqEnumTryParseOutParamTests` (SQLite) |
-| `Convert.ChangeType(col, typeof(T))` | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite) |
+| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `(col IN ('Name1', ...))`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests` |
 | local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderShapeParityTests` |
 
@@ -115,16 +115,15 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 ## Open parity gaps (🚧)
 
-The 🚧 rows above are the immediate release-gate blockers. They share a common
-root cause: the recent SCV-additions iteration shipped provider hooks for all
-four providers (SqlServer, Postgres, MySQL overrides exist in source) but the
-test coverage was SQLite-only. Closing the gap is mostly writing live-parity
-tests against existing implementations — not new translator work.
+The only remaining 🚧 rows are the Post-Take/Skip family on SqlServer, Postgres,
+and MySQL. All SCV-additions rows (DateTimeOffset col == DateTime literal,
+LocalDateTime, DTO subtraction, DTO ±TimeSpan, Enum.TryParse, Convert.ChangeType,
+Aggregate folds) have been verified on all four providers and are now ✅.
 
 Tracked workstream:
-- Task #95 — DateTimeOffset col == DateTime literal: live-parity test for
-  the SqlServer / Postgres / MySQL hooks added in 560f24b.
-- Task #96 — Remaining SCV additions: one live-parity test per feature.
+- Post-Take/Skip live-parity tests for SqlServer / Postgres / MySQL — translator
+  already handles the derived-table wrap correctly (SQLite passes); live tests
+  need to be written against the existing implementation.
 
 When each 🚧 row flips to ✅ on all four providers (or to ⚠️ with a documented
 provider note), update this report in the same commit.

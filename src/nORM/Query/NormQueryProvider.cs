@@ -646,6 +646,11 @@ namespace nORM.Query
                 projParam = preSelLambda.Parameters[0];
                 projBody = preSelLambda.Body;
             }
+            // Ordering is preserved in groupedSource. HandleGroupBy sets _orderBy when
+            // it processes the OrderBy chain. For the constant-key GroupBy (no GROUP BY
+            // emitted), TranslateGroupAggregateMethod consumes _orderBy and routes it
+            // through GetStringAggregateSql(expr, sep, orderBy) so each provider uses
+            // its native ordered-aggregate syntax (WITHIN GROUP / inline ORDER BY / etc.).
             var sourceGenArg = groupedSource.Type.IsGenericType ? groupedSource.Type.GetGenericArguments()[0] : projParam.Type;
             var projLambda = Expression.Lambda(projBody, projParam);
 

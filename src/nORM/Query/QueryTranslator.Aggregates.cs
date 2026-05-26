@@ -122,23 +122,35 @@ namespace nORM.Query
             }
             else
             {
-                var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                var visitor = FastExpressionVisitorPool.Get(in vctx2);
-                groupBySql = visitor.Translate(keySelectorLambda.Body);
-                // Use AddLiteralParameter (not AddParameter) so the inline-constant `@p0` from
-                // a COALESCE-fallback / literal-bearing key selector isn't also flagged in
-                // `_compiledParams`. Flagging it makes BindPlanParameters treat the slot as a
-                // compiled-query closure binding and skip the literal value at execution time —
-                // SQLite then throws `Must add values for the following parameters`. Matches the
-                // composite-key path above which already uses AddLiteralParameter.
-                foreach (var kvp in visitor.GetParameters())
-                    AddLiteralParameter(kvp.Key, kvp.Value);
-                FastExpressionVisitorPool.Return(visitor);
-                // Decimal key: coerce to REAL (see composite-key path above).
-                var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
-                if (keyType == typeof(decimal))
-                    groupBySql = _provider.NormalizeDecimalForCompare(groupBySql);
-                _groupBy.Add(groupBySql);
+                // Constant key (e.g. `_ => 1` from the string-concat aggregate rewrite) means
+                // "group all rows into a single group". SQL Server rejects GROUP BY <constant>
+                // and MySQL ONLY_FULL_GROUP_BY rejects it too. Omit GROUP BY entirely — a plain
+                // aggregate SELECT without GROUP BY gives the same single-group semantics.
+                if (keySelectorLambda.Body is ConstantExpression)
+                {
+                    groupBySql = string.Empty;
+                    // Do NOT add to _groupBy — no GROUP BY clause will be emitted.
+                }
+                else
+                {
+                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx2);
+                    groupBySql = visitor.Translate(keySelectorLambda.Body);
+                    // Use AddLiteralParameter (not AddParameter) so the inline-constant `@p0` from
+                    // a COALESCE-fallback / literal-bearing key selector isn't also flagged in
+                    // `_compiledParams`. Flagging it makes BindPlanParameters treat the slot as a
+                    // compiled-query closure binding and skip the literal value at execution time —
+                    // SQLite then throws `Must add values for the following parameters`. Matches the
+                    // composite-key path above which already uses AddLiteralParameter.
+                    foreach (var kvp in visitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(visitor);
+                    // Decimal key: coerce to REAL (see composite-key path above).
+                    var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
+                    if (keyType == typeof(decimal))
+                        groupBySql = _provider.NormalizeDecimalForCompare(groupBySql);
+                    _groupBy.Add(groupBySql);
+                }
             }
 
             // If there's a result selector, handle the projection
@@ -487,6 +499,20 @@ namespace nORM.Query
                     AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(aggVisitor);
                 var sepLit = $"'{aggSep.Replace("'", "''")}'";
+                // For constant-key GroupBy (single-group aggregate, no GROUP BY emitted),
+                // route source OrderBy into the aggregate function when the provider supports
+                // native ordered-aggregate syntax (SQL Server WITHIN GROUP, Postgres / MySQL
+                // inline ORDER BY). Consuming _orderBy here prevents it from appearing as a
+                // meaningless outer ORDER BY on the single-row result set.
+                // For SQLite (SupportsNativeOrderedStringAggregate = false), leave _orderBy
+                // on the outer SELECT so SQLite's query planner uses an index scan in ORDER BY
+                // order, which GROUP_CONCAT then observes as its input order.
+                if (_groupBy.Count == 0 && _orderBy.Count > 0 && _provider.SupportsNativeOrderedStringAggregate)
+                {
+                    var orderSql = PooledStringBuilder.JoinOrderBy(_orderBy);
+                    _orderBy.Clear();
+                    return _provider.GetStringAggregateSql(memberSql, sepLit, orderSql);
+                }
                 return _provider.GetStringAggregateSql(memberSql, sepLit);
             }
 

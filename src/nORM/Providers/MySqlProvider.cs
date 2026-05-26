@@ -385,6 +385,17 @@ namespace nORM.Providers
         public override string GetStringAggregateSql(string expr, string sepLiteral)
             => $"GROUP_CONCAT({expr} SEPARATOR {sepLiteral})";
 
+        /// <summary>MySQL ordered GROUP_CONCAT: ORDER BY comes before SEPARATOR.</summary>
+        public override string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
+            => $"GROUP_CONCAT({expr} ORDER BY {orderBySql} SEPARATOR {sepLiteral})";
+
+        /// <summary>
+        /// MySQL has no BOOLEAN as a CAST target; use a comparison expression that
+        /// returns 1 (true) for any nonzero input and 0 (false) for zero.
+        /// </summary>
+        public override string GetBoolCastSql(string innerSql)
+            => $"(({innerSql}) <> 0)";
+
         /// <summary>MySQL uses the REGEXP infix operator for regex match (synonym RLIKE).</summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} REGEXP {patternLiteral})";

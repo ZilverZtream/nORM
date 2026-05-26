@@ -195,6 +195,10 @@ namespace nORM.Providers
         /// <summary>PostgreSQL TEXT is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 
+        /// <summary>Postgres puts ORDER BY inside the aggregate function arguments.</summary>
+        public override string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
+            => $"STRING_AGG({expr}, {sepLiteral} ORDER BY {orderBySql})";
+
         /// <summary>
         /// PostgreSQL uses <c>to_char(x, 'FM999999999990.{N zeros}')</c> for fixed-
         /// decimal text. 'FM' strips leading whitespace; '9' is optional digit, '0'
