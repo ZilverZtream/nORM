@@ -40,6 +40,13 @@ namespace nORM.Providers
         private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: KeyTableSchemaCacheSize);
 
         /// <summary>
+        /// SQL Server ROWVERSION columns are server-managed and cannot receive explicit values on INSERT.
+        /// Exclude them from the INSERT column list; the server populates them automatically.
+        /// </summary>
+        public override Column[] GetInsertColumns(TableMapping m)
+            => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
+
+        /// <summary>
         /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
         /// </summary>
         public override bool UsesFetchOffsetPaging => true;
@@ -276,15 +283,20 @@ namespace nORM.Providers
 
         /// <summary>
         /// Returns an <c>OUTPUT INSERTED.[keyCol]</c> clause placed between the column list and VALUES.
-        /// This works for any column type (int, bigint, uniqueidentifier, varchar, …) unlike SCOPE_IDENTITY()
-        /// which is restricted to numeric auto-increment columns.
+        /// When the mapping also declares a timestamp (ROWVERSION) column, that column is included as
+        /// a second OUTPUT column so the server-assigned value is read back after INSERT and kept in sync
+        /// with the in-memory entity — preventing a false concurrency conflict on the first UPDATE.
         /// </summary>
         /// <param name="m">The table mapping for the insert.</param>
-        /// <returns>SQL clause e.g. <c> OUTPUT INSERTED.[Id]</c>, or empty when no db-generated key exists.</returns>
+        /// <returns>SQL clause e.g. <c> OUTPUT INSERTED.[Id]</c> or <c> OUTPUT INSERTED.[Id], INSERTED.[RowVersion]</c>.</returns>
         public override string GetIdentityRetrievalPrefix(TableMapping m)
         {
             var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
-            return keyCol != null ? $" OUTPUT INSERTED.{keyCol.EscCol}" : string.Empty;
+            if (keyCol == null) return string.Empty;
+            var tsCol = m.TimestampColumn;
+            return tsCol != null
+                ? $" OUTPUT INSERTED.{keyCol.EscCol}, INSERTED.{tsCol.EscCol}"
+                : $" OUTPUT INSERTED.{keyCol.EscCol}";
         }
 
         /// <summary>SQL Server uses NVARCHAR(MAX) for unbounded textual conversion.</summary>

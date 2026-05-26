@@ -121,6 +121,9 @@ $lines.Add("- Mode: $Mode")
 $lines.Add("- Configuration: $Configuration")
 $lines.Add("- Stress iterations: $StressIterations")
 $lines.Add("- Benchmark skipped: $BenchmarkSkipped")
+if ($BenchmarkSkipped) {
+    $lines.Add("- **Performance note**: This manifest was produced with `-SkipBenchmark`. No fresh BenchmarkDotNet evidence was captured. Performance claims documented in `docs/benchmark-governance.md` are not backed by this run. A separate benchmark run is required before making public performance claims.")
+}
 $lines.Add("- SDK: $sdkVersion")
 $lines.Add("- OS: $os ($processArch)")
 $lines.Add("- Working tree clean: $([string]::IsNullOrWhiteSpace($status))")
@@ -170,4 +173,16 @@ foreach ($section in $sections) {
 }
 
 $lines | Set-Content -LiteralPath $mdPath -Encoding UTF8
+
+# Copy package files into the artifact bundle so consumers can verify the exact
+# files the gate ran against without needing the source repo's bin/Release output.
+$pkgBundleDir = Join-Path $OutputDirectory 'packages'
+New-Item -ItemType Directory -Force -Path $pkgBundleDir | Out-Null
+foreach ($pkg in $packages) {
+    $src = Join-Path $root $pkg.File.Replace('/', '\')
+    if (Test-Path $src) {
+        Copy-Item -LiteralPath $src -Destination $pkgBundleDir -Force
+    }
+}
+
 Write-Host "RC artifact manifest written to $OutputDirectory"

@@ -99,7 +99,7 @@ namespace nORM.Core
                 cmd.CommandText = _p.BuildInsert(mapping, hydrateGeneratedKeys && !hydrateFromCommand);
                 cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
 
-                foreach (var col in mapping.InsertColumns)
+                foreach (var col in _p.GetInsertColumns(mapping))
                 {
                     cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, null, GetParameterKnownType(col, null));
                     ApplyPreparedInsertSizeHint(cmd.Parameters[cmd.Parameters.Count - 1], col);
@@ -209,7 +209,7 @@ namespace nORM.Core
                 _hydrateGeneratedKeys = hydrateGeneratedKeys && HasDbGeneratedKey(_mapping.KeyColumns);
                 _hydrateGeneratedKeysFromCommand = hydrateGeneratedKeysFromCommand && _hydrateGeneratedKeys;
 
-                var insertCols = _mapping.InsertColumns;
+                var insertCols = _context.Provider.GetInsertColumns(_mapping);
                 _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
                 var prefix = _context.Provider.ParamPrefix;
 

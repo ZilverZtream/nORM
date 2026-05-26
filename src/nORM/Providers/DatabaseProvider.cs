@@ -1668,6 +1668,13 @@ namespace nORM.Providers
 
         #region SQL Generation
         /// <summary>
+        /// Returns the columns that should appear in an INSERT statement for the given mapping.
+        /// Override in provider subclasses to exclude server-managed columns (e.g. SQL Server ROWVERSION)
+        /// that cannot receive explicit values on INSERT.
+        /// </summary>
+        public virtual Column[] GetInsertColumns(TableMapping m) => m.InsertColumns;
+
+        /// <summary>
         /// Builds a parameterized <c>INSERT</c> statement for the specified table
         /// mapping, caching the generated SQL for future use.
         /// </summary>
@@ -1681,7 +1688,7 @@ namespace nORM.Providers
             var includeIdentityRetrieval = hydrateGeneratedKeys && m.KeyColumns.Any(k => k.IsDbGenerated);
             var cacheKey = includeIdentityRetrieval ? "INSERT" : "INSERT_PLAIN";
             return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheKey, m.SqlShapeKey), _ => {
-                var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
+                var cols = GetInsertColumns(m);
                 var identityPrefix = includeIdentityRetrieval ? GetIdentityRetrievalPrefix(m) : string.Empty;
                 var identitySuffix = includeIdentityRetrieval ? GetIdentityRetrievalString(m) : string.Empty;
                 if (cols.Length == 0)
