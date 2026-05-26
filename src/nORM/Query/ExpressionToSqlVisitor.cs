@@ -1009,6 +1009,20 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            // dtoCol.LocalDateTime — sister of the projection-side handler in
+            // SelectClauseVisitor (1f06ac1). Snapshot semantics: local offset
+            // captured at query-build time and baked into the SQL shift.
+            // See [[dto-local-datetime]] for the DST trade-off.
+            if (node.Member.Name == nameof(DateTimeOffset.LocalDateTime)
+                && node.Member.DeclaringType == typeof(DateTimeOffset)
+                && node.Expression != null
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(DateTimeOffset))
+            {
+                var dtoSql = GetSql(node.Expression);
+                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
+                _sql.Append(_provider.GetDateTimeOffsetLocalDateTimeSql(dtoSql, localOffset));
+                return node;
+            }
             // `entity.GetType().Name/FullName/Namespace/AssemblyQualifiedName` --
             // fold to the receiver's declared compile-time type. Mirror of the
             // SCV fold in 149fa9a so the same expression works in WHERE. Type.*
