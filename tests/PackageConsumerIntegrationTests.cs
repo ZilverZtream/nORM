@@ -254,13 +254,13 @@ public class PackageConsumerIntegrationTests
     private static void EnsureRuntimePackage(string root)
     {
         CleanPackageOutput(Path.Combine(root, "src", "bin", "Release"), "nORM");
-        RunDotNet("pack src\\nORM.csproj -c Release --no-restore --nologo", root, null);
+        RunDotNet("pack src/nORM.csproj -c Release --no-restore --nologo", root, null);
     }
 
     private static void EnsureToolPackage(string root)
     {
         CleanPackageOutput(Path.Combine(root, "src", "dotnet-norm", "bin", "Release"), "dotnet-norm");
-        RunDotNet("pack src\\dotnet-norm\\dotnet-norm.csproj -c Release --no-restore --nologo", root, null);
+        RunDotNet("pack src/dotnet-norm/dotnet-norm.csproj -c Release --no-restore --nologo", root, null);
     }
 
     private static string ReadPackageVersion(string root)
