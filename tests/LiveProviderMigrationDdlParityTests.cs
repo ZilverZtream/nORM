@@ -722,4 +722,121 @@ public class LiveProviderMigrationDdlParityTests
             db.Dispose();
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Item 13 — RENAME COLUMN: column renamed with data preserved
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static string InsertRowDdl(string kind, string table) => kind switch
+    {
+        "sqlite"    => $"INSERT INTO \"{table}\" (\"Id\", \"OldName\") VALUES (1, 'hello')",
+        "sqlserver" => $"INSERT INTO [{table}] ([Id], [OldName]) VALUES (1, 'hello')",
+        "mysql"     => $"INSERT INTO `{table}` (`Id`, `OldName`) VALUES (1, 'hello')",
+        "postgres"  => $"INSERT INTO \"{table}\" (\"Id\", \"OldName\") VALUES (1, 'hello')",
+        _           => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static string CreateRenameBaseDdl(string kind, string table) => kind switch
+    {
+        "sqlite"    => $"CREATE TABLE IF NOT EXISTS \"{table}\" (\"Id\" INTEGER PRIMARY KEY, \"OldName\" TEXT NOT NULL)",
+        "sqlserver" => $"IF OBJECT_ID('{table}','U') IS NULL CREATE TABLE [{table}] ([Id] INT NOT NULL PRIMARY KEY, [OldName] NVARCHAR(200) NOT NULL)",
+        "mysql"     => $"CREATE TABLE IF NOT EXISTS `{table}` (`Id` INT NOT NULL PRIMARY KEY, `OldName` VARCHAR(200) NOT NULL)",
+        "postgres"  => $"CREATE TABLE IF NOT EXISTS \"{table}\" (\"Id\" INT NOT NULL PRIMARY KEY, \"OldName\" VARCHAR(200) NOT NULL)",
+        _           => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static string? ReadNewNameValue(DbConnection cn, string kind, string table)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = kind switch
+        {
+            "sqlite"    => $"SELECT \"NewName\" FROM \"{table}\" WHERE \"Id\" = 1",
+            "sqlserver" => $"SELECT [NewName] FROM [{table}] WHERE [Id] = 1",
+            "mysql"     => $"SELECT `NewName` FROM `{table}` WHERE `Id` = 1",
+            "postgres"  => $"SELECT \"NewName\" FROM \"{table}\" WHERE \"Id\" = 1",
+            _           => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        var val = cmd.ExecuteScalar();
+        return val is DBNull or null ? null : (string)val;
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_RenameColumn_OldGoneNewPresentDataPreserved(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_Rename";
+
+        try
+        {
+            Exec(db, CreateRenameBaseDdl(kind, table));
+            Exec(db, InsertRowDdl(kind, table));
+
+            Assert.True(ColumnExists(db, table, "OldName"),  $"[{kind}] OldName should exist before rename.");
+            Assert.False(ColumnExists(db, table, "NewName"), $"[{kind}] NewName should not exist before rename.");
+
+            var baseTable = new TableSchema { Name = table, Columns = { new ColumnSchema { Name = "Id",      IsPrimaryKey = true  }, new ColumnSchema { Name = "OldName" } } };
+            var newCol    = new ColumnSchema { Name = "NewName", ClrType = typeof(string).FullName!, IsNullable = false };
+            var diff      = new SchemaDiff();
+            diff.RenamedColumns.Add((baseTable, "OldName", newCol));
+
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.False(ColumnExists(db, table, "OldName"), $"[{kind}] OldName should be gone after rename.");
+            Assert.True(ColumnExists(db, table, "NewName"),  $"[{kind}] NewName should exist after rename.");
+
+            // Data must survive the rename.
+            var value = ReadNewNameValue(db, kind, table);
+            Assert.Equal("hello", value);
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_RenameColumn_DownReverses(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_RenameDown";
+
+        try
+        {
+            Exec(db, CreateRenameBaseDdl(kind, table));
+
+            var baseTable = new TableSchema { Name = table, Columns = { new ColumnSchema { Name = "Id", IsPrimaryKey = true }, new ColumnSchema { Name = "OldName" } } };
+            var newCol    = new ColumnSchema { Name = "NewName", ClrType = typeof(string).FullName!, IsNullable = false };
+            var diff      = new SchemaDiff();
+            diff.RenamedColumns.Add((baseTable, "OldName", newCol));
+
+            var stmts = Generator(kind).GenerateSql(diff);
+            ApplyStatements(db, stmts.Up);
+
+            Assert.False(ColumnExists(db, table, "OldName"), $"[{kind}] OldName should be gone after UP.");
+            Assert.True(ColumnExists(db, table, "NewName"),  $"[{kind}] NewName should exist after UP.");
+
+            ApplyStatements(db, stmts.Down);
+
+            Assert.True(ColumnExists(db, table, "OldName"),  $"[{kind}] OldName should be restored after DOWN.");
+            Assert.False(ColumnExists(db, table, "NewName"), $"[{kind}] NewName should be gone after DOWN.");
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
 }
