@@ -111,7 +111,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Tests |
 | --- | --- | --- | --- | --- | --- |
-| Compiled-query equivalent of every runtime row above | ✅ for the existing matrix; 🚧 for SCV additions in 2026-05-25/26. | | | | `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
+| Compiled-query equivalent of every runtime row above | ✅ for the existing matrix; SCV additions (DTO ops, Enum.TryParse, Convert.ChangeType, Aggregate folds, Post-Take/Skip family) are marked `—` — compiled form not required. | | | | `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
 
 ## Open parity gaps (🚧)
 
