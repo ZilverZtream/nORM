@@ -77,6 +77,7 @@ namespace nORM.Query
                 nameof(int.Parse),
                 nameof(Enum.HasFlag),
                 nameof(Enum.Parse),
+                nameof(Enum.TryParse),
                 // Convert.* from-string overloads -- sister to X.Parse(string).
                 nameof(Convert.ToInt32),
                 nameof(Convert.ToInt64),
