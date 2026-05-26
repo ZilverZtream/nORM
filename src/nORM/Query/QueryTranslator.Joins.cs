@@ -652,65 +652,12 @@ namespace nORM.Query
                 smResultSelector.Parameters[0], smResultSelector.Parameters[1],
                 outerMemberName, freshOuter, freshInner);
             var newBody = rewriter.Visit(smResultSelector.Body)!;
-            // Detect `inner == null` / `inner != null` defensive null-checks inside the
-            // projection. SQL LEFT JOIN naturally NULLs unmatched right-side columns, so
-            // the conditional is semantically redundant — but nORM's visitor doesn't yet
-            // recognise the entity-parameter-vs-null shape and silently mis-binds the
-            // projected column to the inner's first ordinal (returns the inner's Id
-            // instead of the named property). Surface a clear error pointing at the
-            // idiomatic bare `c.Tag` workaround.
-            if (ContainsEntityNullCheck(newBody, freshInner))
-            {
-                throw new NormUnsupportedFeatureException(
-                    "Defensive `inner == null` / `inner != null` checks inside a LEFT JOIN " +
-                    "(GroupJoin + SelectMany + DefaultIfEmpty) projection aren't yet supported — " +
-                    "nORM mis-binds the projected column when the conditional wraps an inner-row " +
-                    "null test. The check is redundant in SQL anyway: LEFT JOIN already NULLs the " +
-                    "unmatched right side, so a downstream `c.Tag` projection returns NULL for the " +
-                    "DefaultIfEmpty rows automatically. Workaround: drop the conditional and " +
-                    "project the column directly — `select new { p.Name, Tag = c.Tag }` instead of " +
-                    "`select new { p.Name, Tag = c == null ? null : c.Tag }`.");
-            }
             var rewrittenResultSel = Expression.Lambda(newBody, freshOuter, freshInner);
 
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
             _sql.Clear();
             JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
-        }
-
-        private static bool ContainsEntityNullCheck(Expression body, ParameterExpression entityParam)
-        {
-            var visitor = new EntityNullCheckDetector(entityParam);
-            visitor.Visit(body);
-            return visitor.Found;
-        }
-
-        private sealed class EntityNullCheckDetector : ExpressionVisitor
-        {
-            private readonly ParameterExpression _entity;
-            public bool Found { get; private set; }
-
-            public EntityNullCheckDetector(ParameterExpression entity) => _entity = entity;
-
-            protected override Expression VisitBinary(BinaryExpression node)
-            {
-                if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
-                {
-                    if (IsEntityVsNull(node.Left, node.Right) || IsEntityVsNull(node.Right, node.Left))
-                    {
-                        Found = true;
-                        return node;
-                    }
-                }
-                return base.VisitBinary(node);
-            }
-
-            private bool IsEntityVsNull(Expression maybeEntity, Expression maybeNull)
-            {
-                return maybeEntity == _entity
-                    && maybeNull is ConstantExpression { Value: null };
-            }
         }
 
         private sealed class QuerySyntaxLeftJoinRewriter : ExpressionVisitor
@@ -735,6 +682,33 @@ namespace nORM.Query
                 _newInner = newInner;
             }
 
+            protected override Expression VisitConditional(ConditionalExpression node)
+            {
+                // Strip idiomatic LEFT JOIN null-guard: `c == null ? null : c.Prop` and the
+                // mirrored `c != null ? c.Prop : null` form. LEFT JOIN already NULLs unmatched
+                // right-side columns, making the null-guard semantically redundant. Stripping it
+                // lets ExtractNeededColumns resolve the column reference and the materializer
+                // correctly maps the column ordinal. Non-trivial fallbacks (e.g. "None") are
+                // not simplified — they fall through to the default visitor.
+                if (IsInnerParam(node.Test, out bool testIsEqual))
+                {
+                    // Whole test is the inner param itself (treated as c != null)
+                    var propBranch = testIsEqual ? node.IfFalse : node.IfTrue;
+                    var nullBranch = testIsEqual ? node.IfTrue  : node.IfFalse;
+                    if (IsNullOrDefault(nullBranch))
+                        return Visit(propBranch);
+                }
+                else if (IsEntityNullComparison(node.Test, out bool testNullOnLeft, out bool eqOp))
+                {
+                    // c == null ? X : Y  →  propBranch = Y when eqOp, X when !eqOp
+                    var propBranch = eqOp ? node.IfFalse : node.IfTrue;
+                    var nullBranch = eqOp ? node.IfTrue  : node.IfFalse;
+                    if (IsNullOrDefault(nullBranch))
+                        return Visit(propBranch);
+                }
+                return base.VisitConditional(node);
+            }
+
             protected override Expression VisitMember(MemberExpression node)
             {
                 if (node.Expression == _oldTransparent && node.Member.Name == _outerMemberName)
@@ -747,6 +721,35 @@ namespace nORM.Query
                 if (node == _oldInner) return _newInner;
                 return base.VisitParameter(node);
             }
+
+            private bool IsInnerParam(Expression e, out bool isEqual)
+            {
+                isEqual = false;
+                return e == _oldInner || e == _newInner;
+            }
+
+            private bool IsEntityNullComparison(Expression test, out bool nullOnLeft, out bool isEqual)
+            {
+                nullOnLeft = false;
+                isEqual = false;
+                if (test is not BinaryExpression bin) return false;
+                if (bin.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual)) return false;
+                isEqual = bin.NodeType == ExpressionType.Equal;
+                if ((bin.Left == _oldInner || bin.Left == _newInner)
+                    && bin.Right is ConstantExpression { Value: null })
+                { nullOnLeft = false; return true; }
+                if ((bin.Right == _oldInner || bin.Right == _newInner)
+                    && bin.Left is ConstantExpression { Value: null })
+                { nullOnLeft = true; return true; }
+                return false;
+            }
+
+            private static bool IsNullOrDefault(Expression e) =>
+                e is ConstantExpression { Value: null }
+                || e is DefaultExpression
+                || (e is UnaryExpression ue
+                    && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked)
+                    && ue.Operand is ConstantExpression { Value: null });
         }
     }
 }
