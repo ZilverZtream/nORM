@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
+using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
 
@@ -24,6 +25,8 @@ namespace nORM.Query
         // the principal table's escaped name when no JOIN alias is in scope — SQLite
         // accepts table-qualified outer-scope references even without an explicit AS alias.
         private readonly string _outerAlias;
+        // Used to look up intermediate/dependent-type mappings for multi-hop nav aggregates.
+        private readonly DbContext? _ctx;
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder? _sb;
@@ -41,12 +44,13 @@ namespace nORM.Query
         // use native DECIMAL and don't need this coercion.
         public bool CoerceDecimalProjectionsToReal { get; set; }
 
-        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null)
+        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _groupBy = groupBy ?? throw new ArgumentNullException(nameof(groupBy));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
             _outerAlias = outerAlias ?? mapping.EscTable;
+            _ctx = ctx;
         }
 
         /// <summary>
@@ -877,6 +881,34 @@ namespace nORM.Query
                 navFilter = whereLambda;
                 navCandidate = whereCall.Arguments[0];
             }
+
+            // Two-hop: p.Children.SelectMany(c => c.GrandChildren).Count/LongCount/Any
+            // Single-hop nav aggregates emit (SELECT COUNT(*) FROM child WHERE fk=parent.pk).
+            // Two-hop chains a SelectMany between the first navigation and the aggregate,
+            // requiring a second correlated level:
+            //   (SELECT COUNT(*) FROM grandChild g2
+            //    WHERE g2.fk2 IN (SELECT g1.pk2 FROM child g1 WHERE g1.fk1 = outer.pk1))
+            if (_ctx != null
+                && navCandidate is MethodCallExpression twoHopCall
+                && twoHopCall.Method.Name == nameof(Enumerable.SelectMany)
+                && twoHopCall.Arguments.Count == 2
+                && twoHopCall.Arguments[0] is MemberExpression hop1NavMember
+                && hop1NavMember.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(hop1NavMember.Member.Name, out var hop1Relation)
+                && StripQuotes(twoHopCall.Arguments[1]) is LambdaExpression hop2SelectorLambda
+                && hop2SelectorLambda.Body is MemberExpression hop2NavMember
+                && (node.Method.Name is nameof(Queryable.Count)
+                                     or nameof(Queryable.LongCount)
+                                     or nameof(Queryable.Any)))
+            {
+                var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
+                if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
+                {
+                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation);
+                    return node;
+                }
+            }
+
             if (navCandidate is MemberExpression navMember
                 && navMember.Expression is ParameterExpression
                 && _mapping.Relations.TryGetValue(navMember.Member.Name, out var relation)
@@ -1129,6 +1161,42 @@ namespace nORM.Query
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
             }
             sb.Append(')');
+        }
+
+        private void EmitTwoHopNavigationCountSubquery(
+            StringBuilder sb,
+            string methodName,
+            TableMapping.Relation hop1Rel,
+            TableMapping intermediateMapping,
+            TableMapping.Relation hop2Rel)
+        {
+            var hop2DepMapping = _ctx!.GetMapping(hop2Rel.DependentType);
+            var hop1EscTable  = intermediateMapping.EscTable;
+            var hop1Alias     = _provider.Escape("__mhn1");
+            var hop1FkEscCol  = hop1Rel.ForeignKey.EscCol;
+            var hop1PkEscCol  = hop1Rel.PrincipalKey.EscCol;
+            var hop2EscTable  = hop2DepMapping.EscTable;
+            var hop2Alias     = _provider.Escape("__mhn2");
+            var hop2FkEscCol  = hop2Rel.ForeignKey.EscCol;
+            // The inner SELECT returns the PK on the intermediate table that hop2's FK points to.
+            var hop2PkEscCol  = hop2Rel.PrincipalKey.EscCol;
+
+            var innerSql = $"SELECT {hop1Alias}.{hop2PkEscCol} FROM {hop1EscTable} {hop1Alias}" +
+                           $" WHERE {hop1Alias}.{hop1FkEscCol} = {_outerAlias}.{hop1PkEscCol}";
+
+            if (methodName is nameof(Queryable.Any))
+            {
+                sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
+                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
+                  .Append(" IN (").Append(innerSql).Append(')')
+                  .Append(") THEN 1 ELSE 0 END)");
+            }
+            else // Count / LongCount
+            {
+                sb.Append("(SELECT COUNT(*) FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
+                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
+                  .Append(" IN (").Append(innerSql).Append("))");
+            }
         }
 
         private string RenderNavigationFilter(LambdaExpression filter, string depAlias)

@@ -610,7 +610,7 @@ namespace nORM.Query
                         && navMember.Expression is ParameterExpression
                         && t._mapping.Relations.ContainsKey(navMember.Member.Name))
                     {
-                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias);
+                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias, ctx: t._ctx);
                         var navSql = scv.Translate(navAggCall);
                         t._orderBy.Add((navSql, ascending));
                         FastExpressionVisitorPool.Return(visitor);
