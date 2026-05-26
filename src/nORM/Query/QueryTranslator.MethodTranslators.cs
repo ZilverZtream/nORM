@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -2183,17 +2184,30 @@ namespace nORM.Query
                 }
                 // Cast / OfType collapse to an identity pass-through at the SQL layer when
                 // the target type matches the source element type (or is a reference-type
-                // base that the runtime cast will satisfy on materialization). TPH/derived
-                // filtering by discriminator isn't wired in v1 — surface that case explicitly
-                // rather than silently returning the wrong rows.
+                // base that the runtime cast will satisfy on materialization).
                 if (targetElement == sourceElement ||
                     (!targetElement.IsValueType && targetElement.IsAssignableFrom(sourceElement)))
                 {
                     return t.Visit(source);
                 }
+                // OfType<DerivedType>() on a TPH hierarchy: TranslationBuilder.Setup() already
+                // injected the discriminator WHERE predicate and set _rootType to the derived
+                // type. VisitConstant will reset _rootType back to the base type when it sees the
+                // inner IQueryable<BaseType> constant — restore it so the materializer targets Dog,
+                // not Animal.
+                if (targetElement.IsSubclassOf(sourceElement) &&
+                    targetElement.GetCustomAttribute<DiscriminatorValueAttribute>() != null &&
+                    t._mapping.DiscriminatorColumn != null)
+                {
+                    var derivedRoot = t._rootType;
+                    t.Visit(source);
+                    t._rootType = derivedRoot;
+                    return source;
+                }
                 throw new NormUnsupportedFeatureException(
-                    $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> would require a runtime type filter " +
-                    "that nORM has not yet wired to TPH/discriminator metadata. Project explicitly with Select(...) instead.");
+                    $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> cannot be translated to SQL: " +
+                    $"{targetElement.Name} is not a subtype of {sourceElement.Name} with a [DiscriminatorValue] attribute, " +
+                    "or the base type has no [DiscriminatorColumn]. Project explicitly with Select(...) instead.");
             }
         }
 

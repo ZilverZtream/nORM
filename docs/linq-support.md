@@ -45,7 +45,7 @@ Status values:
 | Arbitrary CLR methods in predicates | Unsupported | Unsupported methods/members throw from expression translation instead of being evaluated client-side in filters. |
 | Arbitrary client evaluation before server filtering/paging | Unsupported | Server filters and paging must happen before any allowed client projection tail. |
 | `TakeWhile` / `SkipWhile` | Unsupported | No SQL equivalent; throw deterministically rather than buffering the entire table client-side. |
-| `OfType<T>` / `Cast<T>` | Constrained | Identity pass-through when `T` equals the source element type, or (for reference types) is a base class assignable from it — useful for `query.Cast<TBase>()` upcasts in mixed-typed pipelines. Strict downcasting or TPH-derived filtering is not yet wired and throws `NormUnsupportedFeatureException`. |
+| `OfType<T>` / `Cast<T>` | Constrained | Identity pass-through when `T` equals the source element type, or (for reference types) is a base class assignable from it. `OfType<TDerived>()` is also supported for TPH hierarchies: when `TDerived` carries `[DiscriminatorValue]` and its base type carries `[DiscriminatorColumn]`, the translator injects the discriminator `WHERE` predicate automatically — composing with further `Where(...)` calls works as expected. Downcasting to a type with no discriminator metadata still throws `NormUnsupportedFeatureException`. |
 | `SequenceEqual` | Unsupported | Not a query contract; materialize both sides explicitly with `ToListAsync` and compare in CLR. |
 
 ## Terminal operators
