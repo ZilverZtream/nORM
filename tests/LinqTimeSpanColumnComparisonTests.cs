@@ -112,3 +112,129 @@ public class LinqTimeSpanColumnComparisonTests : IAsyncLifetime
         public TimeSpan Hi { get; set; }
     }
 }
+
+/// <summary>
+/// Live-provider parity for TimeSpan column-vs-column ordering.
+/// SQL Server / MySQL use TIME; PostgreSQL uses INTERVAL.
+/// Native TIME/INTERVAL types compare correctly without conversion,
+/// so the NormalizeTimeSpanForCompare identity path must not distort them.
+/// Three rows cover all three branches: Lo &lt; Hi, Lo &gt; Hi, Lo == Hi.
+/// </summary>
+[Trait("Category", TestCategory.LiveProvider)]
+public class LinqTimeSpanColumnComparisonLiveProviderTests
+{
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task TimeSpan_column_less_than_column_returns_correct_rows_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured (set NORM_TEST_*)")) return;
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await Setup(ctx, kind);
+            try
+            {
+                var ids = (await ctx.Query<LiveTsCompRow>()
+                    .Where(r => r.Lo < r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                Assert.Equal(new[] { 1 }, ids); // only 10min < 20min
+            }
+            finally { await Teardown(ctx); }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task TimeSpan_column_greater_than_column_returns_correct_rows_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured (set NORM_TEST_*)")) return;
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await Setup(ctx, kind);
+            try
+            {
+                var ids = (await ctx.Query<LiveTsCompRow>()
+                    .Where(r => r.Lo > r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                Assert.Equal(new[] { 2 }, ids); // only 20min > 10min
+            }
+            finally { await Teardown(ctx); }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task TimeSpan_column_equal_column_returns_correct_rows_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured (set NORM_TEST_*)")) return;
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await Setup(ctx, kind);
+            try
+            {
+                var ids = (await ctx.Query<LiveTsCompRow>()
+                    .Where(r => r.Lo == r.Hi)
+                    .ToListAsync())
+                    .Select(r => r.Id).OrderBy(x => x).ToArray();
+
+                Assert.Equal(new[] { 3 }, ids); // only 1h == 1h
+            }
+            finally { await Teardown(ctx); }
+        }
+    }
+
+    private static async Task Setup(DbContext ctx, ProviderKind kind)
+    {
+        await Teardown(ctx);
+        await using var c = ctx.Connection.CreateCommand();
+        c.CommandText = kind switch
+        {
+            ProviderKind.SqlServer => "CREATE TABLE LiveTsCompRow (Id INT PRIMARY KEY, Lo TIME(7) NOT NULL, Hi TIME(7) NOT NULL);",
+            ProviderKind.Postgres  => "CREATE TABLE \"LiveTsCompRow\" (\"Id\" INT PRIMARY KEY, \"Lo\" INTERVAL NOT NULL, \"Hi\" INTERVAL NOT NULL);",
+            ProviderKind.MySql     => "CREATE TABLE LiveTsCompRow (Id INT PRIMARY KEY, Lo TIME(6) NOT NULL, Hi TIME(6) NOT NULL);",
+            _ => throw new ArgumentOutOfRangeException()
+        };
+        await c.ExecuteNonQueryAsync();
+        await using var c2 = ctx.Connection.CreateCommand();
+        c2.CommandText = kind == ProviderKind.Postgres
+            ? "INSERT INTO \"LiveTsCompRow\" VALUES (1,'00:10:00','00:20:00'),(2,'00:20:00','00:10:00'),(3,'01:00:00','01:00:00');"
+            : "INSERT INTO LiveTsCompRow VALUES (1,'00:10:00','00:20:00'),(2,'00:20:00','00:10:00'),(3,'01:00:00','01:00:00');";
+        await c2.ExecuteNonQueryAsync();
+    }
+
+    private static async Task Teardown(DbContext ctx)
+    {
+        await using var c = ctx.Connection.CreateCommand();
+        c.CommandText = "DROP TABLE IF EXISTS LiveTsCompRow;";
+        try { await c.ExecuteNonQueryAsync(); } catch { }
+        await using var c2 = ctx.Connection.CreateCommand();
+        c2.CommandText = "DROP TABLE IF EXISTS \"LiveTsCompRow\";";
+        try { await c2.ExecuteNonQueryAsync(); } catch { }
+    }
+
+    [Table("LiveTsCompRow")]
+    public sealed class LiveTsCompRow
+    {
+        [Key] public int Id { get; set; }
+        public TimeSpan Lo { get; set; }
+        public TimeSpan Hi { get; set; }
+    }
+}
