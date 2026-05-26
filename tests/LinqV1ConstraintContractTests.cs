@@ -42,11 +42,19 @@ public class LinqV1ConstraintContractTests
     }
 
     [Theory]
+    [InlineData("Group joins", "Supported")]
+    [InlineData("`AsAsyncEnumerable`", "Supported")]
+    public void Matrix_marks_v1_supported_shape_promoted(string feature, string status)
+    {
+        var doc = Doc();
+        var probe = $"| {feature} | {status} |";
+        Assert.Contains(probe, doc, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("`GroupBy`", "Constrained")]
-    [InlineData("Group joins", "Constrained")]
     [InlineData("`SelectMany`", "Constrained")]
     [InlineData("`Include`, `ThenInclude`", "Constrained")]
-    [InlineData("`AsAsyncEnumerable`", "Constrained")]
     public void Matrix_marks_v1_constrained_shape(string feature, string status)
     {
         var doc = Doc();

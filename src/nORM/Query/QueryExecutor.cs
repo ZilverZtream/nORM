@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -637,6 +638,121 @@ namespace nORM.Query
             static IList CreateListFromItems(Type innerType, List<object> items)
             {
                 // PERFORMANCE: Reuse cached list factory to avoid Activator reflection per group
+                var list = CreateList(innerType, items.Count);
+                foreach (var item in items) list.Add(item);
+                return list;
+            }
+        }
+
+        internal async IAsyncEnumerable<T> StreamGroupJoinAsync<T>(
+            QueryPlan plan,
+            DbCommand cmd,
+            [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var info = plan.GroupJoinInfo!;
+
+            var trackOuter = !plan.NoTracking && info.OuterType.IsClass &&
+                             !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+            var trackInner = !plan.NoTracking && info.InnerType.IsClass &&
+                             !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+
+            var outerMap = _ctx.GetMapping(info.OuterType);
+            var innerMap = _ctx.GetMapping(info.InnerType);
+
+            var outerColumnCount = outerMap.Columns.Length;
+            var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+            if (innerKeyOffset < 0)
+                throw new InvalidOperationException(
+                    $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+            var innerKeyIndex = outerColumnCount + innerKeyOffset;
+
+            // Non-sequential read: innerKeyIndex may be read before inner columns are consumed.
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
+                    _ctx, CommandBehavior.Default | CommandBehavior.SingleResult, ct)
+                .ConfigureAwait(false);
+
+            object? currentOuter = null;
+            object? currentKey = null;
+            List<object> currentChildren = [];
+
+            var syncMaterializer = plan.SyncMaterializer;
+
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var outer = syncMaterializer(reader);
+                var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+
+                if (currentOuter == null || !Equals(currentKey, key))
+                {
+                    if (currentOuter != null)
+                    {
+                        var childList = BuildInnerList(info.InnerType, currentChildren);
+                        yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+                        currentChildren = [];
+                    }
+
+                    if (trackOuter)
+                    {
+                        var actualMap = _ctx.GetMapping(outer.GetType());
+                        var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                        outer = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
+                    }
+
+                    currentOuter = outer;
+                    currentKey = key;
+                }
+
+                if (!reader.IsDBNull(innerKeyIndex))
+                {
+                    var maxSize = _ctx.Options.MaxGroupJoinSize;
+                    if (currentChildren.Count >= maxSize)
+                        throw new NormQueryException(
+                            $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
+                            "This may indicate a malformed query or incorrect join keys. " +
+                            "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
+                            "Review your GroupJoin operation and ensure join keys are correct.");
+
+                    var inner = BuildInnerEntity(reader, innerMap, outerColumnCount, ct);
+                    if (trackInner)
+                    {
+                        var actualMap = _ctx.GetMapping(inner.GetType());
+                        var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                        inner = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                    }
+                    currentChildren.Add(inner);
+                }
+            }
+
+            if (currentOuter != null)
+            {
+                var childList = BuildInnerList(info.InnerType, currentChildren);
+                yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+            }
+
+            static object BuildInnerEntity(DbDataReader reader, TableMapping map, int offset, CancellationToken ct)
+            {
+                if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
+                {
+                    var discIndex = offset + Array.IndexOf(map.Columns, map.DiscriminatorColumn);
+                    if (!reader.IsDBNull(discIndex))
+                    {
+                        var disc = reader.GetValue(discIndex);
+                        if (disc != null && map.TphMappings.TryGetValue(disc, out var derived))
+                            return BuildInnerEntity(reader, derived, offset, ct);
+                    }
+                }
+
+                if (CompiledMaterializerStore.TryGet(map.Type, map.TableName, out var compiled) && offset == 0)
+                    return compiled(reader, ct).GetAwaiter().GetResult();
+
+                var materializer = _sharedMaterializerFactory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
+                return materializer(reader);
+            }
+
+            static IList BuildInnerList(Type innerType, List<object> items)
+            {
                 var list = CreateList(innerType, items.Count);
                 foreach (var item in items) list.Add(item);
                 return list;
