@@ -58,10 +58,13 @@ public class LiveProviderPostTakeSkipParityTests
         var drop = DropDdl(kind, esc);
         var intT = IntCol(kind);
         var varT = VarCol(kind);
+        var eId  = ctx.Provider.Escape("Id");
+        var eVal = ctx.Provider.Escape("Val");
+        var eCat = ctx.Provider.Escape("Cat");
         await ExecuteAsync(ctx,
-            $"{drop} CREATE TABLE {esc} (Id {intT} PRIMARY KEY, Val {intT} NOT NULL, Cat {varT} NOT NULL)");
+            $"{drop} CREATE TABLE {esc} ({eId} {intT} PRIMARY KEY, {eVal} {intT} NOT NULL, {eCat} {varT} NOT NULL)");
         await ExecuteAsync(ctx,
-            $"INSERT INTO {esc} (Id,Val,Cat) VALUES (1,10,'a'),(2,20,'b'),(3,30,'a'),(4,40,'b'),(5,50,'a')");
+            $"INSERT INTO {esc} ({eId},{eVal},{eCat}) VALUES (1,10,'a'),(2,20,'b'),(3,30,'a'),(4,40,'b'),(5,50,'a')");
     }
 
     private static async Task TeardownAsync(DbContext ctx, ProviderKind kind)
