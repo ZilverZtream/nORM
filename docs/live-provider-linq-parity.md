@@ -82,8 +82,8 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `Where` after `Take/Skip` (derived-table wrap) | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | All 13 op groups follow same wrap pattern. | `LinqAfterTakeSkip*` |
-| `OrderBy` / `Distinct` / `Reverse` / Set ops / `Count` / `First`/`Single`/`Last`/`ElementAt` / `SelectMany` / `Join`/`GroupJoin` / `GroupBy` / direct aggregate after Take/Skip | ✅ | 🚧 | 🚧 | 🚧 | ✅ | — | Same wrap mechanism. | `LinqAfterTakeSkip*`, `LinqGroupByAfterWindow*` |
+| `Where` after `Take/Skip` (derived-table wrap) | ✅ | ✅ | ✅ | ✅ | ✅ | — | All 13 op groups follow same wrap pattern. | `LinqAfterTakeSkip*`, `LiveProviderPostTakeSkipParityTests` |
+| `OrderBy` / `Distinct` / `Reverse` / Set ops / `Count` / `First`/`Single`/`Last`/`ElementAt` / `SelectMany` / `Join`/`GroupJoin` / `GroupBy` / direct aggregate after Take/Skip | ✅ | ✅ | ✅ | ✅ | ✅ | — | Same wrap mechanism. | `LinqAfterTakeSkip*`, `LinqGroupByAfterWindow*`, `LiveProviderPostTakeSkipParityTests` |
 
 ### Type-specific surfaces
 
@@ -115,18 +115,15 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 ## Open parity gaps (🚧)
 
-The only remaining 🚧 rows are the Post-Take/Skip family on SqlServer, Postgres,
-and MySQL. All SCV-additions rows (DateTimeOffset col == DateTime literal,
-LocalDateTime, DTO subtraction, DTO ±TimeSpan, Enum.TryParse, Convert.ChangeType,
-Aggregate folds) have been verified on all four providers and are now ✅.
+No open 🚧 rows remain in the matrix above. Every row is either ✅ (passes on all
+four live providers) or ⚠️ (passes with a documented deterministic caveat).
 
-Tracked workstream:
-- Post-Take/Skip live-parity tests for SqlServer / Postgres / MySQL — translator
-  already handles the derived-table wrap correctly (SQLite passes); live tests
-  need to be written against the existing implementation.
+The compiled-query row carries a note that SCV-additions features are intentionally
+marked `—` in the Compiled column — their query shape is not supported in the
+compiled-query path, which is consistent with their individual row entries.
 
-When each 🚧 row flips to ✅ on all four providers (or to ⚠️ with a documented
-provider note), update this report in the same commit.
+When a future addition creates a new 🚧, add it here with a root-cause note and
+flip it to ✅/⚠️ in the same commit once the live tests pass.
 
 ## Triage policy
 

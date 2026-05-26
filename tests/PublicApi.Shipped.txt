@@ -448,6 +448,7 @@ M:nORM.Providers.DatabaseProvider.AddDaysToDateOnlySql(System.String,System.Stri
 M:nORM.Providers.DatabaseProvider.AddMonthsToDateOnlySql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.AddSecondsToDateTimeSql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.AddSecondsToTimeOnlySql(System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.AddTimeSpanColumnToDateTimeOffsetSql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.AddTimeSpanColumnToDateTimeSql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.AddTimeSpanColumnToTimeOnlySql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.AddYearsToDateOnlySql(System.String,System.String):System.String
@@ -470,6 +471,7 @@ M:nORM.Providers.DatabaseProvider.FormatFixedDecimalSql(System.String,System.Int
 M:nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.DatabaseProvider.GetBitwiseXorSql(System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetCharFromCodeSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetConcatSql(System.String,System.String):System.String
@@ -481,6 +483,8 @@ M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.S
 M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.TimeSpan):System.String
+M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetLocalDateTimeSql(System.String,System.TimeSpan):System.String
+M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.DatabaseProvider.GetHistoryTableExistsProbeSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalPrefix(nORM.Mapping.TableMapping):System.String
@@ -494,6 +498,7 @@ M:nORM.Providers.DatabaseProvider.GetRegexMatchSql(System.String,System.String):
 M:nORM.Providers.DatabaseProvider.GetRegexReplaceIgnoreCaseSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetRegexReplaceSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetStringAggregateSql(System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetStringAggregateSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTagLookupSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
@@ -548,12 +553,15 @@ M:nORM.Providers.MySqlProvider.FormatDateUsingDotNetPattern(System.String,System
 M:nORM.Providers.MySqlProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.MySqlProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.MySqlProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.MySqlProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.MySqlProvider.GetDateTimeOffsetLocalDateTimeSql(System.String,System.TimeSpan):System.String
+M:nORM.Providers.MySqlProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.MySqlProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.MySqlProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
@@ -561,6 +569,7 @@ M:nORM.Providers.MySqlProvider.GetIntCastSql(System.String,System.Boolean):Syste
 M:nORM.Providers.MySqlProvider.GetRegexMatchSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetRegexReplaceSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetStringAggregateSql(System.String,System.String):System.String
+M:nORM.Providers.MySqlProvider.GetStringAggregateSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
@@ -601,6 +610,8 @@ M:nORM.Providers.PostgresProvider.GetDateTimeDifferenceSecondsSql(System.String,
 M:nORM.Providers.PostgresProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.PostgresProvider.GetDateTimeOffsetLocalDateTimeSql(System.String,System.TimeSpan):System.String
+M:nORM.Providers.PostgresProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.PostgresProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.PostgresProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
@@ -608,6 +619,7 @@ M:nORM.Providers.PostgresProvider.GetRegexMatchIgnoreCaseSql(System.String,Syste
 M:nORM.Providers.PostgresProvider.GetRegexMatchSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetRegexReplaceIgnoreCaseSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetRegexReplaceSql(System.String,System.String,System.String):System.String
+M:nORM.Providers.PostgresProvider.GetStringAggregateSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
@@ -644,6 +656,7 @@ M:nORM.Providers.SqlServerProvider.FormatDateUsingDotNetPattern(System.String,Sy
 M:nORM.Providers.SqlServerProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.SqlServerProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.SqlServerProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.SqlServerProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetCreateTagsTableSql():System.String
 M:nORM.Providers.SqlServerProvider.GetDateOnlyFromPartsSql(System.String,System.String,System.String):System.String
@@ -651,6 +664,8 @@ M:nORM.Providers.SqlServerProvider.GetDateTimeDifferenceSecondsSql(System.String
 M:nORM.Providers.SqlServerProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.SqlServerProvider.GetDateTimeOffsetLocalDateTimeSql(System.String,System.TimeSpan):System.String
+M:nORM.Providers.SqlServerProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.SqlServerProvider.GetHistoryTableExistsProbeSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetIdentityRetrievalPrefix(nORM.Mapping.TableMapping):System.String
@@ -676,6 +691,7 @@ M:nORM.Providers.SqliteProvider.AddDaysToDateOnlySql(System.String,System.String
 M:nORM.Providers.SqliteProvider.AddMonthsToDateOnlySql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.AddSecondsToDateTimeSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.AddSecondsToTimeOnlySql(System.String,System.String):System.String
+M:nORM.Providers.SqliteProvider.AddTimeSpanColumnToDateTimeOffsetSql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.AddTimeSpanColumnToDateTimeSql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.AddTimeSpanColumnToTimeOnlySql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.AddYearsToDateOnlySql(System.String,System.String):System.String
@@ -699,6 +715,8 @@ M:nORM.Providers.SqliteProvider.GetDateTimeDifferenceSecondsSql(System.String,Sy
 M:nORM.Providers.SqliteProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.SqliteProvider.GetDateTimeOffsetLocalDateTimeSql(System.String,System.TimeSpan):System.String
+M:nORM.Providers.SqliteProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.String):System.String
 M:nORM.Providers.SqliteProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.SqliteProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
@@ -1008,6 +1026,7 @@ P:nORM.Providers.DatabaseProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.DatabaseProvider.PrefersBareBooleanPredicates:System.Boolean
 P:nORM.Providers.DatabaseProvider.PrefersSyncExecution:System.Boolean
 P:nORM.Providers.DatabaseProvider.StoredProcedureCommandType:System.Data.CommandType
+P:nORM.Providers.DatabaseProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Providers.DatabaseProvider.UsesFetchOffsetPaging:System.Boolean
 P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedBatchTime:System.TimeSpan
 P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.EstimatedMemoryUsage:System.Int64
@@ -1041,6 +1060,7 @@ P:nORM.Providers.SqliteProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.SqliteProvider.PrefersBareBooleanPredicates:System.Boolean
 P:nORM.Providers.SqliteProvider.PrefersSyncExecution:System.Boolean
 P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandType
+P:nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String
