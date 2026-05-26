@@ -128,13 +128,11 @@ public class IncludeContractTests
         Assert.Empty(customers[0].Orders);
     }
 
-    // ── 3. Composite-key dependent Include throws NormUnsupportedFeatureException ─
+    // ── 3. Composite-key dependent Include loads children correctly ──────────────
 
     [Fact]
-    public async Task Include_CompositeKeyDependent_ThrowsNormUnsupportedFeatureException()
+    public async Task Include_CompositeKeyDependent_LoadsChildrenCorrectly()
     {
-        // Covered comprehensively in CompositeKeyIncludeTests but included here
-        // as part of the blocker-10 contract surface.
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE ICT_CompositeParent (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)");
         Exec(cn, "CREATE TABLE ICT_CompositeLine (ParentId INTEGER NOT NULL, Seq INTEGER NOT NULL, Note TEXT NOT NULL, PRIMARY KEY(ParentId, Seq))");
@@ -153,14 +151,17 @@ public class IncludeContractTests
         };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
-        Exec(cn, "INSERT INTO ICT_CompositeParent VALUES(1,'P1')");
-        Exec(cn, "INSERT INTO ICT_CompositeLine VALUES(1,1,'Line1')");
+        Exec(cn, "INSERT INTO ICT_CompositeParent VALUES(1,'P1'),(2,'P2')");
+        Exec(cn, "INSERT INTO ICT_CompositeLine VALUES(1,1,'Line1'),(1,2,'Line2'),(2,1,'LineB')");
 
-        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<IctCompositeParent>)ctx.Query<IctCompositeParent>())
-                .AsSplitQuery()
-                .Include(p => p.Lines)
-                .ToListAsync());
+        var parents = await ((INormQueryable<IctCompositeParent>)ctx.Query<IctCompositeParent>())
+            .AsSplitQuery()
+            .Include(p => p.Lines)
+            .ToListAsync();
+
+        Assert.Equal(2, parents.Count);
+        Assert.Equal(2, parents.First(p => p.Name == "P1").Lines.Count);
+        Assert.Single(parents.First(p => p.Name == "P2").Lines);
     }
 
     // ── 4. Collection Include with multiple parents groups correctly ──────────

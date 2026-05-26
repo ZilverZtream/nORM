@@ -13,12 +13,15 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Verifies that Include on a composite-PK dependent entity throws NormUnsupportedFeatureException
-/// rather than silently corrupting data.
+/// Include on a dependent entity with a composite primary key (FK + surrogate column).
+/// The FK itself is still a single column, so the standard IN-batched load works correctly.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
-public class CompositeKeyIncludeTests
+public class CompositeKeyIncludeTests : IAsyncLifetime
 {
+    private SqliteConnection _cn = null!;
+    private DbContext _ctx = null!;
+
     private class Blog
     {
         [Key]
@@ -48,92 +51,85 @@ public class CompositeKeyIncludeTests
         }
     };
 
-    [Fact]
-    public async Task Include_CompositeKeyDependent_ThrowsNormUnsupportedFeatureException()
+    public async Task InitializeAsync()
     {
-        using var cn = new SqliteConnection("Data Source=:memory:");
-        cn.Open();
+        _cn = new SqliteConnection("Data Source=:memory:");
+        await _cn.OpenAsync();
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Blog     (Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL);
+            CREATE TABLE OrderLine(BlogId INTEGER NOT NULL, LineNumber INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(BlogId, LineNumber));
+            INSERT INTO Blog(Title) VALUES ('Alpha'), ('Beta'), ('Gamma');
+            INSERT INTO OrderLine VALUES (1,1,'a-line1'),(1,2,'a-line2'),(2,1,'b-line1');
+            """;
+        await cmd.ExecuteNonQueryAsync();
+        _ctx = new DbContext(_cn, new SqliteProvider(), BuildOptions());
+    }
 
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE Blog(Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL);";
-            cmd.ExecuteNonQuery();
-        }
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE OrderLine(BlogId INTEGER NOT NULL, LineNumber INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(BlogId, LineNumber));";
-            cmd.ExecuteNonQuery();
-        }
-
-        using var ctx = new DbContext(cn, new SqliteProvider(), BuildOptions());
-
-        // Insert a parent row so EagerLoad doesn't short-circuit on empty parents list.
-        var blog = new Blog { Title = "Test" };
-        ctx.Add(blog);
-        await ctx.SaveChangesAsync();
-
-        // Include on a composite-PK dependent must throw a stable nORM unsupported-feature exception.
-        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToListAsync());
+    public async Task DisposeAsync()
+    {
+        _ctx.Dispose();
+        await _cn.DisposeAsync();
     }
 
     [Fact]
-    public async Task Include_CompositeKeyDependent_ErrorMessage_MentionsEntityAndGuidance()
+    public async Task Include_CompositeKeyDependent_loads_children_correctly()
     {
-        using var cn = new SqliteConnection("Data Source=:memory:");
-        cn.Open();
+        var blogs = await ((INormQueryable<Blog>)_ctx.Query<Blog>())
+            .AsSplitQuery()
+            .Include(b => b.OrderLines)
+            .ToListAsync();
 
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE Blog(Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL);";
-            cmd.ExecuteNonQuery();
-        }
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE OrderLine(BlogId INTEGER NOT NULL, LineNumber INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(BlogId, LineNumber));";
-            cmd.ExecuteNonQuery();
-        }
+        Assert.Equal(3, blogs.Count);
 
-        using var ctx = new DbContext(cn, new SqliteProvider(), BuildOptions());
+        var alpha = blogs.First(b => b.Title == "Alpha");
+        Assert.Equal(2, alpha.OrderLines.Count);
+        Assert.Contains(alpha.OrderLines, ol => ol.Description == "a-line1");
+        Assert.Contains(alpha.OrderLines, ol => ol.Description == "a-line2");
 
-        var blog = new Blog { Title = "Test" };
-        ctx.Add(blog);
-        await ctx.SaveChangesAsync();
+        var beta = blogs.First(b => b.Title == "Beta");
+        Assert.Single(beta.OrderLines);
+        Assert.Equal("b-line1", beta.OrderLines.First().Description);
 
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToListAsync());
-
-        Assert.Contains("OrderLine", ex.Message);
-        Assert.Contains("composite primary key", ex.Message);
+        var gamma = blogs.First(b => b.Title == "Gamma");
+        Assert.Empty(gamma.OrderLines);
     }
 
     [Fact]
-    public void Include_CompositeKeyDependent_Sync_ThrowsNormUnsupportedFeatureException()
+    public async Task Include_CompositeKeyDependent_children_have_correct_composite_keys()
     {
-        using var cn = new SqliteConnection("Data Source=:memory:");
-        cn.Open();
+        var blogs = await ((INormQueryable<Blog>)_ctx.Query<Blog>())
+            .AsSplitQuery()
+            .Include(b => b.OrderLines)
+            .ToListAsync();
 
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE Blog(Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL);";
-            cmd.ExecuteNonQuery();
-        }
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE OrderLine(BlogId INTEGER NOT NULL, LineNumber INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(BlogId, LineNumber));";
-            cmd.ExecuteNonQuery();
-        }
+        var alpha = blogs.First(b => b.Title == "Alpha");
+        Assert.All(alpha.OrderLines, ol => Assert.Equal(alpha.Id, ol.BlogId));
+        Assert.Equal(new[] { 1, 2 }, alpha.OrderLines.Select(ol => ol.LineNumber).OrderBy(n => n).ToArray());
+    }
 
-        using var ctx = new DbContext(cn, new SqliteProvider(), BuildOptions());
+    [Fact]
+    public void Include_CompositeKeyDependent_Sync_loads_children_correctly()
+    {
+        var blogs = ((INormQueryable<Blog>)_ctx.Query<Blog>())
+            .AsSplitQuery()
+            .Include(b => b.OrderLines)
+            .ToList();
 
-        // Insert a parent row so EagerLoad doesn't short-circuit on empty parents.
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "INSERT INTO Blog(Title) VALUES('test');";
-            cmd.ExecuteNonQuery();
-        }
+        Assert.Equal(3, blogs.Count);
+        var alpha = blogs.First(b => b.Title == "Alpha");
+        Assert.Equal(2, alpha.OrderLines.Count);
+    }
 
-        Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ((INormQueryable<Blog>)ctx.Query<Blog>()).Include(b => b.OrderLines).ToList());
+    [Fact]
+    public async Task Include_CompositeKeyDependent_with_Where_loads_filtered_parent_children()
+    {
+        var blogs = await ((INormQueryable<Blog>)_ctx.Query<Blog>().Where(b => b.Title == "Alpha"))
+            .AsSplitQuery()
+            .Include(b => b.OrderLines)
+            .ToListAsync();
+
+        Assert.Single(blogs);
+        Assert.Equal(2, blogs[0].OrderLines.Count);
     }
 }
