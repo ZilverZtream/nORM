@@ -311,10 +311,21 @@ namespace nORM.Query
             if (fold == null || fold.Parameters.Count != 2 || fold.Body.NodeType != ExpressionType.Add)
                 return false;
 
-            var binary = (BinaryExpression)fold.Body;
             var accParam = fold.Parameters[0];
             var elemParam = fold.Parameters[1];
 
+            // String-concat fold: handled separately so seed-aware-separator
+            // (acc + (acc == "" ? "" : sep) + elem) and simple-separator
+            // (acc + sep + elem) shapes both lower to GROUP_CONCAT via
+            // GroupBy(_=>1) synthesis. Empty source returns the seed for the
+            // 3-arg form and throws for the 2-arg form, matching .NET.
+            if ((Nullable.GetUnderlyingType(seedType) ?? seedType) == typeof(string)
+                && TryRewriteStringConcatAggregate<TResult>(mc, source, fold, accParam, elemParam, seed, mc.Arguments.Count == 2, out result))
+            {
+                return true;
+            }
+
+            var binary = (BinaryExpression)fold.Body;
             Expression sub;
             if (binary.Left == accParam) sub = binary.Right;
             else if (binary.Right == accParam) sub = binary.Left;
@@ -405,6 +416,186 @@ namespace nORM.Query
             public ParameterFinderVisitor(ParameterExpression target, Action onFound) { _target = target; _onFound = onFound; }
             protected override Expression VisitParameter(ParameterExpression node)
             { if (node == _target) _onFound(); return node; }
+        }
+
+        // Holder used as the projected anon shape inside the synthesized
+        // GroupBy().Select(g => new { V = string.Join(...) }) chain. Real
+        // anonymous types would need a runtime emit; a named single-field
+        // record is equivalent for the NewExpression-projection translator
+        // path and saves the emit cost.
+        public sealed class StringConcatAggResult
+        {
+            public string? V { get; }
+            public StringConcatAggResult(string? v) => V = v;
+        }
+
+        // Detect string-concat fold shapes and rewrite to
+        //   source.GroupBy(_ => 1).Select(g => string.Join(sep, g.Select(<projLambda>))).FirstOrDefault()
+        // which the existing IGrouping aggregate translator (QueryTranslator.
+        // Aggregates.cs:472) emits as GROUP_CONCAT/STRING_AGG.
+        private bool TryRewriteStringConcatAggregate<TResult>(
+            MethodCallExpression mc,
+            Expression source,
+            LambdaExpression fold,
+            ParameterExpression accParam,
+            ParameterExpression elemParam,
+            object? seed,
+            bool throwOnEmpty,
+            out TResult result)
+        {
+            result = default!;
+            if (fold.Body is not BinaryExpression outerAdd || outerAdd.NodeType != ExpressionType.Add)
+                return false;
+
+            // Outer Add: (prefix) + elemExpr. elemExpr must not reference acc.
+            var elemExpr = outerAdd.Right;
+            if (ReferencesParameter(elemExpr, accParam)) throw new InvalidOperationException("DBG-SC3: elemExpr refs acc");
+
+            // prefix is either `acc` (no separator) OR Add(acc, sepExpr).
+            string sep;
+            if (outerAdd.Left == accParam)
+            {
+                sep = "";
+            }
+            else if (outerAdd.Left is BinaryExpression innerAdd
+                     && innerAdd.NodeType == ExpressionType.Add
+                     && innerAdd.Left == accParam
+                     && TryExtractSeparator(innerAdd.Right, out sep))
+            {
+                // ok
+            }
+            else
+            {
+                throw new InvalidOperationException($"DBG-SC4: outerAdd.Left shape unexpected: type={outerAdd.Left.GetType().Name} nodeType={outerAdd.Left.NodeType} body=[{outerAdd.Left}]");
+            }
+
+            // Synthesize: groupedSource.GroupBy(_ => 1).Select(g => string.Join(sep, g.Select(<proj>))).FirstOrDefault()
+            // where <proj> projects each group element to its string value. For
+            // `Query<T>().Select(r => r.Name).Aggregate(...)` peel the outer
+            // Select so the inner-Select projects an entity column (which nORM
+            // can translate) rather than an identity over a scalar parameter
+            // (which can't reference any column).
+            Expression groupedSource = source;
+            Expression projBody = elemExpr;
+            ParameterExpression projParam = elemParam;
+            if (elemExpr == elemParam
+                && source is MethodCallExpression preSel
+                && preSel.Method.DeclaringType == typeof(System.Linq.Queryable)
+                && preSel.Method.Name == nameof(System.Linq.Queryable.Select)
+                && preSel.Arguments.Count == 2
+                && StripQuotesLocal(preSel.Arguments[1]) is LambdaExpression preSelLambda)
+            {
+                groupedSource = preSel.Arguments[0];
+                projParam = preSelLambda.Parameters[0];
+                projBody = preSelLambda.Body;
+            }
+            var sourceGenArg = groupedSource.Type.IsGenericType ? groupedSource.Type.GetGenericArguments()[0] : projParam.Type;
+            var projLambda = Expression.Lambda(projBody, projParam);
+
+            // GroupBy<TSource, TKey>(IQueryable<TSource>, Expression<Func<TSource, TKey>>)
+            var groupKeyParam = Expression.Parameter(sourceGenArg, "_");
+            var groupKeyLambda = Expression.Lambda(Expression.Constant(1), groupKeyParam);
+            var groupByMethod = typeof(System.Linq.Queryable).GetMethods()
+                .Where(m => m.Name == nameof(System.Linq.Queryable.GroupBy) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2)
+                .Where(m => m.GetParameters().Length == 2)
+                .FirstOrDefault(m =>
+                {
+                    var p1 = m.GetParameters()[1].ParameterType;
+                    if (!p1.IsGenericType) return false;
+                    var fn = p1.GetGenericArguments()[0];
+                    return fn.IsGenericType && fn.GetGenericArguments().Length == 2;
+                });
+            if (groupByMethod == null) throw new InvalidOperationException("DBG-SC6: groupByMethod is null");
+            var groupByCall = Expression.Call(groupByMethod.MakeGenericMethod(sourceGenArg, typeof(int)), groupedSource, Expression.Quote(groupKeyLambda));
+
+            // Inside the result selector: g.Select(<projLambda>) — Enumerable.Select
+            // (NOT Queryable.Select; the second param is Func<,>, not Expression<Func<,>>).
+            var iGroupingType = typeof(System.Linq.IGrouping<,>).MakeGenericType(typeof(int), sourceGenArg);
+            var enumerableSelect = typeof(System.Linq.Enumerable).GetMethods()
+                .Where(m => m.Name == nameof(System.Linq.Enumerable.Select) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2 && m.GetParameters().Length == 2)
+                .FirstOrDefault(m =>
+                {
+                    var p1 = m.GetParameters()[1].ParameterType;
+                    // Want Func<TSource, TResult>, NOT Func<TSource, int, TResult>.
+                    return p1.IsGenericType && p1.GetGenericTypeDefinition() == typeof(Func<,>);
+                });
+            if (enumerableSelect == null) throw new InvalidOperationException("DBG-SC7: enumerableSelect is null");
+            var gParam = Expression.Parameter(iGroupingType, "g");
+            // Enumerable.Select takes a Func, but Expression.Lambda<Func<...>>(...) decays
+            // implicitly. Pass the LambdaExpression directly.
+            var innerSelectCall = Expression.Call(
+                enumerableSelect.MakeGenericMethod(sourceGenArg, typeof(string)),
+                gParam,
+                projLambda);
+
+            // string.Join(string, IEnumerable<string>)
+            var stringJoinMethod = typeof(string).GetMethod(nameof(string.Join), new[] { typeof(string), typeof(System.Collections.Generic.IEnumerable<string>) });
+            if (stringJoinMethod == null) throw new InvalidOperationException("DBG-SC8: stringJoinMethod null");
+            var joinCall = Expression.Call(stringJoinMethod, Expression.Constant(sep), innerSelectCall);
+
+            // Wrap in Select(g => new { V = string.Join(...) }) — the existing
+            // IGrouping-projection path emits BOTH groupKey AND value columns
+            // for a scalar MethodCall body (Aggregates.cs:184). The single-
+            // field NewExpression takes the NewExpression branch which only
+            // emits the explicit args — exactly one column (the joined value)
+            // so the scalar materialiser reads it correctly.
+            var anonType = typeof(StringConcatAggResult);
+            var anonCtor = anonType.GetConstructor(new[] { typeof(string) })!;
+            var anonNew = Expression.New(anonCtor, new[] { joinCall }, new[] { anonType.GetMember("V")[0] });
+            var resultSelector = Expression.Lambda(anonNew, gParam);
+            var queryableSelect = typeof(System.Linq.Queryable).GetMethods()
+                .Where(m => m.Name == nameof(System.Linq.Queryable.Select) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2)
+                .Where(m => m.GetParameters().Length == 2)
+                .FirstOrDefault(m =>
+                {
+                    var p1 = m.GetParameters()[1].ParameterType;
+                    if (!p1.IsGenericType) return false;
+                    var fn = p1.GetGenericArguments()[0];
+                    return fn.IsGenericType && fn.GetGenericArguments().Length == 2;
+                });
+            if (queryableSelect == null) throw new InvalidOperationException("DBG-SC9: queryableSelect null");
+            var outerSelectCall = Expression.Call(
+                queryableSelect.MakeGenericMethod(iGroupingType, anonType),
+                groupByCall,
+                Expression.Quote(resultSelector));
+
+            var firstOrDefault = typeof(System.Linq.Queryable).GetMethods()
+                .Where(m => m.Name == nameof(System.Linq.Queryable.FirstOrDefault) && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 1)
+                .First(m => m.GetParameters().Length == 1)
+                .MakeGenericMethod(anonType);
+            var firstCall = Expression.Call(firstOrDefault, outerSelectCall);
+
+            var row = Execute(firstCall) as StringConcatAggResult;
+            var joined = row?.V;
+
+            if (joined == null)
+            {
+                // Empty source. 1-arg form throws; 2-arg form returns seed.
+                if (throwOnEmpty)
+                    throw new InvalidOperationException("Sequence contains no elements");
+                joined = seed as string ?? string.Empty;
+            }
+
+            result = (TResult)(object)joined;
+            return true;
+        }
+
+        private static bool TryExtractSeparator(Expression sepExpr, out string sep)
+        {
+            sep = "";
+            // Direct string constant: ", "
+            if (TryEvaluateConstant(sepExpr, out var v) && v is string s1) { sep = s1; return true; }
+            // Conditional: (acc == "" ? "" : sep) — extract the non-empty branch.
+            if (sepExpr is ConditionalExpression cond)
+            {
+                if (TryEvaluateConstant(cond.IfTrue, out var t) && t is string tStr
+                    && TryEvaluateConstant(cond.IfFalse, out var f) && f is string fStr)
+                {
+                    if (string.IsNullOrEmpty(tStr) && !string.IsNullOrEmpty(fStr)) { sep = fStr; return true; }
+                    if (string.IsNullOrEmpty(fStr) && !string.IsNullOrEmpty(tStr)) { sep = tStr; return true; }
+                }
+            }
+            return false;
         }
 
         private static System.Reflection.MethodInfo? FindSumNoSelectorOverload(Type elementType)
