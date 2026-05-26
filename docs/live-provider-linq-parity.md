@@ -71,9 +71,9 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `LinqGroupByProjectionTests` |
-| `GroupBy` composite anon key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqCompositeGroupByTests`, `LinqGroupMultiAggregateTests` |
-| `GroupBy` HAVING (`Where(g => agg)`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqHavingTests` |
+| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
+| `GroupBy` composite anon key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqCompositeGroupByTests`, `LinqGroupMultiAggregateTests` |
+| `GroupBy` HAVING (`Where(g => agg)`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqHavingTests` |
 | `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `CompiledJoinDiagnosticTest` |
 | `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. | `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
 | `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
