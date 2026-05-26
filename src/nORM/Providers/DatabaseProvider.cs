@@ -911,6 +911,17 @@ namespace nORM.Providers
             => null;
 
         /// <summary>
+        /// Sister of <see cref="AddTimeSpanColumnToDateTimeSql"/> for
+        /// DateTimeOffset operands. Default delegates to the DateTime hook;
+        /// providers that store DTOs as offset-suffixed text (SQLite) override
+        /// to preserve the original offset on the result so the materialiser
+        /// round-trips with the same wall-clock rendering rather than re-
+        /// interpreting the suffixless result as Local.
+        /// </summary>
+        public virtual string? AddTimeSpanColumnToDateTimeOffsetSql(string dtoSql, string timeSpanColumnSql, bool subtract)
+            => AddTimeSpanColumnToDateTimeSql(dtoSql, timeSpanColumnSql, subtract);
+
+        /// <summary>
         /// Returns SQL that evaluates a TimeSpan column as fractional seconds (double).
         /// Used by the LINQ projection-side translator to lower
         /// <c>col1 + col2</c> / <c>col1 - col2</c> between two TimeSpan columns into
