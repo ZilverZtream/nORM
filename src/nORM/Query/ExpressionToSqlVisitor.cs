@@ -747,6 +747,44 @@ namespace nORM.Query
                 return node;
             }
 
+            // TimeSpan comparison (column vs column, column vs parameter, etc.).
+            // SQLite stores TimeSpan as canonical 'c' TEXT; lex-ordering silently
+            // mis-sorts multi-day durations ("10.00:00:00" < "9.23:59:59" lex but
+            // 10 days > 9 days 23 hours). Both sides must be converted to fractional
+            // seconds via NormalizeTimeSpanForCompare so the comparison is numeric.
+            // Parameters also carry canonical TEXT (Microsoft.Data.Sqlite binds TimeSpan
+            // as text), so the same conversion applies to them.
+            // SQL Server / Postgres / MySQL: NormalizeTimeSpanForCompare is identity —
+            // their native TIME / INTERVAL types compare correctly without conversion.
+            bool isOrderOrEqualCmp = node.NodeType is
+                ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                or ExpressionType.Equal or ExpressionType.NotEqual;
+            Type leftTsType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+            Type rightTsType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+            bool leftIsTs = leftTsType == typeof(TimeSpan);
+            bool rightIsTs = rightTsType == typeof(TimeSpan);
+            if (isOrderOrEqualCmp && (leftIsTs || rightIsTs))
+            {
+                var leftSqlTs = GetSql(node.Left);
+                var rightSqlTs = GetSql(node.Right);
+                var leftNorm  = leftIsTs  ? _provider.NormalizeTimeSpanForCompare(leftSqlTs)  : leftSqlTs;
+                var rightNorm = rightIsTs ? _provider.NormalizeTimeSpanForCompare(rightSqlTs) : rightSqlTs;
+                _sql.Append('(').Append(leftNorm);
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal              => " = ",
+                    ExpressionType.NotEqual           => " <> ",
+                    ExpressionType.GreaterThan        => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan           => " < ",
+                    ExpressionType.LessThanOrEqual    => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append(rightNorm).Append(')');
+                return node;
+            }
+
             _sql.Append("(");
             Visit(node.Left);
             _sql.Append(node.NodeType switch
