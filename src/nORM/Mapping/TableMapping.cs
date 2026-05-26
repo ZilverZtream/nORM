@@ -369,13 +369,18 @@ namespace nORM.Mapping
             {
                 // Resolve the left PK column (this entity)
                 if (KeyColumns.Length == 0)
-                    continue;
+                    throw new NormConfigurationException(
+                        $"Many-to-many relationship on '{Type.Name}' requires a single-column primary key. " +
+                        "Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
                 var leftPkCol = KeyColumns[0];
 
                 // Resolve the right entity mapping and PK column
                 var rightMapping = ctx.GetMapping(m2m.RelatedType);
                 if (rightMapping.KeyColumns.Length == 0)
-                    continue;
+                    throw new NormConfigurationException(
+                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which has no " +
+                        "single-column primary key. Add a [Key] attribute or use HasKey() in OnModelCreating on the " +
+                        "related type.");
                 var rightPkCol = rightMapping.KeyColumns[0];
 
                 // Resolve nav properties

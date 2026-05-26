@@ -1140,6 +1140,123 @@ public class IncludeProcessorCoverageTests
         Assert.Equal(8, authors.Count);
         Assert.All(authors, a => Assert.Equal(2, a.Books.Count));
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Group 7 — M2M NormConfigurationException for keyless entities
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task LoadManyToManyAsync_LeftEntityHasNoPrimaryKey_ThrowsNormConfigurationException()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE IPC_KlessLeft (Code TEXT NOT NULL)");
+
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<IpcKlessLeft>()
+                  .HasMany<IpcKlessRight>(l => l.Rights)
+                  .WithMany()
+                  .UsingTable("IPC_KlessJoin", "LeftCode", "RightLabel")
+        };
+        using var ctx = new DbContext(cn, new AsyncSqliteProvider(), opts);
+
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(async () =>
+            await ctx.Query<IpcKlessLeft>().ToListAsync());
+        Assert.Contains("single-column primary key", ex.Message);
+    }
+
+    [Fact]
+    public async Task LoadManyToManyAsync_RightEntityHasNoPrimaryKey_ThrowsNormConfigurationException()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE IPC_KlessHost (Id INTEGER PRIMARY KEY)");
+
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<IpcKlessHost>()
+                  .HasMany<IpcKlessRight>(h => h.Rights)
+                  .WithMany()
+                  .UsingTable("IPC_KlessHostJoin", "HostId", "RightLabel")
+        };
+        using var ctx = new DbContext(cn, new AsyncSqliteProvider(), opts);
+
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(async () =>
+            await ctx.Query<IpcKlessHost>().ToListAsync());
+        Assert.Contains("single-column primary key", ex.Message);
+    }
+
+    [Fact]
+    public void LoadManyToMany_Sync_LeftEntityHasNoPrimaryKey_ThrowsNormConfigurationException()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE IPC_KlessLeft (Code TEXT NOT NULL)");
+
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<IpcKlessLeft>()
+                  .HasMany<IpcKlessRight>(l => l.Rights)
+                  .WithMany()
+                  .UsingTable("IPC_KlessJoin", "LeftCode", "RightLabel")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ctx.Query<IpcKlessLeft>().ToList());
+        Assert.Contains("single-column primary key", ex.Message);
+    }
+
+    [Fact]
+    public void LoadManyToMany_Sync_RightEntityHasNoPrimaryKey_ThrowsNormConfigurationException()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE IPC_KlessHost (Id INTEGER PRIMARY KEY)");
+
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<IpcKlessHost>()
+                  .HasMany<IpcKlessRight>(h => h.Rights)
+                  .WithMany()
+                  .UsingTable("IPC_KlessHostJoin", "HostId", "RightLabel")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ctx.Query<IpcKlessHost>().ToList());
+        Assert.Contains("single-column primary key", ex.Message);
+    }
+}
+
+// ── Entity types for M2M keyless-entity exception taxonomy tests ───────────────
+// These entities intentionally omit [Key] and any property name that matches the
+// "Id" or "{TypeName}Id" convention so that KeyColumns.Length == 0 in the mapping.
+
+[Table("IPC_KlessLeft")]
+[Xunit.Trait("Category", "Fast")]
+public class IpcKlessLeft
+{
+    public string Code { get; set; } = "";           // no [Key], no "Id"
+    public List<IpcKlessRight> Rights { get; set; } = new();
+}
+
+[Table("IPC_KlessRight")]
+[Xunit.Trait("Category", "Fast")]
+public class IpcKlessRight
+{
+    public string Label { get; set; } = "";          // no [Key], no "Id"
+}
+
+[Table("IPC_KlessHost")]
+[Xunit.Trait("Category", "Fast")]
+public class IpcKlessHost
+{
+    [Key]
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public List<IpcKlessRight> Rights { get; set; } = new();
 }
 
 // ── Extra entity types needed by composite key tests ──────────────────────────
