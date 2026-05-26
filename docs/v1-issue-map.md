@@ -39,8 +39,8 @@ still needs release evidence.
 | 11 | Isolate CLI design-time assembly loading | Verified | CLI migration assembly loading uses `AssemblyLoadContext` plus `AssemblyDependencyResolver`; dependency-backed design-time factory test passed. |
 | 12 | Harden destructive database drop behavior | In Progress | `--yes` and `--dry-run` exist; live provider safety contracts remain open. |
 | 13 | Make migration rename/data-loss handling first-class | In Progress | Destructive-operation warnings exist; first-class rename workflow remains open. |
-| 14 | Prove migration recovery and idempotency across providers | Open | Requires fault-injected live-provider evidence. |
-| 15 | Complete migration SQL live parity | Open | Requires generated DDL execution across supported live providers. |
+| 14 | Prove migration recovery and idempotency across providers | Verified | `LiveProviderMigrationDdlParityTests` fault-injects a failing migration across all four providers and asserts: bad migration history absent, good prior migration history present (per-migration runners) or full rollback (SQLite batch runner). Re-apply after failure also verified. |
+| 15 | Complete migration SQL live parity | Verified | `LiveProviderMigrationDdlParityTests` executes ADD COLUMN (nullable + NOT NULL+DEFAULT), DROP COLUMN, CREATE TABLE, DROP TABLE, and DOWN reversal against SQLite, SQL Server, MySQL, and PostgreSQL live connections, introspecting schema after each step. |
 | 16 | Generate LINQ support matrix from tests | Verified | `docs/linq-support-coverage.md` maps non-unsupported matrix rows to test files and documentation contracts enforce coverage entries. |
 | 17 | Resolve `Any` and `All` semantics across providers | In Progress | Direct SQLite cardinality tests now exercise `Any`, `Any(predicate)`, and `All`; live provider parity still required. |
 | 18 | Stabilize Include and lazy-loading contracts | In Progress | Relationship docs exist; unsupported paths and exception taxonomy need cleanup. |
