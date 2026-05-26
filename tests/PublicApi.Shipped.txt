@@ -1040,6 +1040,7 @@ P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize:System.Int
 P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy:System.String
 P:nORM.Providers.IFastProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.MySqlProvider.Capabilities:nORM.Providers.ProviderCapabilities
+P:nORM.Providers.MySqlProvider.LikeEscapeChar:System.Char
 P:nORM.Providers.MySqlProvider.MaxParameters:System.Int32
 P:nORM.Providers.MySqlProvider.MaxSqlLength:System.Int32
 P:nORM.Providers.PostgresProvider.BooleanFalseLiteral:System.String
