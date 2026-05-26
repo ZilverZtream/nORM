@@ -130,6 +130,10 @@ namespace nORM.Query
         // windowed rows only. Cleared in Clear().
         private string? _windowedGroupBySubSql;
         private string? _windowedGroupByAlias;
+        // Set by TranslateAfterTakeSkipWindow (Where/OrderBy/etc.) to track the alias
+        // of the most recently built derived-table wrap. Regular Where/OrderBy paths
+        // use this when their lambda parameter isn't yet in _correlatedParams.
+        private string? _outerDerivedAlias;
         private bool _isAggregate;
         private string _methodName = "";
         private Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)> _correlatedParams = new();
@@ -271,6 +275,7 @@ namespace nORM.Query
                 _compositeKeyMemberSql.Clear();
                 _windowedGroupBySubSql = null;
                 _windowedGroupByAlias = null;
+                _outerDerivedAlias = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
@@ -316,6 +321,7 @@ namespace nORM.Query
                 _compositeKeyMemberSql.Clear();
                 _windowedGroupBySubSql = null;
                 _windowedGroupByAlias = null;
+                _outerDerivedAlias = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;

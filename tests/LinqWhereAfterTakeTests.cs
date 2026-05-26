@@ -92,6 +92,24 @@ public class LinqWhereAfterTakeTests : IAsyncLifetime
         Assert.Empty(rows);
     }
 
+    [Fact]
+    public async Task Where_after_take_followed_by_OrderBy_uses_derived_table_alias()
+    {
+        // Take(3) → {1,2,3}. Where(Active=1) inside the window → {2}.
+        // Then OrderBy(Score DESC) re-sorts the 1-element result.
+        // A stale correlated-param alias (T0 from the outer OrderBy before Take)
+        // would produce `no such column: T0.Id` on the outer ORDER BY.
+        var rows = await _ctx.Query<WatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.Active == 1)
+            .OrderByDescending(r => r.Score)
+            .ToListAsync();
+
+        Assert.Single(rows);
+        Assert.Equal(2, rows[0].Id);
+    }
+
     [Table("WatRow")]
     public sealed class WatRow
     {

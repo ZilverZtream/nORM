@@ -131,6 +131,7 @@ namespace nORM.Query
                 t.MergeSubPlanParameters(subPlanW);
                 var winAliasW = t.EscapeAlias("__wht" + t._joinCounter++);
                 t._sql.AppendFragment("SELECT * FROM (").Append(subPlanW.Sql).AppendFragment(") AS ").Append(winAliasW);
+                t._outerDerivedAlias = winAliasW;
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
                     lambda = t.ExpandProjection(lambda);
@@ -222,7 +223,10 @@ namespace nORM.Query
                     var isGrouping = t._groupBy.Count > 0;
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
+                        // After a derived-table wrap, reuse the alias that TranslateAfterTakeSkipWindow
+                        // set on _outerDerivedAlias — not a fresh T{counter} that doesn't exist in SQL.
+                        var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                        info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
                     // paramIndexStart = t._params.Count so that this predicate's visitor
@@ -440,6 +444,7 @@ namespace nORM.Query
                 t.MergeSubPlanParameters(subPlanO);
                 var winAliasO = t.EscapeAlias("__wob" + t._joinCounter++);
                 t._sql.AppendFragment("SELECT * FROM (").Append(subPlanO.Sql).AppendFragment(") AS ").Append(winAliasO);
+                t._outerDerivedAlias = winAliasO;
                 // The inner ORDER BY is consumed by the derived table; the outer SELECT
                 // must define its own ordering. For OrderBy/OrderByDescending this is
                 // the new primary order; for ThenBy/ThenByDescending it appends to whatever
@@ -541,7 +546,10 @@ namespace nORM.Query
                     var param = keySelector.Parameters[0];
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
+                        // After a derived-table wrap, reuse the alias that TranslateAfterTakeSkipWindow
+                        // set on _outerDerivedAlias — not a fresh T{counter} that doesn't exist in SQL.
+                        var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                        info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
