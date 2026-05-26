@@ -544,6 +544,9 @@ namespace nORM.Query
                     list.Add(materializer(reader));
             }
 
+            if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+
             if (plan.SingleResult)
                 return Task.FromResult((TResult)HandleSingleResult(plan, list));
 
@@ -637,6 +640,9 @@ namespace nORM.Query
             while (reader.Read())
                 list.Add(materializer(reader));
 
+            if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+
             // Handle List<object> covariant case
             if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
             {
@@ -676,6 +682,9 @@ namespace nORM.Query
                     list.Add(materializer(reader));
             }
 
+            if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+
             if (plan.SingleResult)
             {
                 return (TResult)HandleSingleResult(plan, list);
@@ -695,6 +704,15 @@ namespace nORM.Query
 
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 list.Add(materializer(reader));
+
+            if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
+            if (plan.PostMaterializeTransform != null)
+            {
+                var transformed = plan.PostMaterializeTransform(list);
+                var rebuilt = new List<object>(transformed.Count);
+                foreach (var item in transformed) rebuilt.Add(item!);
+                list = rebuilt;
+            }
 
             return list;
         }
