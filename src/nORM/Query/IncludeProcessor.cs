@@ -91,8 +91,9 @@ namespace nORM.Query
             var leftTenantCol = leftMapping.TenantColumn;
             // M2M requires single-column PK on both sides; guard early.
             if (leftMapping.KeyColumns.Length == 0)
-                throw new InvalidOperationException(
-                    $"Many-to-many Include on '{leftMapping.Type.Name}' failed: entity has no primary key columns.");
+                throw new NormConfigurationException(
+                    $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
+                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantId != null && leftTenantCol != null;
 
@@ -140,8 +141,9 @@ namespace nORM.Query
             }
             // M2M requires single-column PK on the right side; guard early.
             if (rightMapping.KeyColumns.Length == 0)
-                throw new InvalidOperationException(
-                    $"Many-to-many Include on '{rightMapping.Type.Name}' failed: entity has no primary key columns.");
+                throw new NormConfigurationException(
+                    $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
+                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
@@ -261,8 +263,9 @@ namespace nORM.Query
             var leftTenantCol = leftMapping.TenantColumn;
             // M2M requires single-column PK on both sides; guard early.
             if (leftMapping.KeyColumns.Length == 0)
-                throw new InvalidOperationException(
-                    $"Many-to-many Include on '{leftMapping.Type.Name}' failed: entity has no primary key columns.");
+                throw new NormConfigurationException(
+                    $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
+                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantId != null && leftTenantCol != null;
 
@@ -307,8 +310,9 @@ namespace nORM.Query
             }
             // M2M requires single-column PK on the right side; guard early.
             if (rightMapping.KeyColumns.Length == 0)
-                throw new InvalidOperationException(
-                    $"Many-to-many Include on '{rightMapping.Type.Name}' failed: entity has no primary key columns.");
+                throw new NormConfigurationException(
+                    $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
+                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
