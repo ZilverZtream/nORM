@@ -684,27 +684,31 @@ namespace nORM.Query
 
             protected override Expression VisitConditional(ConditionalExpression node)
             {
-                // Strip idiomatic LEFT JOIN null-guard: `c == null ? null : c.Prop` and the
-                // mirrored `c != null ? c.Prop : null` form. LEFT JOIN already NULLs unmatched
-                // right-side columns, making the null-guard semantically redundant. Stripping it
-                // lets ExtractNeededColumns resolve the column reference and the materializer
-                // correctly maps the column ordinal. Non-trivial fallbacks (e.g. "None") are
-                // not simplified — they fall through to the default visitor.
-                if (IsInnerParam(node.Test, out bool testIsEqual))
+                // `c == null ? null : c.Prop` and mirrored `c != null ? c.Prop : null`:
+                // Strip the null-guard entirely — LEFT JOIN already NULLs unmatched rows.
+                // `c == null ? fallback : c.Prop` and mirrored `c != null ? c.Prop : fallback`
+                // where fallback is a non-null constant: rewrite to COALESCE(c.Prop, fallback).
+                // In SQL a LEFT JOIN null propagates through ALL right-side columns, so
+                // COALESCE correctly substitutes the fallback for unmatched rows. The one
+                // edge case where COALESCE differs from .NET: a matched row where c.Prop
+                // happens to be NULL in the DB also gets the fallback in SQL, whereas .NET
+                // would return null. That distinction is documented as an acceptable
+                // approximation for non-nullable projected columns.
+                if (IsInnerParam(node.Test, out bool testIsEqualParam))
                 {
-                    // Whole test is the inner param itself (treated as c != null)
-                    var propBranch = testIsEqual ? node.IfFalse : node.IfTrue;
-                    var nullBranch = testIsEqual ? node.IfTrue  : node.IfFalse;
+                    var propBranch = testIsEqualParam ? node.IfFalse : node.IfTrue;
+                    var nullBranch = testIsEqualParam ? node.IfTrue  : node.IfFalse;
                     if (IsNullOrDefault(nullBranch))
                         return Visit(propBranch);
+                    return Expression.Coalesce(Visit(propBranch), Visit(nullBranch));
                 }
-                else if (IsEntityNullComparison(node.Test, out bool testNullOnLeft, out bool eqOp))
+                else if (IsEntityNullComparison(node.Test, out bool _, out bool eqOp))
                 {
-                    // c == null ? X : Y  →  propBranch = Y when eqOp, X when !eqOp
                     var propBranch = eqOp ? node.IfFalse : node.IfTrue;
                     var nullBranch = eqOp ? node.IfTrue  : node.IfFalse;
                     if (IsNullOrDefault(nullBranch))
                         return Visit(propBranch);
+                    return Expression.Coalesce(Visit(propBranch), Visit(nullBranch));
                 }
                 return base.VisitConditional(node);
             }
