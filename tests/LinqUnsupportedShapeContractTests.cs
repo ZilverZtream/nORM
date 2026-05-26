@@ -64,10 +64,10 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
     [Fact]
     public async Task OfType_throws_deterministically_for_unsupported_TPH_filter()
     {
-        // OfType<UnrelatedRow>() against IQueryable<UnRow> can't collapse to an identity
-        // pass-through — the runtime cast would never succeed. nORM doesn't wire TPH
-        // discriminator filtering yet, so this must surface a clear exception rather
-        // than silently emit SQL that returns zero rows.
+        // OfType<UnrelatedRow>() against IQueryable<UnRow> can't be translated: UnrelatedRow
+        // is not a subclass of UnRow and has no [DiscriminatorValue] attribute, so there is
+        // no discriminator predicate that nORM could inject. The translator must surface a
+        // clear exception rather than silently emit SQL that returns zero rows.
         var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
             await _ctx.Query<UnRow>().OfType<UnrelatedRow>().ToListAsync();
@@ -108,8 +108,9 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
         public string Name { get; set; } = string.Empty;
     }
 
-    // Distinct CLR type with no inheritance relationship to UnRow — used to drive the
-    // OfType TPH unsupported-throw test without needing actual TPH metadata wiring.
+    // Distinct CLR type with no inheritance relationship to UnRow and no [DiscriminatorValue]
+    // attribute — used to drive the OfType unsupported-throw test (translator must throw
+    // because there is no discriminator predicate it could inject for this type).
     public sealed class UnrelatedRow
     {
         public int Id { get; set; }

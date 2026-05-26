@@ -30,7 +30,7 @@ the matrix notes an explicit deterministic failure contract.
 | Set operations: `Union`, `Intersect`, `Except` | `tests/QueryTranslatorCrossProviderTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryTranslatorRecursionTests.cs`, `tests/LinqSetOperationProjectionTests.cs`, `tests/LinqSetOpCompositionTests.cs` |
 | `Include`, `ThenInclude` | `tests/IncludeProcessorCoverageTests.cs`, `tests/CompositeKeyIncludeTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqMultiLevelIncludeTests.cs` |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | `tests/QueryTranslatorCoverageTests.cs`, `tests/ConstructorBoundEntityTrackingTests.cs`, `tests/MiscCoverageTests.cs` |
-| `OfType<T>` / `Cast<T>` | `tests/LinqCastOfTypeTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
+| `OfType<T>` / `Cast<T>` | `tests/LinqCastOfTypeTests.cs` (identity pass-through; TPH derived-type filtering via `TphOfTypeTests`), `tests/LinqUnsupportedShapeContractTests.cs` (unsupported shapes) |
 | Raw SQL composition | `tests/RawSqlNameBasedMaterializationTests.cs`, `tests/SourceGenMaterializerCorrectnesTests.cs`, `tests/TransactionIsolationTests.cs` |
 | `AsAsyncEnumerable` | `tests/AsyncEnumerableTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/AsyncCancellationAuditTests.cs` |
 | `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs` |

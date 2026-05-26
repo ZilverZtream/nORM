@@ -11,6 +11,71 @@ using Xunit;
 
 namespace nORM.Tests;
 
+// ---------------------------------------------------------------------------
+// TPH OfType tests — Animal/Cat/Dog types live in nORM.Tests (AdvancedMappingTests.cs)
+// and are referenced here directly.
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Exercises TPH <c>OfType&lt;TDerived&gt;()</c> translation: a query starting from
+/// <c>IQueryable&lt;Animal&gt;</c> that calls <c>OfType&lt;Dog&gt;()</c> must emit the
+/// discriminator WHERE predicate and return only matching rows.
+/// </summary>
+[Trait("Category", TestCategory.Fast)]
+public class TphOfTypeTests : IAsyncLifetime
+{
+    private SqliteConnection _cn = null!;
+    private DbContext _ctx = null!;
+
+    public async Task InitializeAsync()
+    {
+        _cn = new SqliteConnection("Data Source=:memory:");
+        await _cn.OpenAsync();
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Animal(Id INTEGER PRIMARY KEY, Type TEXT, Lives INTEGER, GoodBoy INTEGER);
+            INSERT INTO Animal VALUES(1,'Cat',9,NULL);
+            INSERT INTO Animal VALUES(2,'Dog',NULL,1);
+            """;
+        await cmd.ExecuteNonQueryAsync();
+        _ctx = new DbContext(_cn, new SqliteProvider());
+    }
+
+    public async Task DisposeAsync()
+    {
+        _ctx.Dispose();
+        await _cn.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task OfType_Dog_returns_only_dogs()
+    {
+        // OfType<Dog>() on IQueryable<Animal> must inject the discriminator predicate
+        // and return only rows where Type = 'Dog', materialised as Dog instances.
+        var dogs = await _ctx.Query<Animal>().OfType<Dog>().ToListAsync();
+        Assert.Single(dogs);
+        Assert.True(dogs[0].GoodBoy);
+    }
+
+    [Fact]
+    public async Task OfType_Cat_returns_only_cats()
+    {
+        var cats = await _ctx.Query<Animal>().OfType<Cat>().ToListAsync();
+        Assert.Single(cats);
+        Assert.Equal(9, cats[0].Lives);
+    }
+
+    [Fact]
+    public async Task OfType_Dog_composed_with_Where_filters_correctly()
+    {
+        // Composing OfType<Dog>() with a subsequent Where() must keep the discriminator
+        // predicate and apply the additional filter on the same SQL query.
+        var results = await _ctx.Query<Animal>().OfType<Dog>().Where(d => d.GoodBoy).ToListAsync();
+        Assert.Single(results);
+        Assert.True(results[0].GoodBoy);
+    }
+}
+
 /// <summary>
 /// Pins LINQ `Cast&lt;T&gt;()` and `OfType&lt;T&gt;()` translation. Both methods
 /// are identity operations at the SQL layer when the target type equals (or for
