@@ -638,6 +638,16 @@ namespace nORM.Providers
         public virtual string NormalizeTimeSpanForCompare(string sql) => sql;
 
         /// <summary>
+        /// Builds a SQL predicate fragment that is TRUE when <paramref name="colSql"/> is
+        /// NULL or an empty string. The default <c>(col IS NULL OR col = '')</c> works on
+        /// every provider except SQL Server, where trailing spaces are insignificant in
+        /// equality comparisons so <c>'   ' = ''</c> evaluates to TRUE. SQL Server must use
+        /// <c>DATALENGTH(col) = 0</c> for a byte-exact empty-string test.
+        /// </summary>
+        public virtual string IsNullOrEmptySql(string colSql) =>
+            $"({colSql} IS NULL OR {colSql} = '')";
+
+        /// <summary>
         /// Formats a numeric SQL expression as a fixed-decimal text with exactly
         /// <paramref name="digits"/> fractional digits, matching .NET's
         /// <c>ToString("F{digits}")</c>. Each provider has a different primitive:

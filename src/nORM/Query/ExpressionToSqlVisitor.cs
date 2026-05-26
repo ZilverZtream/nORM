@@ -2309,15 +2309,22 @@ namespace nORM.Query
                         return node;
                     }
                 }
-                // static string.IsNullOrEmpty(x) -> (x IS NULL OR x = '')
-                // static string.IsNullOrWhiteSpace(x) -> (x IS NULL OR LTRIM(RTRIM(x)) = '')
+                // static string.IsNullOrEmpty(x): provider hook handles the empty-string check
+                //   (SQL Server ignores trailing spaces in =, so must use DATALENGTH).
+                // static string.IsNullOrWhiteSpace(x): trim then compare to ''.
                 if (node.Object == null && node.Arguments.Count == 1 &&
                     (node.Method.Name == nameof(string.IsNullOrEmpty) || node.Method.Name == nameof(string.IsNullOrWhiteSpace)))
                 {
                     var inner = GetSql(node.Arguments[0]);
-                    var trimmed = _provider.TranslateFunction(nameof(string.Trim), typeof(string), inner) ?? inner;
-                    var target = node.Method.Name == nameof(string.IsNullOrWhiteSpace) ? trimmed : inner;
-                    _sql.Append('(').Append(inner).Append(" IS NULL OR ").Append(target).Append(" = '')");
+                    if (node.Method.Name == nameof(string.IsNullOrEmpty))
+                    {
+                        _sql.Append(_provider.IsNullOrEmptySql(inner));
+                    }
+                    else
+                    {
+                        var trimmed = _provider.TranslateFunction(nameof(string.Trim), typeof(string), inner) ?? inner;
+                        _sql.Append('(').Append(inner).Append(" IS NULL OR ").Append(trimmed).Append(" = '')");
+                    }
                     return node;
                 }
                 // static string.Compare(a, b) and instance a.CompareTo(b) -> CASE WHEN a<b THEN -1 WHEN a>b THEN 1 ELSE 0 END
