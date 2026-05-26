@@ -33,8 +33,8 @@ the matrix notes an explicit deterministic failure contract.
 | `OfType<T>` / `Cast<T>` | `tests/LinqCastOfTypeTests.cs` (identity pass-through; TPH derived-type filtering via `TphOfTypeTests`), `tests/LinqUnsupportedShapeContractTests.cs` (unsupported shapes) |
 | Raw SQL composition | `tests/RawSqlNameBasedMaterializationTests.cs`, `tests/SourceGenMaterializerCorrectnesTests.cs`, `tests/TransactionIsolationTests.cs` |
 | `AsAsyncEnumerable` | `tests/AsyncEnumerableTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/AsyncCancellationAuditTests.cs` |
-| `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs` |
-| `ExecuteDeleteAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs` |
+| `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source) |
+| `ExecuteDeleteAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source) |
 
 ## Terminal operators
 

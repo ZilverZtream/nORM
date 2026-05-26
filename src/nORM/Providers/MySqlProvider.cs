@@ -29,6 +29,9 @@ namespace nORM.Providers
 
         internal override bool SupportsFastPathPreparedCommandCache => true;
 
+        // MySQL rejects self-referencing IN subqueries in DELETE/UPDATE — wrap in a derived table.
+        internal override bool CudWhereInSubqueryNeedsDoubleWrap => true;
+
         internal override bool SupportsCommandGeneratedKeyRetrieval => true;
 
         internal override bool PrefersSyncFastPathExecution => true;
