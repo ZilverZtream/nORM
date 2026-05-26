@@ -97,8 +97,8 @@ namespace nORM.Core
                     shouldAcceptChanges = HandleEnlistmentPolicy(context, connection, ambientTransaction, policy);
                 }
             }
-            // else: existingTransaction != null -- external explicit transaction controls durability.
-            // shouldAcceptChanges remains false; caller commits/rolls back.
+            // else: existingTransaction != null — external explicit transaction controls durability.
+            // shouldAcceptChanges remains false; the caller decides whether to commit or roll back.
 
             return new TransactionManager(transaction, ownsTransaction, shouldAcceptChanges, cts, token, context.Options.Logger);
         }

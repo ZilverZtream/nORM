@@ -336,7 +336,7 @@ namespace nORM.Core
             switch (operation)
             {
                 case WriteOperation.Insert:
-                    foreach (var col in map.InsertColumns)
+                    foreach (var col in _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
@@ -468,7 +468,7 @@ namespace nORM.Core
             var identityFragment = hasDbGeneratedKey
                 ? _p.GetIdentityRetrievalString(map)
                 : string.Empty;
-            var cols = map.InsertColumns;
+            var cols = _p.GetInsertColumns(map);
             if (cols.Length == 0)
                 return $"INSERT INTO {map.EscTable}{identityPrefix} DEFAULT VALUES{identityFragment}";
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
@@ -549,7 +549,7 @@ namespace nORM.Core
             switch (operation)
             {
                 case WriteOperation.Insert:
-                    foreach (var col in map.InsertColumns)
+                    foreach (var col in _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;

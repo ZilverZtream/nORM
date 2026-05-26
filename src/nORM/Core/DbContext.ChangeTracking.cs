@@ -308,6 +308,19 @@ namespace nORM.Core
                         continue;
                     var map = group.Key.Mapping;
                     var state = group.Key.State;
+
+                    // Guard against re-inserting entities whose DB-generated key was already
+                    // assigned by a previous SaveChanges call (e.g. inside a committed external
+                    // transaction where AcceptChanges was not invoked). If the entity is in Added
+                    // state but its DB-generated key is already non-default, the INSERT already
+                    // committed; skip to avoid duplicate rows.
+                    if (state == EntityState.Added && map.KeyColumns.Any(k => k.IsDbGenerated))
+                    {
+                        entries = entries.Where(e => e.Entity is not null && IsDefaultDbGeneratedKey(e.Entity, map)).ToList();
+                        if (entries.Count == 0)
+                            continue;
+                    }
+
                     await using var commandScope = new CommandScope(Connection, transaction);
 
                     // Include tenant param in per-entity count for Modified/Deleted so that
@@ -315,7 +328,7 @@ namespace nORM.Core
                     var tenantParamCount = (Options.TenantProvider != null && map.TenantColumn != null) ? 1 : 0;
                     var paramsPerEntity = state switch
                     {
-                        EntityState.Added    => map.InsertColumns.Length,
+                        EntityState.Added    => _p.GetInsertColumns(map).Length,
                         EntityState.Modified => map.UpdateColumns.Length + map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0) + tenantParamCount,
                         EntityState.Deleted  => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0) + tenantParamCount,
                         _ => 0
@@ -910,6 +923,27 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns true when every DB-generated key column on the entity still holds its
+        /// default value (0 for integer types, <see cref="Guid.Empty"/> for GUIDs, null
+        /// for nullable types) — meaning no INSERT has been committed for this entity yet.
+        /// </summary>
+        private static bool IsDefaultDbGeneratedKey(object entity, TableMapping map)
+        {
+            foreach (var k in map.KeyColumns)
+            {
+                if (!k.IsDbGenerated) continue;
+                var val = k.Getter(entity);
+                if (val is null) continue;
+                var underlying = Nullable.GetUnderlyingType(k.Prop.PropertyType) ?? k.Prop.PropertyType;
+                if (underlying == typeof(int)  && (int)val  != 0) return false;
+                if (underlying == typeof(long) && (long)val != 0L) return false;
+                if (underlying == typeof(Guid) && (Guid)val != Guid.Empty) return false;
+                if (!val.Equals(Activator.CreateInstance(underlying))) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Builds and executes a batched INSERT command for the provided entities.
         /// </summary>
         /// <param name="cmd">The command used to execute the batch.</param>
@@ -921,6 +955,41 @@ namespace nORM.Core
         /// <returns>The number of rows affected.</returns>
         private async Task<int> ExecuteInsertBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
         {
+            // Providers like MySQL expose the generated key directly on the command object
+            // (LastInsertedId) rather than through a reader result set. Batching multiple
+            // INSERT + SELECT LAST_INSERT_ID() statements produces result-set ordering that
+            // the generic reader loop below cannot correctly attribute to individual entities,
+            // so execute them one at a time and read the key after each.
+            if (HasDbGeneratedKey(map.KeyColumns) && _p.SupportsCommandGeneratedKeyRetrieval)
+            {
+                var insertSql = _p.BuildInsert(map, false);
+                cmd.CommandText = insertSql;
+                cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, insertSql));
+                int keysAssigned = 0;
+                foreach (var entry in batch)
+                {
+                    var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
+                    cmd.Parameters.Clear();
+                    AddParametersOptimized(cmd, map, entity, WriteOperation.Insert);
+                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                    var newId = _p.GetCommandGeneratedKey(cmd, map);
+                    if (newId != null && newId != DBNull.Value)
+                    {
+                        map.SetPrimaryKey(entity, newId);
+                        ChangeTracker.ReindexAfterInsert(entity, map);
+                        keysAssigned++;
+                    }
+                }
+                if (keysAssigned != batch.Count)
+                    throw new InvalidOperationException(
+                        $"Generated key mismatch: expected {batch.Count} keys for inserted " +
+                        $"'{map.Type.Name}' entities but only {keysAssigned} were assigned. " +
+                        $"Identity retrieval SQL: '{_p.GetIdentityRetrievalString(map)}'. " +
+                        "Possible causes: trigger interference, driver quirk, or partial batch execution. " +
+                        "The transaction will be rolled back.");
+                return batch.Count;
+            }
+
             foreach (var entry in batch)
             {
                 sql.Append(BuildInsertBatch(map, paramIndex)).Append(';');
@@ -930,7 +999,10 @@ namespace nORM.Core
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
-            if (batch.Count > 1)
+            // Skip PrepareAsync when identity retrieval is needed: the INSERT SQL contains
+            // multiple result-set-returning statements (e.g. "; SELECT LAST_INSERT_ID();")
+            // and some providers (MySQL) do not support preparing multi-statement commands.
+            if (batch.Count > 1 && !HasDbGeneratedKey(map.KeyColumns))
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             if (HasDbGeneratedKey(map.KeyColumns))
@@ -947,7 +1019,15 @@ namespace nORM.Core
                         if (entity != null)
                         {
                             map.SetPrimaryKey(entity, newId);
-                            // Reindex the entity in the identity map now that it has a real PK.
+                            // When the provider includes a server-assigned timestamp as a second
+                            // OUTPUT column (e.g. SQL Server ROWVERSION), read it back now so the
+                            // entity's in-memory token matches the DB and the first UPDATE succeeds.
+                            if (reader.FieldCount > 1 && map.TimestampColumn != null)
+                            {
+                                var tsValue = reader.GetValue(1);
+                                if (tsValue != DBNull.Value)
+                                    map.TimestampColumn.Setter(entity, tsValue);
+                            }
                             ChangeTracker.ReindexAfterInsert(entity, map);
                             keysAssigned++;
                         }
@@ -958,7 +1038,7 @@ namespace nORM.Core
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
 
                 // If DB returned fewer keys than entities, identity map is corrupt.
-                // Throwing here triggers the SaveChanges catch block ? rollback.
+                // Throwing here triggers the SaveChanges catch block → rollback.
                 if (keysAssigned != batch.Count)
                 {
                     var identitySql = _p.GetIdentityRetrievalString(map);

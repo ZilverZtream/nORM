@@ -491,6 +491,7 @@ M:nORM.Providers.DatabaseProvider.GetDateTimeOffsetWithOffsetSql(System.String,S
 M:nORM.Providers.DatabaseProvider.GetHistoryTableExistsProbeSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalPrefix(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.DatabaseProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.DatabaseProvider.GetInsertColumns(nORM.Mapping.TableMapping):nORM.Mapping.Column[]
 M:nORM.Providers.DatabaseProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetIntCastSql(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.GetLikeEscapeSql(System.String):System.String
@@ -674,6 +675,7 @@ M:nORM.Providers.SqlServerProvider.GetDateTimeOffsetWithOffsetSql(System.String,
 M:nORM.Providers.SqlServerProvider.GetHistoryTableExistsProbeSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetIdentityRetrievalPrefix(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.SqlServerProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.SqlServerProvider.GetInsertColumns(nORM.Mapping.TableMapping):nORM.Mapping.Column[]
 M:nORM.Providers.SqlServerProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetRealCastSql(System.String,System.Boolean):System.String
 M:nORM.Providers.SqlServerProvider.GetRegexMatchSql(System.String,System.String):System.String

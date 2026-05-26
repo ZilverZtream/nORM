@@ -68,6 +68,13 @@ and `NORM_TEST_MYSQL` (or `NORM_TEST_MYSQL_CS`). Use
 `-SkipProviderMatrixBenchmark` only when validating a non-performance change
 that cannot access all three external servers locally.
 
+**`-SkipBenchmark` caveat**: When `-SkipBenchmark` is passed, BenchmarkDotNet
+is not run and the resulting RC artifact manifest contains no performance
+evidence. A manifest produced with `-SkipBenchmark` validates correctness and
+provider parity only — it does not constitute benchmark evidence and must not be
+used to support public performance claims. Run without `-SkipBenchmark` on the
+release commit before making any throughput or latency claims.
+
 Every successful gate writes an artifact index with
 `eng/rc-artifact-manifest.ps1` under `artifacts/v1-rc/`. The manifest records
 the validated commit, mode, SDK, configured providers, TRX files, package files,
