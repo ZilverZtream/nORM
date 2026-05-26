@@ -290,6 +290,9 @@ namespace nORM.Providers
         /// <summary>SQL Server uses NVARCHAR(MAX) for unbounded textual conversion.</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS NVARCHAR(MAX))";
 
+        /// <summary>SQL Server uses BIT (0/1) as its boolean type; BOOLEAN is not valid SQL Server syntax.</summary>
+        public override string GetBoolCastSql(string innerSql) => $"CAST({innerSql} AS BIT)";
+
         /// <summary>
         /// SQL Server uses <c>FORMAT(x, 'FN', 'en-US')</c> for fixed-decimal text.
         /// The invariant 'en-US' culture forces a decimal point separator regardless

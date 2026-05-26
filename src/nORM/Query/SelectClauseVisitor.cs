@@ -346,23 +346,37 @@ namespace nORM.Query
                 Visit(node.Arguments[0]);
                 var innerSql = sb.ToString(innerStart, sb.Length - innerStart);
                 sb.Length = innerStart;
-                var sqlType = targetType switch
+                // Route through provider hooks so each engine uses the correct CAST syntax.
+                // SQL Server: NVARCHAR(MAX), MySQL: CHAR/SIGNED, Postgres/SQLite: TEXT/INTEGER.
+                if (targetType == typeof(string))
                 {
-                    var t when t == typeof(int)     => "INTEGER",
-                    var t when t == typeof(short)   => "INTEGER",
-                    var t when t == typeof(byte)    => "INTEGER",
-                    var t when t == typeof(sbyte)   => "INTEGER",
-                    var t when t == typeof(long)    => "BIGINT",
-                    var t when t == typeof(string)  => "TEXT",
-                    var t when t == typeof(double)  => "REAL",
-                    var t when t == typeof(float)   => "REAL",
-                    var t when t == typeof(decimal) => "DECIMAL",
-                    var t when t == typeof(bool)    => "BOOLEAN",
-                    _ => null
-                };
-                if (sqlType != null)
+                    sb.Append(_provider.GetToStringSql(innerSql));
+                    return node;
+                }
+                if (targetType == typeof(int) || targetType == typeof(short)
+                    || targetType == typeof(byte) || targetType == typeof(sbyte))
                 {
-                    sb.Append("CAST(").Append(innerSql).Append(" AS ").Append(sqlType).Append(')');
+                    sb.Append(_provider.GetIntCastSql(innerSql, asLong: false));
+                    return node;
+                }
+                if (targetType == typeof(long))
+                {
+                    sb.Append(_provider.GetIntCastSql(innerSql, asLong: true));
+                    return node;
+                }
+                if (targetType == typeof(double) || targetType == typeof(float))
+                {
+                    sb.Append(_provider.GetRealCastSql(innerSql, asDecimal: false));
+                    return node;
+                }
+                if (targetType == typeof(decimal))
+                {
+                    sb.Append(_provider.GetRealCastSql(innerSql, asDecimal: true));
+                    return node;
+                }
+                if (targetType == typeof(bool))
+                {
+                    sb.Append(_provider.GetBoolCastSql(innerSql));
                     return node;
                 }
             }

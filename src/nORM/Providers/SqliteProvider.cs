@@ -300,6 +300,15 @@ namespace nORM.Providers
             => $"GROUP_CONCAT({expr}, {sepLiteral})";
 
         /// <summary>
+        /// Microsoft.Data.Sqlite 8.0.0 ships SQLite 3.43, which does not yet support the
+        /// aggregate ORDER BY syntax (<c>GROUP_CONCAT(x, sep ORDER BY key)</c> added in 3.44).
+        /// Setting this to false keeps ORDER BY on the outer SELECT instead; SQLite then scans
+        /// the table in ORDER BY order (guaranteed for INTEGER PRIMARY KEY), which GROUP_CONCAT
+        /// observes as its input order.
+        /// </summary>
+        public override bool SupportsNativeOrderedStringAggregate => false;
+
+        /// <summary>
         /// SQLite REGEXP is an infix operator backed by a user-defined function;
         /// Microsoft.Data.Sqlite doesn't register one by default, so callers must
         /// supply one via <c>SqliteConnection.CreateFunction("regexp", ...)</c>
