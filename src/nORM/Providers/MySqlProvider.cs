@@ -278,6 +278,12 @@ namespace nORM.Providers
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS CHAR)";
 
         /// <summary>
+        /// MySQL treats <c>\</c> as a string-literal escape so <c>ESCAPE '\'</c> generates a syntax error.
+        /// Use <c>!</c> — it has no special meaning in MySQL string literals and is safe as a LIKE escape character.
+        /// </summary>
+        public override char LikeEscapeChar => '!';
+
+        /// <summary>
         /// MySQL's <c>FORMAT(x, N)</c> inserts thousand-separators by default
         /// ('1,234.50') which doesn't match .NET's <c>ToString("F2")</c>
         /// ('1234.50'). Wrap in REPLACE to strip the commas. The result still
