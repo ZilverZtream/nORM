@@ -308,11 +308,20 @@ namespace nORM.Query
                 return false;
             }
 
-            if (fold == null || fold.Parameters.Count != 2 || fold.Body.NodeType != ExpressionType.Add)
+            if (fold == null || fold.Parameters.Count != 2)
                 return false;
 
             var accParam = fold.Parameters[0];
             var elemParam = fold.Parameters[1];
+
+            // Min/max fold: handled first so Math.Max/Min calls and Conditional
+            // `x > acc ? x : acc` shapes lower to MAX/MIN before the Add check
+            // rejects them.
+            if (TryRewriteMinMaxAggregate<TResult>(mc, source, fold, accParam, elemParam, seed, mc.Arguments.Count == 2, out result))
+                return true;
+
+            if (fold.Body.NodeType != ExpressionType.Add)
+                return false;
 
             // String-concat fold: handled separately so seed-aware-separator
             // (acc + (acc == "" ? "" : sep) + elem) and simple-separator
@@ -433,6 +442,154 @@ namespace nORM.Query
         //   source.GroupBy(_ => 1).Select(g => string.Join(sep, g.Select(<projLambda>))).FirstOrDefault()
         // which the existing IGrouping aggregate translator (QueryTranslator.
         // Aggregates.cs:472) emits as GROUP_CONCAT/STRING_AGG.
+        // Detect Aggregate min/max fold shapes:
+        //   Conditional: (acc, x) => x [>/<] acc ? x : acc  (or acc[>/<]x ? acc : x)
+        //   Method:      (acc, x) => Math.Max(acc, x) / Math.Min(acc, x)
+        // Lowers to Queryable.Max / Queryable.Min on the source's element type
+        // (peeling the outer Select if the fold body's "element-side" is the
+        // elemParam itself, same trick as the sum-fold rewrite). For seed forms
+        // we combine the SQL-side max/min with the seed using the same op.
+        private bool TryRewriteMinMaxAggregate<TResult>(
+            MethodCallExpression mc,
+            Expression source,
+            LambdaExpression fold,
+            ParameterExpression accParam,
+            ParameterExpression elemParam,
+            object? seed,
+            bool throwOnEmpty,
+            out TResult result)
+        {
+            result = default!;
+            // Try to detect "isMax" (true = MAX, false = MIN, null = no match).
+            bool? isMax = null;
+            // Math.Max(acc, x) / Math.Min(acc, x) — order-insensitive args.
+            if (fold.Body is MethodCallExpression mathCall
+                && mathCall.Method.DeclaringType == typeof(Math)
+                && mathCall.Arguments.Count == 2
+                && ((mathCall.Arguments[0] == accParam && mathCall.Arguments[1] == elemParam)
+                    || (mathCall.Arguments[0] == elemParam && mathCall.Arguments[1] == accParam)))
+            {
+                if (mathCall.Method.Name == nameof(Math.Max)) isMax = true;
+                else if (mathCall.Method.Name == nameof(Math.Min)) isMax = false;
+            }
+            // Conditional: x [>/<] acc ? x : acc — or acc [>/<] x ? acc : x.
+            else if (fold.Body is ConditionalExpression cond
+                     && cond.Test is BinaryExpression cmp
+                     && (cmp.NodeType == ExpressionType.GreaterThan
+                         || cmp.NodeType == ExpressionType.GreaterThanOrEqual
+                         || cmp.NodeType == ExpressionType.LessThan
+                         || cmp.NodeType == ExpressionType.LessThanOrEqual))
+            {
+                bool isGreater = cmp.NodeType is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual;
+                // Test == "x > acc"  : IfTrue=x, IfFalse=acc → MAX
+                // Test == "acc > x"  : IfTrue=acc, IfFalse=x → MAX
+                // (and mirrored for <)
+                if (cmp.Left == elemParam && cmp.Right == accParam
+                    && cond.IfTrue == elemParam && cond.IfFalse == accParam) isMax = isGreater;
+                else if (cmp.Left == accParam && cmp.Right == elemParam
+                         && cond.IfTrue == accParam && cond.IfFalse == elemParam) isMax = isGreater;
+            }
+            if (isMax == null) return false;
+
+            // Peel `source = Select(r => proj)` so the synthesized Max/Min selector
+            // projects an entity column rather than identity-over-scalar (same
+            // trick as TryRewriteAggregateToSum's outer-Select unwrap).
+            Expression aggSource = source;
+            Expression projBody = elemParam;
+            ParameterExpression projParam = elemParam;
+            if (source is MethodCallExpression preSel
+                && preSel.Method.DeclaringType == typeof(System.Linq.Queryable)
+                && preSel.Method.Name == nameof(System.Linq.Queryable.Select)
+                && preSel.Arguments.Count == 2
+                && StripQuotesLocal(preSel.Arguments[1]) is LambdaExpression preSelLambda)
+            {
+                aggSource = preSel.Arguments[0];
+                projParam = preSelLambda.Parameters[0];
+                projBody = preSelLambda.Body;
+            }
+            var sourceGenArg = aggSource.Type.IsGenericType ? aggSource.Type.GetGenericArguments()[0] : projParam.Type;
+            var subType = projBody.Type;
+            var selectorLambda = Expression.Lambda(projBody, projParam);
+
+            // Find Queryable.Max<TSource, TResult>(IQueryable<TSource>, Expression<Func<TSource,TResult>>).
+            var aggMethod = FindAggregateOverload(isMax.Value ? nameof(System.Linq.Queryable.Max) : nameof(System.Linq.Queryable.Min), sourceGenArg, subType);
+            if (aggMethod == null) return false;
+            var aggCall = Expression.Call(aggMethod, aggSource, Expression.Quote(selectorLambda));
+
+            object? sqlResult;
+            try
+            {
+                sqlResult = Execute(aggCall);
+            }
+            catch (InvalidOperationException) when (throwOnEmpty)
+            {
+                // Max/Min on empty already throws "Sequence contains no elements".
+                throw;
+            }
+
+            // Combine with seed if 3-arg overload. For empty-source: 1-arg form
+            // already threw; 3-arg sees sqlResult==null and returns seed alone.
+            if (seed != null && sqlResult != null)
+            {
+                sqlResult = isMax.Value
+                    ? CombineMinMax(seed, sqlResult, subType, isMax: true)
+                    : CombineMinMax(seed, sqlResult, subType, isMax: false);
+            }
+            else if (seed != null && sqlResult == null)
+            {
+                sqlResult = seed;
+            }
+
+            result = (TResult)System.Convert.ChangeType(sqlResult!, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture)!;
+            return true;
+        }
+
+        private static System.Reflection.MethodInfo? FindAggregateOverload(string methodName, Type tSource, Type returnType)
+        {
+            // Prefer the 2-generic overload Max<TSource,TResult>(...) since it
+            // accepts any return type. Queryable also has 1-generic overloads
+            // with fixed return types (int/long/double/decimal/etc.), but
+            // those would match by return-type comparison only against the
+            // already-instantiated Func signature.
+            foreach (var m in typeof(System.Linq.Queryable).GetMethods())
+            {
+                if (m.Name != methodName) continue;
+                if (!m.IsGenericMethodDefinition) continue;
+                var ga = m.GetGenericArguments();
+                if (ga.Length != 2) continue;
+                var ps = m.GetParameters();
+                if (ps.Length != 2) continue;
+                return m.MakeGenericMethod(tSource, returnType);
+            }
+            return null;
+        }
+
+        private static object CombineMinMax(object seed, object sqlValue, Type accType, bool isMax)
+        {
+            accType = Nullable.GetUnderlyingType(accType) ?? accType;
+            if (accType == typeof(int))
+            {
+                int a = System.Convert.ToInt32(seed), b = System.Convert.ToInt32(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(long))
+            {
+                long a = System.Convert.ToInt64(seed), b = System.Convert.ToInt64(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(double))
+            {
+                double a = System.Convert.ToDouble(seed), b = System.Convert.ToDouble(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(decimal))
+            {
+                decimal a = System.Convert.ToDecimal(seed), b = System.Convert.ToDecimal(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            throw new NotSupportedException($"Aggregate min/max fold accumulator type '{accType.Name}' is not supported.");
+        }
+
         private bool TryRewriteStringConcatAggregate<TResult>(
             MethodCallExpression mc,
             Expression source,
