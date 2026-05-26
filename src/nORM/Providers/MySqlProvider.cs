@@ -367,10 +367,12 @@ namespace nORM.Providers
 
         /// <inheritdoc/>
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
-            // MySQL stores nORM DateTimeOffset columns as DATETIME(6) with the wall
-            // clock pre-normalised to UTC at write time, so UNIX_TIMESTAMP needs UTC
-            // session-tz interpretation. Wrap with CONVERT_TZ to be explicit.
-            => $"UNIX_TIMESTAMP(CONVERT_TZ({dtoSql}, '+00:00', '+00:00'))";
+            // MySQL stores nORM DateTimeOffset columns as DATETIME(6) pre-normalised
+            // to UTC. UNIX_TIMESTAMP() interprets its argument in the session timezone,
+            // so it gives wrong results when the session TZ is not UTC.
+            // TIMESTAMPDIFF(SECOND, epoch, col) does pure arithmetic on the stored
+            // value without any TZ conversion — correct because the value IS UTC.
+            => $"TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', {dtoSql})";
 
         /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
