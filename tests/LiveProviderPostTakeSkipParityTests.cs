@@ -528,4 +528,42 @@ public class LiveProviderPostTakeSkipParityTests
             finally { await TeardownAsync(ctx, kind); }
         }
     }
+
+    // ── 14: Compound re-sort after windowed Take ─────────────────────────────
+    // OrderBy(Val).Take(3) → inner window {1(10,'a'), 2(20,'b'), 3(30,'a')}.
+    // Re-sort by OrderByDescending(Val).ThenBy(Cat) → [{3,30,'a'},{2,20,'b'},{1,10,'a'}].
+    // Rows 4 (40,'b') and 5 (50,'a') must NOT appear — they were excluded by Take(3).
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task OrderBy_Take_then_OrderByDescending_ThenBy_resorts_window_by_compound_key_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupAsync(ctx, kind);
+            try
+            {
+                var rows = (await ctx.Query<PtsRow>()
+                    .OrderBy(r => r.Val)
+                    .Take(3)
+                    .OrderByDescending(r => r.Val)
+                    .ThenBy(r => r.Cat)
+                    .ToListAsync())
+                    .ToArray();
+
+                Assert.Equal(3, rows.Length);
+                Assert.DoesNotContain(rows, r => r.Id == 4 || r.Id == 5);
+                Assert.Equal(new[] { 3, 2, 1 }, rows.Select(r => r.Id).ToArray());
+            }
+            finally { await TeardownAsync(ctx, kind); }
+        }
+    }
 }
