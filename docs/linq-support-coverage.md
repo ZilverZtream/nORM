@@ -64,6 +64,15 @@ the matrix notes an explicit deterministic failure contract.
 | `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs` |
 | `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs` |
 | `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs` |
+| `Convert.ChangeType(col, typeof(T))` with `Type` constant | `tests/LinqConvertChangeTypeOnColumnTests.cs` |
+| `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs` |
+| `DateTimeOffset` col `==` / `!=` DateTime literal | `tests/LinqDateTimeOffsetEqualsDateTimeLiteralTests.cs` |
+| `DateTimeOffset` - `DateTimeOffset` → `TimeSpan` (cross-column) | `tests/LinqDateTimeOffsetColumnSubtractionTests.cs` |
+| `DateTimeOffset` col `+` / `-` `TimeSpan` col → `DateTimeOffset` | `tests/LinqDateTimeOffsetPlusTimeSpanColumnTests.cs` |
+| LINQ `Aggregate` sum-fold (1-arg + seed forms) | `tests/LinqAggregateOperatorTests.cs` |
+| LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional shapes) | `tests/LinqAggregateMinMaxFoldTests.cs` |
+| LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | `tests/LinqAggregateStringConcatTests.cs` |
+| `Enum.TryParse<T>(stringCol, out T)` as WHERE predicate | `tests/LinqEnumTryParseOutParamTests.cs` |
 | Conditional expressions (`cond ? a : b`) in `Where` and `Select` | `tests/LinqEnumAndConditionalTests.cs` |
 | Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs` |
 | Enum equality and `(int)enumCol` projection | `tests/LinqEnumAndConditionalTests.cs` |
