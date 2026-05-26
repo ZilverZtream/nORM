@@ -31,7 +31,7 @@ still needs release evidence.
 | 3 | Decide whether `ConnectionPool` is removed or restored | Verified | Public docs now direct users to provider-native pooling and `ConnectionManager`; no public `ConnectionPool` examples remain. |
 | 4 | Fix v1 issue map and blocker accounting | Verified | This map tracks exactly 40 blockers with evidence-aware statuses. |
 | 5 | Make Release build warning-free | Verified | `dotnet build nORM.sln -c Release --nologo` reports 0 warnings on this tree. |
-| 6 | Harden public API snapshotting before freeze | In Progress | `tests/PublicApi.Shipped.txt` exists; full supportability classification remains open. |
+| 6 | Harden public API snapshotting before freeze | Verified | `tests/PublicApi.Shipped.txt` baseline exists and is enforced by `PublicApiSnapshotTests`; `PublicApiClassificationTests` verifies every public namespace is assigned exactly one of StableUser / StableProvider / StableTooling / Unsupported, with no uncategorized entries and no zombie classifications. |
 | 7 | Revisit runtime package dependency architecture | Open | Dependency graph is documented only partially; package split decision remains open. |
 | 8 | Clean release artifact and version hygiene | Verified | `NormVersion` is centralized in `Directory.Build.props`; package tests and `eng/v1-release-gate.ps1` clean and validate package outputs. |
 | 9 | Run package consumer tests cross-platform | In Progress | Package consumer tests exist; cross-platform CI evidence is still required. |
