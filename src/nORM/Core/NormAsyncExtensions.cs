@@ -674,5 +674,63 @@ namespace nORM.Core
         {
             return Queryable.GroupJoin(outer, inner, outerKeySelector, innerKeySelector, resultSelector);
         }
+
+        /// <summary>
+        /// Returns the entity in the sequence that has the minimum value of the key selected by
+        /// <paramref name="keySelector"/>. Translates to <c>ORDER BY key ASC LIMIT 1</c>.
+        /// Throws <see cref="InvalidOperationException"/> when the sequence is empty.
+        /// </summary>
+        public static Task<T> MinByAsync<T, TKey>(
+            this IQueryable<T> source,
+            Expression<Func<T, TKey>> keySelector,
+            CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(keySelector);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var minByExpression = Expression.Call(
+                    typeof(Queryable),
+                    "MinBy",
+                    new[] { typeof(T), typeof(TKey) },
+                    source.Expression,
+                    Expression.Quote(keySelector));
+                return normProvider.ExecuteAsync<T>(minByExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "MinByAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>().");
+        }
+
+        /// <summary>
+        /// Returns the entity in the sequence that has the maximum value of the key selected by
+        /// <paramref name="keySelector"/>. Translates to <c>ORDER BY key DESC LIMIT 1</c>.
+        /// Throws <see cref="InvalidOperationException"/> when the sequence is empty.
+        /// </summary>
+        public static Task<T> MaxByAsync<T, TKey>(
+            this IQueryable<T> source,
+            Expression<Func<T, TKey>> keySelector,
+            CancellationToken ct = default)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(keySelector);
+            if (source.Provider is Query.NormQueryProvider normProvider)
+            {
+                var maxByExpression = Expression.Call(
+                    typeof(Queryable),
+                    "MaxBy",
+                    new[] { typeof(T), typeof(TKey) },
+                    source.Expression,
+                    Expression.Quote(keySelector));
+                return normProvider.ExecuteAsync<T>(maxByExpression, ct);
+            }
+
+            throw new NormUsageException(
+                "MaxByAsync extension can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>().");
+        }
     }
 }

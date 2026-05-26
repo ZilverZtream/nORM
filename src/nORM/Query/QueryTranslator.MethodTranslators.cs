@@ -50,6 +50,8 @@ namespace nORM.Query
             { "SingleOrDefault", new FirstSingleTranslator() },
             { "Last", new LastTranslator() },
             { "LastOrDefault", new LastTranslator() },
+            { "MinBy", new MinByMaxByTranslator() },
+            { "MaxBy", new MinByMaxByTranslator() },
             { "Count", new CountTranslator() },
             { "LongCount", new CountTranslator() },
             { "InternalSumExpression", new AggregateExpressionTranslator() },
@@ -1704,6 +1706,45 @@ namespace nORM.Query
                 t._takeSetByTerminal = true;
                 t._singleResult = t._methodName == "Last";
                 return lastSrc;
+            }
+        }
+
+        private sealed class MinByMaxByTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                // Save terminal method name before visiting source — source chain overwrites _methodName.
+                var terminalName = t._methodName; // "MinBy" or "MaxBy"
+                var ascending = terminalName == "MinBy";
+                t._orderBy.Clear();
+                if (StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
+                {
+                    keySelector = t.ExpandProjection(keySelector);
+                    var param = keySelector.Parameters[0];
+                    var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                    if (!t._correlatedParams.ContainsKey(param))
+                        t._correlatedParams[param] = (t._mapping, alias);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias,
+                        t._correlatedParams, t._compiledParams, t._paramMap,
+                        t._recursionDepth, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    var keySql = visitor.Translate(keySelector.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
+                    t._orderBy.Add((keySql, ascending));
+                }
+                t._take = 1;
+                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                t._params[pName] = 1;
+                t._takeParam = pName;
+                t._takeSetByTerminal = true;
+                t._singleResult = true;
+                var src = t.Visit(node.Arguments[0]);
+                t._methodName = terminalName; // restore after source chain overwrites it
+                return src;
             }
         }
 
