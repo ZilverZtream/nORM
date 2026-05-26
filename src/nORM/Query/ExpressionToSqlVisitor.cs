@@ -1110,6 +1110,22 @@ namespace nORM.Query
                 }
             }
 
+            // TimeSpan stored-column member access: r.Duration.TotalSeconds, .Days, etc.
+            // The subtraction path above handles (end - start).MemberName. This path handles
+            // a mapped column (or any non-subtraction expression) whose CLR type is TimeSpan.
+            // GetTimeSpanColumnSecondsSql wraps the column reference in provider-specific SQL
+            // that evaluates to total fractional seconds, then TryEmitTimeSpanMemberFromSeconds
+            // applies the same unit-conversion math as the subtraction path.
+            if (node.Expression != null
+                && !(node.Expression is BinaryExpression { NodeType: ExpressionType.Subtract })
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(TimeSpan))
+            {
+                var storedColSql = GetSql(node.Expression);
+                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(storedColSql);
+                if (TryEmitTimeSpanMemberFromSeconds(node.Member.Name, secondsSql))
+                    return node;
+            }
+
             // Nullable<T> structural members: HasValue -> IS NOT NULL, Value -> operand itself.
             // GetValueOrDefault is a method, handled in VisitMethodCall.
             if (node.Expression != null
@@ -3245,8 +3261,15 @@ namespace nORM.Query
             var secondsSql = useTimeOnly
                 ? _provider.GetTimeOnlyDifferenceSecondsSql(endSql, startSql)
                 : _provider.GetDateTimeDifferenceSecondsSql(endSql, startSql);
-            // Total* return fractional values; Days/Hours/Minutes/Seconds are the integer
-            // component matching System.TimeSpan's semantics (truncate toward zero).
+            return TryEmitTimeSpanMemberFromSeconds(memberName, secondsSql);
+        }
+
+        // Shared emit logic for both (end-start).MemberName and storedColumn.MemberName.
+        // secondsSql is total fractional seconds from any source.
+        // Total* return fractional values; Days/Hours/Minutes/Seconds match TimeSpan
+        // integer-component semantics (truncate toward zero with modular wrap).
+        private bool TryEmitTimeSpanMemberFromSeconds(string memberName, string secondsSql)
+        {
             switch (memberName)
             {
                 case nameof(TimeSpan.TotalSeconds):
