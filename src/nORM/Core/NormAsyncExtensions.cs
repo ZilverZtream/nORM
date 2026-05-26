@@ -34,7 +34,7 @@ namespace nORM.Core
         /// Converts nORM query to List asynchronously - only works with nORM queries
         /// </summary>
         public static Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken ct = default)
-            where T : class
+            where T : class?
         {
             ArgumentNullException.ThrowIfNull(source);
             // Only works with nORM provider - this avoids conflicts with EF Core
