@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using nORM.Core;
@@ -102,6 +104,96 @@ public class ConnectionManagerTests
         await Assert.ThrowsAnyAsync<Exception>(() => manager.GetWriteConnectionAsync());
         var ex = await Assert.ThrowsAsync<NormConnectionException>(() => manager.GetWriteConnectionAsync());
         Assert.Contains("Circuit breaker is open", ex.Message);
+    }
+
+    [Fact]
+    public async Task HealthCheck_ChurnStress_ConcurrentAccessors_DoNotThrowUnexpectedException()
+    {
+        // 1 primary + 2 replicas; all pointing to valid SQLite databases so OpenAsync always succeeds
+        var topology = new DatabaseTopology();
+        var primary = new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.Primary,
+            Priority = 1,
+            IsHealthy = true
+        };
+        var replica1 = new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.ReadReplica,
+            Priority = 1,
+            IsHealthy = true
+        };
+        var replica2 = new DatabaseTopology.DatabaseNode
+        {
+            ConnectionString = CreateSqliteConnectionString(),
+            Role = DatabaseTopology.DatabaseRole.ReadReplica,
+            Priority = 2,
+            IsHealthy = true
+        };
+        topology.Nodes.Add(primary);
+        topology.Nodes.Add(replica1);
+        topology.Nodes.Add(replica2);
+
+        // Very fast health-check interval to maximize concurrent health-check + accessor races.
+        using var manager = new ConnectionManager(topology, Provider, NullLogger.Instance, TimeSpan.FromMilliseconds(5));
+
+        var unexpected = new ConcurrentBag<Exception>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        // Churn task: toggle primary and replicas between healthy/unhealthy on a rotating pattern.
+        // Tick 12 makes all three unhealthy (12%4==0, 12%3==0, 12%5!=0 → actually only two),
+        // but tick 60 makes all three unhealthy simultaneously — this is the hard case.
+        var churnTask = Task.Run(async () =>
+        {
+            var tick = 0;
+            while (!cts.IsCancellationRequested)
+            {
+                tick++;
+                primary.IsHealthy  = (tick % 4) != 0;
+                replica1.IsHealthy = (tick % 3) != 0;
+                replica2.IsHealthy = (tick % 5) != 0;
+                await Task.Delay(1, CancellationToken.None);
+            }
+            // Restore all nodes to healthy so post-churn assertion can use the manager.
+            primary.IsHealthy = replica1.IsHealthy = replica2.IsHealthy = true;
+        });
+
+        // 16 concurrent accessor tasks: half writes, half reads.
+        var accessorTasks = Enumerable.Range(0, 16).Select(i => Task.Run(async () =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    if (i % 2 == 0)
+                    {
+                        await using var cn = await manager.GetWriteConnectionAsync(cts.Token);
+                    }
+                    else
+                    {
+                        await using var cn = await manager.GetReadConnectionAsync(cts.Token);
+                    }
+                }
+                catch (NormConnectionException) { /* expected: circuit breaker open or no healthy node */ }
+                catch (OperationCanceledException) { /* expected: CTS fired */ }
+                catch (DbException) { /* expected: transient SQLite error */ }
+                catch (ObjectDisposedException) { /* expected: manager disposed */ }
+                catch (Exception ex) { unexpected.Add(ex); }
+            }
+        })).ToArray();
+
+        await Task.WhenAll(accessorTasks);
+        await churnTask;
+
+        Assert.Empty(unexpected);
+
+        // Post-churn: all nodes restored to healthy; manager must still serve connections.
+        await using var writeConn = await manager.GetWriteConnectionAsync();
+        Assert.NotNull(writeConn);
+        await using var readConn = await manager.GetReadConnectionAsync();
+        Assert.NotNull(readConn);
     }
 
     [Fact]
