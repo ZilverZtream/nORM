@@ -77,7 +77,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderJoinSelectManyParityTests`, `CompiledJoinDiagnosticTest` |
 | `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. `CommandBehavior.SequentialAccess` replaced with `Default` to avoid backward-seek on Npgsql when innerKeyIndex > first inner col. | `LiveProviderJoinSelectManyParityTests`, `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
 | `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
-| `Union` / `Intersect` / `Except` / `Concat` (incl. ordered/paged tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Trailing `Where` wraps as derived table. | `QueryTranslatorCrossProviderTests`, `LinqSetOpCompositionTests` |
+| `Union` / `Intersect` / `Except` / `Concat` (incl. ordered/paged tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Trailing `Where` wraps as derived table. `Intersect`/`Except` require MySQL 8.0+; nORM's `MySqlProvider` gate blocks 5.x. | `LiveProviderSetOpParityTests`, `QueryTranslatorCrossProviderTests`, `LinqSetOpCompositionTests` |
 
 ### Post-Take/Skip family (silent-wrongness pins)
 
