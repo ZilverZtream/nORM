@@ -64,6 +64,8 @@ namespace nORM.Query
     ///
     /// Current recursion depth limit: configurable via <see cref="nORM.Configuration.DbContextOptions.MaxRecursionDepth"/> (default 50 levels)
     /// </remarks>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("QueryTranslator builds Expression-based materializers via reflection; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("QueryTranslator reflects over entity types to build SQL and materializers; trimming may remove the required members.")]
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
         /// <summary>Default initial capacity for cross-join SQL builders.</summary>

@@ -223,6 +223,8 @@ namespace nORM.Migration
         /// </summary>
         /// <param name="column">The column metadata describing the CLR type.</param>
         /// <returns>The corresponding MySQL data type.</returns>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "ResolveType is only used for design-time enum-to-underlying-type mapping; the enum type should be present in the loaded assembly set.")]
         private static string GetSqlType(ColumnSchema column)
         {
             ArgumentNullException.ThrowIfNull(column);
@@ -284,6 +286,7 @@ namespace nORM.Migration
 
         // Resolve a CLR type by its full name, scanning loaded assemblies when Type.GetType fails.
         // Results are cached in _resolveTypeCache to avoid repeated AppDomain scans.
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Type resolution by assembly-qualified name is not trim-safe; the target type may be removed by the linker.")]
         private static Type? ResolveType(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))

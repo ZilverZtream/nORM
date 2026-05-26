@@ -216,6 +216,31 @@ public class AotTrimmingPolicyTests
         throw new DirectoryNotFoundException("Could not locate repository root containing nORM.sln.");
     }
 
+    [Fact]
+    public void LazyNavigationCollection_is_annotated_for_aot_and_trimming()
+    {
+        var t = typeof(nORM.Navigation.LazyNavigationCollection<object>);
+        Assert.NotNull(t.GetCustomAttribute<RequiresDynamicCodeAttribute>());
+        Assert.NotNull(t.GetCustomAttribute<RequiresUnreferencedCodeAttribute>());
+    }
+
+    [Fact]
+    public void LazyNavigationReference_is_annotated_for_aot_and_trimming()
+    {
+        var t = typeof(nORM.Navigation.LazyNavigationReference<object>);
+        Assert.NotNull(t.GetCustomAttribute<RequiresDynamicCodeAttribute>());
+        Assert.NotNull(t.GetCustomAttribute<RequiresUnreferencedCodeAttribute>());
+    }
+
+    [Fact]
+    public void CacheableExtensions_Cacheable_is_annotated_for_aot_and_trimming()
+    {
+        var method = typeof(CacheableExtensions).GetMethod(nameof(CacheableExtensions.Cacheable))
+            ?? throw new MissingMethodException(nameof(CacheableExtensions), nameof(CacheableExtensions.Cacheable));
+        Assert.NotNull(method.GetCustomAttribute<RequiresDynamicCodeAttribute>());
+        Assert.NotNull(method.GetCustomAttribute<RequiresUnreferencedCodeAttribute>());
+    }
+
     private static void TryDeleteDirectory(string path)
     {
         try

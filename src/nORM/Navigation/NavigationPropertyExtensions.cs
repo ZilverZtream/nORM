@@ -567,6 +567,8 @@ namespace nORM.Navigation
     /// <summary>
     /// Lazy loading collection that defers database access until first enumeration or mutation.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Lazy collection loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Lazy collection loading uses reflection over entity properties; trimming may remove the required members.")]
     public sealed class LazyNavigationCollection<T> : ICollection<T>, IList<T>, IAsyncEnumerable<T> where T : class
     {
         private readonly object _parent;
@@ -694,6 +696,8 @@ namespace nORM.Navigation
     /// <summary>
     /// Lazy loading reference that defers database access until the value is first requested.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Lazy reference loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Lazy reference loading uses reflection over entity properties; trimming may remove the required members.")]
     public sealed class LazyNavigationReference<T> where T : class
     {
         private readonly object _parent;

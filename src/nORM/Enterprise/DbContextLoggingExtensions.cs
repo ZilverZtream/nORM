@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using nORM.Core;
-using nORM.Query;
+using nORM.Internal;
 
 namespace Microsoft.Extensions.Logging
 {
@@ -18,7 +18,7 @@ namespace Microsoft.Extensions.Logging
             if (logger == null) return;
             logger.LogInformation(
                 "Executed SQL query {Sql} with parameters {@Parameters} in {Duration}. Records: {RecordCount}",
-                QueryExecutor.RedactSqlForLogging(sql),
+                SqlRedaction.RedactForLogging(sql),
                 RedactParameters(parameters),
                 duration,
                 recordCount);

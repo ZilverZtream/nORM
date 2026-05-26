@@ -63,6 +63,8 @@ namespace nORM.Providers
         /// <param name="operationKey">Key identifying the operation for caching performance history.</param>
         /// <param name="totalRecords">Optional total record count to further constrain the batch size.</param>
         /// <returns>Calculated sizing information including optimal batch size and estimates.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateRecordSize which calls JsonSerializer.Serialize(object).")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateRecordSize which reflects over entity value types.")]
         public BatchSizingResult CalculateOptimalBatchSize<T>(
             IEnumerable<T> sample,
             TableMapping mapping,
@@ -105,6 +107,8 @@ namespace nORM.Providers
             };
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateValueSize which calls JsonSerializer.Serialize(object).")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateValueSize which reflects over value types.")]
         private int EstimateRecordSize<T>(T sampleRecord, TableMapping mapping) where T : class
         {
             var baseSize = BaseObjectOverhead;
@@ -119,6 +123,8 @@ namespace nORM.Providers
             return baseSize + columnSizes;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateComplexObjectSize which calls JsonSerializer.Serialize(object).")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateComplexObjectSize which reflects over the value type.")]
         private int EstimateValueSize(object? value, Type type)
         {
             if (value == null) return 4;
@@ -140,6 +146,8 @@ namespace nORM.Providers
             };
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("JsonSerializer.Serialize(object) is not NativeAOT-compatible; use the generic overload with a known type.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("JsonSerializer.Serialize(object) reflects over the value type at runtime; trimming may remove required members.")]
         private int EstimateComplexObjectSize(object value, Type type)
         {
             if (type.IsEnum) return 4;
