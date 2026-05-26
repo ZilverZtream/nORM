@@ -65,6 +65,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQL Server/Postgres/MySQL use native ordered aggregate (WITHIN GROUP / inline ORDER BY). SQLite uses outer ORDER BY to guide index scan order for GROUP_CONCAT. | `LinqAggregateStringConcatTests`, `LiveProviderRecentScvParityTests` |
+| LINQ `Aggregate` conditional-fold (`acc + (cond ? weight : 0)`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `SUM(CASE WHEN cond THEN weight ELSE 0 END)` via the existing Add-pattern rewrite. | `LinqAggregateConditionalFoldTests` |
 
 ### GroupBy / joins / set ops
 
@@ -90,6 +91,9 @@ already exist, the linked file is the live-parity test that backs the claim.
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `string` methods (Contains, StartsWith, EndsWith, Substring, Trim*, Concat, Compare, ToUpper/Lower, char.ToUpperInvariant) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `TypeConversionParityTests` |
+| `char.IsDigit` / `char.IsLetter` / `char.IsWhiteSpace` on column character | ✅ | ✅ | ✅ | ✅ | ✅ | — | ASCII-range BETWEEN comparisons; Unicode characters outside ASCII are not matched. | `LiveProviderCharStringPredicateParityTests` |
+| `string.IsNullOrEmpty` / `string.IsNullOrWhiteSpace` on nullable column | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `(col IS NULL OR col = '')` and `(col IS NULL OR LTRIM(RTRIM(col)) = '')` respectively. | `LiveProviderCharStringPredicateParityTests` |
+| `string.Length` comparison (`col.Length > N`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite/Postgres: `LENGTH`; SQL Server: `LEN`; MySQL: `CHAR_LENGTH`. | `LiveProviderCharStringPredicateParityTests` |
 | `DateTime` arithmetic, parts, AddDays/Months/Years/Hours/Minutes/Seconds | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
 | `DateOnly` / `TimeOnly` arithmetic + parts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
 | `TimeSpan` column ops (Total*, components, Negate/Duration/unary-negate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqTimeSpanInstanceNegateAndAbsTests` (SQLite); cross-provider via `ProviderParityDepthTests` |

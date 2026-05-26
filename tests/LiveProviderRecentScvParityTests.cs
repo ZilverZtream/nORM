@@ -664,6 +664,39 @@ public class LiveProviderRecentScvParityTests
         }
     }
 
+    // ------------------------------------------------------------------ test 10: Aggregate conditional fold
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Aggregate_conditional_fold_lowers_to_server_side_SUM_CASE_WHEN(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupAggTableAsync(ctx, kind);
+            try
+            {
+                // Data: (10,20,30,40). Score > 15: rows with 20,30,40 → count = 3.
+                int count = ctx.Query<AggParityRow>()
+                    .Aggregate(0, (acc, x) => acc + (x.Score > 15 ? 1 : 0));
+                Assert.Equal(3, count);
+
+                // Custom weight: Score > 15 → 2, else → 1. Total = 1+2+2+2 = 7.
+                int weighted = ctx.Query<AggParityRow>()
+                    .Aggregate(0, (acc, x) => acc + (x.Score > 15 ? 2 : 1));
+                Assert.Equal(7, weighted);
+            }
+            finally { await Teardown(ctx, AggTable); }
+        }
+    }
+
     private static async Task SetupAggTableAsync(DbContext ctx, ProviderKind kind)
     {
         var t  = ctx.Provider.Escape(AggTable);
