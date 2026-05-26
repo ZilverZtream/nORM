@@ -265,6 +265,32 @@ namespace nORM.Providers
             return AddSecondsToDateTimeSql(dateTimeSql, seconds);
         }
 
+        /// <summary>
+        /// SQLite stores DTOs as offset-suffixed ISO text. The base hook's
+        /// strftime drops the trailing offset, so the materialiser would parse
+        /// the result as Local and shift the wall clock by the machine's TZ.
+        /// Preserve the original suffix and shift the wall clock by both the
+        /// TimeSpan seconds AND the original offset (the latter cancels out
+        /// strftime's UTC normalisation). substr(col, 20) extracts the
+        /// trailing offset since canonical DTO text is 19-char date+time
+        /// followed by a signed HH:MM offset.
+        /// </summary>
+        public override string? AddTimeSpanColumnToDateTimeOffsetSql(string dtoSql, string timeSpanColumnSql, bool subtract)
+        {
+            var sign = subtract ? "-1.0 * " : "";
+            var seconds = $"{sign}{TimeSpanColumnTotalSecondsSql(timeSpanColumnSql)}";
+            // strftime with '%Y-%m-%d %H:%M:%f' parses the offset-suffixed input
+            // and outputs the UTC wall clock; appending the original suffix
+            // would mislabel UTC as the original offset. Instead, use the offset
+            // as a modifier to keep wall-clock at the original offset, then
+            // re-append the suffix.
+            // Approach: shift by seconds AND by inverse-offset-then-offset (net
+            // zero TZ shift, just preserves the offset suffix).
+            var offsetSuffix = $"substr({dtoSql}, 20)";
+            var shifted = $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {dtoSql}, ({seconds}) || ' seconds', {offsetSuffix}), '0'), '.')";
+            return $"({shifted} || {offsetSuffix})";
+        }
+
         /// <summary>SQLite uses strftime with a 'N days' modifier on the DateOnly TEXT column.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"strftime('%Y-%m-%d', {dateOnlySql}, ({daysSqlFragment}) || ' days')";

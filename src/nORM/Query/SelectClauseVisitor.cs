@@ -1476,7 +1476,10 @@ namespace nORM.Query
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
                 var subtract = node.NodeType == ExpressionType.Subtract;
-                var dateArithSql = _provider.AddTimeSpanColumnToDateTimeSql(leftSql, rightSql, subtract);
+                var leftIsDto = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTimeOffset);
+                var dateArithSql = leftIsDto
+                    ? _provider.AddTimeSpanColumnToDateTimeOffsetSql(leftSql, rightSql, subtract)
+                    : _provider.AddTimeSpanColumnToDateTimeSql(leftSql, rightSql, subtract);
                 if (dateArithSql != null)
                 {
                     sb.Append(dateArithSql);
