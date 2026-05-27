@@ -524,16 +524,19 @@ namespace nORM.Providers
 
             if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
+                var source = declaringType == typeof(DateTimeOffset)
+                    ? $"({args[0]} AT TIME ZONE 'UTC')"
+                    : args[0];
                 return name switch
                 {
-                    nameof(DateTime.Year) => $"EXTRACT(YEAR FROM {args[0]})",
-                    nameof(DateTime.Month) => $"EXTRACT(MONTH FROM {args[0]})",
-                    nameof(DateTime.Day) => $"EXTRACT(DAY FROM {args[0]})",
-                    nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
-                    nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
-                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {args[0]})",
-                    nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
-                    nameof(DateTime.Date) => $"DATE_TRUNC('day', {args[0]})",
+                    nameof(DateTime.Year) => $"EXTRACT(YEAR FROM {source})",
+                    nameof(DateTime.Month) => $"EXTRACT(MONTH FROM {source})",
+                    nameof(DateTime.Day) => $"EXTRACT(DAY FROM {source})",
+                    nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {source})",
+                    nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {source})",
+                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {source})",
+                    nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {source})",
+                    nameof(DateTime.Date) => $"DATE_TRUNC('day', {source})",
                     nameof(DateTime.AddDays) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 day')",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 month')",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 year')",
@@ -544,10 +547,10 @@ namespace nORM.Providers
                     nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 millisecond')",
                     // Postgres EXTRACT(MILLISECONDS FROM ts) returns SS*1000+ms;
                     // modulo 1000 yields the millisecond component matching .NET.
-                    nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
+                    nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {source})::int % 1000)",
                     // EXTRACT(MICROSECONDS FROM ts) returns SS*1e6+us; %1000
                     // yields the microsecond within the current millisecond.
-                    nameof(DateTime.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {args[0]}))::bigint % 1000)",
+                    nameof(DateTime.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {source}))::bigint % 1000)",
                     // PostgreSQL timestamps have microsecond precision; the
                     // sub-microsecond Nanosecond is always zero.
                     nameof(DateTime.Nanosecond) => "0",
@@ -555,7 +558,7 @@ namespace nORM.Providers
                     // ticks/10 gives microseconds (truncating sub-microsecond precision).
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"({args[0]} + (({args[1]}) / 10) * INTERVAL '1 microsecond')",
                     // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
-                    nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
+                    nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {source})",
                     // Compare / CompareTo: signed -1/0/1 sentinel via CASE.
                     nameof(DateTime.Compare) when args.Length == 2 =>
                         $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
