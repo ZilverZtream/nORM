@@ -23,7 +23,7 @@ Status values:
 | `Select` into DTO with positional record | Supported | Constructor parameter names matched against projected member names. |
 | `Select` into DTO with parameterized class constructor | Supported | Same constructor-match rule as records. |
 | `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | Supported | `MemberInit` projections bind each assignment to the DTO property; navigation-collection assignments are skipped. |
-| `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. `string.Format`/interpolated strings/enum `.ToString()` fall into this path. |
+| `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. `string.Format` and interpolated strings fall into this path. |
 | `OrderBy`, `ThenBy` | Supported | Including the `Descending` variants. Provider-specific identifier escaping and expression translation apply. |
 | `Reverse` | Supported | Flips the active ORDER BY direction at the SQL layer. |
 | `Skip`, `Take` | Supported | Provider-specific paging. `Skip(m).Take(n)` is the canonical pagination shape. `Take(n).Skip(m)` works with both literal counts (rewritten algebraically to `Skip(m).Take(n - m)`) and runtime parameters (emits `LIMIT (@take - @skip) OFFSET @skip` so the runtime values still produce the [skip, take) window). |
@@ -90,7 +90,7 @@ Status values:
 | Conditional expressions (`cond ? a : b`) in `Where` and `Select` | Supported | Emit `CASE WHEN ... END`. Nested conditionals supported. |
 | Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | Supported | Column types drive numeric semantics. |
 | Enum equality and `(int)enumCol` projection | Supported | Enum values are emitted as their underlying integer; cast collapses to the operand. |
-| Enum `.ToString()` in projection | Constrained | Routed via the client-side projection split; the SQL fetches the underlying integer column. |
+| Enum `.ToString()` in projection | Supported | Emits a provider-neutral `CASE` expression mapping defined enum values to names; undefined values fall back to the numeric text representation, matching .NET `Enum.ToString()`. |
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | Supported | Null-aware: emits `(col IN (...) OR col IS NULL)` when the list contains nulls. |
 | `Guid.Empty` and other static-field constants in predicates | Supported | Evaluated at execution time via the static-member constant path. |
 | `Guid.NewGuid()` in queries | Unsupported | Generate the value in CLR before composing the query. |

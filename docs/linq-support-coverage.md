@@ -15,7 +15,7 @@ the matrix notes an explicit deterministic failure contract.
 | `Select` into DTO with positional record | `tests/LinqDtoProjectionTests.cs` |
 | `Select` into DTO with parameterized class constructor | `tests/LinqDtoProjectionTests.cs` |
 | `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | `tests/LinqDtoProjectionTests.cs` |
-| `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/LinqEnumToStringTests.cs` |
+| `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs` |
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
 | `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs` |
