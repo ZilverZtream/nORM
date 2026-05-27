@@ -96,12 +96,14 @@ namespace nORM.Query
 
         private sealed class PooledPlanCommand
         {
-            public PooledPlanCommand(DbCommand command)
+            public PooledPlanCommand(DbCommand command, int fixedParameterCount)
             {
                 Command = command;
+                FixedParameterCount = fixedParameterCount;
             }
 
             public DbCommand Command { get; }
+            public int FixedParameterCount { get; }
             public object Lock { get; } = new();
         }
 
@@ -1017,7 +1019,7 @@ namespace nORM.Query
                 return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
 
             if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
-                return ExecutePooledQueryPlanSync<TResult>(plan, sw, ct);
+                return ExecutePooledQueryPlanSync<TResult>(plan, paramValues, sw, ct);
 
             // Synchronous command setup — no async state machine needed
             var cmd = _ctx.CreateCommand();
@@ -1055,7 +1057,7 @@ namespace nORM.Query
         {
             await ensureTask.ConfigureAwait(false);
             if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
-                return await ExecutePooledQueryPlanSync<TResult>(plan, sw, ct).ConfigureAwait(false);
+                return await ExecutePooledQueryPlanSync<TResult>(plan, paramValues, sw, ct).ConfigureAwait(false);
 
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -1081,8 +1083,7 @@ namespace nORM.Query
         private bool CanUsePooledPlanCommand<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues)
             => _ctx.Provider.SupportsQueryPlanPreparedCommandCache &&
                _ctx.Options.CommandInterceptors.Count == 0 &&
-               paramValues == null &&
-               plan.CompiledParameters.Count == 0 &&
+               (plan.CompiledParameters.Count == 0 || paramValues != null) &&
                !plan.IsScalar &&
                !plan.SingleResult &&
                plan.GroupJoinInfo == null &&
@@ -1097,13 +1098,15 @@ namespace nORM.Query
                 !_ctx.IsMapped(plan.ElementType) ||
                 _ctx.GetMapping(plan.ElementType).OwnedCollections.Count == 0);
 
-        private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, Stopwatch? sw, CancellationToken ct)
+        private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             var pooled = _pooledPlanCommands.GetOrAdd(plan.Fingerprint, _ => CreatePooledPlanCommand(plan));
             lock (pooled.Lock)
             {
                 ct.ThrowIfCancellationRequested();
                 pooled.Command.Transaction = _ctx.CurrentTransaction;
+                if (paramValues != null)
+                    BindPooledCompiledParameters(pooled.Command, pooled.FixedParameterCount, plan, paramValues);
                 var list = _executor.MaterializePooled(plan, pooled.Command);
                 if (plan.PostMaterializeTransform != null)
                     list = plan.PostMaterializeTransform(list);
@@ -1119,8 +1122,37 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, null);
+            var fixedParameterCount = cmd.Parameters.Count;
+            foreach (var parameterName in plan.CompiledParameters)
+            {
+                if (IsUnusedCompiledParameter(parameterName))
+                    continue;
+                cmd.AddOptimizedParam(parameterName, DBNull.Value);
+            }
             try { cmd.Prepare(); } catch (Exception) { }
-            return new PooledPlanCommand(cmd);
+            return new PooledPlanCommand(cmd, fixedParameterCount);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void BindPooledCompiledParameters(
+            DbCommand cmd,
+            int fixedParameterCount,
+            QueryPlan plan,
+            IReadOnlyList<object?> paramValues)
+        {
+            var compiledParams = plan.CompiledParameters;
+            var count = Math.Min(compiledParams.Count, paramValues.Count);
+            var boundIndex = 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i]))
+                    continue;
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], paramValues[i] ?? DBNull.Value);
+                boundIndex++;
+            }
+
+            for (; boundIndex < cmd.Parameters.Count - fixedParameterCount; boundIndex++)
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], DBNull.Value);
         }
 
         /// <summary>PERF: Extracted parameter binding to share between fast and slow paths.</summary>
