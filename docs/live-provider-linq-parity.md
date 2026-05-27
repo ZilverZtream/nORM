@@ -56,6 +56,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests`, `LiveProviderContainsParityTests` |
 | `Count` / `LongCount` (parameterless + predicate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `MinBy` / `MaxBy` | ✅ | ✅ | ✅ | ✅ | ✅ | — | ORDER BY key ascending/descending plus one-row terminal read; empty source throws. | `LinqMinByMaxByTests`, `LiveProviderMinByMaxByParityTests` |
+| `AsAsyncEnumerable` streaming | ✅ | ✅ | ✅ | ✅ | ✅ | — | Streams ordinary query results and GroupJoin results; Include is rejected with `NormUnsupportedFeatureException` because eager loading needs dependent round trips. | `LiveProviderAsyncEnumerableParityTests`, `AsyncEnumerableTests`, `GroupJoinAsyncEnumerableTests` |
 
 ### Aggregates
 
