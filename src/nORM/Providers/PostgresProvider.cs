@@ -652,7 +652,7 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
-                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT(CASE WHEN {args[0]} < 0 THEN NULL ELSE {args[0]} END)",
                     nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
                     nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
                     nameof(Math.Log) when args.Length == 1 => $"LN({args[0]})",

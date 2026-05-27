@@ -517,7 +517,8 @@ namespace nORM.Providers
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x})" : $"ROUND({x}, {digits})",
-                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})")
+                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})",
+                integerCastType: "SIGNED")
             ?? TryTranslateIeee754Predicate(node, args)
             ?? TryTranslateTimeSpanFactory(node, args);
 

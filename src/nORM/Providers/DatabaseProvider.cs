@@ -247,7 +247,8 @@ namespace nORM.Providers
             System.Linq.Expressions.MethodCallExpression node,
             string[] args,
             Func<string, string?, string> awayFromZero,
-            Func<string, string?, string> truncateTowardZero)
+            Func<string, string?, string> truncateTowardZero,
+            string integerCastType = "BIGINT")
         {
             var declType = node.Method.DeclaringType;
             if (!((declType == typeof(Math) && node.Method.Name == nameof(Math.Round))
@@ -295,7 +296,7 @@ namespace nORM.Providers
                         $"CASE " +
                         $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) > 0.5 THEN 1 " +
                         $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) < 0.5 THEN 0 " +
-                        $"ELSE (CAST(FLOOR(ABS({scaled})) AS BIGINT) % 2) END))");
+                        $"ELSE (CAST(FLOOR(ABS({scaled})) AS {integerCastType}) % 2) END))");
             }
         }
 
