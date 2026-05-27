@@ -43,29 +43,6 @@ function Convert-MeanToNanoseconds {
     }
 
     $normalized = $Value.Trim() -replace ',', ''
-    if ($normalized -notmatch '^([0-9]+(?:\.[0-9]+)?)\s*(ns|us|µs|μs|ms|s)?$') {
-        return [double]::PositiveInfinity
-    }
-
-    $number = [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture)
-    switch ($Matches[2]) {
-        's' { return $number * 1000000000.0 }
-        'ms' { return $number * 1000000.0 }
-        'us' { return $number * 1000.0 }
-        'µs' { return $number * 1000.0 }
-        'μs' { return $number * 1000.0 }
-        default { return $number }
-    }
-}
-
-function Convert-MeanToNanoseconds {
-    param([string]$Value)
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        return [double]::PositiveInfinity
-    }
-
-    $normalized = $Value.Trim() -replace ',', ''
     if ($normalized -notmatch '^([0-9]+(?:\.[0-9]+)?)\s*(\S+)?$') {
         return [double]::PositiveInfinity
     }
