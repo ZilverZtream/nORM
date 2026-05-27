@@ -1019,7 +1019,7 @@ namespace nORM.Core
                 await using var cmd = CommandPool.Get(ctx.Connection, _p.GetCreateTagSql(p0, p1));
                 var span = new (string name, object value)[2];
                 span[0] = (p0, tagName);
-                span[1] = (p1, DateTime.UtcNow);
+                span[1] = (p1, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified));
                 cmd.SetParametersFast(span);
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 cmd.Parameters.Clear();

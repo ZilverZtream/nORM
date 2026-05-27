@@ -912,6 +912,18 @@ ORDER BY ORDINAL_POSITION";
         }
 
         /// <summary>
+        /// MySQL cannot use a TEXT column as a primary key without a prefix length.
+        /// Use bounded VARCHAR/DATETIME columns for temporal tags.
+        /// </summary>
+        public override string GetCreateTagsTableSql()
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"CREATE TABLE IF NOT EXISTS {table} ({tagCol} VARCHAR(450) NOT NULL, {tsCol} DATETIME NOT NULL, PRIMARY KEY ({tagCol})) ENGINE=InnoDB";
+        }
+
+        /// <summary>
         /// Generates the SQL statement to create the temporal history table for an entity.
         /// When liveColumns are supplied, column types are taken from the live DB schema.
         /// </summary>

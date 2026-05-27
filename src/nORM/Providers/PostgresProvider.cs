@@ -1038,6 +1038,18 @@ CREATE TABLE {historyTable} (
         }
 
         /// <summary>
+        /// Use a timestamp column for temporal tag lookups so tag timestamps have
+        /// the same UTC-without-kind contract as generated history rows.
+        /// </summary>
+        public override string GetCreateTagsTableSql()
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"CREATE TABLE IF NOT EXISTS {table} ({tagCol} TEXT NOT NULL, {tsCol} TIMESTAMP NOT NULL, PRIMARY KEY ({tagCol}))";
+        }
+
+        /// <summary>
         /// Produces the trigger definitions required to track changes in the temporal history table.
         /// </summary>
         /// <param name="mapping">The mapping describing the target table.</param>
