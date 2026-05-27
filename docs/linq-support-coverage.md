@@ -69,10 +69,10 @@ the matrix notes an explicit deterministic failure contract.
 | `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs` |
 | `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderNullableBoolParityTests.cs` |
 | `Convert.ChangeType(col, typeof(T))` with `Type` constant | `tests/LinqConvertChangeTypeOnColumnTests.cs` |
-| `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs` |
-| `DateTimeOffset` col `==` / `!=` DateTime literal | `tests/LinqDateTimeOffsetEqualsDateTimeLiteralTests.cs` |
-| `DateTimeOffset` - `DateTimeOffset` → `TimeSpan` (cross-column) | `tests/LinqDateTimeOffsetColumnSubtractionTests.cs` |
-| `DateTimeOffset` col `+` / `-` `TimeSpan` col → `DateTimeOffset` | `tests/LinqDateTimeOffsetPlusTimeSpanColumnTests.cs` |
+| `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| `DateTimeOffset` col `==` / `!=` DateTime literal | `tests/LinqDateTimeOffsetEqualsDateTimeLiteralTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| `DateTimeOffset` - `DateTimeOffset` → `TimeSpan` (cross-column) | `tests/LinqDateTimeOffsetColumnSubtractionTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| `DateTimeOffset` col `+` / `-` `TimeSpan` col → `DateTimeOffset` | `tests/LinqDateTimeOffsetPlusTimeSpanColumnTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | LINQ `Aggregate` sum-fold (1-arg + seed forms) | `tests/LinqAggregateOperatorTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional shapes) | `tests/LinqAggregateMinMaxFoldTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | `tests/LinqAggregateStringConcatTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |

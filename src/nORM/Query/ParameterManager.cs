@@ -151,7 +151,7 @@ namespace nORM.Query
             if (type == typeof(DateTime))
             {
                 p.DbType = System.Data.DbType.DateTime2;
-                p.Value = v;
+                p.Value = DateTime.SpecifyKind((DateTime)v, DateTimeKind.Unspecified);
                 return;
             }
 
