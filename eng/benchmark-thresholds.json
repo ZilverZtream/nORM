@@ -73,6 +73,16 @@
       "rationale": "Count is a core LINQ aggregate and has a dedicated fast path. It should remain within a tight 1.25x budget against typed Dapper or optimized Raw ADO for the same provider, and preferably beat them on providers where pooled scalar execution is effective."
     },
     {
+      "name": "Single insert stays within Raw ADO, Dapper, or EF range",
+      "provider": "*",
+      "targetMethods": [ "Insert_Single_nORM" ],
+      "baselineMethods": [ "Insert_Single_RawAdo", "Insert_Single_Dapper", "Insert_Single_EfCore" ],
+      "maxMeanRatio": 1.25,
+      "maxAllocatedRatio": 2.0,
+      "required": true,
+      "rationale": "Single-row inserts are a public unit-of-work path and were a prior SQL Server regression cluster. The 1.25x ceiling allows provider roundtrip variance while ensuring nORM stays competitive with the fastest comparable raw ADO, Dapper, or EF Core insert for the same provider and keeps allocation below the general-purpose ORM baselines."
+    },
+    {
       "name": "BulkInsertAsync stays within EF or Dapper transaction range",
       "provider": "*",
       "targetMethods": [ "BulkInsert_Idiomatic_nORM" ],
