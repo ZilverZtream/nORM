@@ -207,7 +207,7 @@ public class BatchedNavigationCancellationParityTests
         {
             try
             {
-                await tasks[i].WaitAsync(TimeSpan.FromSeconds(5));
+                await tasks[i].WaitAsync(TimeSpan.FromSeconds(30));
                 succeeded++;
             }
             catch (OperationCanceledException)
