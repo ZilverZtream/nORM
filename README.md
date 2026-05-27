@@ -1,4 +1,4 @@
-# nORM (The Norm) - High-Performance ORM for .NET
+# nORM (The Norm) - Performance-Focused ORM for .NET
 
 nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being tuned for low-overhead hot paths while keeping familiar ORM features such as LINQ queries, change tracking, migrations, multi-tenancy, and provider-specific bulk operations.
 
@@ -76,10 +76,10 @@ public class User
 }
 ```
 
-### High-Performance LINQ Queries
+### LINQ Queries
 
 ```csharp
-// Familiar EF Core-style syntax with lower runtime overhead on tuned paths
+// Familiar EF Core-style syntax on provider-tested query paths
 var users = await context.Query<User>()
     .Where(u => u.Name.StartsWith("John"))
     .Include(u => u.Orders)
@@ -93,14 +93,14 @@ var userStats = await context.Query<User>()
     .Select(g => new { Date = g.Key, Count = g.Count() })
     .ToListAsync();
 
-// Compiled queries for maximum performance
+// Compiled queries for warm-path execution
 var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User>(
     (ctx, since) => ctx.Query<User>()
         .Where(u => u.CreatedAt > since)
 );
 ```
 
-### Lightning-Fast CRUD Operations
+### CRUD Operations
 
 > **Note:** nORM is async-first for writes. Only `SaveChangesAsync()` is provided; there is no synchronous `SaveChanges()`. Use `await ctx.SaveChangesAsync()` in all contexts, including console apps: `ctx.SaveChangesAsync().GetAwaiter().GetResult()` can cause deadlocks in some synchronization contexts. Synchronous query helpers such as `ToListSync()` and `CountSync()` remain supported for legacy synchronous callers; see [Sync and Async Policy](docs/sync-policy.md).
 
@@ -115,7 +115,7 @@ await context.UpdateAsync(user);
 await context.DeleteAsync(user);
 ```
 
-### Superior Bulk Operations
+### Bulk Operations
 
 ```csharp
 // Process thousands of records efficiently
@@ -485,21 +485,21 @@ public class MyDbContext : nORM.Core.DbContext
 
 ## Performance Design
 
-- **Advanced IL Materialization**: Hand-optimized IL generation eliminates reflection overhead
-- **Zero-Allocation Query Execution**: Memory-efficient query processing reduces GC pressure  
+- **Advanced IL Materialization**: IL-generated materializers avoid reflection on tuned paths
+- **Low-Allocation Query Execution**: Memory-conscious query processing reduces avoidable GC pressure
 - **Intelligent Caching**: Multi-layered caching strategy for query plans and metadata
 - **Driver Pooling**: Uses ADO.NET provider-native pooling instead of a custom public pool
 - **Native Bulk Operations**: Database-specific bulk operation implementations
-- **Compiled Query Support**: Pre-compile frequently used queries for maximum speed
+- **Compiled Query Support**: Pre-compile frequently used queries for warm-path reuse
 
 ## Performance Targets
 
 nORM is being tuned toward these release goals:
 
-- **Query latency**: stay competitive with Dapper on simple and joined reads
-- **Compiled queries**: make warm-path execution consistently faster than uncompiled LINQ
-- **Memory usage**: keep allocations well below EF Core on read-heavy paths
-- **Bulk operations**: remain substantially faster than EF Core and competitive with Dapper transaction-based inserts
+- **Query latency**: keep simple, joined, and complex read paths inside the versioned benchmark budgets
+- **Compiled queries**: keep warm-path execution inside the compiled-query benchmark budgets
+- **Memory usage**: keep read-heavy allocations inside the versioned benchmark budgets
+- **Bulk operations**: keep idiomatic `BulkInsertAsync` inside the provider-specific benchmark budgets
 
 Benchmark claims must follow the reproducibility and baseline rules in
 [Benchmark Governance](docs/benchmark-governance.md).
@@ -540,4 +540,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-*nORM - Entity Framework performance, without the Entity Framework overhead* 
+*nORM - familiar ORM ergonomics with provider-tested LINQ and benchmark-governed performance*

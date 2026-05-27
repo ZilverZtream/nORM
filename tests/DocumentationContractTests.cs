@@ -80,6 +80,12 @@ public class DocumentationContractTests
         Assert.DoesNotContain("beats raw ADO", readme, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Enterprise Ready", readme, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("built-in pooling", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Zero-Allocation", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("maximum performance", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Lightning-Fast", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Superior Bulk", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("substantially faster", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Entity Framework performance", readme, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Benchmark Governance", readme, StringComparison.Ordinal);
         Assert.Contains("Documented LINQ Support", readme, StringComparison.Ordinal);
     }
