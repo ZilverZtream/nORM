@@ -11,6 +11,7 @@ files, coverage reports, or temporary scratch projects. These paths are ignored:
 - `bin/` and `obj/`
 - `*.nupkg` and `*.snupkg`
 - `BenchmarkDotNet.Artifacts/`
+- `.tmp/`
 - `tests/TestResults/`
 - `*.trx` and `*.coverage`
 - `coverage/` and `coverage-report/`

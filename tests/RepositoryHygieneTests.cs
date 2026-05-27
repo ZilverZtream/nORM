@@ -28,8 +28,10 @@ public sealed class RepositoryHygieneTests
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
 
         Assert.Contains("tests/TestResults/", gitignore, StringComparison.Ordinal);
+        Assert.Contains(".tmp/", gitignore, StringComparison.Ordinal);
         Assert.Contains("*.trx", gitignore, StringComparison.Ordinal);
         Assert.Contains("*.coverage", gitignore, StringComparison.Ordinal);
+        Assert.Contains(".tmp/", hygiene, StringComparison.Ordinal);
         Assert.Contains("tests/TestResults/", hygiene, StringComparison.Ordinal);
         Assert.Contains("test-suite-ownership.md", hygiene, StringComparison.Ordinal);
         Assert.Contains("Do not add new catch-all `CoverageBoost` files.", ownership, StringComparison.Ordinal);
