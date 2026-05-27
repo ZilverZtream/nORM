@@ -449,13 +449,15 @@ namespace nORM.Providers
             _parameterFactory.CreateParameter(name, value);
 
         /// <summary>
-        /// MySQL TIMESTAMPDIFF(SECOND) is integer seconds. Wrap in CAST to DOUBLE so the
-        /// subsequent division for TotalHours / TotalDays etc. stays fractional.
+        /// MySQL TIMESTAMPDIFF(MICROSECOND) preserves sub-second deltas while
+        /// avoiding TIMESTAMPDIFF(SECOND)'s integer truncation. Divide by
+        /// 1,000,000.0 so Total* projections and TimeSpan materialisation receive
+        /// fractional seconds.
         /// </summary>
         /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
         /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
-            => $"CAST(TIMESTAMPDIFF(SECOND, {startSql}, {endSql}) AS DOUBLE)";
+            => $"(CAST(TIMESTAMPDIFF(MICROSECOND, {startSql}, {endSql}) AS DOUBLE) / 1000000.0)";
 
         /// <summary>
         /// MySQL has no native date-from-parts; STR_TO_DATE on a zero-padded

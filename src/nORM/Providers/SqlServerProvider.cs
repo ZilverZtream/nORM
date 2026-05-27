@@ -444,14 +444,14 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// DATEDIFF(SECOND) overflows around 68 years; for the LINQ use-case (TotalHours,
-        /// TotalDays) that's well within range. CAST the result to FLOAT so subsequent
-        /// divisions (e.g. TotalHours = sec / 3600) stay fractional.
+        /// DATEDIFF_BIG(MICROSECOND) preserves sub-second deltas while avoiding
+        /// DATEDIFF(SECOND)'s integer truncation. Divide by 1,000,000.0 so Total*
+        /// projections and TimeSpan materialisation receive fractional seconds.
         /// </summary>
         /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
         /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
-            => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
+            => $"(CAST(DATEDIFF_BIG(MICROSECOND, {startSql}, {endSql}) AS FLOAT) / 1000000.0)";
 
         /// <summary>T-SQL DATETIME2FROMPARTS with precision 7 matches .NET DateTime ticks.</summary>
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
