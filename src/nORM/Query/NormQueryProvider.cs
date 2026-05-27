@@ -1107,13 +1107,32 @@ namespace nORM.Query
                 pooled.Command.Transaction = _ctx.CurrentTransaction;
                 if (paramValues != null)
                     BindPooledCompiledParameters(pooled.Command, pooled.FixedParameterCount, plan, paramValues);
-                var list = _executor.MaterializePooled(plan, pooled.Command);
+                var list = CanUseUnmappedPooledMaterializer(plan)
+                    ? MaterializeUnmappedPooled(plan, pooled.Command)
+                    : _executor.MaterializePooled(plan, pooled.Command);
                 if (plan.PostMaterializeTransform != null)
                     list = plan.PostMaterializeTransform(list);
                 sw?.Stop();
                 _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
                 return Task.FromResult((TResult)(object)list);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool CanUseUnmappedPooledMaterializer(QueryPlan plan)
+            => !plan.ElementType.IsClass || !plan.ElementType.Name.StartsWith("<>", StringComparison.Ordinal) && !_ctx.IsMapped(plan.ElementType);
+
+        private IList MaterializeUnmappedPooled(QueryPlan plan, DbCommand command)
+        {
+            var capacity = plan.SingleResult ? 1 : QueryExecutor.ClampTakeCapacity(plan.Take);
+            var list = _executor.CreateListForType(plan.ElementType, capacity);
+            using var reader = command.ExecuteReader(CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+            var materializer = plan.SyncMaterializer;
+            while (reader.Read())
+                list.Add(materializer(reader));
+            if (plan.PostReverse)
+                QueryExecutor.ReverseListInPlace(list);
+            return list;
         }
 
         private PooledPlanCommand CreatePooledPlanCommand(QueryPlan plan)
