@@ -474,6 +474,9 @@ namespace nORM.Query
                     _t.InstallGroupingTransform(_t._streamingGroupByKeySelector);
                 }
 
+                if (_t._clauses.WindowFunctions.Count > 0 && _t._projection == null)
+                    _t._projection = _t._clauses.WindowFunctions[^1].ResultSelector;
+
                 var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
                 var topLevelMethodName = (_expression as MethodCallExpression)?.Method.Name;
                 if (_t._isAggregate && _t._groupBy.Count == 0 && topLevelMethodName is "Count" or "LongCount")
@@ -960,16 +963,9 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(visitor2);
                     defaultSql = $", {defSql}";
                 }
-                string offsetParam;
-                do
-                {
-                    offsetParam = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
-                }
-                while (_params.ContainsKey(offsetParam));
-                AddParameter(offsetParam, wf.Offset);
-                return $"{wf.FunctionName}({valueSql}, {offsetParam}{defaultSql}) OVER ({overClause})";
+                return $"{wf.FunctionName}({valueSql}, {wf.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}{defaultSql}) OVER ({overClause})";
             }
-            return $"{wf.FunctionName}() OVER ({overClause})";
+            return _provider.GetIntCastSql($"{wf.FunctionName}() OVER ({overClause})", asLong: false);
         }
         /// <summary>
         /// Translates a sub-expression using a nested translation context.
