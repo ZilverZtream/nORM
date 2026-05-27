@@ -441,6 +441,10 @@ namespace nORM.Providers
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
 
+        /// <summary>MySQL requires SIGNED as the integer cast target and TRUNCATE for toward-zero semantics.</summary>
+        public override string GetTruncateToIntSql(string numericSql)
+            => $"CAST(TRUNCATE({numericSql}, 0) AS SIGNED)";
+
         /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT IGNORE INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";

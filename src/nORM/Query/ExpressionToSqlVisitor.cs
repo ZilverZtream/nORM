@@ -3315,16 +3315,16 @@ namespace nORM.Query
                     _sql.Append('(').Append(secondsSql).Append(" * 1000.0)");
                     return true;
                 case nameof(TimeSpan.Days):
-                    _sql.Append("CAST(").Append(secondsSql).Append(" / 86400 AS INTEGER)");
+                    _sql.Append(_provider.GetTruncateToIntSql($"({secondsSql} / 86400)"));
                     return true;
                 case nameof(TimeSpan.Hours):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 3600 AS INTEGER) % 24)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")).Append(" % 24)");
                     return true;
                 case nameof(TimeSpan.Minutes):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 60 AS INTEGER) % 60)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql($"({secondsSql} / 60)")).Append(" % 60)");
                     return true;
                 case nameof(TimeSpan.Seconds):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" AS INTEGER) % 60)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql(secondsSql)).Append(" % 60)");
                     return true;
                 default:
                     return false;

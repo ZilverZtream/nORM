@@ -248,10 +248,39 @@ namespace nORM.Query
                     nameof(TimeSpan.TotalHours) => $"({secondsSql} / 3600.0)",
                     nameof(TimeSpan.TotalDays) => $"({secondsSql} / 86400.0)",
                     nameof(TimeSpan.TotalMilliseconds) => $"({secondsSql} * 1000.0)",
-                    nameof(TimeSpan.Days) => $"CAST({secondsSql} / 86400 AS INTEGER)",
-                    nameof(TimeSpan.Hours) => $"(CAST({secondsSql} / 3600 AS INTEGER) % 24)",
-                    nameof(TimeSpan.Minutes) => $"(CAST({secondsSql} / 60 AS INTEGER) % 60)",
-                    nameof(TimeSpan.Seconds) => $"(CAST({secondsSql} AS INTEGER) % 60)",
+                    nameof(TimeSpan.Days) => _provider.GetTruncateToIntSql($"({secondsSql} / 86400)"),
+                    nameof(TimeSpan.Hours) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")} % 24)",
+                    nameof(TimeSpan.Minutes) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 60)")} % 60)",
+                    nameof(TimeSpan.Seconds) => $"({_provider.GetTruncateToIntSql(secondsSql)} % 60)",
+                    _ => null
+                };
+                if (emit != null)
+                {
+                    sb.Append(emit);
+                    return node;
+                }
+            }
+
+            // Stored TimeSpan column members: r.Duration.TotalSeconds, .Hours,
+            // .Minutes, etc. The WHERE visitor already routes these through the
+            // provider seconds hook; projection needs the same handling before
+            // the member name is mistaken for an entity column.
+            if (node.Expression != null
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(TimeSpan))
+            {
+                var spanSql = TranslateProjectionArg(node.Expression);
+                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(spanSql);
+                string? emit = node.Member.Name switch
+                {
+                    nameof(TimeSpan.TotalSeconds) => secondsSql,
+                    nameof(TimeSpan.TotalMinutes) => $"({secondsSql} / 60.0)",
+                    nameof(TimeSpan.TotalHours) => $"({secondsSql} / 3600.0)",
+                    nameof(TimeSpan.TotalDays) => $"({secondsSql} / 86400.0)",
+                    nameof(TimeSpan.TotalMilliseconds) => $"({secondsSql} * 1000.0)",
+                    nameof(TimeSpan.Days) => _provider.GetTruncateToIntSql($"({secondsSql} / 86400)"),
+                    nameof(TimeSpan.Hours) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")} % 24)",
+                    nameof(TimeSpan.Minutes) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 60)")} % 60)",
+                    nameof(TimeSpan.Seconds) => $"({_provider.GetTruncateToIntSql(secondsSql)} % 60)",
                     _ => null
                 };
                 if (emit != null)

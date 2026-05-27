@@ -63,7 +63,7 @@ the matrix notes an explicit deterministic failure contract.
 | `DateTime.AddDays` / `AddMonths` / `AddYears` / `AddHours` / `AddMinutes` / `AddSeconds` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `DateTime.UtcNow` / `DateTime.Now` / `DateTime.Today` in predicates | `tests/LinqDateTimeNowTests.cs`, `tests/LiveProviderStaticValuePredicateParityTests.cs` |
 | `DateTimeOffset` members | `tests/LinqDateTimeOffsetMemberTests.cs` |
-| `TimeSpan` member access on a stored TimeSpan column (`r.Duration.TotalSeconds`, `.Days`, etc.) | `tests/LinqProjectionTimeSpanTotalsTests.cs` |
+| `TimeSpan` member access on a stored TimeSpan column (`r.Duration.TotalSeconds`, `.Days`, etc.) | `tests/LinqProjectionTimeSpanTotalsTests.cs`, `tests/LiveProviderTimeSpanMemberParityTests.cs` |
 | `DateTime`/`DateTimeOffset` subtraction TimeSpan members (`(r.End - r.Start).TotalHours`, `.TotalDays`, `.TotalSeconds`, `.TotalMinutes`, `.TotalMilliseconds`, `.Days`, `.Hours`, `.Minutes`, `.Seconds`) | `tests/LinqDateTimeArithmeticTests.cs`, `tests/LiveProviderDateTimeSubtractionPrecisionTests.cs` |
 | `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
