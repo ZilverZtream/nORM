@@ -54,11 +54,16 @@ Covered scenarios:
 - Count query
 - Naive, batched, prepared, and idiomatic bulk insert variants
 
-Use BenchmarkDotNet filters for focused provider runs:
+Use `--provider` plus BenchmarkDotNet filters for focused provider runs. This
+keeps result tables provider-specific and avoids noisy four-provider summaries
+while investigating regressions:
 
 ```powershell
-dotnet run -c Release -- --provider-matrix --filter "*ProviderMatrixBenchmarks.Query_Complex*"
-dotnet run -c Release -- --provider-matrix --filter "*ProviderMatrixBenchmarks.BulkInsert*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.Query_Complex*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.Query_Join*"
+dotnet run -c Release -- --provider-matrix --provider Sqlite --filter "*ProviderMatrixBenchmarks.Query_Join*"
+dotnet run -c Release -- --provider-matrix --provider SqlServer --filter "*ProviderMatrixBenchmarks.Insert_Single*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.BulkInsert_Batched*"
 ```
 
 ## Test Data

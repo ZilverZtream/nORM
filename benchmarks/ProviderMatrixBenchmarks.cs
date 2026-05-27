@@ -87,12 +87,17 @@ public sealed class ProviderMatrixEfContext : EfDbContext
 [SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]
 public class ProviderMatrixBenchmarks
 {
+    private static readonly string[] AllProviders = ["Sqlite", "SqlServer", "Postgres", "MySql"];
     private const int UserCount = 1000;
     private const int OrderCount = 2000;
     private readonly List<BenchmarkUser> _testUsers = new();
     private readonly List<BenchmarkOrder> _testOrders = new();
 
-    [Params("Sqlite", "SqlServer", "Postgres", "MySql")]
+    public static IReadOnlyList<string> SelectedProviders { get; set; } = AllProviders;
+
+    public static IEnumerable<string> Providers() => SelectedProviders;
+
+    [ParamsSource(nameof(Providers))]
     public string Provider { get; set; } = "Sqlite";
 
     private string _connectionString = string.Empty;
