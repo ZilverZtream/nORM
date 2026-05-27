@@ -1979,21 +1979,21 @@ namespace nORM.Query
                         _ctx.Provider.GetType().GetHashCode(), mappingHash)
                 .Extend((int)_ctx.Options.ClientEvaluationPolicy);
 
+            if (_planCache.TryGet(fingerprint, out var cached))
+            {
+                parameterValues = ExtractParameterValues(filtered, cached);
+                return cached;
+            }
+
             // ExceptBy / IntersectBy / UnionBy capture an in-memory IEnumerable from
             // the user's closure into a post-materialize transform. The plan cache
             // keys by expression fingerprint, which doesn't differentiate captured
             // collection identity / contents; reusing the cached plan would replay
             // the prior call's collection. Bypass the cache for these methods so each
-            // invocation translates fresh against the live closure values. (Future
-            // work: model these like CompiledParameters so the captured collection
-            // becomes a per-call lookup instead of a plan-baked closure.)
+            // invocation translates fresh against the live closure values. Run this
+            // detector only after a cache miss so normal hot cached queries do not
+            // pay a full tree walk on every execution.
             bool bypassPlanCache = ExpressionContainsKeyedSetByOp(filtered);
-
-            if (!bypassPlanCache && _planCache.TryGet(fingerprint, out var cached))
-            {
-                parameterValues = ExtractParameterValues(filtered, cached);
-                return cached;
-            }
 
             var localFiltered = filtered;
             QueryPlan plan;
