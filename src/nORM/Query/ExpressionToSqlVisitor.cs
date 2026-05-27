@@ -2520,19 +2520,21 @@ namespace nORM.Query
             if (node.Method.DeclaringType == typeof(Convert) && node.Arguments.Count == 1)
             {
                 var inner = GetSql(node.Arguments[0]);
-                var sqlType = node.Method.Name switch
+                var convertSql = node.Method.Name switch
                 {
-                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => "INTEGER",
-                    nameof(Convert.ToInt64) => "BIGINT",
-                    nameof(Convert.ToString) => "TEXT",
-                    nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => "REAL",
-                    nameof(Convert.ToDecimal) => "DECIMAL",
-                    nameof(Convert.ToBoolean) => "BOOLEAN",
+                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => _provider.GetIntCastSql(inner),
+                    nameof(Convert.ToInt64) => _provider.GetIntCastSql(inner, asLong: true),
+                    nameof(Convert.ToString) => _provider.GetToStringSql(inner),
+                    nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => _provider.GetRealCastSql(inner),
+                    nameof(Convert.ToDecimal) => _provider.GetRealCastSql(inner, asDecimal: true),
+                    nameof(Convert.ToBoolean) => node.Arguments[0].Type == typeof(string)
+                        ? GetStringToBoolSql(inner)
+                        : _provider.GetBoolCastSql(inner),
                     _ => null
                 };
-                if (sqlType != null)
+                if (convertSql != null)
                 {
-                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(sqlType).Append(')');
+                    _sql.Append(convertSql);
                     return node;
                 }
             }
@@ -2546,19 +2548,21 @@ namespace nORM.Query
                 && ctTypeConst.Value is Type ctTargetType)
             {
                 var inner = GetSql(node.Arguments[0]);
-                var ctSqlType = ctTargetType switch
+                var ctSql = ctTargetType switch
                 {
-                    var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => "INTEGER",
-                    var t when t == typeof(long) => "BIGINT",
-                    var t when t == typeof(string) => "TEXT",
-                    var t when t == typeof(double) || t == typeof(float) => "REAL",
-                    var t when t == typeof(decimal) => "DECIMAL",
-                    var t when t == typeof(bool) => "BOOLEAN",
+                    var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => _provider.GetIntCastSql(inner),
+                    var t when t == typeof(long) => _provider.GetIntCastSql(inner, asLong: true),
+                    var t when t == typeof(string) => _provider.GetToStringSql(inner),
+                    var t when t == typeof(double) || t == typeof(float) => _provider.GetRealCastSql(inner),
+                    var t when t == typeof(decimal) => _provider.GetRealCastSql(inner, asDecimal: true),
+                    var t when t == typeof(bool) => node.Arguments[0].Type == typeof(string)
+                        ? GetStringToBoolSql(inner)
+                        : _provider.GetBoolCastSql(inner),
                     _ => null
                 };
-                if (ctSqlType != null)
+                if (ctSql != null)
                 {
-                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(ctSqlType).Append(')');
+                    _sql.Append(ctSql);
                     return node;
                 }
             }
@@ -3605,6 +3609,9 @@ namespace nORM.Query
             _sql.Remove(start, _sql.Length - start);
             return segment;
         }
+
+        private string GetStringToBoolSql(string innerSql)
+            => $"(LOWER(LTRIM(RTRIM({_provider.GetToStringSql(innerSql)}))) = 'true')";
 
         // dtoCol [==/!=] dateTimeLiteral — see Bxxxx commit message: SQLite text
         // storage of DTOs needs UTC-instant comparison, not byte equality of
