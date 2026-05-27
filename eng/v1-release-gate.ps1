@@ -334,16 +334,13 @@ if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     }
 
     Invoke-Step 'benchmark threshold gate' {
-        $thresholdArgs = @(
-            '-ResultsDirectory',
-            $benchmarkResultsPath,
-            '-OutputDirectory',
-            $benchmarkEvidencePath,
-            '-ThresholdFile',
-            (Join-Path $root 'eng/benchmark-thresholds.json')
-        )
+        $thresholdArgs = @{
+            ResultsDirectory = $benchmarkResultsPath
+            OutputDirectory = $benchmarkEvidencePath
+            ThresholdFile = (Join-Path $root 'eng/benchmark-thresholds.json')
+        }
         if ($Mode -ne 'rc') {
-            $thresholdArgs += '-AllowMissingRules'
+            $thresholdArgs.AllowMissingRules = $true
         }
 
         & (Join-Path $root 'eng/check-benchmark-thresholds.ps1') @thresholdArgs
