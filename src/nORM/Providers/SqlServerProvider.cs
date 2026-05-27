@@ -66,6 +66,9 @@ namespace nORM.Providers
         // (e.g. WHERE (pk1, pk2) IN (SELECT ...)). Composite-PK CUD uses a JOIN form instead.
         internal override bool SupportsRowTupleComparison => false;
 
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"{sql} COLLATE Latin1_General_100_BIN2";
+
         private readonly IDbParameterFactory? _parameterFactory;
         private readonly bool _isDialectOnly;
 

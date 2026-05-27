@@ -2172,7 +2172,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var compareSql = ignoreCase ? $"LOWER({nameSql})" : nameSql;
+                    var compareSql = ignoreCase ? $"LOWER({nameSql})" : _provider.ForceCaseSensitiveStringComparison(nameSql);
                     _sql.Append("(").Append(compareSql).Append(" IN (");
                     for (int i = 0; i < names.Length; i++)
                     {
