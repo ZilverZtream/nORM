@@ -38,6 +38,10 @@ Current non-benchmark validation for the RC2 candidate:
   `1207/1207` live-provider tests passed.
 - Direct Release full-suite run with live provider environment configured:
   `9729/9729` tests passed.
+- Single-pass stress smoke for navigation, transaction, and compiled-query gate
+  groups: `107/107` tests passed.
+- Single-pass source-gen parity, bulk/provider parity, migration, cache, and
+  adversarial gate groups: `1484/1484` tests passed.
 
 Public-claim interpretation:
 
