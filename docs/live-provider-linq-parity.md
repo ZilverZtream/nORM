@@ -65,7 +65,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQL Server/Postgres/MySQL use native ordered aggregate (WITHIN GROUP / inline ORDER BY). SQLite uses outer ORDER BY to guide index scan order for GROUP_CONCAT. | `LinqAggregateStringConcatTests`, `LiveProviderRecentScvParityTests` |
-| LINQ `Aggregate` conditional-fold (`acc + (cond ? weight : 0)`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `SUM(CASE WHEN cond THEN weight ELSE 0 END)` via the existing Add-pattern rewrite. | `LinqAggregateConditionalFoldTests` |
+| LINQ `Aggregate` conditional-fold (`acc + (cond ? weight : 0)`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `SUM(CASE WHEN cond THEN weight ELSE 0 END)` via the existing Add-pattern rewrite. | `LinqAggregateConditionalFoldTests`, `LiveProviderRecentScvParityTests` |
 
 ### GroupBy / joins / set ops
 
@@ -111,7 +111,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests`, `LiveProviderEnumParityTests` |
 | `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to a provider-forced case-sensitive enum-name comparison; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests` |
+| `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests`, `LiveProviderNullableBoolParityTests` |
 | local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderContainsParityTests` |
 
 ### Compiled-query parity
