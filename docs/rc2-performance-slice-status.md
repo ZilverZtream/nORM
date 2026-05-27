@@ -33,6 +33,9 @@ Notable tight-but-passing ratios:
 
 Current non-benchmark validation for the RC2 candidate:
 
+- Full RC correctness gate with `-SkipBenchmark`: passed. The generated
+  `artifacts/v1-rc/rc-artifacts.md` manifest records the exact gate commit and
+  package hashes.
 - Quick release gate with `-SkipBenchmark`: passed.
 - Live provider gate with SQL Server, PostgreSQL, and MySQL configured:
   `1207/1207` live-provider tests passed.
