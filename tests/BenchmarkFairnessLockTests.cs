@@ -139,6 +139,7 @@ public sealed class BenchmarkFairnessLockTests
         var gate = ReadRepoFile("eng/v1-release-gate.ps1");
         var evidence = ReadRepoFile("eng/benchmark-evidence.ps1");
         var thresholdGate = ReadRepoFile("eng/check-benchmark-thresholds.ps1");
+        var sliceRunner = ReadRepoFile("eng/run-provider-benchmark-slice.ps1");
         var thresholds = ReadRepoFile("eng/benchmark-thresholds.json");
         var governance = ReadRepoFile("docs/benchmark-governance.md");
 
@@ -151,6 +152,9 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Tx + per row", governance);
         Assert.Contains("eng/benchmark-thresholds.json", governance);
         Assert.Contains("eng/check-benchmark-thresholds.ps1", governance);
+        Assert.Contains("--provider-matrix --provider", sliceRunner);
+        Assert.Contains("-AllowMissingRules", sliceRunner);
+        Assert.Contains("provider-slices", sliceRunner);
         Assert.Contains("Redact-ConnectionString", evidence);
         Assert.Contains("NORM_TEST_SQLSERVER", evidence);
         Assert.Contains("NORM_TEST_POSTGRES", evidence);
