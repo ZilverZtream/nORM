@@ -12,10 +12,10 @@ src/nORM/Internal/ExpressionCompiler.cs:149:IL2026
 src/nORM/Internal/ExpressionCompiler.cs:149:IL3050
 src/nORM/Internal/ExpressionCompiler.cs:414:IL2026
 src/nORM/Internal/ExpressionCompiler.cs:414:IL3050
-src/nORM/Internal/ExpressionCompiler.cs:570:IL2026
-src/nORM/Internal/ExpressionCompiler.cs:570:IL3050
-src/nORM/Internal/ExpressionCompiler.cs:609:IL2026
-src/nORM/Internal/ExpressionCompiler.cs:609:IL3050
+src/nORM/Internal/ExpressionCompiler.cs:572:IL2026
+src/nORM/Internal/ExpressionCompiler.cs:572:IL3050
+src/nORM/Internal/ExpressionCompiler.cs:611:IL2026
+src/nORM/Internal/ExpressionCompiler.cs:611:IL3050
 src/nORM/Internal/ExpressionCompiler.cs:99:IL2026
 src/nORM/Internal/ExpressionCompiler.cs:99:IL3050
 src/nORM/Mapping/Column.cs:148:IL3050
