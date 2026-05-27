@@ -15,6 +15,7 @@ instead of one noisy monolithic run:
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-223024` | SQLite, SQL Server | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-221104` | PostgreSQL | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-222018` | MySQL | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260528-001020` | SQL Server | Simple/runtime compiled and complex/runtime compiled after the compiled string-parameter reuse fix | Passed threshold gate |
 
 The earlier monolithic run is retained only as a failed-run diagnostic because
 it mixed provider output and failed during the PostgreSQL phase. The RC gate now
