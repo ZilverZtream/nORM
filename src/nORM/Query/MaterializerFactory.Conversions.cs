@@ -74,6 +74,7 @@ namespace nORM.Query
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DateOnly ConvertToDateOnly(object value)
         {
+            if (value is DateOnly d0) return d0;
             if (value is DateTime dt) return DateOnly.FromDateTime(dt);
             if (value is string s)
             {
@@ -93,6 +94,7 @@ namespace nORM.Query
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static TimeOnly ConvertToTimeOnly(object value)
         {
+            if (value is TimeOnly t0) return t0;
             if (value is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
             if (value is DateTime dt) return TimeOnly.FromDateTime(dt);
             if (value is string s) return TimeOnly.Parse(s, CultureInfo.InvariantCulture);

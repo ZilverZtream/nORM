@@ -54,19 +54,19 @@ the matrix notes an explicit deterministic failure contract.
 
 | Feature | Coverage |
 | --- | --- |
-| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs` |
+| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareTo` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqConversionAndCompareTests.cs` |
 | `string.Format` / interpolated strings | `tests/LinqStringFormatTranslationTests.cs`, `tests/LinqProjectionStringFormatTests.cs`, `tests/LinqProjectionStringFormatColumnsTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/StringFormatSpecProviderShapeTests.cs`, `tests/StringFormatAlignmentProviderShapeTests.cs` |
 | `Convert.ToInt32` / `ToInt64` / `ToString` / `ToBoolean` / `ToDouble` / `ToDecimal` / etc. | `tests/LinqConversionAndCompareTests.cs` |
-| `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | `tests/LinqMathFunctionTranslationTests.cs` |
-| `DateTime` members: `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`, `DayOfYear`, `DayOfWeek`, `Date` | `tests/LinqDateTimeMemberTranslationTests.cs` |
-| `DateTime.AddDays` / `AddMonths` / `AddYears` / `AddHours` / `AddMinutes` / `AddSeconds` | `tests/LinqDateTimeMemberTranslationTests.cs` |
+| `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | `tests/LinqMathFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
+| `DateTime` members: `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`, `DayOfYear`, `DayOfWeek`, `Date` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
+| `DateTime.AddDays` / `AddMonths` / `AddYears` / `AddHours` / `AddMinutes` / `AddSeconds` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `DateTime.UtcNow` / `DateTime.Now` / `DateTime.Today` in predicates | `tests/LinqDateTimeNowTests.cs` |
 | `DateTimeOffset` members | `tests/LinqDateTimeOffsetMemberTests.cs` |
 | `TimeSpan` member access on a stored TimeSpan column (`r.Duration.TotalSeconds`, `.Days`, etc.) | `tests/LinqProjectionTimeSpanTotalsTests.cs` |
 | `DateTime`/`DateTimeOffset` subtraction TimeSpan members (`(r.End - r.Start).TotalHours`, `.TotalDays`, `.TotalSeconds`, `.TotalMinutes`, `.TotalMilliseconds`, `.Days`, `.Hours`, `.Minutes`, `.Seconds`) | `tests/LinqDateTimeArithmeticTests.cs`, `tests/LiveProviderDateTimeSubtractionPrecisionTests.cs` |
-| `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs` |
-| `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs` |
+| `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
+| `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderNullableBoolParityTests.cs` |
 | `Convert.ChangeType(col, typeof(T))` with `Type` constant | `tests/LinqConvertChangeTypeOnColumnTests.cs` |
 | `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
