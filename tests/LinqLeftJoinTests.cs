@@ -13,14 +13,13 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the supported and unsupported shapes of LEFT JOIN composition.
+/// Pins the supported LEFT JOIN composition shapes.
 ///
-/// Supported today (navigation form): `SelectMany(p => p.Children.DefaultIfEmpty(), ...)` —
+/// Navigation form: `SelectMany(p => p.Children.DefaultIfEmpty(), ...)` —
 /// emits LEFT JOIN with the relation's FK predicate.
 ///
-/// Unsupported today (query-syntax form): `from p in P join c in C on p.Id equals c.Pid into
-/// grp from c in grp.DefaultIfEmpty() select projection(p, c)` — requires a deeper
-/// MaterializeGroupJoin rework. Throws NormUnsupportedFeatureException with a rewrite hint.
+/// Query-syntax form: `from p in P join c in C on p.Id equals c.Pid into
+/// grp from c in grp.DefaultIfEmpty() select projection(p, c)` also emits LEFT JOIN.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqLeftJoinTests : IAsyncLifetime
