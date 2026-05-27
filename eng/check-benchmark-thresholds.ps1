@@ -7,6 +7,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+$invariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
+
+function Format-InvariantNumber {
+    param([object]$Value)
+
+    if ($Value -is [double] -or $Value -is [float] -or $Value -is [decimal]) {
+        return $Value.ToString('0.###', $invariantCulture)
+    }
+
+    return [string]$Value
+}
 
 function Get-FullInputPath {
     param([string]$Path)
@@ -217,11 +228,11 @@ foreach ($rule in $thresholds.rules) {
         $results.Add($result)
 
         if ($meanRatio -gt [double]$rule.maxMeanRatio) {
-            $violations.Add("Mean threshold failed for '$($rule.name)' provider '$provider': $($target.Method) $($target.Mean) vs $($baseline.Method) $($baseline.Mean), ratio $([Math]::Round($meanRatio, 3)) > $($rule.maxMeanRatio).")
+            $violations.Add("Mean threshold failed for '$($rule.name)' provider '$provider': $($target.Method) $($target.Mean) vs $($baseline.Method) $($baseline.Mean), ratio $(Format-InvariantNumber ([Math]::Round($meanRatio, 3))) > $(Format-InvariantNumber $rule.maxMeanRatio).")
         }
 
         if ($allocatedRatio -gt [double]$rule.maxAllocatedRatio) {
-            $violations.Add("Allocation threshold failed for '$($rule.name)' provider '$provider': $($target.Method) $($target.Allocated) vs $($baseline.Method) $($baseline.Allocated), ratio $([Math]::Round($allocatedRatio, 3)) > $($rule.maxAllocatedRatio).")
+            $violations.Add("Allocation threshold failed for '$($rule.name)' provider '$provider': $($target.Method) $($target.Allocated) vs $($baseline.Method) $($baseline.Allocated), ratio $(Format-InvariantNumber ([Math]::Round($allocatedRatio, 3))) > $(Format-InvariantNumber $rule.maxAllocatedRatio).")
         }
     }
 }
@@ -249,7 +260,7 @@ $lines.Add('')
 $lines.Add('| Rule | Provider | Target | Baseline | Mean ratio | Allocation ratio |')
 $lines.Add('| --- | --- | --- | --- | --- | --- |')
 foreach ($result in $results) {
-    $lines.Add(('| {0} | {1} | `{2}` {3} | `{4}` {5} | {6}/{7} | {8}/{9} |' -f $result.Rule, $result.Provider, $result.TargetMethod, $result.TargetMean, $result.BaselineMethod, $result.BaselineMean, $result.MeanRatio, $result.MaxMeanRatio, $result.AllocatedRatio, $result.MaxAllocatedRatio))
+    $lines.Add(('| {0} | {1} | `{2}` {3} | `{4}` {5} | {6}/{7} | {8}/{9} |' -f $result.Rule, $result.Provider, $result.TargetMethod, $result.TargetMean, $result.BaselineMethod, $result.BaselineMean, (Format-InvariantNumber $result.MeanRatio), (Format-InvariantNumber $result.MaxMeanRatio), (Format-InvariantNumber $result.AllocatedRatio), (Format-InvariantNumber $result.MaxAllocatedRatio)))
 }
 
 if ($violations.Count -gt 0) {
