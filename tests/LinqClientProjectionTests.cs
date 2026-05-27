@@ -5,16 +5,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
-using nORM.Configuration;
 using nORM.Providers;
 using Xunit;
 
 namespace nORM.Tests;
 
 /// <summary>
-/// Verifies projections that require client-side evaluation: interpolated strings, string.Format,
-/// and user-defined helper methods. The SQL side fetches the raw columns, the client-side path
-/// reconstructs the projected value. Uses ClientEvaluationPolicy.Allow so the fallback engages.
+/// Verifies common string-building projections that used to require client
+/// evaluation but now translate through provider concatenation.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqClientProjectionTests : IAsyncLifetime
@@ -35,8 +33,7 @@ public class LinqClientProjectionTests : IAsyncLifetime
                 (3, 'Linus', 'Torvalds');
             """;
         await cmd.ExecuteNonQueryAsync();
-        _ctx = new DbContext(_cn, new SqliteProvider(),
-            new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow });
+        _ctx = new DbContext(_cn, new SqliteProvider());
     }
 
     public async Task DisposeAsync()
@@ -46,11 +43,14 @@ public class LinqClientProjectionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Interpolated_string_in_projection_runs_client_side()
+    public async Task Interpolated_string_in_projection_translates_server_side()
     {
-        var rows = (await _ctx.Query<CpRow>().OrderBy(r => r.Id)
-            .Select(r => new { r.Id, FullName = $"{r.First} {r.Last}" })
-            .ToListAsync())
+        var query = _ctx.Query<CpRow>().OrderBy(r => r.Id)
+            .Select(r => new { r.Id, FullName = $"{r.First} {r.Last}" });
+        var sql = query.ToString();
+        Assert.Contains("||", sql, StringComparison.Ordinal);
+
+        var rows = (await query.ToListAsync())
             .ToArray();
         Assert.Equal(3, rows.Length);
         Assert.Equal("Ada Lovelace", rows[0].FullName);
@@ -59,11 +59,14 @@ public class LinqClientProjectionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task StringFormat_in_projection_runs_client_side()
+    public async Task StringFormat_in_projection_translates_server_side()
     {
-        var rows = (await _ctx.Query<CpRow>().OrderBy(r => r.Id)
-            .Select(r => new { r.Id, Display = string.Format("{0}, {1}", r.Last, r.First) })
-            .ToListAsync())
+        var query = _ctx.Query<CpRow>().OrderBy(r => r.Id)
+            .Select(r => new { r.Id, Display = string.Format("{0}, {1}", r.Last, r.First) });
+        var sql = query.ToString();
+        Assert.Contains("||", sql, StringComparison.Ordinal);
+
+        var rows = (await query.ToListAsync())
             .ToArray();
         Assert.Equal("Lovelace, Ada", rows[0].Display);
         Assert.Equal("Torvalds, Linus", rows[2].Display);

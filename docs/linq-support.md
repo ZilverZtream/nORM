@@ -23,7 +23,7 @@ Status values:
 | `Select` into DTO with positional record | Supported | Constructor parameter names matched against projected member names. |
 | `Select` into DTO with parameterized class constructor | Supported | Same constructor-match rule as records. |
 | `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | Supported | `MemberInit` projections bind each assignment to the DTO property; navigation-collection assignments are skipped. |
-| `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. `string.Format` and interpolated strings fall into this path. |
+| `Select` with custom client logic | Constrained | Controlled by `DbContextOptions.ClientEvaluationPolicy`. The v1 default is `Throw`; `Warn` logs and allows the projection tail after server materialization, and `Allow` permits it silently. User-defined helper methods fall into this path. |
 | `OrderBy`, `ThenBy` | Supported | Including the `Descending` variants. Provider-specific identifier escaping and expression translation apply. |
 | `Reverse` | Supported | Flips the active ORDER BY direction at the SQL layer. |
 | `Skip`, `Take` | Supported | Provider-specific paging. `Skip(m).Take(n)` is the canonical pagination shape. `Take(n).Skip(m)` works with both literal counts (rewritten algebraically to `Skip(m).Take(n - m)`) and runtime parameters (emits `LIMIT (@take - @skip) OFFSET @skip` so the runtime values still produce the [skip, take) window). |
@@ -66,7 +66,7 @@ Status values:
 | --- | --- | --- |
 | `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | Supported | Provider-specific syntax. |
 | `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareTo` | Supported | `Compare` / `CompareTo` emit a `CASE` returning `-1` / `0` / `1`. |
-| `string.Format` / interpolated strings | Constrained | Run via the client-side projection split under `ClientEvaluationPolicy.Allow` or `Warn`. |
+| `string.Format` / interpolated strings | Supported | Constant templates with positional placeholders lower to provider concatenation. Fixed numeric specs (`F<N>`), common date/time tokens (`yyyy`, `yy`, `MM`, `dd`, `HH`, `mm`, `ss`), and alignment are translated through provider hooks. Locale-aware/custom .NET formatting outside that subset remains client-projection work. |
 | `Convert.ToInt32` / `ToInt64` / `ToString` / `ToBoolean` / `ToDouble` / `ToDecimal` / etc. | Supported | Emit a provider `CAST`. |
 | `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | Supported | Per-provider mapping (`LEAST`/`GREATEST` on PG/MySQL, `CASE` for SQL Server `Min`/`Max`, etc.). |
 | `DateTime` members: `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`, `DayOfYear`, `DayOfWeek`, `Date` | Supported | Provider-specific extraction; `DayOfWeek` normalized to `System.DayOfWeek` (`0`=Sun..`6`=Sat) on every provider. |
