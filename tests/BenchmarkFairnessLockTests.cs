@@ -159,7 +159,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("maxAllocatedRatio", thresholds);
         Assert.Contains("Query_Complex_nORM", thresholds);
         Assert.Contains("Query_Join_nORM_Compiled", thresholds);
-        Assert.Contains("BulkInsert_Batched_nORM", thresholds);
+        Assert.Contains("BulkInsert_Idiomatic_nORM", thresholds);
         Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
         Assert.Contains("Convert-AllocatedToBytes", thresholdGate);
         Assert.Contains("Benchmark threshold check failed", thresholdGate);
