@@ -29,6 +29,8 @@ namespace nORM.Providers
         /// </summary>
         public override bool PrefersSyncExecution => true;
 
+        internal override bool SupportsQueryPlanPreparedCommandCache => true;
+
         /// <summary>
         /// Bare boolean predicates avoid steering SQLite toward low-selectivity boolean indexes
         /// when a more selective conjunct is available.
