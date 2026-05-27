@@ -437,11 +437,13 @@ namespace nORM.Internal
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         private static void ApplyPreparedParameterSizeHint(DbCommand cmd, DbParameter parameter)
         {
-            if (parameter.DbType is DbType.String or DbType.AnsiString or DbType.StringFixedLength or DbType.AnsiStringFixedLength)
+            var isSqlClient = cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand";
+            if (isSqlClient &&
+                parameter.DbType is DbType.String or DbType.AnsiString or DbType.StringFixedLength or DbType.AnsiStringFixedLength)
                 parameter.Size = ParameterOptimizer.MaxInlineStringSize;
             else if (parameter.DbType == DbType.Binary)
                 parameter.Size = -1;
-            else if (cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand" && parameter.Size == 0)
+            else if (isSqlClient && parameter.Size == 0)
                 parameter.Size = 1;
         }
 
