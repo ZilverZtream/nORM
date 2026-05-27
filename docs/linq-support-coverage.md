@@ -54,8 +54,8 @@ the matrix notes an explicit deterministic failure contract.
 
 | Feature | Coverage |
 | --- | --- |
-| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
-| `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareTo` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqConversionAndCompareTests.cs` |
+| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
+| `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareTo` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqConversionAndCompareTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
 | `string.Format` / interpolated strings | `tests/LinqStringFormatTranslationTests.cs`, `tests/LinqProjectionStringFormatTests.cs`, `tests/LinqProjectionStringFormatColumnsTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/StringFormatSpecProviderShapeTests.cs`, `tests/StringFormatAlignmentProviderShapeTests.cs` |
 | `Convert.ToInt32` / `ToInt64` / `ToString` / `ToBoolean` / `ToDouble` / `ToDecimal` / etc. | `tests/LinqConversionAndCompareTests.cs` |
 | `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | `tests/LinqMathFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
