@@ -456,6 +456,9 @@ namespace nORM.Query
                     return Visit(asContains);
                 }
             }
+            if (TryEmitDateTimeOffsetLiteralComparison(node))
+                return node;
+
             if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
             {
                 bool leftNull  = IsNullExpression(node.Left);
@@ -482,7 +485,7 @@ namespace nORM.Query
                 // For reference types (string, class): only expand when BOTH sides could be null
                 // at runtime (i.e., neither side is a known non-null constant or parameter).
                 // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
-                // DateTimeOffset col == DateTime literal: SQLite stores DTOs as
+                // DateTimeOffset col vs DateTime literal: SQLite stores DTOs as
                 // text with an offset suffix and the literal binds as offset-less
                 // text, so naive equality misses rows storing the same UTC instant
                 // in a different offset. Lower to UTC epoch-millisecond comparison via
@@ -490,7 +493,7 @@ namespace nORM.Query
                 // treats Utc-kind as offset 0 and Unspecified/Local as the local
                 // offset (we use the snapshot offset, consistent with
                 // GetDateTimeOffsetLocalDateTimeSql).
-                if (TryEmitDateTimeOffsetEqualsLiteral(node))
+                if (TryEmitDateTimeOffsetLiteralComparison(node))
                     return node;
 
                 if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
@@ -3617,24 +3620,29 @@ namespace nORM.Query
         // storage of DTOs needs UTC-instant comparison, not byte equality of
         // canonical text. Snapshot semantics mirror [[dto-local-datetime]] for
         // the DateTime.Kind=Unspecified / Local conversion.
-        private bool TryEmitDateTimeOffsetEqualsLiteral(BinaryExpression node)
+        private bool TryEmitDateTimeOffsetLiteralComparison(BinaryExpression node)
         {
-            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual))
+            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual))
                 return false;
 
             var leftType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
             var rightType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
 
             Expression colSide; Expression litSide;
+            bool columnOnLeft;
             if (leftType == typeof(DateTimeOffset) && IsColumnReference(node.Left))
             {
                 colSide = node.Left;
                 litSide = node.Right;
+                columnOnLeft = true;
             }
             else if (rightType == typeof(DateTimeOffset) && IsColumnReference(node.Right))
             {
                 colSide = node.Right;
                 litSide = node.Left;
+                columnOnLeft = false;
             }
             else return false;
 
@@ -3664,12 +3672,31 @@ namespace nORM.Query
             var colSql = GetSql(colSide);
             var epochSql = _provider.GetDateTimeOffsetUtcEpochMillisecondsSql(colSql);
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _sql.Append("(").Append(epochSql);
-            _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
-            _sql.AppendParameterizedValue(paramName, epochMs, _paramSink);
+            _sql.Append("(");
+            if (columnOnLeft)
+            {
+                _sql.Append(epochSql).Append(ComparisonSql(node.NodeType));
+                _sql.AppendParameterizedValue(paramName, epochMs, _paramSink);
+            }
+            else
+            {
+                _sql.AppendParameterizedValue(paramName, epochMs, _paramSink);
+                _sql.Append(ComparisonSql(node.NodeType)).Append(epochSql);
+            }
             _sql.Append(")");
             return true;
         }
+
+        private static string ComparisonSql(ExpressionType nodeType) => nodeType switch
+        {
+            ExpressionType.Equal => " = ",
+            ExpressionType.NotEqual => " <> ",
+            ExpressionType.GreaterThan => " > ",
+            ExpressionType.GreaterThanOrEqual => " >= ",
+            ExpressionType.LessThan => " < ",
+            ExpressionType.LessThanOrEqual => " <= ",
+            _ => throw new InvalidOperationException($"Unsupported comparison node '{nodeType}'.")
+        };
         /// <summary>
         /// Delegates to the shared ExpressionValueExtractor utility for consistent behavior.
         /// </summary>
