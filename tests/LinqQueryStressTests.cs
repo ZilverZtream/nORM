@@ -149,13 +149,13 @@ public class LinqQueryStressTests
         Assert.Equal(85, results.Count);
     }
 
-    // ── Test 2: Large IN clause via raw SQL (nORM Contains not supported) ─
+    // ── Test 2: Large range filter cardinality ─
 
     /// <summary>
     /// Query 500 specific rows from 1000 total using a targeted Value range filter.
     /// Asserts exactly the right number of rows returned with no duplicates.
-    /// (nORM does not support List.Contains translation to SQL IN clause.
-    ///  We use a range filter instead which achieves the same adversarial goal.)
+    /// Large local-collection Contains/IN coverage lives in dedicated LINQ
+    /// parity tests; this stress test keeps the range-filter adversarial case.
     /// </summary>
     [Fact]
     public async Task LargeValueRangeFilter_500Rows_CorrectCount()
