@@ -1062,29 +1062,10 @@ namespace nORM.Query
                         else
                         {
                             if (seg.ArgIndex >= argExprs.Count) goto fallthrough;
-                            var arg = UnwrapFormatObjectConvert(argExprs[seg.ArgIndex]);
+                            var arg = argExprs[seg.ArgIndex];
                             var inner = TranslateProjectionArg(arg);
-                            if (seg.FormatSpec != null)
-                            {
-                                inner = ApplyFormatSpecToArg(inner, arg.Type, seg.FormatSpec)
-                                    ?? throw new InvalidOperationException(
-                                        $"string.Format spec '{{{seg.ArgIndex}:{seg.FormatSpec}}}' is not supported in projection. " +
-                                        "Supported subset: numeric F<N>/f<N> and DateTime tokens yyyy/yy/MM/dd/HH/mm/ss.");
-                            }
-                            else if (arg.Type != typeof(string))
-                            {
+                            if (arg.Type != typeof(string))
                                 inner = _provider.GetToStringSql(inner);
-                            }
-                            if (seg.Alignment != 0)
-                            {
-                                var width = Math.Abs(seg.Alignment).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                                var padded = seg.Alignment > 0
-                                    ? _provider.TranslateFunction(nameof(string.PadLeft), typeof(string), inner, width)
-                                    : _provider.TranslateFunction(nameof(string.PadRight), typeof(string), inner, width);
-                                inner = padded
-                                    ?? throw new InvalidOperationException(
-                                        $"string.Format alignment '{{{seg.ArgIndex},{seg.Alignment}}}' is not supported by provider '{_provider.GetType().Name}'.");
-                            }
                             parts.Add(inner);
                         }
                     }
@@ -1423,50 +1404,13 @@ namespace nORM.Query
             }
         }
 
-        private static Expression UnwrapFormatObjectConvert(Expression arg)
-        {
-            if (arg is UnaryExpression u
-                && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked)
-                && u.Type == typeof(object))
-            {
-                return u.Operand;
-            }
-
-            return arg;
-        }
-
-        private string? ApplyFormatSpecToArg(string argSql, Type argType, string spec)
-        {
-            var underlying = Nullable.GetUnderlyingType(argType) ?? argType;
-            if (spec.Length >= 2
-                && (spec[0] == 'F' || spec[0] == 'f')
-                && int.TryParse(spec.AsSpan(1), out var digits)
-                && digits >= 0
-                && digits <= 28)
-            {
-                return _provider.FormatFixedDecimalSql(argSql, digits);
-            }
-
-            if (underlying == typeof(DateTime)
-                || underlying == typeof(DateTimeOffset)
-                || underlying == typeof(DateOnly)
-                || underlying == typeof(TimeOnly))
-            {
-                return _provider.FormatDateUsingDotNetPattern(argSql, spec);
-            }
-
-            return null;
-        }
-
         private readonly struct FormatSegment
         {
             public readonly bool IsLiteral;
             public readonly string? Literal;
             public readonly int ArgIndex;
-            public readonly string? FormatSpec;
-            public readonly int Alignment;
-            public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; FormatSpec = null; Alignment = 0; }
-            public FormatSegment(int i, string? f, int a) { IsLiteral = false; Literal = null; ArgIndex = i; FormatSpec = f; Alignment = a; }
+            public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; }
+            public FormatSegment(int i) { IsLiteral = false; Literal = null; ArgIndex = i; }
         }
 
         /// <summary>
@@ -1529,29 +1473,9 @@ namespace nORM.Query
                     int end = template.IndexOf('}', i + 1);
                     if (end < 0) return null;
                     var inner = template.Substring(i + 1, end - i - 1);
-                    if (inner.Length == 0) return null;
-                    string indexPart = inner;
-                    string? alignmentPart = null;
-                    string? spec = null;
-                    int colon = inner.IndexOf(':');
-                    if (colon >= 0)
-                    {
-                        spec = inner.Substring(colon + 1);
-                        if (spec.Length == 0) return null;
-                        indexPart = inner.Substring(0, colon);
-                    }
-                    int comma = indexPart.IndexOf(',');
-                    if (comma >= 0)
-                    {
-                        alignmentPart = indexPart.Substring(comma + 1);
-                        indexPart = indexPart.Substring(0, comma);
-                        if (alignmentPart.Length == 0) return null;
-                    }
-                    if (!int.TryParse(indexPart, out var argIdx) || argIdx < 0) return null;
-                    int alignment = 0;
-                    if (alignmentPart != null && !int.TryParse(alignmentPart, out alignment))
-                        return null;
-                    segments.Add(new FormatSegment(argIdx, spec, alignment));
+                    if (inner.Length == 0 || inner.IndexOfAny(new[] { ',', ':' }) >= 0) return null;
+                    if (!int.TryParse(inner, out var argIdx) || argIdx < 0) return null;
+                    segments.Add(new FormatSegment(argIdx));
                     i = end + 1;
                 }
                 else if (c == '}')
