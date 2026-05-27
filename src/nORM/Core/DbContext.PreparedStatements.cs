@@ -248,6 +248,13 @@ namespace nORM.Core
                     return ExecuteWithHydrateAsync(entity, ct);
                 }
 
+                if (_context.Provider.PrefersSyncFastPathExecution
+                    && _context.Options.CommandInterceptors.Count == 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(_command.ExecuteNonQuery());
+                }
+
                 return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
             }
 
@@ -294,11 +301,32 @@ namespace nORM.Core
             {
                 if (_hydrateGeneratedKeysFromCommand)
                 {
+                    if (_context.Provider.PrefersSyncFastPathExecution
+                        && _context.Options.CommandInterceptors.Count == 0)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var recordsAffectedSync = _command.ExecuteNonQuery();
+                        var commandGeneratedIdSync = _context.Provider.GetCommandGeneratedKey(_command, _mapping);
+                        if (commandGeneratedIdSync != null && commandGeneratedIdSync != DBNull.Value)
+                            _mapping.SetPrimaryKey(entity, commandGeneratedIdSync);
+                        return recordsAffectedSync;
+                    }
+
                     var recordsAffected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
                     var commandGeneratedId = _context.Provider.GetCommandGeneratedKey(_command, _mapping);
                     if (commandGeneratedId != null && commandGeneratedId != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, commandGeneratedId);
                     return recordsAffected;
+                }
+
+                if (_context.Provider.PrefersSyncFastPathExecution
+                    && _context.Options.CommandInterceptors.Count == 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var newIdSync = _command.ExecuteScalar();
+                    if (newIdSync != null && newIdSync != DBNull.Value)
+                        _mapping.SetPrimaryKey(entity, newIdSync);
+                    return 1;
                 }
 
                 var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
