@@ -77,8 +77,8 @@ the matrix notes an explicit deterministic failure contract.
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional shapes) | `tests/LinqAggregateMinMaxFoldTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | `tests/LinqAggregateStringConcatTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | `Enum.TryParse<T>(stringCol, out T)` as WHERE predicate | `tests/LinqEnumTryParseOutParamTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
-| Conditional expressions (`cond ? a : b`) in `Where` and `Select` | `tests/LinqEnumAndConditionalTests.cs` |
-| Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs` |
+| Conditional expressions (`cond ? a : b`) in `Where` and `Select` | `tests/LinqEnumAndConditionalTests.cs`, `tests/LiveProviderConditionalArithmeticParityTests.cs` |
+| Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs`, `tests/LiveProviderConditionalArithmeticParityTests.cs` |
 | Enum equality and `(int)enumCol` projection | `tests/LinqEnumAndConditionalTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
 | Enum `.ToString()` in projection | `tests/LinqEnumToStringTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs`, `tests/LiveProviderContainsParityTests.cs` |
