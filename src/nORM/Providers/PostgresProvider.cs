@@ -27,6 +27,8 @@ namespace nORM.Providers
         internal override bool SupportsQueryPlanPreparedCommandCache => true;
         internal override bool PrefersSyncFastPathExecution => true;
 
+        internal override bool PrefersSyncCompiledQueryExecution => true;
+
         internal override bool PrefersSyncQueryPlanExecution => true;
 
         /// <summary>
