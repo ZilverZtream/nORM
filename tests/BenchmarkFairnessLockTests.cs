@@ -163,6 +163,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Query_Complex_nORM", thresholds);
         Assert.Contains("Query_Join_nORM", thresholds);
         Assert.Contains("Query_Join_nORM_Compiled", thresholds);
+        Assert.Contains("Count_nORM", thresholds);
         Assert.Contains("BulkInsert_Idiomatic_nORM", thresholds);
         Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
         Assert.Contains("Convert-AllocatedToBytes", thresholdGate);

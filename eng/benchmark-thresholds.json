@@ -63,6 +63,16 @@
       "rationale": "Runtime joins are a public LINQ path and were a prior regression cluster. The 1.5x ceiling allows normal expression-shape lookup overhead while ensuring runtime joins stay competitive with typed Dapper and ordinal Raw ADO for the same provider and projection."
     },
     {
+      "name": "Count stays within Dapper or optimized Raw ADO range",
+      "provider": "*",
+      "targetMethods": [ "Count_nORM" ],
+      "baselineMethods": [ "Count_Dapper", "Count_RawAdo_Optimized" ],
+      "maxMeanRatio": 1.25,
+      "maxAllocatedRatio": 2.0,
+      "required": true,
+      "rationale": "Count is a core LINQ aggregate and has a dedicated fast path. It should remain within a tight 1.25x budget against typed Dapper or optimized Raw ADO for the same provider, and preferably beat them on providers where pooled scalar execution is effective."
+    },
+    {
       "name": "BulkInsertAsync stays within EF or Dapper transaction range",
       "provider": "*",
       "targetMethods": [ "BulkInsert_Idiomatic_nORM" ],
