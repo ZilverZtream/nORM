@@ -31,7 +31,7 @@ Notable tight-but-passing ratios:
 - After the pooled-plan guard fix, MySQL runtime join improved to `1.038/1.5`
   and MySQL complex compiled remained inside budget at `1.027/1.4`.
 
-Current non-benchmark validation for RC2 candidate `c3f1aa8`:
+Current non-benchmark validation for RC2 candidate `6f588a9`:
 
 - Quick release gate with `-SkipBenchmark`: passed.
 - Live provider gate with SQL Server, PostgreSQL, and MySQL configured:
