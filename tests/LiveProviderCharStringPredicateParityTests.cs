@@ -243,4 +243,41 @@ public class LiveProviderCharStringPredicateParityTests
             finally { await TeardownAsync(ctx, kind); }
         }
     }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task String_format_and_interpolation_project_expected_values(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupAsync(ctx, kind);
+            try
+            {
+                var rows = await ctx.Query<StrPredRow>()
+                    .Where(r => r.Id <= 2)
+                    .OrderBy(r => r.Id)
+                    .Select(r => new
+                    {
+                        Format = string.Format("{0}:{1}", r.Code, r.Id),
+                        Interpolated = $"{r.Code}-{r.Id}"
+                    })
+                    .ToListAsync();
+
+                Assert.Equal(2, rows.Count);
+                Assert.Equal("1:1", rows[0].Format);
+                Assert.Equal("1-1", rows[0].Interpolated);
+                Assert.Equal("ab:2", rows[1].Format);
+                Assert.Equal("ab-2", rows[1].Interpolated);
+            }
+            finally { await TeardownAsync(ctx, kind); }
+        }
+    }
 }
