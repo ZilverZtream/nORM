@@ -51,7 +51,8 @@ public sealed class BenchmarkFairnessLockTests
     {
         var code = ReadRepoFile("benchmarks/ProviderMatrixBenchmarks.cs");
 
-        Assert.Contains("[Params(\"Sqlite\", \"SqlServer\", \"Postgres\", \"MySql\")]", code);
+        Assert.Contains("[ParamsSource(nameof(Providers))]", code);
+        Assert.Contains("public static IReadOnlyList<string> SelectedProviders", code);
         Assert.Contains("NORM_TEST_MYSQL", code);
         Assert.Contains("Query_Simple_EfCore_Compiled", code);
         Assert.Contains("Query_Simple_nORM_Compiled", code);
