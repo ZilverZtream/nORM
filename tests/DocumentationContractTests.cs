@@ -521,9 +521,12 @@ public class DocumentationContractTests
 
         Assert.Contains("eng/rc-artifact-manifest.ps1", gates, StringComparison.Ordinal);
         Assert.Contains("artifacts/v1-rc/", gates, StringComparison.Ordinal);
+        Assert.Contains("provider-specific slices", gates, StringComparison.Ordinal);
         Assert.Contains("rc-artifacts.md", checklist, StringComparison.Ordinal);
         Assert.Contains("RC artifact manifest", gateScript, StringComparison.Ordinal);
         Assert.Contains("rc-artifact-manifest.ps1", gateScript, StringComparison.Ordinal);
+        Assert.Contains("run-provider-benchmark-slice.ps1", gateScript, StringComparison.Ordinal);
+        Assert.Contains("provider-slices", gateScript, StringComparison.Ordinal);
         Assert.Contains("TestResults", manifestScript, StringComparison.Ordinal);
         Assert.Contains("BenchmarkArtifacts", manifestScript, StringComparison.Ordinal);
         Assert.Contains("ReleaseEvidence", manifestScript, StringComparison.Ordinal);

@@ -319,8 +319,22 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
         throw 'Provider matrix benchmark requires SQL Server, PostgreSQL, and MySQL live connection strings.'
     }
 
-    Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark' {
-        Invoke-BenchmarkStep @('--provider-matrix', '--filter', $ProviderMatrixBenchmarkFilter)
+    Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark slices' {
+        $sliceRoot = Join-Path $root 'BenchmarkDotNet.Artifacts/provider-slices'
+        & (Join-Path $root 'eng/run-provider-benchmark-slice.ps1') `
+            -Providers 'Sqlite,SqlServer,Postgres,MySql' `
+            -Filters $ProviderMatrixBenchmarkFilter `
+            -Configuration $Configuration `
+            -OutputRoot $sliceRoot
+
+        $latestSlice = Get-ChildItem -LiteralPath $sliceRoot -Directory |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+        if (-not $latestSlice) {
+            throw "Provider matrix benchmark slices produced no run directory under $sliceRoot."
+        }
+
+        $script:benchmarkResultsPath = Join-Path $latestSlice.FullName 'results'
     }
 }
 

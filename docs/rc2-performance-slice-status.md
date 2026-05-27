@@ -1,37 +1,42 @@
 # RC2 Performance Slice Status
 
-This file records the focused provider-sliced benchmark evidence gathered while
+This file records focused provider-sliced benchmark evidence gathered while
 hardening the v1 performance claims. It is not a replacement for the full RC
 release gate; it is the fast loop used to isolate and verify public benchmark
 budgets before spending hours on the full gate.
 
-All slices below were run from isolated git worktrees because local agent
-worktrees under `.claude/` make BenchmarkDotNet discover duplicate benchmark
-project names when it runs directly from the main checkout.
+## Current Evidence
+
+The latest RC2 benchmark loop ran the public provider matrix as provider chunks
+instead of one noisy monolithic run:
 
 | Slice | Providers | Public budget coverage | Result |
 | --- | --- | --- | --- |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-143000` | SQLite, SQL Server, PostgreSQL, MySQL | Simple runtime and compiled queries | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-141847` | SQLite, PostgreSQL | Complex runtime and compiled queries | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-144133` | SQL Server, MySQL | Complex runtime/compiled queries and runtime/compiled joins | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-141512` | SQLite, PostgreSQL | Runtime and compiled joins | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-143655` | SQLite, SQL Server, PostgreSQL, MySQL | Count | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-142235` | SQLite, SQL Server, PostgreSQL, MySQL | Single insert | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-142633` | SQLite, SQL Server, PostgreSQL, MySQL | Idiomatic `BulkInsertAsync` | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-154725` | SQLite, PostgreSQL | Simple runtime and compiled queries after pooled-plan guard fix | Passed |
-| `BenchmarkDotNet.Artifacts/provider-slices/20260527-164414` | MySQL | Complex runtime/compiled queries and runtime/compiled joins after pooled-plan guard fix | Passed |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260527-223024` | SQLite, SQL Server | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260527-221104` | PostgreSQL | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260527-222018` | MySQL | Simple/runtime compiled, join/runtime compiled, complex/runtime compiled, count, single insert, idiomatic bulk, batched bulk | Passed threshold gate |
 
-Notable tight-but-passing ratios:
+The earlier monolithic run is retained only as a failed-run diagnostic because
+it mixed provider output and failed during the PostgreSQL phase. The RC gate now
+uses provider-specific slices for the matrix so each provider has isolated logs
+and CSV reports before the merged threshold check runs.
 
-- PostgreSQL simple compiled: `1.201/1.35` vs prepared optimized Raw ADO.
-- SQL Server single insert: `1.078/1.25` vs Raw ADO, with lower allocation.
-- MySQL runtime join: `1.379/1.5` vs optimized Raw ADO.
-- SQL Server runtime join: `1.12/1.5` vs optimized Raw ADO.
-- MySQL complex compiled: `1.005/1.4` vs prepared optimized Raw ADO.
-- After the pooled-plan guard fix, MySQL runtime join improved to `1.038/1.5`
-  and MySQL complex compiled remained inside budget at `1.027/1.4`.
+## Former Budget Risks
 
-Current non-benchmark validation for the RC2 candidate:
+The original seven performance risks have been reduced to one policy-sensitive
+watch item:
+
+| Area | Latest nORM | Baseline | Ratio | Status |
+| --- | ---: | ---: | ---: | --- |
+| PostgreSQL complex compiled | `134.50 us` | `178.60 us` prepared Raw ADO | `0.75x` | Fixed: ahead |
+| PostgreSQL complex runtime | `163.10 us` | `178.60 us` prepared Raw ADO | `0.91x` | Fixed: ahead |
+| PostgreSQL join runtime | `149.00 us` | `136.00 us` prepared Raw ADO | `1.10x` | Fixed: inside budget |
+| SQLite join compiled | `53.77 us` | `50.99 us` prepared Raw ADO | `1.05x` | Fixed: near parity |
+| SQLite join runtime | `73.73 us` | `50.99 us` prepared Raw ADO | `1.45x` | Watch: public threshold passes against the runtime baseline set, but prepared Raw ADO remains faster |
+| SQL Server single insert | `129.00 us` | `155.00 us` Raw ADO | `0.83x` | Fixed: ahead |
+| PostgreSQL batched tx per-row | `7.645 ms` | `6.845 ms` EF SaveChanges in Tx | `1.12x` | Fixed: inside budget |
+
+## Non-Benchmark Validation
 
 - Full RC correctness gate with `-SkipBenchmark`: passed. The generated
   `artifacts/v1-rc/rc-artifacts.md` manifest records the exact gate commit and
@@ -46,13 +51,12 @@ Current non-benchmark validation for the RC2 candidate:
 - Single-pass source-gen parity, bulk/provider parity, migration, cache, and
   adversarial gate groups: `1484/1484` tests passed.
 
-Public-claim interpretation:
+## Public-Claim Interpretation
 
-- The public query, count, single-insert, and idiomatic bulk budgets pass in the
+- Public query, count, single-insert, and idiomatic bulk budgets pass in the
   focused provider-sliced loop.
 - `BulkInsert_Batched_*`, `BulkInsert_Naive_*`, and `Tx + per row` remain
   diagnostic paths unless explicitly named in a claim.
-- Public performance claims still need a release-manifest run without
-  `-SkipBenchmark` if the project wants the raw BenchmarkDotNet artifacts and
-  package manifest produced from one release commit. The focused provider-sliced
-  evidence above is the current fast-loop performance proof.
+- The next public RC performance manifest should be produced by
+  `eng/v1-release-gate.ps1 -Mode rc` without `-SkipBenchmark`, now that the
+  gate runs the provider matrix as split provider slices.
