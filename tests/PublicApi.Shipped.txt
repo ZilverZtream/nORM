@@ -467,6 +467,7 @@ M:nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object):S
 M:nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.Escape(System.String):System.String
 M:nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String):System.String
+M:nORM.Providers.DatabaseProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.DatabaseProvider.FormatBooleanPredicate(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
@@ -508,6 +509,7 @@ M:nORM.Providers.DatabaseProvider.GetTimeOnlyFromPartsSql(System.String,System.S
 M:nORM.Providers.DatabaseProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetToStringSql(System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetTruncateToIntSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConnection):System.Void
 M:nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
@@ -554,12 +556,14 @@ M:nORM.Providers.MySqlProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mappi
 M:nORM.Providers.MySqlProvider.CreateParameter(System.String,System.Object):System.Data.Common.DbParameter
 M:nORM.Providers.MySqlProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.MySqlProvider.Escape(System.String):System.String
+M:nORM.Providers.MySqlProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.MySqlProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.MySqlProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.MySqlProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.MySqlProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetCharCodeSql(System.String):System.String
+M:nORM.Providers.MySqlProvider.GetCreateTagsTableSql():System.String
 M:nORM.Providers.MySqlProvider.GetDateOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
@@ -580,6 +584,7 @@ M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.Stri
 M:nORM.Providers.MySqlProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetToStringSql(System.String):System.String
+M:nORM.Providers.MySqlProvider.GetTruncateToIntSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.MySqlProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Providers.MySqlProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
@@ -610,6 +615,7 @@ M:nORM.Providers.PostgresProvider.GenerateTemporalTriggersSql(nORM.Mapping.Table
 M:nORM.Providers.PostgresProvider.GetBitwiseXorSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.GetCharFromCodeSql(System.String):System.String
+M:nORM.Providers.PostgresProvider.GetCreateTagsTableSql():System.String
 M:nORM.Providers.PostgresProvider.GetDateOnlyFromPartsSql(System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetDateTimeDifferenceSecondsSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetDateTimeFromPartsSql(System.String,System.String,System.String):System.String
@@ -630,6 +636,7 @@ M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.S
 M:nORM.Providers.PostgresProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.GetToStringSql(System.String):System.String
+M:nORM.Providers.PostgresProvider.GetTruncateToIntSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.PostgresProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Providers.PostgresProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
@@ -657,6 +664,7 @@ M:nORM.Providers.SqlServerProvider.CreateParameter(System.String,System.Object):
 M:nORM.Providers.SqlServerProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqlServerProvider.Escape(System.String):System.String
 M:nORM.Providers.SqlServerProvider.EscapeLikePattern(System.String):System.String
+M:nORM.Providers.SqlServerProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.SqlServerProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.SqlServerProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
@@ -685,6 +693,7 @@ M:nORM.Providers.SqlServerProvider.GetTimeOnlyFromPartsSql(System.String,System.
 M:nORM.Providers.SqlServerProvider.GetTimeOnlyFromPartsSql(System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetTimeSpanColumnSecondsSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetToStringSql(System.String):System.String
+M:nORM.Providers.SqlServerProvider.GetTruncateToIntSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.SqlServerProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Providers.SqlServerProvider.IsNullOrEmptySql(System.String):System.String
@@ -710,6 +719,7 @@ M:nORM.Providers.SqliteProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapp
 M:nORM.Providers.SqliteProvider.CreateParameter(System.String,System.Object):System.Data.Common.DbParameter
 M:nORM.Providers.SqliteProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqliteProvider.Escape(System.String):System.String
+M:nORM.Providers.SqliteProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.SqliteProvider.FormatBooleanPredicate(System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
