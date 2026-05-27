@@ -1548,6 +1548,21 @@ namespace nORM.Query
                 _sql.Append("))");
                 return node;
             }
+            if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
+            {
+                var operandType = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (operandType == typeof(TimeSpan))
+                {
+                    var operandSql = GetSql(node.Operand);
+                    _sql.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(operandSql)).Append(')');
+                    return node;
+                }
+
+                _sql.Append("-(");
+                Visit(node.Operand);
+                _sql.Append(')');
+                return node;
+            }
             // Numeric / enum conversions in projections: (int)entity.Status, (long)e.Count, etc.
             // SQL columns are already typed, so just emit the operand. Reference-type Convert
             // (interface casts, base→derived) has no SQL meaning and falls through to default.
