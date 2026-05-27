@@ -8,6 +8,33 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
+function Get-FullInputPath {
+    param([string]$Path)
+
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
+}
+
+function Get-DisplayPath {
+    param([string]$Path)
+
+    $fullPath = Get-FullInputPath $Path
+    $fullRoot = [System.IO.Path]::GetFullPath($root).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    if ($fullPath.Equals($fullRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        return '.'
+    }
+
+    $rootPrefix = $fullRoot + [System.IO.Path]::DirectorySeparatorChar
+    if ($fullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        return $fullPath.Substring($rootPrefix.Length)
+    }
+
+    return $fullPath
+}
+
 function Convert-MeanToNanoseconds {
     param([string]$Value)
 
@@ -28,6 +55,63 @@ function Convert-MeanToNanoseconds {
         'µs' { return $number * 1000.0 }
         'μs' { return $number * 1000.0 }
         default { return $number }
+    }
+}
+
+function Convert-MeanToNanoseconds {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return [double]::PositiveInfinity
+    }
+
+    $normalized = $Value.Trim() -replace ',', ''
+    if ($normalized -notmatch '^([0-9]+(?:\.[0-9]+)?)\s*(\S+)?$') {
+        return [double]::PositiveInfinity
+    }
+
+    $number = [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture)
+    $unit = $Matches[2]
+    switch ($unit) {
+        's' { return $number * 1000000000.0 }
+        'ms' { return $number * 1000000.0 }
+        'us' { return $number * 1000.0 }
+        ([char]0x00B5 + 's') { return $number * 1000.0 }
+        ([char]0x03BC + 's') { return $number * 1000.0 }
+        default { return $number }
+    }
+}
+
+function Get-CanonicalMethodName {
+    param([string]$Method)
+
+    $name = $Method.Trim().Trim("'")
+    switch ($name) {
+        'Query Simple Raw ADO (Convenience)' { return 'Query_Simple_RawAdo_Convenience' }
+        'Query Simple Raw ADO (Optimized)' { return 'Query_Simple_RawAdo_Optimized' }
+        'Query Simple EF Core (Compiled)' { return 'Query_Simple_EfCore_Compiled' }
+        'Query Simple nORM (Compiled)' { return 'Query_Simple_nORM_Compiled' }
+        'Query Simple Raw ADO (Prepared Optimized)' { return 'Query_Simple_RawAdo_PreparedOptimized' }
+        'Query Complex Raw ADO (Convenience)' { return 'Query_Complex_RawAdo_Convenience' }
+        'Query Complex Raw ADO (Optimized)' { return 'Query_Complex_RawAdo_Optimized' }
+        'Query Complex EF Core (Compiled)' { return 'Query_Complex_EfCore_Compiled' }
+        'Query Complex nORM (Compiled)' { return 'Query_Complex_nORM_Compiled' }
+        'Query Complex Raw ADO (Prepared Optimized)' { return 'Query_Complex_RawAdo_PreparedOptimized' }
+        'Query Join Raw ADO (Convenience)' { return 'Query_Join_RawAdo_Convenience' }
+        'Query Join Raw ADO (Optimized)' { return 'Query_Join_RawAdo_Optimized' }
+        'Query Join Raw ADO (Prepared Optimized)' { return 'Query_Join_RawAdo_PreparedOptimized' }
+        'Count Raw ADO (Optimized)' { return 'Count_RawAdo_Optimized' }
+        'BulkInsert Naive - EF per row' { return 'BulkInsert_Naive_EfCore' }
+        'BulkInsert Naive - nORM per row' { return 'BulkInsert_Naive_nORM' }
+        'BulkInsert Naive - Dapper per row' { return 'BulkInsert_Naive_Dapper' }
+        'BulkInsert Batched - EF SaveChanges in Tx' { return 'BulkInsert_Batched_EfCore' }
+        'BulkInsert Batched - nORM Tx + per row' { return 'BulkInsert_Batched_nORM' }
+        'BulkInsert Batched - Dapper prepared' { return 'BulkInsert_Batched_Dapper' }
+        'BulkInsert Batched - nORM Prepared' { return 'BulkInsert_Batched_nORM_Prepared' }
+        'BulkInsert Idiomatic - EF AddRange' { return 'BulkInsert_Idiomatic_EfCore' }
+        'BulkInsert Idiomatic - nORM BulkInsert' { return 'BulkInsert_Idiomatic_nORM' }
+        'BulkInsert Idiomatic - Dapper list in Tx' { return 'BulkInsert_Idiomatic_Dapper' }
+        default { return $name }
     }
 }
 
@@ -81,6 +165,7 @@ function Import-BenchmarkRows {
                 Report = $file.Name
                 Provider = $provider
                 Method = $row.Method
+                MethodKey = Get-CanonicalMethodName $row.Method
                 Mean = $row.Mean
                 MeanNs = Convert-MeanToNanoseconds $row.Mean
                 Allocated = $row.Allocated
@@ -111,8 +196,8 @@ foreach ($rule in $thresholds.rules) {
 
     foreach ($provider in $providers) {
         $providerRows = @($rows | Where-Object { $_.Provider -eq $provider })
-        $targetRows = @($providerRows | Where-Object { $rule.targetMethods -contains $_.Method })
-        $baselineRows = @($providerRows | Where-Object { $rule.baselineMethods -contains $_.Method })
+        $targetRows = @($providerRows | Where-Object { $rule.targetMethods -contains $_.MethodKey })
+        $baselineRows = @($providerRows | Where-Object { $rule.baselineMethods -contains $_.MethodKey })
 
         if ($targetRows.Count -eq 0 -or $baselineRows.Count -eq 0) {
             if ($rule.required -and -not $AllowMissingRules) {
@@ -166,7 +251,7 @@ $mdPath = Join-Path $OutputDirectory 'benchmark-thresholds.md'
 
 $summary = [ordered]@{
     GeneratedUtc = [DateTime]::UtcNow.ToString('O')
-    ThresholdFile = $ThresholdFile.Substring($root.Length) -replace '^[\\/]+', ''
+    ThresholdFile = Get-DisplayPath $ThresholdFile
     ResultsDirectory = $ResultsDirectory
     Passed = $violations.Count -eq 0
     Results = [object]$results.ToArray()

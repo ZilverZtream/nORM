@@ -53,14 +53,14 @@
       "rationale": "The compiled join benchmark is the primary evidence that nORM's source-generated, pre-compiled path reaches near-raw-ADO performance. The tight 1.25x budget signals to reviewers that the compiled path eliminates most of the interpretation overhead from the hot path."
     },
     {
-      "name": "Batched insert stays within EF or Dapper range",
+      "name": "BulkInsertAsync stays within EF or Dapper transaction range",
       "provider": "*",
-      "targetMethods": [ "BulkInsert_Batched_nORM", "BulkInsert_Batched_nORM_Prepared" ],
-      "baselineMethods": [ "BulkInsert_Batched_EfCore", "BulkInsert_Batched_Dapper" ],
-      "maxMeanRatio": 1.5,
-      "maxAllocatedRatio": 3.0,
+      "targetMethods": [ "BulkInsert_Idiomatic_nORM" ],
+      "baselineMethods": [ "BulkInsert_Idiomatic_EfCore", "BulkInsert_Idiomatic_Dapper" ],
+      "maxMeanRatio": 1.0,
+      "maxAllocatedRatio": 2.0,
       "required": true,
-      "rationale": "Batched inserts are the most write-heavy benchmark. The 1.5x ceiling vs EF/Dapper batch inserts is reasonable because nORM reuses prepared statement handles and applies FK-ordering logic that EF and Dapper skip in raw batch mode."
+      "rationale": "BulkInsertAsync is the public bulk-insert API used for public performance claims. It must be no slower than the fastest transaction-based EF Core or Dapper bulk insert for the same provider while keeping allocation within 2x of that fastest baseline."
     },
     {
       "name": "Native bulk insert is not slower than batched when available",
