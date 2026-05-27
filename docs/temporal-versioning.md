@@ -15,7 +15,9 @@ Release candidates must run temporal tests in the live provider gate before
 temporal claims are used in release notes. Local unit tests lock SQL generation,
 custom column names, SQLite bootstrap, cancellation, idempotency, and `AsOf`
 translation; live RC artifacts prove execution against the configured provider
-versions.
+versions. `LiveProviderTemporalParityTests` is the four-provider smoke that
+proves bootstrap, tag creation, history trigger writes, and `AsOf(DateTime)`
+execution on SQL Server, PostgreSQL, MySQL, and SQLite.
 
 ## Runtime Model
 

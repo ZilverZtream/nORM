@@ -16,6 +16,9 @@ Versions in the Minimum Version column are floors enforced at runtime: connectio
 servers fail startup validation with a `NormConfigurationException` that names the actual
 and minimum versions. `ProviderCapabilityContractTests` enforces that this table and the
 runtime `Capabilities.MinimumServerVersion` for each provider stay in sync.
+Temporal "Yes" means nORM-managed history tables/triggers, not provider-native
+temporal tables; `LiveProviderTemporalParityTests` verifies the live execution
+contract across all four providers.
 
 ## Startup Validation
 

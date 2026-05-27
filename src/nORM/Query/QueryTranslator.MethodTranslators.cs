@@ -2225,7 +2225,7 @@ namespace nORM.Query
                 {
                     if (value is DateTime dt)
                     {
-                        t._asOfTimestamp = dt;
+                        t._asOfTimestamp = DateTime.SpecifyKind(dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt, DateTimeKind.Unspecified);
                     }
                     else if (value is string tagName)
                     {

@@ -647,18 +647,14 @@ namespace nORM.Query
                     {
                         alias ??= _t.EscapeAlias("T0");
                         var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                        _t.AddParameter(timeParamName, _t._asOfTimestamp.Value);
+                        _t.AddLiteralParameter(timeParamName, _t._asOfTimestamp.Value);
                         var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
                         var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
                         var t1 = _t.EscapeAlias("T1");
-                        var t2 = _t.EscapeAlias("T2");
                         var temporalQuery = $@"
 (
-    SELECT {cols} FROM {_t._mapping.EscTable} {t1}
+    SELECT {cols} FROM {historyTable} {t1}
     WHERE {timeParamName} >= {t1}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t1}.{_t._provider.Escape("__ValidTo")}
-    UNION ALL
-    SELECT {cols} FROM {historyTable} {t2}
-    WHERE {timeParamName} >= {t2}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t2}.{_t._provider.Escape("__ValidTo")}
 )";
                         fromClause = temporalQuery;
                     }
