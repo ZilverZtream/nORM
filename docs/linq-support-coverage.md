@@ -5,6 +5,11 @@ Supported, Constrained, or Preview matrix row must have at least one test file
 listed here. Unsupported rows may be documented without a coverage row only when
 the matrix notes an explicit deterministic failure contract.
 
+Coverage rows are test anchors, not a substitute for provider parity evidence.
+Rows that are part of the v1 cross-provider contract must also appear in
+`docs/live-provider-linq-parity.md` with SQLite, SQL Server, PostgreSQL, and
+MySQL evidence before they are treated as release-green.
+
 ## Query operators
 
 | Feature | Coverage |
