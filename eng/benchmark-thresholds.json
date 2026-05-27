@@ -53,6 +53,16 @@
       "rationale": "The compiled join benchmark is the primary evidence that nORM's source-generated, pre-compiled path reaches near-raw-ADO performance. The tight 1.25x budget signals to reviewers that the compiled path eliminates most of the interpretation overhead from the hot path."
     },
     {
+      "name": "Runtime join stays within Dapper or optimized Raw ADO range",
+      "provider": "*",
+      "targetMethods": [ "Query_Join_nORM" ],
+      "baselineMethods": [ "Query_Join_Dapper", "Query_Join_RawAdo_Optimized" ],
+      "maxMeanRatio": 1.5,
+      "maxAllocatedRatio": 3.0,
+      "required": true,
+      "rationale": "Runtime joins are a public LINQ path and were a prior regression cluster. The 1.5x ceiling allows normal expression-shape lookup overhead while ensuring runtime joins stay competitive with typed Dapper and ordinal Raw ADO for the same provider and projection."
+    },
+    {
       "name": "BulkInsertAsync stays within EF or Dapper transaction range",
       "provider": "*",
       "targetMethods": [ "BulkInsert_Idiomatic_nORM" ],
