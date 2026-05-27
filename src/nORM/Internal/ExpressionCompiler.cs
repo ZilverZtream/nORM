@@ -361,6 +361,7 @@ namespace nORM.Internal
                             ParameterAssign.AssignValue(p, i < args.Length ? args[i] : DBNull.Value);
                             cmd.Parameters.Add(p);
                         }
+                        ApplyPreparedParameterSizeHints(cmd);
                         try { cmd.Prepare(); } catch (Exception) { /* Prepare is a performance optimization; failure is non-fatal */ }
                         state.FixedParamCount = fixedCount;
                     }
@@ -372,7 +373,10 @@ namespace nORM.Internal
                     var compiledCount = Math.Min(compiledParams.Count, args.Length);
                     var fixedParamCount = state.FixedParamCount;
                     for (int i = 0; i < compiledCount; i++)
+                    {
                         ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], args[i]);
+                        ApplyPreparedParameterSizeHint(cmd, cmd.Parameters[fixedParamCount + i]);
+                    }
 
                     var materializer = cachedPlan.SyncMaterializer;
                     var capacity = cachedPlan.SingleResult ? 1 : (cachedPlan.Take ?? 16);
@@ -422,6 +426,23 @@ namespace nORM.Internal
                 return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
                     cachedPlan!, args, invEntry.FixedParams, state, default);
             };
+        }
+
+        private static void ApplyPreparedParameterSizeHints(DbCommand cmd)
+        {
+            foreach (DbParameter parameter in cmd.Parameters)
+                ApplyPreparedParameterSizeHint(cmd, parameter);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static void ApplyPreparedParameterSizeHint(DbCommand cmd, DbParameter parameter)
+        {
+            if (parameter.DbType is DbType.String or DbType.AnsiString or DbType.StringFixedLength or DbType.AnsiStringFixedLength)
+                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
+            else if (parameter.DbType == DbType.Binary)
+                parameter.Size = -1;
+            else if (cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand" && parameter.Size == 0)
+                parameter.Size = 1;
         }
 
         private static CompiledParameterValueSource[] BuildCompiledParameterValueSources(
