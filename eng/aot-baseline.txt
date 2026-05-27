@@ -79,8 +79,8 @@ src/nORM/Query/ExpressionToSqlVisitor.cs:3658:IL2075
 src/nORM/Query/ExpressionToSqlVisitor.cs:401:IL2075
 src/nORM/Query/MaterializerFactory.Types.cs:242:IL2093
 src/nORM/Query/MaterializerFactory.Types.cs:70:IL2093
-src/nORM/Query/NormQueryProvider.cs:2253:IL2026
-src/nORM/Query/NormQueryProvider.cs:2253:IL3050
+src/nORM/Query/NormQueryProvider.cs:2257:IL2026
+src/nORM/Query/NormQueryProvider.cs:2257:IL3050
 src/nORM/Query/QueryTranslator.cs:1043:IL2026
 src/nORM/Query/QueryTranslator.cs:1043:IL3050
 src/nORM/Query/QueryTranslator.cs:410:IL2026
