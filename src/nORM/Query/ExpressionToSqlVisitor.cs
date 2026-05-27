@@ -2208,9 +2208,9 @@ namespace nORM.Query
                 return node;
             }
             if (!IsTranslatableMethod(node.Method))
-                // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
-                // The {0} argument below is a detail message, not a duplicate prefix.
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
+                throw new NormUnsupportedFeatureException(
+                    $"Method '{node.Method.Name}' cannot be translated to SQL by the nORM v1 query translator. " +
+                    "See docs/linq-support.md for the supported method matrix.");
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
                 return TranslateWithNullCheck(node);
