@@ -179,6 +179,17 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("$thresholdArgs.AllowMissingRules = $true", gate);
     }
 
+    [Fact]
+    public void RcArtifactManifest_CleansStalePackageBundleBeforeCopyingCurrentPackages()
+    {
+        var manifest = ReadRepoFile("eng/rc-artifact-manifest.ps1");
+
+        Assert.Contains("Get-ChildItem -LiteralPath $pkgBundleDir -File -Filter '*.nupkg'", manifest);
+        Assert.Contains("Get-ChildItem -LiteralPath $pkgBundleDir -File -Filter '*.snupkg'", manifest);
+        Assert.Contains("Remove-Item -Force", manifest);
+        Assert.Contains("Copy-Item -LiteralPath $src -Destination $pkgBundleDir -Force", manifest);
+    }
+
     private static void AssertMethodContains(string code, string methodName, string expected)
     {
         var pattern = $@"public\s+(?:async\s+)?(?:Task<[^>]+>|Task|ValueTask<[^>]+>|[A-Za-z0-9_<>,\s]+)\s+{Regex.Escape(methodName)}\s*\([^)]*\)\s*(?:=>|{{)";

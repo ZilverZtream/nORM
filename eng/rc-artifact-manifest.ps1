@@ -178,6 +178,10 @@ $lines | Set-Content -LiteralPath $mdPath -Encoding UTF8
 # files the gate ran against without needing the source repo's bin/Release output.
 $pkgBundleDir = Join-Path $OutputDirectory 'packages'
 New-Item -ItemType Directory -Force -Path $pkgBundleDir | Out-Null
+Get-ChildItem -LiteralPath $pkgBundleDir -File -Filter '*.nupkg' -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+Get-ChildItem -LiteralPath $pkgBundleDir -File -Filter '*.snupkg' -ErrorAction SilentlyContinue |
+    Remove-Item -Force
 foreach ($pkg in $packages) {
     $src = Join-Path $root $pkg.File.Replace('/', '\')
     if (Test-Path $src) {
