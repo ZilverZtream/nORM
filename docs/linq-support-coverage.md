@@ -31,6 +31,7 @@ the matrix notes an explicit deterministic failure contract.
 | Set operations: `Union`, `Intersect`, `Except` | `tests/QueryTranslatorCrossProviderTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryTranslatorRecursionTests.cs`, `tests/LinqSetOperationProjectionTests.cs`, `tests/LinqSetOpCompositionTests.cs` |
 | `Include`, `ThenInclude` | `tests/IncludeProcessorCoverageTests.cs`, `tests/CompositeKeyIncludeTests.cs`, `tests/LinqIncludeCompositePkErrorTests.cs` (composite-PK dependent), `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqMultiLevelIncludeTests.cs` |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | `tests/QueryTranslatorCoverageTests.cs`, `tests/ConstructorBoundEntityTrackingTests.cs`, `tests/MiscCoverageTests.cs` |
+| Window functions: `WithRowNumber`, `WithRank`, `WithDenseRank`, `WithLag`, `WithLead` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryTranslatorCrossProviderTests.cs`, `tests/WindowFunctionParameterTests.cs`, `tests/LiveProviderJsonWindowParityTests.cs` |
 | `OfType<T>` / `Cast<T>` | `tests/LinqCastOfTypeTests.cs` (identity pass-through; TPH derived-type filtering via `TphOfTypeTests`), `tests/LiveProviderOfTypeParityTests.cs` (live TPH derived-type filtering), `tests/LinqUnsupportedShapeContractTests.cs` (unsupported shapes) |
 | Raw SQL composition | `tests/RawSqlNameBasedMaterializationTests.cs`, `tests/SourceGenMaterializerCorrectnesTests.cs`, `tests/TransactionIsolationTests.cs` |
 | `AsAsyncEnumerable` | `tests/AsyncEnumerableTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/AsyncCancellationAuditTests.cs`, `tests/GroupJoinAsyncEnumerableTests.cs` (GroupJoin streaming) |
@@ -82,6 +83,7 @@ the matrix notes an explicit deterministic failure contract.
 | Enum `.ToString()` in projection | `tests/LinqEnumToStringTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs`, `tests/LiveProviderContainsParityTests.cs` |
 | `Guid.Empty` and other static-field constants in predicates | `tests/LinqGuidAndDistinctTests.cs` |
+| `Json.Value<T>(jsonColumn, constantPath)` | `tests/JsonPathValidationTests.cs`, `tests/ExpressionToSqlVisitorTests.cs`, `tests/LiveProviderJsonWindowParityTests.cs` |
 | `NormFunctions.Like(value, pattern)` | `tests/LinqNormFunctionsLikeTests.cs` |
 
 This file maps each documented LINQ shape to its contract tests. Provider-neutral

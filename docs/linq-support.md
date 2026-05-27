@@ -39,6 +39,7 @@ Status values:
 | Set operations: `Union`, `Intersect`, `Except` | Supported | Each side must project the same row shape. `Concat` lowers to `UNION ALL` under the same shape rule. `OrderBy` / `OrderByDescending` / `Skip` / `Take` AFTER the set op work (the trailing clauses apply to the unified result). `Where` AFTER the set op also works — the translator wraps the set-op SQL as `SELECT * FROM (<inner>) AS T0` so the predicate filters the unified rows. |
 | `Include`, `ThenInclude` | Supported | Supported for mapped navigation paths including composite-key dependents, multi-level chains, and tenant-filtered contexts. Use with `AsSplitQuery()` to trigger eager loading. Unmapped navigation properties throw `NormUnsupportedFeatureException`. |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | Supported | These are nORM-specific query modifiers with dedicated tests. |
+| Window functions: `WithRowNumber`, `WithRank`, `WithDenseRank`, `WithLag`, `WithLead` | Supported | nORM-specific query modifiers that project SQL window-function columns. Use an explicit `OrderBy` / `ThenBy` chain before the window call for deterministic results. |
 | Raw SQL composition | Constrained | `FromSqlRawAsync<T>` and `FromSqlInterpolatedAsync<T>` execute read-only `SELECT`/CTE statements through the provider-aware raw query gate. Raw SQL does not add tenant predicates automatically. |
 | `AsAsyncEnumerable` | Supported | Streams ordinary queries and GroupJoin queries (groups yielded one at a time). Include queries are rejected because eager-load paths require a coordinated multi-round-trip fetch incompatible with row-by-row streaming. |
 | `ExecuteUpdateAsync` | Supported | Filtered and join-sourced entity queries, including composite-primary-key entities. Grouped, ordered, distinct, paged, and aggregated queries are rejected. Join sources: single-PK → `WHERE pk IN (SELECT T0.pk ...)`, composite-PK → row-tuple `WHERE (pk1, pk2) IN (SELECT T0.pk1, T0.pk2 ...)` (SQLite/Postgres/MySQL) or JOIN-based form (SQL Server). Two assignment forms: (1) literal / captured-local value — `SetProperty(x => x.Foo, 42)`; (2) server-side computed expression — `SetProperty(x => x.Counter, x => x.Counter + 1)` supporting member access, constants, arithmetic (`+`/`-`/`*`/`/`/`%`), and Convert. |
@@ -96,6 +97,7 @@ Status values:
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | Supported | Null-aware: emits `(col IN (...) OR col IS NULL)` when the list contains nulls. |
 | `Guid.Empty` and other static-field constants in predicates | Supported | Evaluated at execution time via the static-member constant path. |
 | `Guid.NewGuid()` in queries | Unsupported | Generate the value in CLR before composing the query. |
+| `Json.Value<T>(jsonColumn, constantPath)` | Supported | Translates to provider JSON value extraction. The path must be a constant string and is validated before SQL generation; SQLite support depends on the JSON1 extension. |
 | `NormFunctions.Like(value, pattern)` | Supported | Emits `(value LIKE pattern)` verbatim — no automatic LIKE-pattern escaping unlike `Contains`/`StartsWith`/`EndsWith`. |
 
 ## Provider Notes

@@ -31,14 +31,18 @@ public class WindowFunctionParameterTests : TestBase
         pm.Parameters[existingName] = 999;
         pm.Index = 0; // Force next parameter to start from p0
 
-        // Build query that introduces a window function offset parameter
+        // Build query that introduces a window function offset. Offsets are
+        // emitted as numeric SQL literals so they cannot be misclassified as
+        // compiled-query parameters and skipped during runtime binding.
         var query = ctx.Query<Item>()
             .WithLag(i => i.Id, 1, (i, prev) => new { i.Id, Prev = prev });
 
         var plan = translator.Translate(query.Expression);
 
-        Assert.Equal(2, plan.Parameters.Count); // original + offset
+        Assert.Single(plan.Parameters); // original only; offset is literal
         Assert.Equal(999, plan.Parameters[existingName]); // original value preserved
-        Assert.Contains(plan.Parameters, kv => kv.Key != existingName && kv.Value.Equals(1));
+        Assert.Contains("LAG", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(", 1)", plan.Sql, StringComparison.Ordinal);
+        Assert.DoesNotContain(provider.ParamPrefix + "p1", plan.Sql, StringComparison.Ordinal);
     }
 }
