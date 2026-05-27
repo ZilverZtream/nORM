@@ -18,7 +18,7 @@ the matrix notes an explicit deterministic failure contract.
 | `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs` |
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
-| `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs` |
+| `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs` |
 | `Distinct` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGuidAndDistinctTests.cs` |
 | `Count`, `LongCount`, `Any`, `All` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryExecutorCoverageTests.cs` |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | `tests/LinqNavigationAggregateTests.cs`, `tests/LinqCompiledQueryExpandedParityTests.cs`, `tests/LinqMultiHopNavAggregateInProjectionTests.cs` |
@@ -64,21 +64,21 @@ the matrix notes an explicit deterministic failure contract.
 | `DateTime`/`DateTimeOffset` subtraction TimeSpan members (`(r.End - r.Start).TotalHours`, `.TotalDays`, `.TotalSeconds`, `.TotalMinutes`, `.TotalMilliseconds`, `.Days`, `.Hours`, `.Minutes`, `.Seconds`) | `tests/LinqDateTimeArithmeticTests.cs` |
 | `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs` |
 | `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs` |
-| `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs` |
+| `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderNullableBoolParityTests.cs` |
 | `Convert.ChangeType(col, typeof(T))` with `Type` constant | `tests/LinqConvertChangeTypeOnColumnTests.cs` |
 | `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs` |
 | `DateTimeOffset` col `==` / `!=` DateTime literal | `tests/LinqDateTimeOffsetEqualsDateTimeLiteralTests.cs` |
 | `DateTimeOffset` - `DateTimeOffset` → `TimeSpan` (cross-column) | `tests/LinqDateTimeOffsetColumnSubtractionTests.cs` |
 | `DateTimeOffset` col `+` / `-` `TimeSpan` col → `DateTimeOffset` | `tests/LinqDateTimeOffsetPlusTimeSpanColumnTests.cs` |
-| LINQ `Aggregate` sum-fold (1-arg + seed forms) | `tests/LinqAggregateOperatorTests.cs` |
-| LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional shapes) | `tests/LinqAggregateMinMaxFoldTests.cs` |
-| LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | `tests/LinqAggregateStringConcatTests.cs` |
-| `Enum.TryParse<T>(stringCol, out T)` as WHERE predicate | `tests/LinqEnumTryParseOutParamTests.cs` |
+| LINQ `Aggregate` sum-fold (1-arg + seed forms) | `tests/LinqAggregateOperatorTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional shapes) | `tests/LinqAggregateMinMaxFoldTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | `tests/LinqAggregateStringConcatTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
+| `Enum.TryParse<T>(stringCol, out T)` as WHERE predicate | `tests/LinqEnumTryParseOutParamTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | Conditional expressions (`cond ? a : b`) in `Where` and `Select` | `tests/LinqEnumAndConditionalTests.cs` |
 | Arithmetic operators (`+`, `-`, `*`, `/`, `%`) in `Where`, `Select`, and aggregate selectors | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs` |
-| Enum equality and `(int)enumCol` projection | `tests/LinqEnumAndConditionalTests.cs` |
-| Enum `.ToString()` in projection | `tests/LinqEnumToStringTests.cs` |
-| Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs` |
+| Enum equality and `(int)enumCol` projection | `tests/LinqEnumAndConditionalTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
+| Enum `.ToString()` in projection | `tests/LinqEnumToStringTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
+| Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs`, `tests/LiveProviderContainsParityTests.cs` |
 | `Guid.Empty` and other static-field constants in predicates | `tests/LinqGuidAndDistinctTests.cs` |
 | `NormFunctions.Like(value, pattern)` | `tests/LinqNormFunctionsLikeTests.cs` |
 
