@@ -119,7 +119,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | --- | --- | --- | --- | --- | --- |
 | Compiled-query equivalent of every runtime row above | ✅ for the existing matrix; SCV additions (DTO ops, Enum.TryParse, Convert.ChangeType, Aggregate folds, Post-Take/Skip family) are marked `—` — compiled form not required. | | | | `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
 
-## Open parity gaps (🚧)
+## Parity gap tracking
 
 No open 🚧 rows remain in the matrix above. Every row is either ✅ (passes on all
 four live providers) or ⚠️ (passes with a documented deterministic caveat).
