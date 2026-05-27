@@ -1272,13 +1272,49 @@ namespace nORM.Query
             {
                 var paramType = parameters[i].ParameterType;
                 var readValue = GetOptimizedReaderCall(reader, paramType, i + startOffset);
-                var defaultValue = Expression.Default(paramType);
-                var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
-                args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+                if (CanSkipDbNullCheck(parameters[i]))
+                {
+                    args[i] = readValue;
+                }
+                else
+                {
+                    var defaultValue = Expression.Default(paramType);
+                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                    args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+                }
             }
 
             var body = Expression.Convert(Expression.New(ctor, args), typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(body, reader).Compile();
+        }
+
+        private static bool CanSkipDbNullCheck(ParameterInfo parameter)
+        {
+            var parameterType = parameter.ParameterType;
+            if (parameterType.IsValueType)
+                return Nullable.GetUnderlyingType(parameterType) == null;
+
+            var nullabilityCtx = _nullabilityInfoContext;
+            if (nullabilityCtx == null)
+                return false;
+
+            try
+            {
+                NullabilityInfo nullabilityInfo;
+                lock (_nullabilityInfoContextLock)
+                {
+                    nullabilityInfo = nullabilityCtx.Create(parameter);
+                }
+                return nullabilityInfo.ReadState == NullabilityState.NotNull;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
