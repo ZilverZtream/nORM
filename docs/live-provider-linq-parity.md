@@ -118,16 +118,21 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Tests |
 | --- | --- | --- | --- | --- | --- |
-| Compiled-query equivalent of every runtime row above | ✅ for the existing matrix; SCV additions (DTO ops, Enum.TryParse, Convert.ChangeType, Aggregate folds, Post-Take/Skip family) are marked `—` — compiled form not required. | | | | `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
+| Compiled-query rows marked ✅ in the matrix above | ✅ | ✅ | ✅ | ✅ | `LiveProviderCompiledQueryParityTests`, `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
+
+Rows marked `—` in the Compiled column are runtime-only v1 contracts, not
+implicit compiled-query claims. Coverage rows are not substitutes for live
+provider gates; provider-neutral tests must be paired with SQL Server, SQLite,
+PostgreSQL, and MySQL evidence before a row is promoted to v1-green.
 
 ## Parity gap tracking
 
 No open 🚧 rows remain in the matrix above. Every row is either ✅ (passes on all
 four live providers) or ⚠️ (passes with a documented deterministic caveat).
 
-The compiled-query row carries a note that SCV-additions features are intentionally
-marked `—` in the Compiled column — their query shape is not supported in the
-compiled-query path, which is consistent with their individual row entries.
+Rows with `—` in the Compiled column are intentionally excluded from the v1
+compiled-query contract. If one of those shapes is promoted later, add a focused
+compiled-query live-provider test and flip the row in the same commit.
 
 When a future addition creates a new 🚧, add it here with a root-cause note and
 flip it to ✅/⚠️ in the same commit once the live tests pass.
