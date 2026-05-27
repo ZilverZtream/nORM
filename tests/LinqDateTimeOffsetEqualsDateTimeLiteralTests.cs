@@ -35,9 +35,10 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
         cmd.CommandText = """
             CREATE TABLE DeqRow (Id INTEGER PRIMARY KEY, Dto TEXT NOT NULL);
             INSERT INTO DeqRow VALUES
-                (1, '2026-05-25 12:30:45+00:00'),
-                (2, '2026-05-25 14:30:45+02:00'),
-                (3, '2026-05-25 12:30:46+00:00');
+                (1, '2026-05-25 12:30:45.123+00:00'),
+                (2, '2026-05-25 14:30:45.123+02:00'),
+                (3, '2026-05-25 12:30:45.987+00:00'),
+                (4, '2026-05-25 12:30:46.123+00:00');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider());
@@ -54,7 +55,7 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
     {
         // Rows 1 and 2 represent the same UTC instant (12:30:45Z) in two
         // different offsets. Equality must match BOTH.
-        var literal = new DateTime(2026, 5, 25, 12, 30, 45, DateTimeKind.Utc);
+        var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
         var rows = await _ctx.Query<DeqRow>()
             .Where(r => r.Dto == literal)
             .OrderBy(r => r.Id)
@@ -65,12 +66,12 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
     [Fact]
     public async Task DateTimeOffset_column_not_equals_UTC_DateTime_literal_excludes_matching_instants()
     {
-        var literal = new DateTime(2026, 5, 25, 12, 30, 45, DateTimeKind.Utc);
+        var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
         var rows = await _ctx.Query<DeqRow>()
             .Where(r => r.Dto != literal)
             .OrderBy(r => r.Id)
             .ToListAsync();
-        Assert.Equal(new[] { 3 }, rows.Select(r => r.Id).ToArray());
+        Assert.Equal(new[] { 3, 4 }, rows.Select(r => r.Id).ToArray());
     }
 
     [Table("DeqRow")]

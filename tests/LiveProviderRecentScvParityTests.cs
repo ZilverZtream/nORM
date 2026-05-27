@@ -123,19 +123,20 @@ public class LiveProviderRecentScvParityTests
             await SetupDtoTableAsync(ctx, kind);
             try
             {
-                var literal = new DateTime(2026, 5, 25, 12, 30, 45, DateTimeKind.Utc);
+                var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
                 var rows = await ctx.Query<DtoParityRow>()
                     .Where(r => r.Dto == literal)
                     .OrderBy(r => r.Id)
                     .ToListAsync();
-                // Rows 1+2 share the same UTC instant stored in different offsets; row 3 is 1s later.
+                // Rows 1+2 share the same UTC instant stored in different offsets.
+                // Row 3 is the same second but a different millisecond and must not match.
                 Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).ToArray());
 
                 var notRows = await ctx.Query<DtoParityRow>()
                     .Where(r => r.Dto != literal)
                     .OrderBy(r => r.Id)
                     .ToListAsync();
-                Assert.Equal(new[] { 3 }, notRows.Select(r => r.Id).ToArray());
+                Assert.Equal(new[] { 3, 4 }, notRows.Select(r => r.Id).ToArray());
             }
             finally { await Teardown(ctx, DtoTable); }
         }
@@ -154,24 +155,28 @@ public class LiveProviderRecentScvParityTests
         {
             ProviderKind.SqlServer =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
-                "(1,CAST('2026-05-25 12:30:45 +00:00' AS DATETIMEOFFSET))," +
-                "(2,CAST('2026-05-25 14:30:45 +02:00' AS DATETIMEOFFSET))," +
-                "(3,CAST('2026-05-25 12:30:46 +00:00' AS DATETIMEOFFSET))",
+                "(1,CAST('2026-05-25 12:30:45.123 +00:00' AS DATETIMEOFFSET))," +
+                "(2,CAST('2026-05-25 14:30:45.123 +02:00' AS DATETIMEOFFSET))," +
+                "(3,CAST('2026-05-25 12:30:45.987 +00:00' AS DATETIMEOFFSET))," +
+                "(4,CAST('2026-05-25 12:30:46.123 +00:00' AS DATETIMEOFFSET))",
             ProviderKind.Postgres =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
-                "(1,'2026-05-25 12:30:45+00'::timestamptz)," +
-                "(2,'2026-05-25 14:30:45+02'::timestamptz)," +
-                "(3,'2026-05-25 12:30:46+00'::timestamptz)",
+                "(1,'2026-05-25 12:30:45.123+00'::timestamptz)," +
+                "(2,'2026-05-25 14:30:45.123+02'::timestamptz)," +
+                "(3,'2026-05-25 12:30:45.987+00'::timestamptz)," +
+                "(4,'2026-05-25 12:30:46.123+00'::timestamptz)",
             ProviderKind.MySql =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
-                "(1,'2026-05-25 12:30:45.000000')," +
-                "(2,'2026-05-25 12:30:45.000000')," +
-                "(3,'2026-05-25 12:30:46.000000')",
+                "(1,'2026-05-25 12:30:45.123000')," +
+                "(2,'2026-05-25 12:30:45.123000')," +
+                "(3,'2026-05-25 12:30:45.987000')," +
+                "(4,'2026-05-25 12:30:46.123000')",
             ProviderKind.Sqlite =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
-                "(1,'2026-05-25 12:30:45+00:00')," +
-                "(2,'2026-05-25 14:30:45+02:00')," +
-                "(3,'2026-05-25 12:30:46+00:00')",
+                "(1,'2026-05-25 12:30:45.123+00:00')," +
+                "(2,'2026-05-25 14:30:45.123+02:00')," +
+                "(3,'2026-05-25 12:30:45.987+00:00')," +
+                "(4,'2026-05-25 12:30:46.123+00:00')",
             _ => throw new NotSupportedException()
         };
         await ExecuteAsync(ctx, insert);
@@ -211,10 +216,11 @@ public class LiveProviderRecentScvParityTests
                     .ToListAsync())
                     .ToArray();
 
-                Assert.Equal(3, rows.Length);
+                Assert.Equal(4, rows.Length);
                 Assert.Equal(TimeSpan.FromSeconds(15), rows[0].Diff);  // 12:30:45Z - 12:30:30Z
                 Assert.Equal(TimeSpan.Zero,            rows[1].Diff);  // 12:00:00Z - 12:00:00Z (different stored offsets)
                 Assert.Equal(TimeSpan.FromHours(-1),   rows[2].Diff);  // 12:00:00Z - 13:00:00Z
+                Assert.InRange((rows[3].Diff - TimeSpan.FromSeconds(1.25)).TotalMilliseconds, -1.0, 1.0);
             }
             finally { await Teardown(ctx, DsubTable); }
         }
@@ -236,23 +242,27 @@ public class LiveProviderRecentScvParityTests
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,CAST('2026-05-25 12:30:45 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 12:30:30 +00:00' AS DATETIMEOFFSET))," +
                 "(2,CAST('2026-05-25 14:00:00 +02:00' AS DATETIMEOFFSET),CAST('2026-05-25 11:00:00 -01:00' AS DATETIMEOFFSET))," +
-                "(3,CAST('2026-05-25 12:00:00 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 13:00:00 +00:00' AS DATETIMEOFFSET))",
+                "(3,CAST('2026-05-25 12:00:00 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 13:00:00 +00:00' AS DATETIMEOFFSET))," +
+                "(4,CAST('2026-05-25 12:00:01.500 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 12:00:00.250 +00:00' AS DATETIMEOFFSET))",
             ProviderKind.Postgres =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45+00'::timestamptz,'2026-05-25 12:30:30+00'::timestamptz)," +
                 "(2,'2026-05-25 14:00:00+02'::timestamptz,'2026-05-25 11:00:00-01'::timestamptz)," +
-                "(3,'2026-05-25 12:00:00+00'::timestamptz,'2026-05-25 13:00:00+00'::timestamptz)",
+                "(3,'2026-05-25 12:00:00+00'::timestamptz,'2026-05-25 13:00:00+00'::timestamptz)," +
+                "(4,'2026-05-25 12:00:01.500+00'::timestamptz,'2026-05-25 12:00:00.250+00'::timestamptz)",
             // MySQL stores as UTC DATETIME(6); both +02:00 and -01:00 rows become 12:00:00 UTC.
             ProviderKind.MySql =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45.000000','2026-05-25 12:30:30.000000')," +
                 "(2,'2026-05-25 12:00:00.000000','2026-05-25 12:00:00.000000')," +
-                "(3,'2026-05-25 12:00:00.000000','2026-05-25 13:00:00.000000')",
+                "(3,'2026-05-25 12:00:00.000000','2026-05-25 13:00:00.000000')," +
+                "(4,'2026-05-25 12:00:01.500000','2026-05-25 12:00:00.250000')",
             ProviderKind.Sqlite =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45+00:00','2026-05-25 12:30:30+00:00')," +
                 "(2,'2026-05-25 14:00:00+02:00','2026-05-25 11:00:00-01:00')," +
-                "(3,'2026-05-25 12:00:00+00:00','2026-05-25 13:00:00+00:00')",
+                "(3,'2026-05-25 12:00:00+00:00','2026-05-25 13:00:00+00:00')," +
+                "(4,'2026-05-25 12:00:01.500+00:00','2026-05-25 12:00:00.250+00:00')",
             _ => throw new NotSupportedException()
         };
         await ExecuteAsync(ctx, insert);

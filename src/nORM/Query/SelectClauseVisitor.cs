@@ -1615,26 +1615,20 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                // For DateTimeOffset operands, use integer UTC-epoch-seconds
-                // subtraction (sister of GetDateTimeOffsetUtcEpochSecondsSql
-                // from the equality lowering) to avoid the julianday-delta
-                // double-precision noise that turns FromSeconds(15) into
-                // 14.9999991s. DTO storage is conventionally second-precision,
-                // so integer subtraction loses no information here. DateTime
-                // operands keep the existing julianday path.
+                // For DateTimeOffset operands, use UTC-epoch-millisecond
+                // subtraction (sister of the equality lowering) to avoid the
+                // julianday-delta double-precision noise that turns FromSeconds(15)
+                // into 14.9999991s while still preserving practical sub-second
+                // duration semantics across providers.
                 Type lt = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
                 Type rt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
                 if (lt == typeof(DateTimeOffset) && rt == typeof(DateTimeOffset))
                 {
-                    // `* 1.0` forces REAL coercion in SQLite (sister of the
-                    // TimeSpan-seconds fix). Without it the materialiser's
-                    // ConvertToTimeSpan(long) path treats the diff as ticks and
-                    // returns 15 ticks instead of 15 seconds.
                     sb.Append("((")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(leftSql))
+                      .Append(_provider.GetDateTimeOffsetUtcEpochMillisecondsSql(leftSql))
                       .Append(" - ")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(rightSql))
-                      .Append(") * 1.0)");
+                      .Append(_provider.GetDateTimeOffsetUtcEpochMillisecondsSql(rightSql))
+                      .Append(") / 1000.0)");
                 }
                 else
                 {

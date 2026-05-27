@@ -1044,6 +1044,15 @@ namespace nORM.Providers
                 $"DateTimeOffset UTC-instant comparison is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// SQL evaluating <paramref name="dtoSql"/> as milliseconds since the Unix
+        /// epoch (UTC). Used internally for DateTimeOffset equality/subtraction
+        /// where second-resolution is too coarse but full .NET tick precision is
+        /// not portable across the built-in providers.
+        /// </summary>
+        internal virtual string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"(({GetDateTimeOffsetUtcEpochSecondsSql(dtoSql)}) * 1000)";
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;

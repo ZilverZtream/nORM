@@ -386,6 +386,9 @@ namespace nORM.Providers
             // value without any TZ conversion — correct because the value IS UTC.
             => $"TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', {dtoSql})";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"FLOOR(TIMESTAMPDIFF(MICROSECOND, '1970-01-01 00:00:00', {dtoSql}) / 1000)";
+
         /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
         /// DATE so the materializer reads a DateOnly-compatible value.
