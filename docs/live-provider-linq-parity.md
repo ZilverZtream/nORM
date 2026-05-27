@@ -71,12 +71,13 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
+| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Raw `GroupBy(key).ToListAsync()` returns `IGrouping<K,V>` via client-side grouping after provider fetch; aggregate projections remain server-side SQL GROUP BY. | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
 | `GroupBy` composite anon key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqCompositeGroupByTests`, `LinqGroupMultiAggregateTests` |
 | `GroupBy` HAVING (`Where(g => agg)`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqHavingTests` |
 | `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderJoinSelectManyParityTests`, `CompiledJoinDiagnosticTest` |
 | `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. `CommandBehavior.SequentialAccess` replaced with `Default` to avoid backward-seek on Npgsql when innerKeyIndex > first inner col. | `LiveProviderJoinSelectManyParityTests`, `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
-| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
+| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join / correlated expansion | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. Correlated query expansion lowers to INNER JOIN with the correlated predicate in ON. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests`, `LinqCorrelatedSelectManyTests` |
+| `ExecuteUpdateAsync` / `ExecuteDeleteAsync` filtered and join-sourced, including composite PK | ✅ | ✅ | ✅ | ✅ | ✅ | — | Composite-PK join-source CUD uses row-tuple IN on SQLite/Postgres/MySQL and a JOIN target form on SQL Server. Grouped/ordered/distinct/paged/aggregated CUD remains rejected. | `LiveProviderCompositePkBulkCudParityTests`, `ExecuteDeleteUpdateJoinSourceTests`, `LinqCompositePkExecuteCudTests` |
 | `Union` / `Intersect` / `Except` / `Concat` (incl. ordered/paged tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Trailing `Where` wraps as derived table. `Intersect`/`Except` require MySQL 8.0+; nORM's `MySqlProvider` gate blocks 5.x. | `LiveProviderSetOpParityTests`, `QueryTranslatorCrossProviderTests`, `LinqSetOpCompositionTests` |
 
 ### Post-Take/Skip family (silent-wrongness pins)

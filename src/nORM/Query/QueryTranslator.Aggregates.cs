@@ -168,6 +168,14 @@ namespace nORM.Query
                     BuildGroupBySelectClause(resultSelector, groupBySql, alias);
                 }
             }
+            else
+            {
+                // 2-arg GroupBy with no result selector: the caller may want to enumerate
+                // IGrouping<K, V> directly. Record the key lambda so Generate() can detect
+                // this streaming case and install a client-side grouping transform instead
+                // of emitting a SQL GROUP BY that the entity materializer can't handle.
+                _streamingGroupByKeySelector = keySelectorLambda;
+            }
 
             return node;
         }
@@ -851,6 +859,73 @@ namespace nORM.Query
             using var cts = new CancellationTokenSource(timeout);
             return ExpressionUtils.CompileWithFallback(lambda, cts.Token);
         }
+        /// <summary>
+        /// Compiles <paramref name="keySelectorLambda"/> into a client-side grouping transform
+        /// that groups a materialized entity list by key, returning a typed
+        /// <c>List&lt;IGrouping&lt;K, V&gt;&gt;</c>.  Stored as
+        /// <see cref="_postMaterializeTransform"/> so the normal entity materializer handles
+        /// row reading; the transform runs once after all rows are in memory.
+        /// </summary>
+        private void InstallGroupingTransform(LambdaExpression keySelectorLambda)
+        {
+            var entityType = keySelectorLambda.Parameters[0].Type;
+            var keyType = keySelectorLambda.Body.Type;
+
+            // Compile key selector: entity → boxed key (object?)
+            var objParam = Expression.Parameter(typeof(object), "e");
+            var castEntity = Expression.Convert(objParam, entityType);
+            var reboundKey = new ParameterReplacer(keySelectorLambda.Parameters[0], castEntity).Visit(keySelectorLambda.Body)!;
+            var boxedKey = keyType.IsValueType ? (Expression)Expression.Convert(reboundKey, typeof(object)) : reboundKey;
+            var keyFuncExpr = Expression.Lambda<Func<object, object?>>(boxedKey, objParam);
+            ExpressionUtils.ValidateExpression(keyFuncExpr);
+            var timeout = ExpressionUtils.GetCompilationTimeout(keyFuncExpr);
+            using var cts = new CancellationTokenSource(timeout);
+            var keyFunc = ExpressionUtils.CompileWithFallback(keyFuncExpr, cts.Token);
+
+            // Reflection pieces needed inside the transform closure
+            var groupingType = typeof(IGrouping<,>).MakeGenericType(keyType, entityType);
+            var concreteType = typeof(ClientGrouping<,>).MakeGenericType(keyType, entityType);
+            var groupingCtor = concreteType.GetConstructor(
+                new[] { keyType, typeof(IEnumerable<>).MakeGenericType(entityType) })!;
+            var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!.MakeGenericMethod(entityType);
+            var resultListType = typeof(List<>).MakeGenericType(groupingType);
+
+            // Sentinel used as dictionary key when the actual group key is null,
+            // since Dictionary<object,…> does not permit null keys.
+            var nullSentinel = new object();
+
+            System.Collections.IList Transform(System.Collections.IList rows)
+            {
+                // Preserve first-seen key order (LINQ GroupBy semantics)
+                var keyOrder = new List<object?>();
+                var buckets = new Dictionary<object, List<object>>(EqualityComparer<object>.Default);
+                foreach (var row in rows)
+                {
+                    var key = row == null ? null : keyFunc(row);
+                    var dictKey = (object?)key ?? nullSentinel;
+                    if (!buckets.TryGetValue(dictKey, out var bucket))
+                    {
+                        bucket = new List<object>();
+                        buckets[dictKey] = bucket;
+                        keyOrder.Add(key);   // actual key (may be null)
+                    }
+                    bucket.Add(row!);
+                }
+
+                var result = (System.Collections.IList)Activator.CreateInstance(resultListType, keyOrder.Count)!;
+                foreach (var keyObj in keyOrder)
+                {
+                    var dictKey = (object?)keyObj ?? nullSentinel;
+                    var items = castMethod.Invoke(null, new object?[] { buckets[dictKey] })!;
+                    var grouping = groupingCtor.Invoke(new object?[] { keyObj, items })!;
+                    result.Add(grouping);
+                }
+                return result;
+            }
+
+            _postMaterializeTransform = Transform;
+        }
+
         private sealed class ProjectionMemberReplacer : ExpressionVisitor
         {
             protected override Expression VisitMember(MemberExpression node)
@@ -887,5 +962,21 @@ namespace nORM.Query
                 return base.VisitMember(node);
             }
         }
+    }
+
+    /// <summary>
+    /// Concrete IGrouping implementation returned by the streaming GroupBy transform.
+    /// </summary>
+    internal sealed class ClientGrouping<TKey, TElement> : IGrouping<TKey, TElement>
+    {
+        private readonly List<TElement> _elements;
+        public TKey Key { get; }
+        public ClientGrouping(TKey key, IEnumerable<TElement> elements)
+        {
+            Key = key;
+            _elements = new List<TElement>(elements);
+        }
+        public IEnumerator<TElement> GetEnumerator() => _elements.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => _elements.GetEnumerator();
     }
 }

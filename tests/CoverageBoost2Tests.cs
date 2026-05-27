@@ -351,7 +351,7 @@ public class CoverageBoost2Tests : TestBase
     /// G1 fix: HandleGroupBy detects NewExpression key body and throws early.
     /// </summary>
     [Fact]
-    public void GroupBy_CompositeAnonymousTypeKey_TranslatesToMultiColumnGroupBy()
+    public void GroupBy_CompositeAnonymousTypeKey_StreamingSelectsAllEntityColumns()
     {
         using var cn = OpenMemory();
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -373,10 +373,11 @@ public class CoverageBoost2Tests : TestBase
             Expression.Quote(keySelector));
 
         var (sql, _) = TranslateDirectExpr(expr, ctx);
-        Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
-        var groupByClause = sql.Substring(sql.IndexOf("GROUP BY", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Name", groupByClause, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Value", groupByClause, StringComparison.OrdinalIgnoreCase);
+        // Streaming GroupBy: entity rows fetched without GROUP BY; client-side grouping
+        Assert.DoesNotContain("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        // Both key columns appear in the entity SELECT
+        Assert.Contains("Name", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Value", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── GROUP 80: TranslateGroupAggregateMethod — Sum/Min/Max/Average/LongCount ──

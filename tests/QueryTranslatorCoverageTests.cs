@@ -682,7 +682,7 @@ public class QueryTranslatorCoverageTests
     // ─── GroupBy (SQL translation only) ──────────────────────────────────
 
     [Fact]
-    public void GroupBy_TranslationProducesGroupBySql()
+    public void GroupBy_StreamingTranslation_NoGroupByClauseEntitySelect()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -699,7 +699,11 @@ public class QueryTranslatorCoverageTests
         var translator = Activator.CreateInstance(translatorType, ctx)!;
         var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { q.Expression })!;
         var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
-        Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        // Streaming GroupBy: fetches all entity rows (no GROUP BY); client-side grouping via PostMaterializeTransform
+        Assert.DoesNotContain("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CategoryId", sql, StringComparison.OrdinalIgnoreCase);
+        var transform = plan.GetType().GetProperty("PostMaterializeTransform")!.GetValue(plan);
+        Assert.NotNull(transform);
     }
 
     // ─── ElementAt ────────────────────────────────────────────────────────
@@ -1637,10 +1641,10 @@ public class QueryTranslatorCoverageTests
         Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ─── GroupBy with aggregate in result selector ─────────────────────────
+    // ─── GroupBy streaming: plain GroupBy emits no GROUP BY SQL ──────────────
 
     [Fact]
-    public void GroupBy_WithCountAggregate_GeneratesGroupByCountSql()
+    public void GroupBy_Streaming_NoGroupByInSqlEntityColumnsPresent()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1651,7 +1655,8 @@ public class QueryTranslatorCoverageTests
         var q = ctx.Query<QtProduct>()
             .GroupBy(p => p.CategoryId);
         var sql = TranslateSql(ctx, q);
-        Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        // Streaming GroupBy: entity rows fetched; client-side grouping via PostMaterializeTransform
+        Assert.DoesNotContain("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CategoryId", sql, StringComparison.OrdinalIgnoreCase);
     }
 
