@@ -160,7 +160,11 @@ function Import-BenchmarkRows {
                 continue
             }
 
-            $provider = if ($row.Provider) { $row.Provider } else { 'Unspecified' }
+            if (-not $row.Provider) {
+                continue
+            }
+
+            $provider = $row.Provider
             $rows.Add([pscustomobject]@{
                 Report = $file.Name
                 Provider = $provider
