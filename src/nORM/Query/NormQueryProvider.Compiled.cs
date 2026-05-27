@@ -193,6 +193,7 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
             {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
@@ -238,6 +239,7 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
             {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
@@ -324,14 +326,23 @@ namespace nORM.Query
             }
             else
             {
-                // Fallback: no pre-computed fixedParams available, add all plan parameters unfiltered
+                // Fallback: no pre-computed fixedParams available, add only SQL-visible constants.
+                var compiledSet = compiledParams.Count == 0
+                    ? null
+                    : new HashSet<string>(compiledParams, StringComparer.Ordinal);
                 foreach (var p in plan.Parameters)
+                {
+                    if (compiledSet?.Contains(p.Key) == true) continue;
                     cmd.AddOptimizedParam(p.Key, p.Value);
+                }
             }
 
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
         }
 
         /// <summary>
@@ -449,9 +460,13 @@ namespace nORM.Query
             }
             else
             {
-                // No compiled params — add all plan parameters
+                // No pre-computed fixed params: add only SQL-visible constants.
+                var compiledSet = plan.CompiledParameters.Count == 0
+                    ? null
+                    : new HashSet<string>(plan.CompiledParameters, StringComparer.Ordinal);
                 foreach (var kvp in plan.Parameters)
                 {
+                    if (compiledSet?.Contains(kvp.Key) == true) continue;
                     var p = cmd.CreateParameter();
                     p.ParameterName = kvp.Key;
                     ParameterAssign.AssignValue(p, kvp.Value);
@@ -464,6 +479,7 @@ namespace nORM.Query
             // such as Npgsql infer prepared-statement parameter types during Prepare().
             for (int i = 0; i < plan.CompiledParameters.Count; i++)
             {
+                if (IsUnusedCompiledParameter(plan.CompiledParameters[i])) continue;
                 var p = cmd.CreateParameter();
                 p.ParameterName = plan.CompiledParameters[i];
                 if (i < parameterValues.Length)
@@ -498,9 +514,11 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             // P1 fix: call AssignValue (not direct .Value assignment) so that DbType and Size
             // are reset when the value is null, preventing stale metadata carry-over.
+            var slot = fixedParamCount;
             for (int i = 0; i < count; i++)
             {
-                var parameter = cmd.Parameters[fixedParamCount + i];
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
+                var parameter = cmd.Parameters[slot++];
                 ParameterAssign.AssignValue(parameter, parameterValues[i]);
                 ApplyPreparedParameterSizeHint(cmd, parameter);
             }
@@ -594,16 +612,25 @@ namespace nORM.Query
             }
             else
             {
-                // No compiled params — add all plan parameters
+                // No pre-computed fixed params: add only SQL-visible constants.
+                var compiledSet = plan.CompiledParameters.Count == 0
+                    ? null
+                    : new HashSet<string>(plan.CompiledParameters, StringComparer.Ordinal);
                 foreach (var kvp in plan.Parameters)
+                {
+                    if (compiledSet?.Contains(kvp.Key) == true) continue;
                     cmd.AddOptimizedParam(kvp.Key, kvp.Value);
+                }
             }
 
             // Bind compiled parameters (values from the caller)
             var compiledParams = plan.CompiledParameters;
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
 
             if (plan.IsScalar)
             {
@@ -813,7 +840,10 @@ namespace nORM.Query
         {
             var dict = new Dictionary<string, object>(plan.Parameters);
             for (int i = 0; i < plan.CompiledParameters.Count && i < parameterValues.Length; i++)
+            {
+                if (IsUnusedCompiledParameter(plan.CompiledParameters[i])) continue;
                 dict[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+            }
 
             var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, dict);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;

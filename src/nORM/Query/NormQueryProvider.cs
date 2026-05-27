@@ -1125,6 +1125,10 @@ namespace nORM.Query
 
         /// <summary>PERF: Extracted parameter binding to share between fast and slow paths.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsUnusedCompiledParameter(string parameterName)
+            => parameterName.EndsWith("_unused", StringComparison.Ordinal);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void BindPlanParameters(DbCommand cmd, QueryPlan plan, IReadOnlyList<object?>? paramValues)
         {
             var compiledParams = plan.CompiledParameters;
@@ -1149,7 +1153,10 @@ namespace nORM.Query
                 {
                     var count = Math.Min(compiledParams.Count, paramValues.Count);
                     for (int i = 0; i < count; i++)
+                    {
+                        if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                         cmd.AddOptimizedParam(compiledParams[i], paramValues[i] ?? DBNull.Value);
+                    }
                 }
             }
         }
