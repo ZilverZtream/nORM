@@ -488,6 +488,12 @@ public class LiveProviderRecentScvParityTests
 
                 // Active (1), Inactive (2), Pending (4) are valid names; NotAStatus (3) is not.
                 Assert.Equal(new[] { 1, 2, 4 }, rows.Select(r => r.Id).ToArray());
+
+                var ignoreCaseRows = await ctx.Query<EtpParityRow>()
+                    .Where(r => Enum.TryParse<EtpStatus>(r.StatusText, true, out sink))
+                    .OrderBy(r => r.Id)
+                    .ToListAsync();
+                Assert.Equal(new[] { 1, 2, 4, 5 }, ignoreCaseRows.Select(r => r.Id).ToArray());
             }
             finally { await Teardown(ctx, EtpTable); }
         }
@@ -504,9 +510,9 @@ public class LiveProviderRecentScvParityTests
 
         string insert = kind switch
         {
-            ProviderKind.MySql    => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending')",
-            ProviderKind.Postgres => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending')",
-            _                     => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending')"
+            ProviderKind.MySql    => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending'),(5,'active')",
+            ProviderKind.Postgres => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending'),(5,'active')",
+            _                     => $"INSERT INTO {t} ({id},{txt}) VALUES (1,'Active'),(2,'Inactive'),(3,'NotAStatus'),(4,'Pending'),(5,'active')"
         };
         await ExecuteAsync(ctx, insert);
     }
