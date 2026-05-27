@@ -11,10 +11,10 @@ the matrix notes an explicit deterministic failure contract.
 | --- | --- |
 | `Where` predicates | `tests/SqlTranslationTests.cs`, `tests/CrossProviderBehaviorTests.cs`, `tests/AdversarialMultiShapeStressTests.cs`, `tests/LinqConversionAndCompareTests.cs`, `tests/LinqEnumAndConditionalTests.cs` |
 | `Select` entity and scalar projections | `tests/MaterializerAndExecutorDeepCoverageTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
-| `Select` into anonymous types | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupByProjectionTests.cs` |
-| `Select` into DTO with positional record | `tests/LinqDtoProjectionTests.cs` |
-| `Select` into DTO with parameterized class constructor | `tests/LinqDtoProjectionTests.cs` |
-| `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | `tests/LinqDtoProjectionTests.cs` |
+| `Select` into anonymous types | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupByProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
+| `Select` into DTO with positional record | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
+| `Select` into DTO with parameterized class constructor | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
+| `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
 | `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/LiveProviderClientEvaluationParityTests.cs` |
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
