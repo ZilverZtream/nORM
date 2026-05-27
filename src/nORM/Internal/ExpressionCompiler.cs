@@ -304,7 +304,8 @@ namespace nORM.Internal
 
                 var args = BuildCompiledParameterValues(invEntry.ValueSources, value, paramNames);
 
-                // Inline pooled sync execution for providers without true async I/O (SQLite).
+                // Inline pooled sync execution for providers whose compiled-query hot path is
+                // faster synchronously.
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
                 // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
                 // Pooled commands avoid per-call DbCommand/DbParameter allocation and SQL compilation.
@@ -313,7 +314,7 @@ namespace nORM.Internal
                 // Interceptors guard removed — the fast path now routes through
                 // ExecuteReaderWithInterception so interceptors are honoured.
                 if (cachedPlan != null &&
-                    ctx.Provider.PrefersSyncExecution &&
+                    ctx.Provider.PrefersSyncCompiledQueryExecution &&
                     ctx.Options.RetryPolicy == null &&
                     ctx.Options.CacheProvider == null &&
                     ctx.Connection.State == ConnectionState.Open &&
