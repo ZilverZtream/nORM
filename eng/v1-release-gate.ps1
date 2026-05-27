@@ -15,7 +15,10 @@ Set-Location $root
 
 $solutionPath = Join-Path $root 'nORM.sln'
 $testsProjectPath = Join-Path (Join-Path $root 'tests') 'nORM.Tests.csproj'
+$benchmarkProjectDir = Join-Path $root 'benchmarks'
 $benchmarkProjectPath = Join-Path (Join-Path $root 'benchmarks') 'nORM.Benchmarks.csproj'
+$benchmarkResultsPath = Join-Path (Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts') 'results'
+$benchmarkEvidencePath = Join-Path (Join-Path $root 'BenchmarkDotNet.Artifacts') 'v1-evidence'
 $runtimeProjectPath = Join-Path (Join-Path $root 'src') 'nORM.csproj'
 $toolProjectPath = Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') 'dotnet-norm.csproj'
 $testResultsPath = Join-Path (Join-Path (Join-Path $root 'tests') 'TestResults') 'v1-release-gate'
@@ -118,6 +121,20 @@ function Clear-PackageOutput {
 
     Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.nupkg" | Remove-Item -Force
     Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.snupkg" | Remove-Item -Force
+}
+
+function Invoke-BenchmarkStep {
+    param(
+        [string[]]$Arguments
+    )
+
+    Push-Location $benchmarkProjectDir
+    try {
+        dotnet run -c $Configuration -- @Arguments
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 function Assert-CurrentPackageOutput {
@@ -288,7 +305,13 @@ if ($Mode -eq 'rc') {
 }
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
-    Invoke-Step 'fast complex query benchmark' { dotnet run --project $benchmarkProjectPath -c $Configuration -- --fast Query_Complex }
+    Invoke-Step 'clean benchmark outputs before run' {
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
+            (Join-Path $root 'BenchmarkDotNet.Artifacts'),
+            (Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts')
+    }
+
+    Invoke-Step 'fast complex query benchmark' { Invoke-BenchmarkStep @('--fast', 'Query_Complex') }
 }
 
 if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'rc') {
@@ -297,17 +320,25 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
     }
 
     Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark' {
-        dotnet run --project $benchmarkProjectPath -c $Configuration -- --provider-matrix --filter $ProviderMatrixBenchmarkFilter
+        Invoke-BenchmarkStep @('--provider-matrix', '--filter', $ProviderMatrixBenchmarkFilter)
     }
 }
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     Invoke-Step 'benchmark evidence manifest' {
-        & (Join-Path $root 'eng/benchmark-evidence.ps1') -BenchmarkFilter $ProviderMatrixBenchmarkFilter -Mode $Mode
+        & (Join-Path $root 'eng/benchmark-evidence.ps1') `
+            -ResultsDirectory $benchmarkResultsPath `
+            -OutputDirectory $benchmarkEvidencePath `
+            -BenchmarkFilter $ProviderMatrixBenchmarkFilter `
+            -Mode $Mode
     }
 
     Invoke-Step 'benchmark threshold gate' {
         $thresholdArgs = @(
+            '-ResultsDirectory',
+            $benchmarkResultsPath,
+            '-OutputDirectory',
+            $benchmarkEvidencePath,
             '-ThresholdFile',
             (Join-Path $root 'eng/benchmark-thresholds.json')
         )
