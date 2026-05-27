@@ -39,19 +39,23 @@ watch item:
 
 ## Non-Benchmark Validation
 
-- Full RC correctness gate with `-SkipBenchmark`: passed. The generated
-  `artifacts/v1-rc/rc-artifacts.md` manifest records the exact gate commit and
-  package hashes.
+- Full RC correctness gate with `-Mode rc -MinLiveProviders 3 -StressIterations 20 -SkipBenchmark`:
+  passed on commit `0bdf8ecdeaa09a66d1e08371ced10b3405ed59a3`. The generated
+  `artifacts/v1-rc/rc-artifacts.md` manifest records the exact gate commit,
+  provider configuration, package hashes, and benchmark-skipped caveat.
 - Quick release gate with `-SkipBenchmark`: passed.
 - Live provider gate with SQL Server, PostgreSQL, and MySQL configured:
-  `1356/1356` live-provider tests passed after the SQL Server compiled string
-  parameter reuse fix.
+  `1356/1356` direct live-provider tests passed after the SQL Server compiled
+  string parameter reuse fix; the RC gate live-provider filter passed
+  `1347/1347` in both required passes.
 - Direct Release full-suite run with live provider environment configured:
-  `9729/9729` tests passed.
-- Single-pass stress smoke for navigation, transaction, and compiled-query gate
-  groups: `107/107` tests passed.
-- Single-pass source-gen parity, bulk/provider parity, migration, cache, and
-  adversarial gate groups: `1484/1484` tests passed.
+  `9872/9872` tests passed; the RC gate full-suite step also passed
+  `9872/9872` in both required passes.
+- RC stress gates passed with 20 iterations each: navigation `26/26`,
+  transaction `55/55`, and compiled-query `26/26` on every iteration.
+- RC focused gates passed: source-gen parity `97/97`, bulk/provider parity
+  `424/424`, migration `215/215`, cache bounds `16/16`, and adversarial
+  `767/767`.
 
 ## Public-Claim Interpretation
 
