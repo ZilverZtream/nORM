@@ -358,7 +358,7 @@ namespace nORM.Internal
                         {
                             var p = cmd.CreateParameter();
                             p.ParameterName = compiledParams2[i];
-                            p.Value = DBNull.Value;
+                            ParameterAssign.AssignValue(p, i < args.Length ? args[i] : DBNull.Value);
                             cmd.Parameters.Add(p);
                         }
                         try { cmd.Prepare(); } catch (Exception) { /* Prepare is a performance optimization; failure is non-fatal */ }
