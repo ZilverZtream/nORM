@@ -18,6 +18,8 @@ project names when it runs directly from the main checkout.
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-143655` | SQLite, SQL Server, PostgreSQL, MySQL | Count | Passed |
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-142235` | SQLite, SQL Server, PostgreSQL, MySQL | Single insert | Passed |
 | `BenchmarkDotNet.Artifacts/provider-slices/20260527-142633` | SQLite, SQL Server, PostgreSQL, MySQL | Idiomatic `BulkInsertAsync` | Passed |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260527-154725` | SQLite, PostgreSQL | Simple runtime and compiled queries after pooled-plan guard fix | Passed |
+| `BenchmarkDotNet.Artifacts/provider-slices/20260527-164414` | MySQL | Complex runtime/compiled queries and runtime/compiled joins after pooled-plan guard fix | Passed |
 
 Notable tight-but-passing ratios:
 
@@ -26,6 +28,16 @@ Notable tight-but-passing ratios:
 - MySQL runtime join: `1.379/1.5` vs optimized Raw ADO.
 - SQL Server runtime join: `1.12/1.5` vs optimized Raw ADO.
 - MySQL complex compiled: `1.005/1.4` vs prepared optimized Raw ADO.
+- After the pooled-plan guard fix, MySQL runtime join improved to `1.038/1.5`
+  and MySQL complex compiled remained inside budget at `1.027/1.4`.
+
+Current non-benchmark validation for RC2 candidate `c3f1aa8`:
+
+- Quick release gate with `-SkipBenchmark`: passed.
+- Live provider gate with SQL Server, PostgreSQL, and MySQL configured:
+  `1207/1207` live-provider tests passed.
+- Direct Release full-suite run with live provider environment configured:
+  `9729/9729` tests passed.
 
 Public-claim interpretation:
 
