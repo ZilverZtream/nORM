@@ -169,6 +169,9 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
         Assert.Contains("Convert-AllocatedToBytes", thresholdGate);
         Assert.Contains("Benchmark threshold check failed", thresholdGate);
+        Assert.Single(Regex.Matches(thresholdGate, "function Convert-MeanToNanoseconds"));
+        Assert.Contains("if ($Mode -ne 'rc')", gate);
+        Assert.Contains("$thresholdArgs.AllowMissingRules = $true", gate);
     }
 
     private static void AssertMethodContains(string code, string methodName, string expected)
