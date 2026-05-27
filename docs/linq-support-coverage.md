@@ -84,7 +84,7 @@ the matrix notes an explicit deterministic failure contract.
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs`, `tests/LiveProviderContainsParityTests.cs` |
 | `Guid.Empty` and other static-field constants in predicates | `tests/LinqGuidAndDistinctTests.cs` |
 | `Json.Value<T>(jsonColumn, constantPath)` | `tests/JsonPathValidationTests.cs`, `tests/ExpressionToSqlVisitorTests.cs`, `tests/LiveProviderJsonWindowParityTests.cs` |
-| `NormFunctions.Like(value, pattern)` | `tests/LinqNormFunctionsLikeTests.cs` |
+| `NormFunctions.Like(value, pattern)` / `NormFunctions.ILike(value, pattern)` | `tests/LinqNormFunctionsLikeTests.cs`, `tests/LinqWhereNormIlikeTests.cs`, `tests/LiveProviderNormFunctionsLikeParityTests.cs` |
 
 This file maps each documented LINQ shape to its contract tests. Provider-neutral
 rows that are marked `Supported` are expected to have live parity evidence in

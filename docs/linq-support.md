@@ -98,7 +98,7 @@ Status values:
 | `Guid.Empty` and other static-field constants in predicates | Supported | Evaluated at execution time via the static-member constant path. |
 | `Guid.NewGuid()` in queries | Unsupported | Generate the value in CLR before composing the query. |
 | `Json.Value<T>(jsonColumn, constantPath)` | Supported | Translates to provider JSON value extraction. The path must be a constant string and is validated before SQL generation; SQLite support depends on the JSON1 extension. |
-| `NormFunctions.Like(value, pattern)` | Supported | Emits `(value LIKE pattern)` verbatim — no automatic LIKE-pattern escaping unlike `Contains`/`StartsWith`/`EndsWith`. |
+| `NormFunctions.Like(value, pattern)` / `NormFunctions.ILike(value, pattern)` | Supported | `Like` emits `(value LIKE pattern)` verbatim. `ILike` emits native PostgreSQL `ILIKE`; other providers lower both sides and use `LIKE`. No automatic LIKE-pattern escaping is performed unlike `Contains`/`StartsWith`/`EndsWith`. |
 
 ## Provider Notes
 

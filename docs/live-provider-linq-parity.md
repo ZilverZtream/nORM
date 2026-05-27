@@ -120,6 +120,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests`, `LiveProviderEnumParityTests` |
 | `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to a provider-forced case-sensitive enum-name comparison; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `NormFunctions.Like` / `NormFunctions.ILike` | ✅ | ✅ | ✅ | ✅ | ✅ | — | `Like` does not auto-escape SQL wildcards. `ILike` uses native PostgreSQL `ILIKE`; other providers use `LOWER(value) LIKE LOWER(pattern)`. | `LiveProviderNormFunctionsLikeParityTests`, `LinqNormFunctionsLikeTests`, `LinqWhereNormIlikeTests` |
 | `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests`, `LiveProviderNullableBoolParityTests` |
 | local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderContainsParityTests` |
 
