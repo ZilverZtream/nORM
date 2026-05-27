@@ -161,6 +161,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("maxMeanRatio", thresholds);
         Assert.Contains("maxAllocatedRatio", thresholds);
         Assert.Contains("Query_Complex_nORM", thresholds);
+        Assert.Contains("Query_Join_nORM", thresholds);
         Assert.Contains("Query_Join_nORM_Compiled", thresholds);
         Assert.Contains("BulkInsert_Idiomatic_nORM", thresholds);
         Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
