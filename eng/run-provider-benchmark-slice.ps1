@@ -1,6 +1,6 @@
 param(
-    [string[]]$Providers = @('Sqlite', 'SqlServer', 'Postgres', 'MySql'),
-    [string[]]$Filters = @('*ProviderMatrixBenchmarks.Query_Join*'),
+    [string]$Providers = 'Sqlite,SqlServer,Postgres,MySql',
+    [string]$Filters = '*ProviderMatrixBenchmarks.Query_Join*',
     [string]$Configuration = 'Release',
     [string]$OutputRoot = (Join-Path (Split-Path -Parent $PSScriptRoot) 'BenchmarkDotNet.Artifacts/provider-slices'),
     [switch]$CheckThresholds,
@@ -14,6 +14,8 @@ $benchmarksDir = Join-Path $root 'benchmarks'
 $runStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $runRoot = Join-Path $OutputRoot $runStamp
 $mergedResults = Join-Path $runRoot 'results'
+$providerList = @($Providers -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$filterList = @($Filters -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
 function Get-SafeName {
     param([string]$Value)
@@ -46,10 +48,8 @@ if (-not $NoIsolation) {
         git -C $root worktree add --detach $tempRoot HEAD | Write-Host
 
         $forwardArgs = @(
-            '-Providers'
-        ) + $Providers + @(
-            '-Filters'
-        ) + $Filters + @(
+            '-Providers', ($providerList -join ','),
+            '-Filters', ($filterList -join ';'),
             '-Configuration', $Configuration,
             '-OutputRoot', $OutputRoot,
             '-NoIsolation'
@@ -63,22 +63,24 @@ if (-not $NoIsolation) {
 
         try {
             & (Join-Path $tempRoot 'eng/run-provider-benchmark-slice.ps1') @forwardArgs
-            exit $LASTEXITCODE
+            $childExitCode = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } else { 0 }
         }
         finally {
             if (-not $KeepWorktree) {
                 git -C $root worktree remove --force $tempRoot | Write-Host
             }
         }
+
+        exit $childExitCode
     }
 }
 
 New-Item -ItemType Directory -Force -Path $mergedResults | Out-Null
 
-foreach ($providerArg in $Providers) {
+foreach ($providerArg in $providerList) {
     $provider = Normalize-ProviderName $providerArg
 
-    foreach ($filter in $Filters) {
+    foreach ($filter in $filterList) {
         $safeFilter = Get-SafeName $filter
         $sliceDir = Join-Path (Join-Path $runRoot $provider) $safeFilter
         $sliceResults = Join-Path $sliceDir 'results'
@@ -115,7 +117,7 @@ foreach ($providerArg in $Providers) {
 & (Join-Path $root 'eng/benchmark-evidence.ps1') `
     -ResultsDirectory $mergedResults `
     -OutputDirectory (Join-Path $runRoot 'v1-evidence') `
-    -BenchmarkFilter ($Filters -join '; ') `
+    -BenchmarkFilter ($filterList -join '; ') `
     -Mode 'slice'
 
 if ($CheckThresholds) {

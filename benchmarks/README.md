@@ -73,7 +73,7 @@ checker with missing unrelated rules allowed:
 
 ```powershell
 eng/run-provider-benchmark-slice.ps1 `
-  -Providers Postgres,Sqlite `
+  -Providers "Postgres,Sqlite" `
   -Filters "*ProviderMatrixBenchmarks.Query_Join*" `
   -CheckThresholds
 ```
