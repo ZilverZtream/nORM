@@ -1032,12 +1032,9 @@ namespace nORM.Providers
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as the integer count of seconds
-        /// since the Unix epoch (UTC). Used to lower <c>dtoCol == dateTimeLiteral</c>
-        /// to instant equality — comparing canonical UTC text would mismatch rows
-        /// that stored the same UTC instant in a different offset. Second-resolution
-        /// is a conscious trade-off: sub-second fidelity would require provider-
-        /// specific decimal math and most DTO columns are second-precision in
-        /// practice.
+        /// since the Unix epoch (UTC). Kept as a provider extension point and as a
+        /// fallback for custom providers; built-in DateTimeOffset equality and
+        /// subtraction use the millisecond hook below.
         /// </summary>
         public virtual string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => throw new NormUnsupportedFeatureException(

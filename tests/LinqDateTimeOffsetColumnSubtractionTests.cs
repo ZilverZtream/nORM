@@ -14,9 +14,9 @@ namespace nORM.Tests;
 /// Pins <c>dtoColA - dtoColB</c> in projection. Result is a TimeSpan
 /// equal to the difference between the two UTC instants — independent
 /// of the offsets each column was stored in. The SQL must lower to a
-/// UTC epoch-seconds difference (using the same hook that powers
-/// DateTimeOffset == DateTime equality) and the materialiser must
-/// reconstruct a TimeSpan from the fractional seconds value.
+/// UTC epoch-millisecond difference (using the same normalization that powers
+/// DateTimeOffset == DateTime equality) and the materialiser must reconstruct a
+/// TimeSpan from the fractional seconds value.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqDateTimeOffsetColumnSubtractionTests : IAsyncLifetime

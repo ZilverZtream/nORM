@@ -485,7 +485,7 @@ namespace nORM.Query
                 // DateTimeOffset col == DateTime literal: SQLite stores DTOs as
                 // text with an offset suffix and the literal binds as offset-less
                 // text, so naive equality misses rows storing the same UTC instant
-                // in a different offset. Lower to UTC epoch-seconds comparison via
+                // in a different offset. Lower to UTC epoch-millisecond comparison via
                 // a provider hook. .NET's DateTime→DateTimeOffset implicit conv
                 // treats Utc-kind as offset 0 and Unspecified/Local as the local
                 // offset (we use the snapshot offset, consistent with
