@@ -413,6 +413,10 @@ namespace nORM.Providers
                 ? $"CAST({innerSql} AS DECIMAL(38, 10))"
                 : $"CAST({innerSql} AS FLOAT)";
 
+        /// <summary>SQL Server ROUND(x, 0, 1) truncates toward zero.</summary>
+        public override string GetTruncateToIntSql(string numericSql)
+            => $"CAST(ROUND({numericSql}, 0, 1) AS INT)";
+
         /// <summary>SQL Server uses IF NOT EXISTS for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";

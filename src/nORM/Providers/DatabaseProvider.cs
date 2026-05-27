@@ -1060,6 +1060,14 @@ namespace nORM.Providers
             => $"CAST({innerSql} AS {(asLong ? "BIGINT" : "INTEGER")})";
 
         /// <summary>
+        /// Returns SQL that truncates a numeric expression toward zero and returns
+        /// an integer. Used for TimeSpan component extraction where .NET truncates
+        /// fractional totals before modulo arithmetic.
+        /// </summary>
+        public virtual string GetTruncateToIntSql(string numericSql)
+            => $"CAST({numericSql} AS INTEGER)";
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> as a floating-point /
         /// fixed-precision number. Used to translate <c>double.Parse(col)</c> and
         /// <c>decimal.Parse(col)</c>. Defaults to ANSI <c>CAST(x AS DOUBLE PRECISION)</c>
