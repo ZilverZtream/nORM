@@ -43,7 +43,8 @@ watch item:
   package hashes.
 - Quick release gate with `-SkipBenchmark`: passed.
 - Live provider gate with SQL Server, PostgreSQL, and MySQL configured:
-  `1207/1207` live-provider tests passed.
+  `1356/1356` live-provider tests passed after the SQL Server compiled string
+  parameter reuse fix.
 - Direct Release full-suite run with live provider environment configured:
   `9729/9729` tests passed.
 - Single-pass stress smoke for navigation, transaction, and compiled-query gate
