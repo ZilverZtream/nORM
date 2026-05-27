@@ -147,6 +147,8 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("benchmark threshold gate", gate);
         Assert.Contains("eng/check-benchmark-thresholds.ps1", gate);
         Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
+        Assert.Contains("BulkInsert_Idiomatic_*", governance);
+        Assert.Contains("Tx + per row", governance);
         Assert.Contains("eng/benchmark-thresholds.json", governance);
         Assert.Contains("eng/check-benchmark-thresholds.ps1", governance);
         Assert.Contains("Redact-ConnectionString", evidence);
