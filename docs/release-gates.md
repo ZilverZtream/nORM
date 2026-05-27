@@ -48,7 +48,9 @@ the live-provider gate with the public API snapshot, package creation, repeated
 navigation/transaction/compiled-query stress loops, provider/source-generator
 parity, migration parity, concurrency/adversarial coverage, the fast complex
 query benchmark, and the full SQLite/SQL Server/PostgreSQL/MySQL provider
-benchmark matrix.
+benchmark matrix. The provider matrix runs as provider-specific slices so each
+database has its own log and raw BenchmarkDotNet reports before the threshold
+gate evaluates the merged result set.
 
 ```powershell
 .\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20
@@ -74,6 +76,12 @@ evidence. A manifest produced with `-SkipBenchmark` validates correctness and
 provider parity only — it does not constitute benchmark evidence and must not be
 used to support public performance claims. Run without `-SkipBenchmark` on the
 release commit before making any throughput or latency claims.
+
+The RC provider matrix writes its split runs under
+`BenchmarkDotNet.Artifacts/provider-slices/<timestamp>/` and then points the
+benchmark evidence and threshold steps at that run's merged `results/`
+directory. This keeps SQLite, SQL Server, PostgreSQL, and MySQL failures
+isolated while preserving one release-grade threshold report.
 
 Every successful gate writes an artifact index with
 `eng/rc-artifact-manifest.ps1` under `artifacts/v1-rc/`. The manifest records
