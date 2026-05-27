@@ -1016,7 +1016,7 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
 
-            if (CanUsePooledPlanCommand(plan, paramValues))
+            if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
                 return ExecutePooledQueryPlanSync<TResult>(plan, sw, ct);
 
             // Synchronous command setup — no async state machine needed
@@ -1054,7 +1054,7 @@ namespace nORM.Query
         private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            if (CanUsePooledPlanCommand(plan, paramValues))
+            if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
                 return await ExecutePooledQueryPlanSync<TResult>(plan, sw, ct).ConfigureAwait(false);
 
             var cmd = _ctx.CreateCommand();
@@ -1078,7 +1078,7 @@ namespace nORM.Query
             return await ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
         }
 
-        private bool CanUsePooledPlanCommand(QueryPlan plan, IReadOnlyList<object?>? paramValues)
+        private bool CanUsePooledPlanCommand<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues)
             => _ctx.Provider.SupportsQueryPlanPreparedCommandCache &&
                _ctx.Options.CommandInterceptors.Count == 0 &&
                paramValues == null &&
@@ -1091,7 +1091,11 @@ namespace nORM.Query
                plan.DependentQueries is not { Count: > 0 } &&
                plan.M2MIncludes is not { Count: > 0 } &&
                plan.ClientProjection == null &&
-               plan.PostMaterializeTransform == null;
+               plan.PostMaterializeTransform == null &&
+               typeof(TResult) != typeof(List<object>) &&
+               (!plan.ElementType.IsClass ||
+                !_ctx.IsMapped(plan.ElementType) ||
+                _ctx.GetMapping(plan.ElementType).OwnedCollections.Count == 0);
 
         private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, Stopwatch? sw, CancellationToken ct)
         {
