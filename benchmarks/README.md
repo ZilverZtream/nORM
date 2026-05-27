@@ -66,6 +66,18 @@ dotnet run -c Release -- --provider-matrix --provider SqlServer --filter "*Provi
 dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.BulkInsert_Batched*"
 ```
 
+For repeatable focused evidence, prefer the checked-in slice runner. It runs one
+provider/filter pair at a time, preserves each provider's logs and raw reports,
+merges the CSV reports into a single evidence folder, and can run the threshold
+checker with missing unrelated rules allowed:
+
+```powershell
+eng/run-provider-benchmark-slice.ps1 `
+  -Providers Postgres,Sqlite `
+  -Filters "*ProviderMatrixBenchmarks.Query_Join*" `
+  -CheckThresholds
+```
+
 ## Test Data
 
 - 1,000 users
