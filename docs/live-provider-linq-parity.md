@@ -61,7 +61,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `Sum` / `Average` / `Min` / `Max` (scalar + selector) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Decimal coerced to REAL on SQLite — small float drift. | `LinqGroupAggregateComputedSelectorTests`, `LiveProviderShapeParityTests` |
 | `Sum`/`Min`/`Max`/`Avg` over decimal column | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite: REAL coercion. | `LiveProviderShapeParityTests` |
-| `Sum`/`Min`/`Max`/`Avg` over nullable columns | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Throws "no elements" when result is null & TResult is non-nullable value (commit 57). | `LinqOperatorCardinalityTests` |
+| `Sum`/`Min`/`Max`/`Avg` over nullable columns | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Throws "no elements" when result is null & TResult is non-nullable value (commit 57). | `LinqOperatorCardinalityTests`, `LiveProviderNullableAggregateParityTests` |
 | LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQL Server/Postgres/MySQL use native ordered aggregate (WITHIN GROUP / inline ORDER BY). SQLite uses outer ORDER BY to guide index scan order for GROUP_CONCAT. | `LinqAggregateStringConcatTests`, `LiveProviderRecentScvParityTests` |

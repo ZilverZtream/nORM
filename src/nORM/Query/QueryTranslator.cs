@@ -551,8 +551,8 @@ namespace nORM.Query
 
                         object HandleNull()
                         {
-                            if (isNullableReturn) return null!;
                             if (isSum) return Convert.ChangeType(0, underlyingType);
+                            if (isNullableReturn) return null!;
                             throw new InvalidOperationException("Sequence contains no elements");
                         }
 

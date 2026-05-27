@@ -89,6 +89,8 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
                 result = ConvertScalarResult<TResult>(scalarResult)!;
@@ -640,6 +642,8 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return Task.FromResult(GetZeroOfTargetType<TResult>());
                     return Task.FromResult(default(TResult)!);
                 }
 
@@ -753,6 +757,8 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
+                if (plan.MethodName == "Sum")
+                    return GetZeroOfTargetType<TResult>();
                 return default(TResult)!;
             }
             return ConvertScalarResult<TResult>(scalarResult)!;
@@ -785,6 +791,8 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
                 result = ConvertScalarResult<TResult>(scalarResult)!;
