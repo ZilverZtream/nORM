@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
@@ -158,5 +159,33 @@ public class PreparedCommandCacheTests
         // Disposing the context must not throw even with a cached prepared command.
         await ctx.DisposeAsync();
         cn.Dispose();
+    }
+
+    [Fact]
+    public async Task QueryPlanCommand_TransactionChange_RebindsWithoutException()
+    {
+        var (cn, ctx) = BuildContext();
+        await using var _ = ctx;
+
+        await ctx.InsertAsync(new PccItem { Name = "a" });
+        await ctx.InsertAsync(new PccItem { Name = "b" });
+
+        var outsideBefore = await ctx.Query<PccItem>()
+            .Where(p => p.Name != "missing")
+            .ToListAsync();
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        var inside = await ctx.Query<PccItem>()
+            .Where(p => p.Name != "missing")
+            .ToListAsync();
+        await tx.CommitAsync();
+
+        var outsideAfter = await ctx.Query<PccItem>()
+            .Where(p => p.Name != "missing")
+            .ToListAsync();
+
+        Assert.Equal(2, outsideBefore.Count);
+        Assert.Equal(2, inside.Count);
+        Assert.Equal(2, outsideAfter.Count);
     }
 }

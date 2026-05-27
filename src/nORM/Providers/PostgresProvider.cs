@@ -24,6 +24,7 @@ namespace nORM.Providers
     public sealed partial class PostgresProvider : BulkOperationProvider
     {
         internal override bool SupportsFastPathPreparedCommandCache => true;
+        internal override bool SupportsQueryPlanPreparedCommandCache => true;
         internal override bool PrefersSyncFastPathExecution => true;
 
         internal override bool PrefersSyncQueryPlanExecution => true;
