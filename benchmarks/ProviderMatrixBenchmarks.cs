@@ -826,6 +826,11 @@ public class ProviderMatrixBenchmarks
         parameter.Value = value;
         if (size.HasValue)
             parameter.Size = size.Value;
+        if (command is SqlClient.SqlCommand && type == DbType.Decimal && parameter is SqlClient.SqlParameter sqlParameter)
+        {
+            sqlParameter.Precision = 18;
+            sqlParameter.Scale = 4;
+        }
         else if (command is SqlClient.SqlCommand && parameter.Size == 0)
             parameter.Size = 1;
         command.Parameters.Add(parameter);
