@@ -20,6 +20,7 @@ the matrix notes an explicit deterministic failure contract.
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
 | `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs` |
 | `Distinct` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGuidAndDistinctTests.cs` |
+| `DefaultIfEmpty` standalone | `tests/LinqDefaultIfEmptyTests.cs`, `tests/LiveProviderDefaultIfEmptyParityTests.cs` |
 | `Count`, `LongCount`, `Any`, `All` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryExecutorCoverageTests.cs` |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | `tests/LinqNavigationAggregateTests.cs`, `tests/LinqCompiledQueryExpandedParityTests.cs`, `tests/LinqMultiHopNavAggregateInProjectionTests.cs` |
 | `Sum`, `Average`, `Min`, `Max` | `tests/AggregateOperatorTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs`, `tests/LinqGroupMultiAggregateTests.cs` |
@@ -46,6 +47,7 @@ the matrix notes an explicit deterministic failure contract.
 | `SingleAsync`, `SingleOrDefaultAsync` | `tests/TerminalOperatorParityTests.cs` |
 | `ElementAt`, `ElementAtOrDefault` | `tests/TerminalOperatorParityTests.cs` |
 | `CountAsync`, `LongCountAsync`, `AnyAsync` | `tests/TerminalOperatorParityTests.cs`, `tests/LinqOperatorCardinalityTests.cs` |
+| `MinByAsync`, `MaxByAsync` | `tests/LinqMinByMaxByTests.cs`, `tests/LiveProviderMinByMaxByParityTests.cs` |
 
 ## Value translations
 

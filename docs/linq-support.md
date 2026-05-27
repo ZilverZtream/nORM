@@ -28,6 +28,7 @@ Status values:
 | `Reverse` | Supported | Flips the active ORDER BY direction at the SQL layer. |
 | `Skip`, `Take` | Supported | Provider-specific paging. `Skip(m).Take(n)` is the canonical pagination shape. `Take(n).Skip(m)` works with both literal counts (rewritten algebraically to `Skip(m).Take(n - m)`) and runtime parameters (emits `LIMIT (@take - @skip) OFFSET @skip` so the runtime values still produce the [skip, take) window). |
 | `Distinct` | Supported | Applies to the projected SQL shape. |
+| `DefaultIfEmpty` standalone | Supported | Applies after source materialization: non-empty sources are unchanged; empty sources return a single `null` element or the provided default value. Left-join `DefaultIfEmpty` is covered by the `GroupJoin` / `SelectMany` rows. |
 | `Count`, `LongCount`, `Any`, `All` | Supported | Includes predicate overloads and short-circuiting AND/OR. |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | Supported | Emit correlated `EXISTS` / `NOT EXISTS` / scalar `(SELECT COUNT(*) ...)` subqueries against the dependent table. Two-hop chains (`parent.Children.SelectMany(c => c.GrandChildren).Count()`) emit a nested `IN` subquery. |
 | `Sum`, `Average`, `Min`, `Max` | Supported | Both top-level aggregate queries and grouped aggregates, including computed selectors like `g.Sum(x => x.Price * x.Qty)` and conditional selectors like `g.Sum(x => x.Active ? x.Score : 0)`. |
@@ -58,6 +59,7 @@ Status values:
 | `SingleAsync`, `SingleOrDefaultAsync` | Supported | Read up to 2 rows to detect duplicate-row violations. |
 | `ElementAt`, `ElementAtOrDefault` | Supported | Translate to `OFFSET n LIMIT 1`. |
 | `CountAsync`, `LongCountAsync`, `AnyAsync` | Supported | Translate to `COUNT(*)` / `EXISTS` server-side. |
+| `MinByAsync`, `MaxByAsync` | Supported | Translate to provider ORDER BY plus one-row terminal read. Empty sequences throw `InvalidOperationException`, matching LINQ terminal semantics. |
 | `AsAsyncEnumerable` | Supported | See main query-operator matrix above. |
 
 ## Value translations

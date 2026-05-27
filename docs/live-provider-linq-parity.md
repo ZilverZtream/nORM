@@ -42,6 +42,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Skip` / `Take` (pagination) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SqlServer uses `OFFSET … FETCH NEXT … ROWS`; Postgres/MySQL use `LIMIT/OFFSET`. | `ProviderParityQueryPagingTests`, `LiveProviderSkipTakeParityTests` |
 | `Reverse` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Flips active ORDER BY. | `LinqReverseAndLastTests` (shape), `LiveProviderShapeParityTests` |
 | `Distinct` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `LinqGuidAndDistinctTests` |
+| `DefaultIfEmpty` standalone | ✅ | ✅ | ✅ | ✅ | ✅ | — | Post-materialization contract: non-empty sources unchanged; empty sources return one null/default element. Left-join DefaultIfEmpty is covered separately. | `LinqDefaultIfEmptyTests`, `LiveProviderDefaultIfEmptyParityTests` |
 
 ### Terminal operators
 
@@ -54,6 +55,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests`, `LiveProviderContainsParityTests` |
 | `Count` / `LongCount` (parameterless + predicate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
+| `MinBy` / `MaxBy` | ✅ | ✅ | ✅ | ✅ | ✅ | — | ORDER BY key ascending/descending plus one-row terminal read; empty source throws. | `LinqMinByMaxByTests`, `LiveProviderMinByMaxByParityTests` |
 
 ### Aggregates
 
