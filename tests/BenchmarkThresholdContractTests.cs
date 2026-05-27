@@ -64,6 +64,7 @@ public class BenchmarkThresholdContractTests
         Assert.Contains("Query_Complex_nORM_Compiled", targetMethodNames);
         Assert.Contains("Query_Join_nORM", targetMethodNames);
         Assert.Contains("Query_Join_nORM_Compiled", targetMethodNames);
+        Assert.Contains("Count_nORM", targetMethodNames);
         Assert.Contains("BulkInsert_Idiomatic_nORM", targetMethodNames);
     }
 }
