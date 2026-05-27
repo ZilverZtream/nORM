@@ -1667,6 +1667,8 @@ namespace nORM.Query
                         if (plan.MethodName is "Min" or "Max" or "Average" &&
                             typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                             throw new InvalidOperationException("Sequence contains no elements");
+                        if (plan.MethodName == "Sum")
+                            return GetZeroOfTargetType<TResult>();
                         return default(TResult)!;
                     }
                     result = ConvertScalarResult<TResult>(scalarResult)!;

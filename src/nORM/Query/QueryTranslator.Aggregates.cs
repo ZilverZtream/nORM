@@ -25,6 +25,7 @@ namespace nORM.Query
             if (selectorLambda == null || functionConstant?.Value is not string functionName)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Invalid aggregate expression structure"));
             Visit(sourceQuery);
+            _methodName = functionName;
 
             var param = selectorLambda.Parameters[0];
             var alias = EscapeAlias("T" + _joinCounter);
@@ -679,6 +680,7 @@ namespace nORM.Query
                 if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var aggUpper))
                     aggUpper = node.Method.Name.ToUpperInvariant();
                 _isAggregate = true;
+                _methodName = node.Method.Name;
                 _sql.Clear();
                 if (node.Arguments.Count > 1
                     && StripQuotes(node.Arguments[1]) is LambdaExpression selA)
@@ -698,6 +700,7 @@ namespace nORM.Query
             }
 
             Visit(sourceQuery);
+            _methodName = node.Method.Name;
 
             if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
             {
