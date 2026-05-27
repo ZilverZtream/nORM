@@ -61,7 +61,7 @@ the matrix notes an explicit deterministic failure contract.
 | `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | `tests/LinqMathFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `DateTime` members: `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`, `DayOfYear`, `DayOfWeek`, `Date` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `DateTime.AddDays` / `AddMonths` / `AddYears` / `AddHours` / `AddMinutes` / `AddSeconds` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
-| `DateTime.UtcNow` / `DateTime.Now` / `DateTime.Today` in predicates | `tests/LinqDateTimeNowTests.cs` |
+| `DateTime.UtcNow` / `DateTime.Now` / `DateTime.Today` in predicates | `tests/LinqDateTimeNowTests.cs`, `tests/LiveProviderStaticValuePredicateParityTests.cs` |
 | `DateTimeOffset` members | `tests/LinqDateTimeOffsetMemberTests.cs` |
 | `TimeSpan` member access on a stored TimeSpan column (`r.Duration.TotalSeconds`, `.Days`, etc.) | `tests/LinqProjectionTimeSpanTotalsTests.cs` |
 | `DateTime`/`DateTimeOffset` subtraction TimeSpan members (`(r.End - r.Start).TotalHours`, `.TotalDays`, `.TotalSeconds`, `.TotalMinutes`, `.TotalMilliseconds`, `.Days`, `.Hours`, `.Minutes`, `.Seconds`) | `tests/LinqDateTimeArithmeticTests.cs`, `tests/LiveProviderDateTimeSubtractionPrecisionTests.cs` |
@@ -82,7 +82,7 @@ the matrix notes an explicit deterministic failure contract.
 | Enum equality and `(int)enumCol` projection | `tests/LinqEnumAndConditionalTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
 | Enum `.ToString()` in projection | `tests/LinqEnumToStringTests.cs`, `tests/LiveProviderEnumParityTests.cs` |
 | Local-collection `Contains` (`ids.Contains(x.Id)`) | `tests/LinqMatrixContractTests.cs`, `tests/SqlTranslationTests.cs`, `tests/LiveProviderContainsParityTests.cs` |
-| `Guid.Empty` and other static-field constants in predicates | `tests/LinqGuidAndDistinctTests.cs` |
+| `Guid.Empty` and other static-field constants in predicates | `tests/LinqGuidAndDistinctTests.cs`, `tests/LiveProviderStaticValuePredicateParityTests.cs` |
 | `Json.Value<T>(jsonColumn, constantPath)` | `tests/JsonPathValidationTests.cs`, `tests/ExpressionToSqlVisitorTests.cs`, `tests/LiveProviderJsonWindowParityTests.cs` |
 | `NormFunctions.Like(value, pattern)` / `NormFunctions.ILike(value, pattern)` | `tests/LinqNormFunctionsLikeTests.cs`, `tests/LinqWhereNormIlikeTests.cs`, `tests/LiveProviderNormFunctionsLikeParityTests.cs` |
 
