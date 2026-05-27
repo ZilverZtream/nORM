@@ -37,7 +37,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `Where` predicates | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `ProviderParityMandatoryTests` |
-| `Select` (entity / scalar / DTO / anonymous / `new T { … }`, constrained client projection tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Custom CLR methods in projection require `ClientEvaluationPolicy.Warn` or `.Allow`; the client tail runs only after server filters/order/page operators. | `LiveProviderIntegrationTests`, `LiveProviderShapeParityTests`, `LiveProviderClientEvaluationParityTests` |
+| `Select` (entity / scalar / DTO / anonymous / `new T { … }`, constrained client projection tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Custom CLR methods in projection require `ClientEvaluationPolicy.Warn` or `.Allow`; the client tail runs only after server filters/order/page operators. | `LiveProviderIntegrationTests`, `LiveProviderShapeParityTests`, `LiveProviderDtoProjectionParityTests`, `LiveProviderClientEvaluationParityTests` |
 | `OrderBy` / `OrderByDescending` / `ThenBy` / `ThenByDescending` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityQueryPagingTests`, `LiveProviderShapeParityTests` |
 | `Skip` / `Take` (pagination) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SqlServer uses `OFFSET … FETCH NEXT … ROWS`; Postgres/MySQL use `LIMIT/OFFSET`. | `ProviderParityQueryPagingTests`, `LiveProviderSkipTakeParityTests` |
 | `Reverse` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Flips active ORDER BY. | `LinqReverseAndLastTests` (shape), `LiveProviderShapeParityTests` |
