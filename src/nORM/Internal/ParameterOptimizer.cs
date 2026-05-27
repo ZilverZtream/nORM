@@ -192,6 +192,7 @@ namespace nORM.Internal
                 else if (valueType == typeof(DateTime))
                 {
                     param.DbType = DbType.DateTime2;
+                    param.Value = DateTime.SpecifyKind((DateTime)value, DateTimeKind.Unspecified);
                 }
                 else if (valueType == typeof(DateOnly))
                 {

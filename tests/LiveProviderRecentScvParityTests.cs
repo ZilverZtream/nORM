@@ -468,6 +468,85 @@ public class LiveProviderRecentScvParityTests
         public DateTimeOffset Dto { get; set; }
     }
 
+    // ------------------------------------------------------------------ test 4b: DTO.LocalDateTime WHERE + OrderBy
+
+    private const string LocalDtoWhereTable = "LocalDtoWhereParity";
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task DateTimeOffset_LocalDateTime_where_and_orderby_use_snapshot_local_offset(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupLocalDtoWhereTableAsync(ctx, kind);
+            try
+            {
+                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
+                var threshold = new DateTime(2026, 5, 25, 12, 0, 0, DateTimeKind.Utc).Add(localOffset);
+
+                var ids = await ctx.Query<LocalDtoWhereParityRow>()
+                    .Where(r => r.Dto.LocalDateTime >= threshold)
+                    .OrderByDescending(r => r.Dto.LocalDateTime)
+                    .Select(r => new { r.Id })
+                    .ToListAsync();
+
+                Assert.Equal(new[] { 3, 2 }, ids.Select(r => r.Id).ToArray());
+            }
+            finally { await Teardown(ctx, LocalDtoWhereTable); }
+        }
+    }
+
+    private static async Task SetupLocalDtoWhereTableAsync(DbContext ctx, ProviderKind kind)
+    {
+        var t = ctx.Provider.Escape(LocalDtoWhereTable);
+        var id  = EscapeCol(kind, "Id");
+        var dto = EscapeCol(kind, "Dto");
+        var ddl = DropTable(kind, LocalDtoWhereTable, t) +
+                  $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {dto} {DtoCol(kind)} NOT NULL)";
+        await ExecuteAsync(ctx, ddl);
+
+        string insert = kind switch
+        {
+            ProviderKind.SqlServer =>
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,CAST('2026-05-25 10:00:00 +00:00' AS DATETIMEOFFSET))," +
+                "(2,CAST('2026-05-25 12:00:00 +00:00' AS DATETIMEOFFSET))," +
+                "(3,CAST('2026-05-25 14:00:00 +00:00' AS DATETIMEOFFSET))",
+            ProviderKind.Postgres =>
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-05-25 10:00:00+00'::timestamptz)," +
+                "(2,'2026-05-25 12:00:00+00'::timestamptz)," +
+                "(3,'2026-05-25 14:00:00+00'::timestamptz)",
+            ProviderKind.MySql =>
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-05-25 10:00:00.000000')," +
+                "(2,'2026-05-25 12:00:00.000000')," +
+                "(3,'2026-05-25 14:00:00.000000')",
+            ProviderKind.Sqlite =>
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-05-25 10:00:00+00:00')," +
+                "(2,'2026-05-25 12:00:00+00:00')," +
+                "(3,'2026-05-25 14:00:00+00:00')",
+            _ => throw new NotSupportedException()
+        };
+        await ExecuteAsync(ctx, insert);
+    }
+
+    [Table(LocalDtoWhereTable)]
+    public sealed class LocalDtoWhereParityRow
+    {
+        [Key] public int Id { get; set; }
+        public DateTimeOffset Dto { get; set; }
+    }
+
     // ------------------------------------------------------------------ test 5: Enum.TryParse<T>(col, out _)
 
     private const string EtpTable = "EtpParity";

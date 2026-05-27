@@ -43,6 +43,29 @@ public class DateTimeDbTypePrecisionTests
     }
 
     [Fact]
+    public void DateTime_parameter_paths_preserve_ticks_but_strip_kind()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+
+        var utc = new DateTime(2026, 5, 25, 12, 0, 0, DateTimeKind.Utc);
+
+        nORM.Internal.ParameterOptimizer.AddOptimizedParam(cmd, "@opt", utc);
+        var optimized = Assert.IsType<DateTime>(cmd.Parameters["@opt"].Value);
+
+        var assignedParam = cmd.CreateParameter();
+        assignedParam.ParameterName = "@assign";
+        ParameterAssign.AssignValue(assignedParam, utc);
+        var assigned = Assert.IsType<DateTime>(assignedParam.Value);
+
+        Assert.Equal(utc.Ticks, optimized.Ticks);
+        Assert.Equal(DateTimeKind.Unspecified, optimized.Kind);
+        Assert.Equal(utc.Ticks, assigned.Ticks);
+        Assert.Equal(DateTimeKind.Unspecified, assigned.Kind);
+    }
+
+    [Fact]
     public void ParameterAssign_DateTime_SetsDbTypeDateTime2_MatchesOptimizer()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
