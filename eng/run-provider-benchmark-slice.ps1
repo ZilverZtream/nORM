@@ -47,7 +47,11 @@ if (-not $NoIsolation) {
         Write-Host "Duplicate benchmark projects detected under repo; running isolated worktree at $tempRoot"
         git -C $root worktree add --detach $tempRoot HEAD | Write-Host
 
+        $childScript = Join-Path $tempRoot 'eng/run-provider-benchmark-slice.ps1'
         $forwardArgs = @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $childScript,
             '-Providers', ($providerList -join ','),
             '-Filters', ($filterList -join ';'),
             '-Configuration', $Configuration,
@@ -62,7 +66,7 @@ if (-not $NoIsolation) {
         }
 
         try {
-            & (Join-Path $tempRoot 'eng/run-provider-benchmark-slice.ps1') @forwardArgs
+            powershell @forwardArgs
             $childExitCode = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } else { 0 }
         }
         finally {
