@@ -124,8 +124,10 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 Rows marked `—` in the Compiled column are runtime-only v1 contracts, not
 implicit compiled-query claims. Coverage rows are not substitutes for live
-provider gates; provider-neutral tests must be paired with SQL Server, SQLite,
-PostgreSQL, and MySQL evidence before a row is promoted to v1-green.
+provider gates: each v1-green row above must cite a live-provider test for SQL
+Server, SQLite, PostgreSQL, and MySQL. `docs/linq-support-coverage.md` remains
+the supplemental provider-neutral test map, not the evidence used to promote a
+row in this live parity report.
 
 ## Parity gap tracking
 
