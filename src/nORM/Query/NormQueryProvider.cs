@@ -1090,7 +1090,8 @@ namespace nORM.Query
                !plan.SplitQuery &&
                plan.DependentQueries is not { Count: > 0 } &&
                plan.M2MIncludes is not { Count: > 0 } &&
-               plan.ClientProjection == null;
+               plan.ClientProjection == null &&
+               plan.PostMaterializeTransform == null;
 
         private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, Stopwatch? sw, CancellationToken ct)
         {
@@ -1100,6 +1101,8 @@ namespace nORM.Query
                 ct.ThrowIfCancellationRequested();
                 pooled.Command.Transaction = _ctx.CurrentTransaction;
                 var list = _executor.MaterializePooled(plan, pooled.Command);
+                if (plan.PostMaterializeTransform != null)
+                    list = plan.PostMaterializeTransform(list);
                 sw?.Stop();
                 _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
                 return Task.FromResult((TResult)(object)list);
@@ -1758,24 +1761,64 @@ namespace nORM.Query
 
         private string BuildJoinedCudWhereInSql(string prefix, string? setSql, string planSql, TableMapping mapping)
         {
-            if (mapping.KeyColumns.Length != 1)
-                throw new NormUnsupportedFeatureException(
-                    $"ExecuteDelete/UpdateAsync with a join requires a single-column primary key on {mapping.EscTable}. " +
-                    "For composite-key entities use a correlated WHERE: " +
-                    "`ctx.Query<T>().Where(t => ctx.Query<Other>().Any(o => o.Fk == t.Pk)).ExecuteDeleteAsync()`.");
             var fromIdx = planSql.IndexOf(" FROM ", StringComparison.Ordinal);
             if (fromIdx < 0)
                 throw new InvalidOperationException("Cannot locate FROM clause in join SQL.");
-            var pk = mapping.KeyColumns[0].EscCol;
-            var subquery = "SELECT T0." + pk + planSql[fromIdx..];
-            string whereIn;
+
+            if (mapping.KeyColumns.Length == 1)
+            {
+                var outerAlias = _ctx.Provider.Escape("T0");
+                var pk = mapping.KeyColumns[0].EscCol;
+                var subquery = "SELECT " + outerAlias + "." + pk + planSql[fromIdx..];
+                string whereIn;
+                if (_ctx.Provider.CudWhereInSubqueryNeedsDoubleWrap)
+                    whereIn = pk + " IN (SELECT " + pk + " FROM (" + subquery + ") AS __nm_cud)";
+                else
+                    whereIn = pk + " IN (" + subquery + ")";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
+
+            // Composite-PK path
+            var cudOuterAlias = _ctx.Provider.Escape("T0");
+            var pkCols = mapping.KeyColumns.Select(k => k.EscCol).ToArray();
+            var subquerySelect = string.Join(", ", pkCols.Select(pk => cudOuterAlias + "." + pk));
+            var subquerySql = "SELECT " + subquerySelect + planSql[fromIdx..];
+
+            if (!_ctx.Provider.SupportsRowTupleComparison)
+            {
+                // SQL Server: row-tuple IN is unsupported — use JOIN-based DELETE/UPDATE.
+                // DELETE __nm_tgt FROM Table AS __nm_tgt INNER JOIN (...) AS __nm_cud ON T.pk1 = cud.pk1 ...
+                const string tgtAlias = "__nm_tgt";
+                var joinOn = string.Join(" AND ", pkCols.Select(pk => tgtAlias + "." + pk + " = __nm_cud." + pk));
+                var cudSubquery = "(" + subquerySql + ") AS __nm_cud";
+                if (setSql == null)
+                    return "DELETE " + tgtAlias + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                        + " INNER JOIN " + cudSubquery + " ON " + joinOn;
+                else
+                    return "UPDATE " + tgtAlias + " SET " + setSql
+                        + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                        + " INNER JOIN " + cudSubquery + " ON " + joinOn;
+            }
+
+            // Row-tuple comparison: (pk1, pk2) IN (SELECT T0.pk1, T0.pk2 FROM ...)
+            var pkTuple = "(" + string.Join(", ", pkCols) + ")";
             if (_ctx.Provider.CudWhereInSubqueryNeedsDoubleWrap)
-                whereIn = pk + " IN (SELECT " + pk + " FROM (" + subquery + ") AS __nm_cud)";
+            {
+                var outerSelect = string.Join(", ", pkCols);
+                var whereIn = pkTuple + " IN (SELECT " + outerSelect + " FROM (" + subquerySql + ") AS __nm_cud)";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
             else
-                whereIn = pk + " IN (" + subquery + ")";
-            return setSql == null
-                ? prefix + " WHERE " + whereIn
-                : prefix + " SET " + setSql + " WHERE " + whereIn;
+            {
+                var whereIn = pkTuple + " IN (" + subquerySql + ")";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
         }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {

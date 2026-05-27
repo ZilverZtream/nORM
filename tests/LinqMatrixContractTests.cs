@@ -683,19 +683,19 @@ public class LinqMatrixContractTests
     // ─── GroupBy basic ────────────────────────────────────────────────────────
 
     [Fact]
-    public void GroupBy_Basic_SqlContainsGroupByClause()
+    public void GroupBy_Basic_StreamingSelectsEntityColumnsWithoutGroupBy()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
-        // nORM's GroupBy is Constrained: SQL-level GROUP BY translation is supported.
-        // Verify that the generated SQL contains GROUP BY for a basic grouping.
+        // Plain GroupBy uses client-side streaming: entity rows fetched without GROUP BY,
+        // then grouped in memory via PostMaterializeTransform.
         var sql = ctx.Query<LinqMatrixItem>()
             .GroupBy(x => x.CategoryId)
             .ToString();
 
         Assert.NotNull(sql);
-        Assert.Contains("GROUP BY", sql!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GROUP BY", sql!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CategoryId", sql!, StringComparison.OrdinalIgnoreCase);
     }
 

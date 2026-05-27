@@ -391,7 +391,8 @@ namespace nORM.Query
     string innerKeySql,
     string? orderBy = null,
     bool distinct = false,
-    string? outerFromOverride = null)
+    string? outerFromOverride = null,
+    string? additionalOnConditions = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -454,6 +455,8 @@ namespace nORM.Query
             }
             joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
             joinSql.Append("ON ").Append(outerKeySql).Append(" = ").Append(innerKeySql);
+            if (!string.IsNullOrEmpty(additionalOnConditions))
+                joinSql.Append(" AND ").Append(additionalOnConditions);
             if (!string.IsNullOrEmpty(orderBy))
                 joinSql.Append(" ORDER BY ").Append(orderBy!);
         }

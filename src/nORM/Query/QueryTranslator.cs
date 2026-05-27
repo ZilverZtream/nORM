@@ -161,6 +161,11 @@ namespace nORM.Query
         // makes the contract pluggable so a future ROW_NUMBER subquery emit can
         // replace it server-side without breaking callers.
         internal System.Func<System.Collections.IList, System.Collections.IList>? _postMaterializeTransform;
+        // Stored by HandleGroupBy when a 2-arg GroupBy with no downstream result selector
+        // is detected. Generate() inspects this after visiting the full expression tree: if
+        // no projection was set (streaming case), _groupBy is cleared and a client-side
+        // grouping transform is installed via InstallGroupingTransform().
+        private LambdaExpression? _streamingGroupByKeySelector;
         private HashSet<string> _tables = new();
         private readonly Stack<TranslationContextSnapshot> _contextStack = new();
         private List<PropertyInfo> _detectedCollections = new();
@@ -324,6 +329,7 @@ namespace nORM.Query
                 _windowedGroupBySubSql = null;
                 _windowedGroupByAlias = null;
                 _outerDerivedAlias = null;
+                _streamingGroupByKeySelector = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
@@ -450,6 +456,24 @@ namespace nORM.Query
             public QueryPlan Generate()
             {
                 _t.Visit(_expression);
+
+                // Streaming GroupBy: GroupBy(source, key) with no downstream projection,
+                // no aggregate terminal (Count/Sum/…), and no HAVING filter means the
+                // caller wants IGrouping<K, V> elements. Discard the SQL GROUP BY (which
+                // the entity materializer can't handle) and install a client-side grouping
+                // transform that groups the plain entity rows in memory.
+                if (_t._streamingGroupByKeySelector != null
+                    && _t._sql.Length == 0
+                    && _t._groupBy.Count > 0
+                    && _t._projection == null
+                    && _t._windowedGroupBySubSql == null
+                    && !_t._isAggregate
+                    && _t._having.Length == 0)
+                {
+                    _t._groupBy.Clear();
+                    _t.InstallGroupingTransform(_t._streamingGroupByKeySelector);
+                }
+
                 var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
                 var topLevelMethodName = (_expression as MethodCallExpression)?.Method.Name;
                 if (_t._isAggregate && _t._groupBy.Count == 0 && topLevelMethodName is "Count" or "LongCount")

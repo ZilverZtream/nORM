@@ -62,6 +62,10 @@ namespace nORM.Providers
 
         internal override bool PrefersSyncQueryPlanExecution => true;
 
+        // SQL Server T-SQL does not support row-tuple comparisons in WHERE IN
+        // (e.g. WHERE (pk1, pk2) IN (SELECT ...)). Composite-PK CUD uses a JOIN form instead.
+        internal override bool SupportsRowTupleComparison => false;
+
         private readonly IDbParameterFactory? _parameterFactory;
         private readonly bool _isDialectOnly;
 

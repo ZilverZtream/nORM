@@ -105,6 +105,13 @@ namespace nORM.Providers
         internal virtual bool CudWhereInSubqueryNeedsDoubleWrap => false;
 
         /// <summary>
+        /// Returns true when the provider supports row-tuple comparison in WHERE IN, e.g.
+        /// <c>WHERE (pk1, pk2) IN (SELECT a, b FROM ...)</c>. SQLite, PostgreSQL, and MySQL all
+        /// support this syntax. SQL Server does not; composite-key CUD must use a JOIN-based form.
+        /// </summary>
+        internal virtual bool SupportsRowTupleComparison => true;
+
+        /// <summary>
         /// Returns true when bare boolean predicates such as <c>WHERE IsActive</c> and
         /// <c>WHERE NOT IsActive</c> are valid and preferred over equality-to-literal forms.
         /// </summary>

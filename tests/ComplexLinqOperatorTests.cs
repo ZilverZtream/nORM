@@ -122,9 +122,11 @@ public class ComplexLinqOperatorTests
     }
 
     [Fact]
-    public void GroupBy_TranslationContainsGroupBySql()
+    public void GroupBy_StreamingTranslation_SelectsEntityColumnsWithoutGroupBy()
     {
-        // Verify the LINQ GroupBy correctly emits GROUP BY in the SQL translation.
+        // Standalone GroupBy(key) with no downstream aggregate uses client-side grouping:
+        // the SQL fetches all entity rows (no GROUP BY) and a PostMaterializeTransform
+        // groups them in memory. Verify the SQL has entity columns but no GROUP BY.
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE CLO_Product (Id INTEGER PRIMARY KEY AUTOINCREMENT, Category TEXT NOT NULL, Stock INTEGER NOT NULL)");
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -134,9 +136,30 @@ public class ComplexLinqOperatorTests
         var translator = Activator.CreateInstance(translatorType, ctx)!;
         var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { q.Expression })!;
         var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
+        var transform = plan.GetType().GetProperty("PostMaterializeTransform")!.GetValue(plan);
+
+        Assert.DoesNotContain("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Category", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(transform);
+    }
+
+    [Fact]
+    public void GroupBy_AggregateProjection_StillEmitsGroupBySql()
+    {
+        // GroupBy followed by a downstream Select/aggregate still uses server-side GROUP BY.
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE CLO_Product (Id INTEGER PRIMARY KEY AUTOINCREMENT, Category TEXT NOT NULL, Stock INTEGER NOT NULL)");
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var q = ctx.Query<CloProduct>()
+            .GroupBy(p => p.Category, (key, g) => new { Category = key, Count = g.Count() });
+        var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
+        var translator = Activator.CreateInstance(translatorType, ctx)!;
+        var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { q.Expression })!;
+        var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
 
         Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Category", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("COUNT", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── 2. GroupJoin MaxGroupJoinSize limits results ───────────────────────────
@@ -309,28 +332,63 @@ public class ComplexLinqOperatorTests
         Assert.Equal(1, results[0].Id);
     }
 
-    // ── 5. Streaming raw IGrouping is unsupported — must not silently succeed ────
+    // ── 5. Streaming raw IGrouping ────────────────────────────────────────────────
 
     [Fact]
-    public void GroupBy_StreamingRawIGrouping_ThrowsOrFails()
+    public void GroupBy_StreamingRawIGrouping_ReturnsGroupings()
     {
-        // nORM translates GroupBy to SQL GROUP BY. Attempting to enumerate the raw
-        // IGrouping<K,V> result set (without a downstream .Select(g => ...) that
-        // projects into a concrete DTO) must not silently succeed with corrupt data.
-        // The system must throw — either NormUnsupportedFeatureException, NormQueryException,
-        // InvalidOperationException, or another exception. Acceptable: any exception.
-        // NOT acceptable: silently returning an empty list or incorrect materialized rows.
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE CLO_Product (Id INTEGER PRIMARY KEY AUTOINCREMENT, Category TEXT NOT NULL, Stock INTEGER NOT NULL)");
-        Exec(cn, "INSERT INTO CLO_Product VALUES(1,'Electronics',10)");
+        Exec(cn, "INSERT INTO CLO_Product VALUES(1,'Electronics',10),(2,'Electronics',5),(3,'Books',3)");
 
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        // Enumerating IGrouping<string, CloProduct> directly must fail.
-        Assert.ThrowsAny<Exception>(() =>
-            ctx.Query<CloProduct>()
-               .GroupBy(p => p.Category)
-               .ToList());
+        var groups = ctx.Query<CloProduct>()
+            .GroupBy(p => p.Category)
+            .ToList();
+
+        Assert.Equal(2, groups.Count);
+        var electronics = groups.First(g => g.Key == "Electronics");
+        var books = groups.First(g => g.Key == "Books");
+        Assert.Equal(2, electronics.Count());
+        Assert.Single(books);
+    }
+
+    [Fact]
+    public void GroupBy_StreamingRawIGrouping_IntKey_ReturnsGroupings()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE CLO_Product (Id INTEGER PRIMARY KEY AUTOINCREMENT, Category TEXT NOT NULL, Stock INTEGER NOT NULL)");
+        Exec(cn, "INSERT INTO CLO_Product VALUES(1,'Electronics',10),(2,'Books',10),(3,'Electronics',5)");
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var groups = ctx.Query<CloProduct>()
+            .GroupBy(p => p.Stock)
+            .ToList();
+
+        Assert.Equal(2, groups.Count);
+        var stockTen = groups.First(g => g.Key == 10);
+        Assert.Equal(2, stockTen.Count());
+    }
+
+    [Fact]
+    public async Task GroupBy_StreamingRawIGrouping_Async_ReturnsGroupings()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE CLO_Product (Id INTEGER PRIMARY KEY AUTOINCREMENT, Category TEXT NOT NULL, Stock INTEGER NOT NULL)");
+        Exec(cn, "INSERT INTO CLO_Product VALUES(1,'Electronics',10),(2,'Electronics',5),(3,'Books',3)");
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var groups = await ctx.Query<CloProduct>()
+            .GroupBy(p => p.Category)
+            .ToListAsync();
+
+        Assert.Equal(2, groups.Count);
+        Assert.All(groups, g => Assert.NotNull(g.Key));
+        var totalItems = groups.Sum(g => g.Count());
+        Assert.Equal(3, totalItems);
     }
 }
 

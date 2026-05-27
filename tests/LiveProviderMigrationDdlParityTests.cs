@@ -90,6 +90,9 @@ public class LiveProviderMigrationDdlParityTests
         try { Exec(cn, sql); } catch { }
     }
 
+    private static void ResetTable(DbConnection cn, string kind, string table)
+        => ExecSafe(cn, DropTableDdl(kind, table));
+
     // ── Schema introspection helpers ─────────────────────────────────────────
 
     private static bool ColumnExists(DbConnection cn, string table, string column)
@@ -352,6 +355,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateBaseDdl(kind, table));
             Assert.False(ColumnExists(db, table, "Score"), "Score should not exist yet");
 
@@ -392,6 +396,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateBaseDdl(kind, table));
 
             var baseTable = BaseTable(table);
@@ -443,6 +448,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             var createWithExtra = kind switch
             {
                 "sqlite"    => $"CREATE TABLE IF NOT EXISTS \"{table}\" (\"Id\" INTEGER PRIMARY KEY, \"Name\" TEXT NOT NULL, \"Score\" INTEGER)",
@@ -528,6 +534,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateBaseDdl(kind, table));
             Assert.True(TableExists(db, table));
 
@@ -574,6 +581,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateBaseDdl(kind, table));
             var baseTable = BaseTable(table);
             var score     = new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = true };
@@ -787,6 +795,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateRenameBaseDdl(kind, table));
             Exec(db, InsertRowDdl(kind, table));
 
@@ -828,6 +837,7 @@ public class LiveProviderMigrationDdlParityTests
 
         try
         {
+            ResetTable(db, kind, table);
             Exec(db, CreateRenameBaseDdl(kind, table));
 
             var baseTable = new TableSchema { Name = table, Columns = { new ColumnSchema { Name = "Id", IsPrimaryKey = true }, new ColumnSchema { Name = "OldName" } } };

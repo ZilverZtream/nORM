@@ -8,11 +8,6 @@ namespace nORM.Tests;
 /// Pins the LINQ matrix in <c>docs/linq-support.md</c> as the v1 contract for query-shape
 /// support. The matrix must not silently drift - either by claiming shapes that aren't
 /// implemented or by dropping the documented Constrained/Supported labels readers depend on.
-///
-/// Several constrained shapes (CROSS APPLY / LATERAL / UNNEST SelectMany expansion,
-/// arbitrary client GroupBy IGrouping composition) throw <c>NormUnsupportedFeatureException</c>
-/// in v1. This test only enforces that the documented behavior stays consistent with
-/// what callers can rely on.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqV1ConstraintContractTests
@@ -36,17 +31,11 @@ public class LinqV1ConstraintContractTests
     [InlineData("Group joins", "Supported")]
     [InlineData("`AsAsyncEnumerable`", "Supported")]
     [InlineData("`Include`, `ThenInclude`", "Supported")]
+    [InlineData("`SelectMany`", "Supported")]
+    [InlineData("`ExecuteUpdateAsync`", "Supported")]
+    [InlineData("`ExecuteDeleteAsync`", "Supported")]
+    [InlineData("`GroupBy`", "Supported")]
     public void Matrix_marks_v1_supported_shape(string feature, string status)
-    {
-        var doc = Doc();
-        var probe = $"| {feature} | {status} |";
-        Assert.Contains(probe, doc, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("`GroupBy`", "Constrained")]
-    [InlineData("`SelectMany`", "Constrained")]
-    public void Matrix_marks_v1_constrained_shape(string feature, string status)
     {
         var doc = Doc();
         var probe = $"| {feature} | {status} |";

@@ -1944,19 +1944,20 @@ public class NormQueryProviderCoverageTests
         Assert.Contains(results, r => r.Title == "B");
     }
 
-    // ─── GroupBy SQL without Select (no materializer issues) ─────────────
+    // ─── GroupBy streaming: plain GroupBy sets transform, no GROUP BY in SQL ─
 
     [Fact]
-    public void GroupBy_WithoutSelect_SqlContainsGroupBy()
+    public void GroupBy_WithoutSelect_StreamingTransformInstalled()
     {
         var (cn, ctx) = CreateContext();
         using var _cn = cn; using var _ctx = ctx;
 
-        // Plain GroupBy without Select — exercises group by SQL generation
+        // Plain GroupBy uses client-side streaming: entity rows selected, no GROUP BY
         var q = ctx.Query<NqpItem>().GroupBy(p => p.TagId);
         var provider = (nORM.Query.NormQueryProvider)ctx.Query<NqpItem>().Provider;
         var plan = provider.GetPlan(q.Expression, out _, out _);
-        Assert.Contains("GROUP BY", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GROUP BY", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(plan.PostMaterializeTransform);
     }
 
     // ─── CountAsync on ordered query (non-fast-path) ───────────────────────

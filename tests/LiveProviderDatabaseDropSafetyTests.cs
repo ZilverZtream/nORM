@@ -80,13 +80,12 @@ public class LiveProviderDatabaseDropSafetyTests
     public void LiveConnection_DatabaseName_IsProtected_RefusesDrop(string kindStr, string expectedDb)
     {
         var kind = ParseKind(kindStr);
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"{kindStr} not configured")) return;
+        var connection = OpenProtectedDatabaseConnection(kind, expectedDb);
+        if (Skip.If(connection is null, $"{kindStr} not configured")) return;
 
-        var (connection, _) = live!.Value;
-        using (connection)
+        using (var protectedConnection = connection!)
         {
-            var actualDb = connection.Database;
+            var actualDb = protectedConnection.Database;
 
             Assert.Equal(expectedDb, actualDb, StringComparer.OrdinalIgnoreCase);
             Assert.True(
@@ -221,4 +220,60 @@ public class LiveProviderDatabaseDropSafetyTests
         "sqlite"    => ProviderKind.Sqlite,
         _ => throw new ArgumentOutOfRangeException(nameof(s), s, null)
     };
+
+    private static DbConnection? OpenProtectedDatabaseConnection(ProviderKind kind, string protectedDatabase)
+    {
+        var baseConnectionString = kind switch
+        {
+            ProviderKind.SqlServer => LiveProviderEnvironment.GetConnectionString("sqlserver"),
+            ProviderKind.Postgres => LiveProviderEnvironment.GetConnectionString("postgres"),
+            ProviderKind.MySql => LiveProviderEnvironment.GetConnectionString("mysql"),
+            _ => null
+        };
+        if (string.IsNullOrEmpty(baseConnectionString)) return null;
+
+        var builder = new DbConnectionStringBuilder { ConnectionString = baseConnectionString };
+        if (builder.ContainsKey("Initial Catalog"))
+            builder["Initial Catalog"] = protectedDatabase;
+        else
+            builder["Database"] = protectedDatabase;
+
+        DbConnection? connection = kind switch
+        {
+            ProviderKind.SqlServer => CreateConnection(
+                "Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient",
+                builder.ConnectionString),
+            ProviderKind.Postgres => CreateConnection(
+                "Npgsql.NpgsqlConnection, Npgsql",
+                builder.ConnectionString),
+            ProviderKind.MySql => CreateConnection(
+                "MySqlConnector.MySqlConnection, MySqlConnector",
+                builder.ConnectionString)
+                ?? CreateConnection(
+                    "MySql.Data.MySqlClient.MySqlConnection, MySql.Data",
+                    builder.ConnectionString),
+            _ => null
+        };
+
+        if (connection == null) return null;
+        try
+        {
+            connection.Open();
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            return null;
+        }
+    }
+
+    private static DbConnection? CreateConnection(string typeName, string connectionString)
+    {
+        var type = Type.GetType(typeName);
+        if (type == null) return null;
+        var connection = (DbConnection)Activator.CreateInstance(type)!;
+        connection.ConnectionString = connectionString;
+        return connection;
+    }
 }
