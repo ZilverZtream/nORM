@@ -52,7 +52,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Last` / `LastOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Requires explicit OrderBy; flips ORDER BY direction to pick final row. | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests`, `LinqReverseAndLastTests` |
 | `ElementAt` / `ElementAtOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Uses `OFFSET N ROWS FETCH NEXT 1 ROWS ONLY` (SqlServer) or `LIMIT 1 OFFSET N` (others). | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
-| `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests` |
+| `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests`, `LiveProviderContainsParityTests` |
 | `Count` / `LongCount` (parameterless + predicate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 
 ### Aggregates
@@ -112,7 +112,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to a provider-forced case-sensitive enum-name comparison; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests` |
-| local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderShapeParityTests` |
+| local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderContainsParityTests` |
 
 ### Compiled-query parity
 
