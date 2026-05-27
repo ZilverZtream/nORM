@@ -51,7 +51,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Single` / `SingleOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `Last` / `LastOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Requires explicit OrderBy; flips ORDER BY direction to pick final row. | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests`, `LinqReverseAndLastTests` |
 | `ElementAt` / `ElementAtOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Uses `OFFSET N ROWS FETCH NEXT 1 ROWS ONLY` (SqlServer) or `LIMIT 1 OFFSET N` (others). | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
-| `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `AnyAsync` on SQLite known mismatch — use `CountAsync() > 0`. | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
+| `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests` |
 | `Count` / `LongCount` (parameterless + predicate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 
