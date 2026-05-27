@@ -257,6 +257,9 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"CAST(strftime('%s', {dtoSql}) AS INTEGER)";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"CAST(ROUND((julianday({dtoSql}) - 2440587.5) * 86400000.0) AS INTEGER)";
+
         /// <inheritdoc/>
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER

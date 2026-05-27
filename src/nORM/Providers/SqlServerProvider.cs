@@ -374,6 +374,9 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"DATEDIFF_BIG(SECOND, CAST('1970-01-01 00:00:00 +00:00' AS DATETIMEOFFSET), {dtoSql})";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"DATEDIFF_BIG(MILLISECOND, CAST('1970-01-01 00:00:00 +00:00' AS DATETIMEOFFSET), {dtoSql})";
+
         /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";

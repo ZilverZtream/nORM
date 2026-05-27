@@ -3638,13 +3638,13 @@ namespace nORM.Query
             else if (raw is DateTimeOffset dto) utcInstant = dto;
             else return false;
 
-            var epochSec = utcInstant.ToUnixTimeSeconds();
+            var epochMs = utcInstant.ToUnixTimeMilliseconds();
             var colSql = GetSql(colSide);
-            var epochSql = _provider.GetDateTimeOffsetUtcEpochSecondsSql(colSql);
+            var epochSql = _provider.GetDateTimeOffsetUtcEpochMillisecondsSql(colSql);
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
             _sql.Append("(").Append(epochSql);
             _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
-            _sql.AppendParameterizedValue(paramName, epochSec, _paramSink);
+            _sql.AppendParameterizedValue(paramName, epochMs, _paramSink);
             _sql.Append(")");
             return true;
         }

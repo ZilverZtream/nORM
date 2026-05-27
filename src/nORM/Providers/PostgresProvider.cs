@@ -301,6 +301,9 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"CAST(EXTRACT(EPOCH FROM {dtoSql}) AS BIGINT)";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"FLOOR(EXTRACT(EPOCH FROM {dtoSql}) * 1000.0)::bigint";
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";

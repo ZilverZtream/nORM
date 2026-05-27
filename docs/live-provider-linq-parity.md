@@ -18,7 +18,7 @@ v1-green only when it passes live on every configured provider.
   provider, with row values, ordering, and null semantics matching .NET / the
   documented provider note.
 - ⚠️ — passes with a documented caveat (e.g. snapshot DST for
-  DateTimeOffset.LocalDateTime, second-resolution for DTO instant comparison).
+  DateTimeOffset.LocalDateTime, millisecond-resolution for DTO instant comparison).
 - ❌ — fails on the live provider; see the linked test or commit.
 - 🚧 — coverage gap; the SQLite probe passes but no live-parity test exists yet.
 - — — not applicable to this provider (e.g. provider-specific dialect).
@@ -102,9 +102,9 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `TimeSpan` col `<`/`>`/`<=`/`>=`/`==` col (cross-column ordering) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite TEXT lex-ordering is wrong for multi-day; `NormalizeTimeSpanForCompare` converts both sides to fractional seconds. SQL Server/Postgres/MySQL use native types. | `LinqTimeSpanColumnComparisonTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTime` - `DateTime` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite uses julianday REAL arithmetic; assertions allow 1ms tolerance. SQL Server/MySQL use microsecond diff hooks. | `ProviderParityDepthTests`, `LiveProviderDateTimeSubtractionPrecisionTests` |
 | `DateTimeOffset.UtcDateTime` / `.LocalDateTime` / `.ToOffset` | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ | — | LocalDateTime uses snapshot offset, not per-instant historical TZ. | `LinqDateTimeOffsetLocalDateTimeTests`, `LinqDateTimeOffsetLocalDateTimeInWhereTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `DateTimeOffset` col `==` / `!=` DateTime literal (UTC-instant equality) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Second-resolution; sub-second fidelity is future work. MySQL hook uses `TIMESTAMPDIFF(SECOND,'1970-01-01',col)` to avoid session-TZ dependence of `UNIX_TIMESTAMP`. | `LinqDateTimeOffsetEqualsDateTimeLiteralTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTimeOffset` col `==` / `!=` DateTime literal (UTC-instant equality) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Millisecond-resolution; full .NET 100ns tick equality is not portable. MySQL hook uses `TIMESTAMPDIFF(MICROSECOND,'1970-01-01',col) / 1000` to avoid session-TZ dependence of `UNIX_TIMESTAMP`. | `LinqDateTimeOffsetEqualsDateTimeLiteralTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTimeOffset` col >/</>=/<= DateTime literal | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Existing `NormalizeDateTimeForCompare` covers it. | `ProviderParityDepthTests` |
-| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | — | Integer epoch-seconds diff for second-resolution accuracy. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | — | Epoch-millisecond diff; SQLite assertions allow 1ms tolerance. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTimeOffset` col +/- `TimeSpan` col | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite preserves original offset via substr-suffix hook. | `LinqDateTimeOffsetPlusTimeSpanColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `decimal` comparisons, ordering, aggregates, distinct, set ops | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite REAL coercion documented. | `TypeConversionParityTests`, `LiveProviderShapeParityTests` |
 | `Guid` comparisons, equality, IN | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqGuidAndDistinctTests`, `TypeConversionParityTests` |
