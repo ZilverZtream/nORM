@@ -39,7 +39,8 @@ public class LinqEnumTryParseOutParamTests : IAsyncLifetime
                 (1, 'Active'),
                 (2, 'Inactive'),
                 (3, 'NotAStatus'),
-                (4, 'Pending');
+                (4, 'Pending'),
+                (5, 'active');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider());
@@ -64,6 +65,17 @@ public class LinqEnumTryParseOutParamTests : IAsyncLifetime
             .ToListAsync();
         // Active, Inactive, Pending — defined; NotAStatus is not.
         Assert.Equal(new[] { 1, 2, 4 }, rows.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task Enum_TryParse_ignoreCase_predicate_filters_case_insensitive_names()
+    {
+        Status sink;
+        var rows = await _ctx.Query<EtpRow>()
+            .Where(r => Enum.TryParse<Status>(r.StatusText, true, out sink))
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 1, 2, 4, 5 }, rows.Select(r => r.Id).ToArray());
     }
 
     [Fact]

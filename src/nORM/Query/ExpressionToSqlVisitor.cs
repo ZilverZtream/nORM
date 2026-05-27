@@ -2145,20 +2145,26 @@ namespace nORM.Query
             // predicate "is parseable" check. Lower to col IN ('Name1', ...).
             // The out parameter is ignored at the SQL level; callers wanting
             // the parsed value should use Enum.Parse<T> or write
-            // `col == "Active"` directly. Case sensitivity: SQLite TEXT
-            // comparison is binary by default which matches Enum.Parse's
-            // case-sensitive overload; the 3-arg ignoreCase form is not
-            // recognised here (use upper(col) IN (...) for case-insensitive).
+            // `col == "Active"` directly. The 3-arg ignoreCase overload is
+            // supported when the bool is a constant/captured value.
             if (node.Method.Name == nameof(Enum.TryParse)
                 && node.Method.DeclaringType == typeof(Enum)
                 && node.Method.IsGenericMethod
                 && node.Method.GetGenericArguments() is { Length: 1 } tryParseGenericArgs
                 && tryParseGenericArgs[0].IsEnum
-                // 2-arg form: TryParse<T>(string, out T). 3-arg ignoreCase form
-                // not supported — fall through.
-                && node.Arguments.Count == 2)
+                // 2-arg form: TryParse<T>(string, out T). 3-arg form:
+                // TryParse<T>(string, ignoreCase, out T).
+                && (node.Arguments.Count == 2 || node.Arguments.Count == 3))
             {
                 var nameSql = GetSql(node.Arguments[0]);
+                var ignoreCase = false;
+                if (node.Arguments.Count == 3)
+                {
+                    if (!TryGetConstantValue(node.Arguments[1], out var ignoreCaseRaw) || ignoreCaseRaw is not bool ignoreCaseValue)
+                        throw new NormUnsupportedFeatureException("Enum.TryParse<T>(value, ignoreCase, out result) requires a constant or captured ignoreCase value.");
+                    ignoreCase = ignoreCaseValue;
+                }
+
                 var names = Enum.GetNames(tryParseGenericArgs[0]);
                 if (names.Length == 0)
                 {
@@ -2166,11 +2172,13 @@ namespace nORM.Query
                 }
                 else
                 {
-                    _sql.Append("(").Append(nameSql).Append(" IN (");
+                    var compareSql = ignoreCase ? $"LOWER({nameSql})" : nameSql;
+                    _sql.Append("(").Append(compareSql).Append(" IN (");
                     for (int i = 0; i < names.Length; i++)
                     {
                         if (i > 0) _sql.Append(", ");
-                        _sql.Append('\'').Append(names[i].Replace("'", "''")).Append('\'');
+                        var name = ignoreCase ? names[i].ToLowerInvariant() : names[i];
+                        _sql.Append('\'').Append(name.Replace("'", "''")).Append('\'');
                     }
                     _sql.Append("))");
                 }
