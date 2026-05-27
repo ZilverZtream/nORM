@@ -295,11 +295,11 @@ public class LiveProviderTerminalOpParityTests
             try
             {
                 // Val > 45 → only Id=5 (Val=50) matches → true
-                var hasHigh = await ctx.Query<TopRow>().Where(r => r.Val > 45).CountAsync() > 0;
+                var hasHigh = await ctx.Query<TopRow>().AnyAsync(r => r.Val > 45);
                 Assert.True(hasHigh);
 
                 // Val > 9999 → no match → false
-                var hasMissing = await ctx.Query<TopRow>().Where(r => r.Val > 9999).CountAsync() > 0;
+                var hasMissing = await ctx.Query<TopRow>().AnyAsync(r => r.Val > 9999);
                 Assert.False(hasMissing);
             }
             finally { await TeardownAsync(ctx, kind); }
