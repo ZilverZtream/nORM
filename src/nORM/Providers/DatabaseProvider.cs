@@ -613,6 +613,14 @@ namespace nORM.Providers
         public virtual string GetToStringSql(string innerSql) => $"CAST({innerSql} AS VARCHAR)";
 
         /// <summary>
+        /// Wraps a string operand so equality/IN comparisons use ordinal, case-sensitive
+        /// semantics even on databases whose default column collation is case-insensitive.
+        /// PostgreSQL is already case-sensitive by default, so the base implementation is
+        /// identity.
+        /// </summary>
+        public virtual string ForceCaseSensitiveStringComparison(string sql) => sql;
+
+        /// <summary>
         /// Returns SQL that XORs two integer expressions. SQL Server and MySQL accept the
         /// `^` operator; PostgreSQL uses `#`; SQLite has no XOR operator and falls back to
         /// `(a | b) - (a &amp; b)` — algebraically equivalent on integers.

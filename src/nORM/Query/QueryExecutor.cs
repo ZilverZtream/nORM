@@ -149,6 +149,27 @@ namespace nORM.Query
             return factory(capacity);
         }
 
+        private CommandBehavior GetEntityReadBehavior(Type elementType)
+        {
+            if (!elementType.IsClass || elementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal))
+                return CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+
+            for (var current = elementType; current != null && current != typeof(object); current = current.BaseType)
+            {
+                if (!_ctx.IsMapped(current)) continue;
+                var map = _ctx.GetMapping(current);
+                if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
+                    return CommandBehavior.Default | CommandBehavior.SingleResult;
+            }
+
+            return CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+        }
+
+        private static CommandBehavior GetEntityReadBehavior(TableMapping mapping)
+            => mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0
+                ? CommandBehavior.Default | CommandBehavior.SingleResult
+                : CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+
         /// <summary>
         /// Materializes directly into <c>List&lt;object&gt;</c> to avoid covariant copy
         /// when the caller needs <c>List&lt;object&gt;</c> but the plan's ElementType is a concrete type.
@@ -173,7 +194,7 @@ namespace nORM.Query
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
                 bool isReadOnly = IsReadOnlyQuery();
 
-                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
                 var syncMaterializer = plan.SyncMaterializer;
@@ -251,7 +272,7 @@ namespace nORM.Query
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
-                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
                 // Use sync materializer to avoid per-row Task allocation.
@@ -361,7 +382,7 @@ namespace nORM.Query
                 bool isReadOnly = IsReadOnlyQuery();
 
                 commandLifetimeTransferred = true;
-                using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, GetEntityReadBehavior(plan.ElementType));
 
                 // Use sync materializer — no Task allocation, no async state machine.
                 var syncMaterializer = plan.SyncMaterializer;
@@ -446,7 +467,7 @@ namespace nORM.Query
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
             bool isReadOnly = IsReadOnlyQuery();
 
-            using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+            using var reader = command.ExecuteReaderWithInterception(_ctx, GetEntityReadBehavior(plan.ElementType));
             var syncMaterializer = plan.SyncMaterializer;
 
             while (reader.Read())
@@ -1036,7 +1057,7 @@ namespace nORM.Query
                 cmd.CommandText).TotalSeconds;
 
             using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(
-                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                _ctx, GetEntityReadBehavior(depQuery.TargetMapping));
 
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
@@ -1105,7 +1126,7 @@ namespace nORM.Query
                 cmd.CommandText).TotalSeconds;
 
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
-                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+                _ctx, GetEntityReadBehavior(depQuery.TargetMapping), ct).ConfigureAwait(false);
 
             // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(

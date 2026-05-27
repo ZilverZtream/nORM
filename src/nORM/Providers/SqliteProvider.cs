@@ -121,6 +121,9 @@ namespace nORM.Providers
         /// <summary>SQLite TEXT affinity is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"{sql} COLLATE BINARY";
+
         /// <summary>SQLite has no XOR operator — synthesize via `(a | b) - (a &amp; b)`.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"(({left} | {right}) - ({left} & {right}))";
 

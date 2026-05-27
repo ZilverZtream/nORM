@@ -109,7 +109,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `decimal` comparisons, ordering, aggregates, distinct, set ops | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite REAL coercion documented. | `TypeConversionParityTests`, `LiveProviderShapeParityTests` |
 | `Guid` comparisons, equality, IN | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqGuidAndDistinctTests`, `TypeConversionParityTests` |
 | `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests` |
-| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to `(col IN ('Name1', ...))`; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to a provider-forced case-sensitive enum-name comparison; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests` |
 | local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderShapeParityTests` |

@@ -40,6 +40,9 @@ namespace nORM.Providers
 
         internal override bool SupportsQueryPlanPreparedCommandCache => true;
 
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"BINARY {sql}";
+
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
 
