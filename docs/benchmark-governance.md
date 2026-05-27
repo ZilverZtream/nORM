@@ -32,6 +32,11 @@ Read benchmarks that compare nORM to handwritten ADO.NET must distinguish:
   claim is explicitly about dynamic result shapes.
 - Row counts and first-row projection parity must be verified when adding or
   changing a benchmark.
+- Bulk-insert claims must use the `BulkInsert_Idiomatic_*` rows unless the
+  claim explicitly says it is measuring a low-level diagnostic path. The
+  `BulkInsert_Naive_*`, `BulkInsert_Batched_*`, and `Tx + per row` rows exist
+  to diagnose fallback behavior and command overhead; they are not the public
+  `BulkInsertAsync` performance claim.
 
 ## BenchmarkDotNet Configuration
 
