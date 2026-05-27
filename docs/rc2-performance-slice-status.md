@@ -52,6 +52,7 @@ Public-claim interpretation:
   focused provider-sliced loop.
 - `BulkInsert_Batched_*`, `BulkInsert_Naive_*`, and `Tx + per row` remain
   diagnostic paths unless explicitly named in a claim.
-- The final RC package still needs the full release gate without
-  `-SkipBenchmark` so the package manifest and raw BenchmarkDotNet artifacts are
-  produced from one release commit.
+- Public performance claims still need a release-manifest run without
+  `-SkipBenchmark` if the project wants the raw BenchmarkDotNet artifacts and
+  package manifest produced from one release commit. The focused provider-sliced
+  evidence above is the current fast-loop performance proof.
