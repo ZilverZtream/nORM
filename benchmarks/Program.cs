@@ -112,6 +112,7 @@ namespace nORM.Benchmarks
                 Console.WriteLine("• Check that SQLite is available");
                 Console.WriteLine("• Run with --quick flag for basic functionality test");
                 Console.WriteLine("• Run with --fast flag for nORM-only debugging");
+                throw;
             }
 
             Console.WriteLine();
@@ -207,6 +208,8 @@ namespace nORM.Benchmarks
                 {
                     Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
                 }
+
+                throw;
             }
         }
 
