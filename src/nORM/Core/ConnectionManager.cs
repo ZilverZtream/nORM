@@ -429,10 +429,10 @@ namespace nORM.Core
             {
                 try
                 {
-                    await PerformHealthChecksAsync(token).ConfigureAwait(false);
-
                     if (!await _healthCheckTimer.WaitForNextTickAsync(token).ConfigureAwait(false))
                         break;
+
+                    await PerformHealthChecksAsync(token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
                 {
