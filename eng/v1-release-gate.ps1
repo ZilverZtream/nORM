@@ -62,6 +62,12 @@ function Get-TrxLogFileName {
     return (($Name -replace '[^A-Za-z0-9_.-]', '_') + '.trx')
 }
 
+function Get-DuplicateBenchmarkProjects {
+    $expectedProject = [System.IO.Path]::GetFullPath($benchmarkProjectPath)
+    return @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'nORM.Benchmarks.csproj' |
+        Where-Object { [System.IO.Path]::GetFullPath($_.FullName) -ne $expectedProject })
+}
+
 function Invoke-TestStep {
     param(
         [string]$Name,
@@ -128,12 +134,49 @@ function Invoke-BenchmarkStep {
         [string[]]$Arguments
     )
 
-    Push-Location $benchmarkProjectDir
+    $workingBenchmarkProjectDir = $benchmarkProjectDir
+    $tempRoot = $null
+    $benchmarkExitCode = 0
+
+    $duplicateBenchmarkProjects = Get-DuplicateBenchmarkProjects
+    if ($duplicateBenchmarkProjects.Count -gt 0) {
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('norm-bench-gate-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        Write-Host "Duplicate benchmark projects detected under repo; running isolated benchmark worktree at $tempRoot"
+        git -C $root worktree add --detach $tempRoot HEAD | Write-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create isolated benchmark worktree at $tempRoot."
+        }
+
+        $workingBenchmarkProjectDir = Join-Path $tempRoot 'benchmarks'
+    }
+
     try {
-        dotnet run -c $Configuration -- @Arguments
+        Push-Location $workingBenchmarkProjectDir
+        try {
+            dotnet run -c $Configuration -- @Arguments
+            $benchmarkExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+        }
+        finally {
+            Pop-Location
+        }
+
+        if ($tempRoot) {
+            $tempArtifacts = Join-Path $workingBenchmarkProjectDir 'BenchmarkDotNet.Artifacts'
+            $localArtifacts = Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts'
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $localArtifacts
+            if (Test-Path $tempArtifacts) {
+                Copy-Item -LiteralPath $tempArtifacts -Destination $benchmarkProjectDir -Recurse -Force
+            }
+        }
     }
     finally {
-        Pop-Location
+        if ($tempRoot) {
+            git -C $root worktree remove --force $tempRoot | Write-Host
+        }
+    }
+
+    if ($benchmarkExitCode -ne 0) {
+        throw "Benchmark command failed with exit code $benchmarkExitCode."
     }
 }
 

@@ -147,6 +147,9 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("eng/benchmark-evidence.ps1", gate);
         Assert.Contains("benchmark threshold gate", gate);
         Assert.Contains("eng/check-benchmark-thresholds.ps1", gate);
+        Assert.Contains("Get-DuplicateBenchmarkProjects", gate);
+        Assert.Contains("running isolated benchmark worktree", gate);
+        Assert.Contains("Benchmark command failed with exit code", gate);
         Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
         Assert.Contains("BulkInsert_Idiomatic_*", governance);
         Assert.Contains("Tx + per row", governance);
@@ -177,6 +180,18 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Single(Regex.Matches(thresholdGate, "function Convert-MeanToNanoseconds"));
         Assert.Contains("if ($Mode -ne 'rc')", gate);
         Assert.Contains("$thresholdArgs.AllowMissingRules = $true", gate);
+    }
+
+    [Fact]
+    public void BenchmarkProgram_DoesNotSwallowBenchmarkFailures()
+    {
+        var code = ReadRepoFile("benchmarks/Program.cs");
+
+        Assert.Contains("Fast nORM benchmark validation failed", code);
+        Assert.Contains("Provider matrix benchmark validation failed", code);
+        Assert.Contains("Console.WriteLine($\"❌ Error running benchmarks: {ex.Message}\");", code);
+        Assert.Contains("Console.WriteLine($\"❌ Error running fast benchmarks: {ex.Message}\");", code);
+        Assert.True(Regex.Matches(code, @"catch\s*\(Exception ex\)[\s\S]*?throw;").Count >= 2);
     }
 
     [Fact]
