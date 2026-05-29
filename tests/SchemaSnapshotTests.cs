@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -30,6 +31,14 @@ public class SchemaSnapshotTests
     {
         public int Id { get; set; }
         public string Color { get; set; } = string.Empty;
+    }
+
+    [Table("SnapshotIndexedEntity")]
+    private class SnapshotIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("IX_SnapshotIndexedEntity_Code", IsUnique = true)]
+        public string Code { get; set; } = string.Empty;
     }
 
  // Helper: build a single-type snapshot using the assembly of the test type
@@ -103,6 +112,17 @@ public class SchemaSnapshotTests
 
         Assert.False(titleCol.IsPrimaryKey);
         Assert.Null(titleCol.IndexName);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsIndexAttribute()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotIndexedEntity");
+        var code = table.Columns.Single(c => c.Name == nameof(SnapshotIndexedEntity.Code));
+
+        Assert.Equal("IX_SnapshotIndexedEntity_Code", code.IndexName);
+        Assert.True(code.IsUnique);
     }
 
     [Fact]

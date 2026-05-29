@@ -155,6 +155,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.Linq.Expressions.E
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.SharesTableWith``1():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.ToTable(System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.IndexAttribute.#ctor(System.String)
 M:nORM.Configuration.ManyToManyConfiguration.#ctor(System.String,System.Type,System.String,System.String,System.String,System.String)
 M:nORM.Configuration.ManyToManyConfiguration.<Clone>$():nORM.Configuration.ManyToManyConfiguration
 M:nORM.Configuration.ManyToManyConfiguration.Deconstruct(System.String&,System.Type&,System.String&,System.String&,System.String&,System.String&):System.Void
@@ -989,6 +990,8 @@ P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.G
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
+P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
+P:nORM.Configuration.IndexAttribute.Name:System.String
 P:nORM.Configuration.ManyToManyConfiguration.JoinTableName:System.String
 P:nORM.Configuration.ManyToManyConfiguration.LeftFkColumn:System.String
 P:nORM.Configuration.ManyToManyConfiguration.NavPropertyName:System.String
@@ -1289,6 +1292,7 @@ T:nORM.Configuration.DbContextOptions
 T:nORM.Configuration.EntityTypeBuilder{`0,`1}
 T:nORM.Configuration.EntityTypeBuilder{`0}
 T:nORM.Configuration.IEntityTypeConfiguration
+T:nORM.Configuration.IndexAttribute
 T:nORM.Configuration.ManyToManyConfiguration
 T:nORM.Configuration.ModelBuilder
 T:nORM.Configuration.NativeTenantSecurityMode

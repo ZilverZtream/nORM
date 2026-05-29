@@ -77,6 +77,7 @@ namespace nORM.Scaffolding
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var relationships = BuildRelationships(foreignKeys, entityByTable, columnPropertiesByTable);
 
@@ -91,8 +92,9 @@ namespace nORM.Scaffolding
 
                     var references = relationships.Where(r => string.Equals(r.DependentTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     var collections = relationships.Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, references, collections).ConfigureAwait(false);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections).ConfigureAwait(false);
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
@@ -117,6 +119,7 @@ namespace nORM.Scaffolding
         /// <param name="entityName">Name of the entity class to produce.</param>
         /// <param name="namespaceName">Namespace for the generated entity.</param>
         /// <param name="columnPropertyNames">Optional map from database column names to generated C# property names.</param>
+        /// <param name="indexes">Index metadata for this entity's table.</param>
         /// <param name="references">Reference navigations from this entity to principal entities.</param>
         /// <param name="collections">Collection navigations from this entity to dependent entities.</param>
         /// <returns>A string containing the generated C# code.</returns>
@@ -128,6 +131,7 @@ namespace nORM.Scaffolding
             string entityName,
             string namespaceName,
             IReadOnlyDictionary<string, string>? columnPropertyNames = null,
+            IReadOnlyList<ScaffoldIndex>? indexes = null,
             IReadOnlyList<ScaffoldRelationship>? references = null,
             IReadOnlyList<ScaffoldRelationship>? collections = null)
         {
@@ -140,6 +144,8 @@ namespace nORM.Scaffolding
                 sb.AppendLine("using System.Collections.Generic;");
                 sb.AppendLine("using System.ComponentModel.DataAnnotations;");
                 sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
+                if (indexes?.Count > 0)
+                    sb.AppendLine("using nORM.Configuration;");
                 sb.AppendLine();
                 sb.AppendLine($"namespace {namespaceName};");
                 sb.AppendLine();
@@ -191,6 +197,13 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
                     if (!clrType.IsValueType && !allowNull)
                         sb.AppendLine("    [Required]");
+                    var index = indexes?.FirstOrDefault(i => string.Equals(i.ColumnName, colName, StringComparison.Ordinal));
+                    if (index is { IndexName.Length: > 0 })
+                    {
+                        var safeIndexName = index.Value.IndexName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var uniqueSuffix = index.Value.IsUnique ? ", IsUnique = true" : string.Empty;
+                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix})]");
+                    }
                     sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");
                     var initializer = !clrType.IsValueType && !allowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
@@ -299,6 +312,154 @@ namespace nORM.Scaffolding
             }
 
             await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldIndex>> GetIndexesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var providerName = provider.GetType().Name;
+            if (provider is SqliteProvider)
+            {
+                var indexes = new List<ScaffoldIndex>();
+                foreach (var table in tables)
+                {
+                    await using var listCommand = connection.CreateCommand();
+                    listCommand.CommandText = $"PRAGMA index_list({provider.Escape(table.Name)})";
+                    await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                    var tableIndexes = new List<(string Name, bool IsUnique, string Origin)>();
+                    while (await listReader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var name = Convert.ToString(listReader["name"]);
+                        if (string.IsNullOrWhiteSpace(name))
+                            continue;
+
+                        tableIndexes.Add((
+                            name,
+                            Convert.ToInt32(listReader["unique"], System.Globalization.CultureInfo.InvariantCulture) != 0,
+                            Convert.ToString(listReader["origin"]) ?? string.Empty));
+                    }
+
+                    foreach (var (name, isUnique, origin) in tableIndexes)
+                    {
+                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        await using var infoCommand = connection.CreateCommand();
+                        infoCommand.CommandText = $"PRAGMA index_info({provider.Escape(name)})";
+                        await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                        var columns = new List<string>();
+                        while (await infoReader.ReadAsync().ConfigureAwait(false))
+                        {
+                            var columnName = Convert.ToString(infoReader["name"]);
+                            if (!string.IsNullOrWhiteSpace(columnName))
+                                columns.Add(columnName);
+                        }
+
+                        if (columns.Count == 1)
+                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), columns[0], name, isUnique, 1));
+                    }
+                }
+
+                return indexes;
+            }
+
+            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryIndexesAsync(connection, """
+                    SELECT
+                        SCHEMA_NAME(t.schema_id) AS TableSchema,
+                        t.name AS TableName,
+                        c.name AS ColumnName,
+                        i.name AS IndexName,
+                        i.is_unique AS IsUnique,
+                        COUNT(*) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount
+                    FROM sys.indexes i
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                    INNER JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = ic.column_id
+                    WHERE t.is_ms_shipped = 0
+                      AND i.is_primary_key = 0
+                      AND i.is_hypothetical = 0
+                      AND i.name IS NOT NULL
+                    ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.key_ordinal
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryIndexesAsync(connection, """
+                    SELECT
+                        ns.nspname AS TableSchema,
+                        tbl.relname AS TableName,
+                        att.attname AS ColumnName,
+                        idx.relname AS IndexName,
+                        ix.indisunique AS IsUnique,
+                        cardinality(ix.indkey) AS ColumnCount
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
+                    INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
+                    WHERE ix.indisprimary = false
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryIndexesAsync(connection, """
+                    SELECT
+                        s.table_schema AS TableSchema,
+                        s.table_name AS TableName,
+                        s.column_name AS ColumnName,
+                        s.index_name AS IndexName,
+                        CASE WHEN s.non_unique = 0 THEN 1 ELSE 0 END AS IsUnique,
+                        COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount
+                    FROM information_schema.statistics s
+                    WHERE s.table_schema = DATABASE()
+                      AND s.index_name <> 'PRIMARY'
+                    ORDER BY s.table_schema, s.table_name, s.index_name, s.seq_in_index
+                    """).ConfigureAwait(false);
+            }
+
+            return Array.Empty<ScaffoldIndex>();
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldIndex>> QueryIndexesAsync(DbConnection connection, string sql)
+        {
+            var indexes = new List<ScaffoldIndex>();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var tableName = Convert.ToString(reader["TableName"]);
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                var indexName = Convert.ToString(reader["IndexName"]);
+                if (string.IsNullOrWhiteSpace(tableName)
+                    || string.IsNullOrWhiteSpace(columnName)
+                    || string.IsNullOrWhiteSpace(indexName))
+                {
+                    continue;
+                }
+
+                var columnCount = Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture);
+                if (columnCount != 1)
+                    continue;
+
+                indexes.Add(new ScaffoldIndex(
+                    TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), tableName),
+                    columnName,
+                    indexName,
+                    Convert.ToBoolean(reader["IsUnique"], System.Globalization.CultureInfo.InvariantCulture),
+                    columnCount));
+            }
+
+            return indexes;
         }
 
         private static async Task<IReadOnlyList<ScaffoldForeignKey>> GetForeignKeysAsync(
@@ -963,6 +1124,13 @@ namespace nORM.Scaffolding
             string PrincipalTable,
             string PrincipalColumn,
             string ConstraintName,
+            int ColumnCount);
+
+        private readonly record struct ScaffoldIndex(
+            string TableKey,
+            string ColumnName,
+            string IndexName,
+            bool IsUnique,
             int ColumnCount);
 
         private readonly record struct ScaffoldRelationship(

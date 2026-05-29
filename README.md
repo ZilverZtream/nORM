@@ -264,9 +264,9 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 identifier cleanup, table filtering, overwrite protection, nullable-safe output,
-and single-column FK navigation generation are supported. Composite FK, index,
-owned-type, inheritance, and provider-specific computed/default/trigger
-inference remain explicit post-processing. See
+single-column FK navigation generation, and single-column index metadata are
+supported. Composite FK/index, owned-type, inheritance, and provider-specific
+computed/default/trigger inference remain explicit post-processing. See
 [Scaffolding Contract](docs/scaffolding.md).
 
 ### Modern SQL Features

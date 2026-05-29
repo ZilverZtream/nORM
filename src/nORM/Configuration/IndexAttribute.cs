@@ -1,0 +1,31 @@
+#nullable enable
+using System;
+
+namespace nORM.Configuration
+{
+    /// <summary>
+    /// Marks a property as participating in a named database index for migration
+    /// snapshot generation.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+    public sealed class IndexAttribute : Attribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="IndexAttribute"/> class.
+        /// </summary>
+        /// <param name="name">The database index name.</param>
+        public IndexAttribute(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Index name cannot be null or whitespace.", nameof(name));
+
+            Name = name;
+        }
+
+        /// <summary>Gets the database index name.</summary>
+        public string Name { get; }
+
+        /// <summary>Gets or sets whether the index is unique.</summary>
+        public bool IsUnique { get; set; }
+    }
+}

@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Mapping;
 using RenameColumnAttr = nORM.Mapping.RenameColumnAttribute;
@@ -201,6 +202,7 @@ namespace nORM.Migration
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var renameAttr = prop.GetCustomAttribute<RenameColumnAttr>();
+                    var indexAttr = prop.GetCustomAttribute<IndexAttribute>();
                     var column = new ColumnSchema
                     {
                         Name = colAttr?.Name ?? prop.Name,
@@ -213,8 +215,8 @@ namespace nORM.Migration
                         // IsUnique is only set for single-column PKs; composite PKs must NOT
                         // emit per-column UNIQUE constraints.
                         IsPrimaryKey = isPk,
-                        IsUnique = isPk && pkNames.Count == 1,
-                        IndexName = isPk ? "PK_" + table.Name : null,
+                        IsUnique = (isPk && pkNames.Count == 1) || indexAttr?.IsUnique == true,
+                        IndexName = isPk ? "PK_" + table.Name : indexAttr?.Name,
                         // Treat both Identity and Computed as server-managed columns for snapshot
                         // purposes: both are excluded from INSERT/UPDATE, and both require the
                         // migration generator to omit a NOT NULL constraint without a DEFAULT.

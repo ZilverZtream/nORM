@@ -605,6 +605,39 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSingleColumnIndexes_GeneratesIndexAttributes()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IndexedWidget (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Code TEXT NOT NULL,
+                Name TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IX_IndexedWidget_Code ON IndexedWidget(Code);
+            CREATE INDEX IX_IndexedWidget_Name ON IndexedWidget(Name);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "IndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedWidget.cs"));
+            Assert.Contains("using nORM.Configuration;", entityCode);
+            Assert.Contains("[Index(\"IX_IndexedWidget_Code\", IsUnique = true)]", entityCode);
+            Assert.Contains("[Index(\"IX_IndexedWidget_Name\")]", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
