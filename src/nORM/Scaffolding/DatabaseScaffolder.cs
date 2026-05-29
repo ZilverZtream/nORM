@@ -1358,6 +1358,10 @@ namespace nORM.Scaffolding
             var relationships = new List<ScaffoldRelationship>();
             var referenceNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var collectionNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var relationshipPairCounts = foreignKeys
+                .Where(fk => fk.ColumnCount == 1)
+                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable) + "\u001f" + TableKey(fk.PrincipalSchema, fk.PrincipalTable), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var foreignKey in foreignKeys.Where(fk => fk.ColumnCount == 1))
             {
@@ -1371,9 +1375,14 @@ namespace nORM.Scaffolding
 
                 var foreignKeyProperty = GetColumnPropertyName(columnPropertiesByTable, dependentKey, foreignKey.DependentColumn);
                 var principalKeyProperty = GetColumnPropertyName(columnPropertiesByTable, principalKey, foreignKey.PrincipalColumn);
+                var hasMultipleRelationshipsToSamePrincipal = relationshipPairCounts.TryGetValue(
+                    dependentKey + "\u001f" + principalKey,
+                    out var relationshipPairCount)
+                    && relationshipPairCount > 1;
 
                 var referenceBase = principalEntity;
-                if (referenceNames.TryGetValue(dependentKey, out var existingReferences)
+                if (hasMultipleRelationshipsToSamePrincipal
+                    || referenceNames.TryGetValue(dependentKey, out var existingReferences)
                     && existingReferences.Contains(referenceBase))
                 {
                     referenceBase = TrimIdSuffix(foreignKeyProperty);
@@ -1381,17 +1390,20 @@ namespace nORM.Scaffolding
                         referenceBase = principalEntity + "Navigation";
                 }
 
+                referenceNames.TryGetValue(dependentKey, out existingReferences);
                 existingReferences ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 referenceNames[dependentKey] = existingReferences;
                 var referenceName = MakeUnique(referenceBase, existingReferences);
 
                 var collectionBase = Pluralize(dependentEntity);
-                if (collectionNames.TryGetValue(principalKey, out var existingCollections)
+                if (hasMultipleRelationshipsToSamePrincipal
+                    || collectionNames.TryGetValue(principalKey, out var existingCollections)
                     && existingCollections.Contains(collectionBase))
                 {
                     collectionBase = Pluralize(dependentEntity) + "By" + foreignKeyProperty;
                 }
 
+                collectionNames.TryGetValue(principalKey, out existingCollections);
                 existingCollections ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 collectionNames[principalKey] = existingCollections;
                 var collectionName = MakeUnique(collectionBase, existingCollections);

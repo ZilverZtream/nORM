@@ -791,6 +791,57 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithMultipleForeignKeysToSamePrincipal_UsesRoleBasedNavigationNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Address (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Line1 TEXT NOT NULL
+            );
+            CREATE TABLE Shipment (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                BillingAddressId INTEGER NOT NULL,
+                ShippingAddressId INTEGER NOT NULL,
+                CONSTRAINT FK_Shipment_BillingAddress FOREIGN KEY (BillingAddressId) REFERENCES Address(Id),
+                CONSTRAINT FK_Shipment_ShippingAddress FOREIGN KEY (ShippingAddressId) REFERENCES Address(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ShipmentContext");
+
+            var addressCode = File.ReadAllText(Path.Combine(dir, "Address.cs"));
+            var shipmentCode = File.ReadAllText(Path.Combine(dir, "Shipment.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ShipmentContext.cs"));
+
+            Assert.Contains("public List<Shipment> ShipmentsByBillingAddressId { get; set; } = new();", addressCode);
+            Assert.Contains("public List<Shipment> ShipmentsByShippingAddressId { get; set; } = new();", addressCode);
+            Assert.Contains("[ForeignKey(nameof(BillingAddressId))]", shipmentCode);
+            Assert.Contains("public Address? BillingAddress { get; set; }", shipmentCode);
+            Assert.Contains("[ForeignKey(nameof(ShippingAddressId))]", shipmentCode);
+            Assert.Contains("public Address? ShippingAddress { get; set; }", shipmentCode);
+            Assert.DoesNotContain("public Address? Address { get; set; }", shipmentCode);
+            Assert.Contains(".HasMany(p => p.ShipmentsByBillingAddressId)", contextCode);
+            Assert.Contains(".WithOne(d => d.BillingAddress)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BillingAddressId, p => p.Id);", contextCode);
+            Assert.Contains(".HasMany(p => p.ShipmentsByShippingAddressId)", contextCode);
+            Assert.Contains(".WithOne(d => d.ShippingAddress)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id);", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSingleColumnIndexes_GeneratesIndexAttributes()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
