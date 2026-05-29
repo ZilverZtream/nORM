@@ -75,7 +75,8 @@ must be reviewed and edited like handwritten model code.
   with the same display string as a schema-qualified table, scaffolding fails
   deterministically because v1 filter syntax cannot disambiguate those objects.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
-  CLI `--no-overwrite`.
+  CLI `--no-overwrite`. Output file conflicts are preflighted before any file
+  is written, so a later collision does not leave a partially generated model.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
@@ -97,15 +98,17 @@ must be reviewed and edited like handwritten model code.
   nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
-  provider-specific partial/expression/included-column index diagnostics,
-  composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
+  FK cascade/non-cascade preservation, computed/generated column write
+  exclusion, provider-specific partial/expression/included-column/descending
+  index diagnostics, composite-FK, many-to-many candidate, and provider-owned
+  schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
-  preservation, and connection ownership for sync/async dynamic scaffolding
-  calls.
+  preservation, computed-column metadata in the dynamic cache key and generated
+  attributes, and connection ownership for sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted
   identifiers.
