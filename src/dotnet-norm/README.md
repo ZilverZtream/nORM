@@ -39,14 +39,20 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 identifier cleanup, de-duplicated generated names, `IQueryable<T>` context
 properties backed by nORM's query provider, single-column FK navigations, pure
 many-to-many join mappings, and single-column/composite index metadata,
-including columns that participate in multiple indexes. It is a
-bounded bootstrap tool, not a database-first completeness claim; unsupported
-composite foreign keys are reported in `nORM.ScaffoldWarnings.md` and
-`nORM.ScaffoldWarnings.json`, while
-composite FK navigation generation, payload join-table modeling, owned-type,
-inheritance, and provider-specific computed/default/trigger inference remain
-explicit post-processing. Use `--fail-on-warnings` in CI to reject lossy
-scaffolds after the warning report is written.
+including columns that participate in multiple indexes. SQL Server and
+PostgreSQL schemas are preserved, SQLite attached database schemas are
+preserved, and MySQL uses the current database for discovery without emitting
+the database/catalog name as a model schema.
+
+It is a bounded bootstrap tool, not a database-first completeness claim.
+Unsupported composite foreign keys, payload join tables, provider-specific
+defaults/computed columns/triggers, SQL Server provider-native temporal tables,
+and skipped views are reported in `nORM.ScaffoldWarnings.md` and
+`nORM.ScaffoldWarnings.json`. Composite FK navigation generation, payload
+join-table modeling, owned-type inference, inheritance inference, view entity
+generation, and provider-specific schema semantics remain explicit
+post-processing. Use `--fail-on-warnings` in CI to reject lossy scaffolds after
+the warning report is written.
 
 ## Provider Mobility Certification
 

@@ -263,17 +263,25 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 ```
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
-identifier cleanup, table filtering, overwrite protection, nullable-safe output,
-single-column FK navigation generation, and single-column/composite index
-metadata are supported, including columns that participate in multiple indexes.
-Unsupported composite foreign keys are reported in `nORM.ScaffoldWarnings.md`
-and `nORM.ScaffoldWarnings.json` instead of being silently converted into
-invalid navigations.
+schema-preserving table mapping, identifier cleanup, table filtering, overwrite
+protection, nullable-safe output, single-column FK navigation generation, pure
+many-to-many join mapping, and single-column/composite index metadata are
+supported, including columns that participate in multiple indexes. SQL Server
+and PostgreSQL schemas are preserved, SQLite attached database schemas are
+preserved, and MySQL discovery does not bake the current database/catalog name
+into the model.
+
+Unsupported composite foreign keys, payload join tables, provider-specific
+defaults/computed columns/triggers, SQL Server provider-native temporal tables,
+and skipped views are reported in `nORM.ScaffoldWarnings.md` and
+`nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
+model code.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
-Composite FK, owned-type, inheritance, and provider-specific
-computed/default/trigger inference remain explicit post-processing. See
-[Scaffolding Contract](docs/scaffolding.md).
+Composite FK navigation generation, payload join-table modeling, owned-type
+inference, inheritance inference, view entity generation, and provider-specific
+schema semantics remain explicit post-processing. See [Scaffolding
+Contract](docs/scaffolding.md).
 
 ### Modern SQL Features
 
