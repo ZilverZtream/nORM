@@ -130,6 +130,22 @@ namespace nORM.Scaffolding
                 typeBuilder.DefineDefaultConstructor(
                     MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
 
+                var tableAttrCtor = typeof(TableAttribute).GetConstructor(new[] { typeof(string) })!;
+                var (schemaName, bareTableName) = SplitSchema(tableName);
+                if (schemaName is null)
+                {
+                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(tableAttrCtor, new object[] { bareTableName }));
+                }
+                else
+                {
+                    var schemaProperty = typeof(TableAttribute).GetProperty(nameof(TableAttribute.Schema))!;
+                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(
+                        tableAttrCtor,
+                        new object[] { bareTableName },
+                        new[] { schemaProperty },
+                        new object[] { schemaName }));
+                }
+
                 // Add properties for each column
                 foreach (var col in columns)
                 {

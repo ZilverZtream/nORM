@@ -95,6 +95,30 @@ public class DynamicTypeQueryTests
     // ─── Gate C: Cache key collision resilience ────────────────────────────
 
     [Fact]
+    public void QueryString_MaterializesRowsFromOriginalTable()
+    {
+        var dbName = $"dynamic_query_exec_{Guid.NewGuid():N}";
+        var (cn, ctx) = CreateContextWithSchema(dbName, new[]
+        {
+            "Id INTEGER PRIMARY KEY",
+            "Name TEXT"
+        });
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "INSERT INTO Users (Id, Name) VALUES (1, 'Ada')";
+            cmd.ExecuteNonQuery();
+        }
+
+        var rows = ctx.Query("Users").Cast<object>().ToList();
+
+        var row = Assert.Single(rows);
+        Assert.Equal("Ada", row.GetType().GetProperty("Name")!.GetValue(row));
+    }
+
+    [Fact]
     public void GateC_SameConnectionStringDifferentOrder_MapsToSameCacheEntry()
     {
         // Gate C: "Server=A;Database=B" and "DATABASE=B;SERVER=A" must normalize to the same
