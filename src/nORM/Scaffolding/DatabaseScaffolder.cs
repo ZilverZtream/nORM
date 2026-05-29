@@ -96,7 +96,8 @@ namespace nORM.Scaffolding
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
-                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed");
+                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
+                var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
@@ -123,7 +124,8 @@ namespace nORM.Scaffolding
                     var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
                     computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns).ConfigureAwait(false);
+                    rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns).ConfigureAwait(false);
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
@@ -163,6 +165,7 @@ namespace nORM.Scaffolding
         /// <param name="collections">Collection navigations from this entity to dependent entities.</param>
         /// <param name="manyToManyCollections">Many-to-many collection navigations from this entity through pure join tables.</param>
         /// <param name="computedColumns">Column names known to be database-computed/generated.</param>
+        /// <param name="rowVersionColumns">Column names known to be database-managed rowversion/timestamp tokens.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -176,7 +179,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldRelationship>? references = null,
             IReadOnlyList<ScaffoldRelationship>? collections = null,
             IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null,
-            IReadOnlySet<string>? computedColumns = null)
+            IReadOnlySet<string>? computedColumns = null,
+            IReadOnlySet<string>? rowVersionColumns = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -221,6 +225,7 @@ namespace nORM.Scaffolding
                     var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                     var isAuto = row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
                     var isComputed = computedColumns?.Contains(colName) == true;
+                    var isRowVersion = rowVersionColumns?.Contains(colName) == true;
 
                     // String length if available
                     int? maxLength = null;
@@ -235,6 +240,8 @@ namespace nORM.Scaffolding
                     sb.AppendLine("    /// </summary>");
                     if (isKey)
                         sb.AppendLine("    [Key]");
+                    if (isRowVersion)
+                        sb.AppendLine("    [Timestamp]");
                     if (isAuto)
                         sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
                     else if (isComputed)
@@ -1146,6 +1153,13 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND ty.name IN ('decimal', 'numeric')
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'RowVersion', ty.name
+                    FROM sys.columns c
+                    INNER JOIN sys.tables t ON t.object_id = c.object_id
+                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                    WHERE t.is_ms_shipped = 0
+                      AND ty.name IN ('timestamp', 'rowversion')
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1588,6 +1602,7 @@ namespace nORM.Scaffolding
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
+                "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
@@ -1939,12 +1954,13 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
-            string kind)
+            params string[] kinds)
         {
+            var kindSet = kinds.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var feature in features)
             {
-                if (!string.Equals(feature.Kind, kind, StringComparison.OrdinalIgnoreCase)
+                if (!kindSet.Contains(feature.Kind)
                     || string.IsNullOrWhiteSpace(feature.Name))
                 {
                     continue;

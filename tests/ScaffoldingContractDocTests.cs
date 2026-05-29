@@ -83,6 +83,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific column types", doc, StringComparison.Ordinal);
         Assert.Contains("decimal precision/scale", doc, StringComparison.Ordinal);
+        Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("temporal_type <> 0", source, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", source, StringComparison.Ordinal);
@@ -90,6 +91,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Collation", source, StringComparison.Ordinal);
         Assert.Contains("ProviderSpecificColumnType", source, StringComparison.Ordinal);
         Assert.Contains("PrecisionScale", source, StringComparison.Ordinal);
+        Assert.Contains("RowVersion", source, StringComparison.Ordinal);
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);

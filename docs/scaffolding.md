@@ -21,6 +21,9 @@ must be reviewed and edited like handwritten model code.
   when provider metadata exposes them. Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
+  SQL Server rowversion/timestamp columns are marked as `[Timestamp]` and
+  database-generated for optimistic concurrency, while the provider DDL remains
+  outside the generated model.
 - Nullable reference/value type generation from database nullability metadata.
 - Non-null reference properties are initialized with `default!` so generated
   nullable-enabled code compiles cleanly before the application adds its own
@@ -81,7 +84,8 @@ must be reviewed and edited like handwritten model code.
   listed there instead of being silently ignored or converted into fake
   single-column navigations; defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
-  decimal precision/scale, non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
+  decimal precision/scale, SQL Server rowversion/timestamp columns,
+  non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
   schema; views, routines, and sequences are discovered and reported as skipped
   database objects; likely many-to-many join tables are flagged when they are
   scaffolded as normal entities.

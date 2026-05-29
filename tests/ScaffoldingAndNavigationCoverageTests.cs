@@ -67,6 +67,17 @@ public class SanComputedGenerated
     public int Total { get; set; }
 }
 
+[Table("SAN_RowVersionGenerated")]
+public class SanRowVersionGenerated
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Timestamp]
+    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+}
+
 [Table("SchemaParent", Schema = "aux")]
 [Xunit.Trait("Category", "Fast")]
 public class SanSchemaParent
@@ -671,6 +682,19 @@ public class DatabaseScaffolderPrivateMethodTests
         var total = Assert.Single(mapping.Columns, c => c.PropName == nameof(SanComputedGenerated.Total));
         Assert.True(total.IsDbGenerated);
         Assert.DoesNotContain(mapping.InsertColumns, c => c.PropName == nameof(SanComputedGenerated.Total));
+    }
+
+    [Fact]
+    public void RowVersionComputed_IsTimestampAndDatabaseGeneratedColumn()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var mapping = ctx.GetMapping(typeof(SanRowVersionGenerated));
+        var rowVersion = Assert.Single(mapping.Columns, c => c.PropName == nameof(SanRowVersionGenerated.RowVersion));
+        Assert.True(rowVersion.IsTimestamp);
+        Assert.True(rowVersion.IsDbGenerated);
+        Assert.DoesNotContain(mapping.InsertColumns, c => c.PropName == nameof(SanRowVersionGenerated.RowVersion));
     }
 
     [Fact]
