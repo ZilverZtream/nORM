@@ -1245,7 +1245,10 @@ public class DatabaseScaffolderPrivateMethodTests
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "CREATE VIRTUAL TABLE SearchDocs USING fts5(Body);";
+        cmd.CommandText = """
+            CREATE VIRTUAL TABLE SearchDocs USING fts5(Body);
+            CREATE TABLE SearchDocs_Audit (Id INTEGER PRIMARY KEY, Message TEXT NOT NULL);
+            """;
         try
         {
             cmd.ExecuteNonQuery();
@@ -1261,7 +1264,10 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "VirtualCtx");
 
             Assert.False(File.Exists(Path.Combine(dir, "SearchDocs.cs")));
-            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileName(path).Contains("SearchDocs", StringComparison.OrdinalIgnoreCase));
+            Assert.True(File.Exists(Path.Combine(dir, "SearchDocsAudit.cs")));
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsData", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsIdx", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsContent", StringComparison.OrdinalIgnoreCase));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("VirtualTable", warnings);

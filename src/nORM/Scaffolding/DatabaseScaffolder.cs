@@ -327,7 +327,19 @@ namespace nORM.Scaffolding
                               FROM {provider.Escape(schema)}.sqlite_master vt
                               WHERE vt.type = 'table'
                                 AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
-                                AND m.name LIKE vt.name || '_%'
+                                AND m.name IN (
+                                    vt.name || '_data',
+                                    vt.name || '_idx',
+                                    vt.name || '_content',
+                                    vt.name || '_docsize',
+                                    vt.name || '_config',
+                                    vt.name || '_segments',
+                                    vt.name || '_segdir',
+                                    vt.name || '_stat',
+                                    vt.name || '_node',
+                                    vt.name || '_parent',
+                                    vt.name || '_rowid'
+                                )
                           )
                         ORDER BY m.name
                         """).ConfigureAwait(false));
@@ -389,7 +401,19 @@ namespace nORM.Scaffolding
                               FROM {provider.Escape(schema)}.sqlite_master vt
                               WHERE vt.type = 'table'
                                 AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
-                                AND m.name LIKE vt.name || '_%'
+                                AND m.name IN (
+                                    vt.name || '_data',
+                                    vt.name || '_idx',
+                                    vt.name || '_content',
+                                    vt.name || '_docsize',
+                                    vt.name || '_config',
+                                    vt.name || '_segments',
+                                    vt.name || '_segdir',
+                                    vt.name || '_stat',
+                                    vt.name || '_node',
+                                    vt.name || '_parent',
+                                    vt.name || '_rowid'
+                                )
                           )
                         ORDER BY ObjectName
                         """).ConfigureAwait(false));
