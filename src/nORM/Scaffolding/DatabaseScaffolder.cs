@@ -316,7 +316,7 @@ namespace nORM.Scaffolding
                 {
                     tables.AddRange(await QueryTablesAsync(
                         connection,
-                        $"SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, name AS TABLE_NAME FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").ConfigureAwait(false));
+                        $"SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, name AS TABLE_NAME FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND UPPER(sql) NOT LIKE 'CREATE VIRTUAL TABLE%' ORDER BY name").ConfigureAwait(false));
                 }
 
                 return tables;
@@ -356,7 +356,16 @@ namespace nORM.Scaffolding
                 {
                     objects.AddRange(await QuerySkippedObjectsAsync(
                         connection,
-                        $"SELECT {SqliteSchemaResult(schema)} AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'view' ORDER BY name").ConfigureAwait(false));
+                        $"""
+                        SELECT {SqliteSchemaResult(schema)} AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail
+                        FROM {provider.Escape(schema)}.sqlite_master
+                        WHERE type = 'view'
+                        UNION ALL
+                        SELECT {SqliteSchemaResult(schema)}, name, 'VirtualTable', 'SQLite virtual table'
+                        FROM {provider.Escape(schema)}.sqlite_master
+                        WHERE type = 'table' AND UPPER(sql) LIKE 'CREATE VIRTUAL TABLE%'
+                        ORDER BY ObjectName
+                        """).ConfigureAwait(false));
                 }
 
                 return objects;
@@ -1660,6 +1669,7 @@ namespace nORM.Scaffolding
                 "Synonym" => "Resolve the synonym to a supported base table or keep it behind provider-bound integration code.",
                 "MaterializedView" => "Map a supported base table or hand-write a provider-bound refresh/query path for the materialized view.",
                 "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
+                "VirtualTable" => "Keep the virtual table behind provider-bound query/index code; v1 scaffolding emits normal base-table models only.",
                 _ => "Keep this database object in provider migrations or hand-written integration code."
             };
 

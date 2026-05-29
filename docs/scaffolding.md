@@ -87,7 +87,7 @@ must be reviewed and edited like handwritten model code.
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
-  schema; views, routines, sequences, SQL Server synonyms, PostgreSQL
+  schema; SQLite virtual tables, views, routines, sequences, SQL Server synonyms, PostgreSQL
   materialized views, and MySQL events are discovered and reported as skipped
   database objects; likely many-to-many join tables are flagged when they are
   scaffolded as normal entities.
@@ -135,9 +135,10 @@ must be reviewed and edited like handwritten model code.
   tables. Defaults, computed/generated columns, check constraints, collations,
   provider-specific column types, decimal precision/scale, non-default identity
   seed/increment settings, triggers, SQL Server provider-native temporal
-  tables, keyless tables, views, routines, sequences, synonyms, materialized
-  views, and events are discovered and reported in scaffold diagnostics, but
-  not converted into complete provider-neutral model code.
+  tables, keyless tables, SQLite virtual tables, views, routines, sequences,
+  synonyms, materialized views, and events are discovered and reported in
+  scaffold diagnostics, but not converted into complete provider-neutral model
+  code.
 - Provider-specific filtered/partial indexes, expression indexes,
   included-column indexes, and descending index key sort direction. These are
   discovered and reported for review; v1 scaffolding emits provider-neutral

@@ -76,6 +76,7 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
         Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
         Assert.Contains("views", doc, StringComparison.Ordinal);
+        Assert.Contains("virtual tables", doc, StringComparison.Ordinal);
         Assert.Contains("routines", doc, StringComparison.Ordinal);
         Assert.Contains("sequences", doc, StringComparison.Ordinal);
         Assert.Contains("synonyms", doc, StringComparison.Ordinal);
@@ -100,6 +101,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
+        Assert.Contains("'VirtualTable'", source, StringComparison.Ordinal);
         Assert.Contains("'Synonym'", source, StringComparison.Ordinal);
         Assert.Contains("'MaterializedView'", source, StringComparison.Ordinal);
         Assert.Contains("'Event'", source, StringComparison.Ordinal);
