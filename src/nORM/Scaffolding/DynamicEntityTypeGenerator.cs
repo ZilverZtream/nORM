@@ -260,8 +260,7 @@ namespace nORM.Scaffolding
                 var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
                 // Include every metadata field that changes the emitted CLR surface. Omitting one can return
                 // a stale dynamic type after a schema change even though the generated C# would differ.
-                var descriptor = string.Join(",", columns.Select(c =>
-                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(c.AllowsNull ? "N" : "NN")}:{(c.IsAuto ? "AI" : "NA")}:{c.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}"));
+                var descriptor = BuildSchemaDescriptor(columns);
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
                 return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
             }
@@ -270,6 +269,30 @@ namespace nORM.Scaffolding
                 if (!connectionWasOpen)
                     connection.Close();
             }
+        }
+
+        private static string BuildSchemaDescriptor(IReadOnlyList<ColumnInfo> columns)
+        {
+            var sb = new StringBuilder();
+            foreach (var column in columns)
+            {
+                AppendDescriptorPart(sb, column.ColumnName);
+                AppendDescriptorPart(sb, column.PropertyType.FullName ?? string.Empty);
+                AppendDescriptorPart(sb, column.IsKey ? "PK" : "C");
+                AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
+                AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
+                AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
+            }
+
+            return sb.ToString();
+        }
+
+        private static void AppendDescriptorPart(StringBuilder builder, string value)
+        {
+            builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            builder.Append(':');
+            builder.Append(value);
+            builder.Append(';');
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)

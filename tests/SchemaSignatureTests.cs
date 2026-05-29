@@ -154,6 +154,25 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void DescriptorDelimiterCharactersInColumnNames_AreHandled()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "T5_delim" (
+                "Id:Part" INTEGER PRIMARY KEY,
+                "Name,Part;Tail" TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var sig = Gen().ComputeSchemaSignature(cn, "T5_delim");
+
+        Assert.Equal(32, sig.Length);
+        Assert.True(Regex.IsMatch(sig, @"^[0-9A-Fa-f]{32}$"), $"Expected 32-char hex, got: {sig}");
+    }
+
+    [Fact]
     public void DifferentPrimaryKey_DifferentSignature()
     {
         using var cn = OpenMemory();
