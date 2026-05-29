@@ -453,27 +453,26 @@ namespace nORM.Scaffolding
             if (requested.Length == 0)
                 return tables;
 
-            var ambiguousBareRequests = requested
-                .Where(request => !request.Contains('.'))
+            var ambiguousRequests = requested
                 .Select(request => new
                 {
                     Request = request,
                     Matches = tables
-                        .Where(table => string.Equals(table.Name, request, StringComparison.OrdinalIgnoreCase))
-                        .Select(table => TableKey(table.Schema, table.Name))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Where(table => MatchesTableFilter(table, request))
+                        .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
+                        .Select(group => DisplayTableMatch(group.First()))
                         .OrderBy(value => value, StringComparer.Ordinal)
                         .ToArray()
                 })
                 .Where(match => match.Matches.Length > 1)
                 .ToArray();
 
-            if (ambiguousBareRequests.Length > 0)
+            if (ambiguousRequests.Length > 0)
             {
                 throw new NormConfigurationException(
-                    "Scaffolding table filter is ambiguous because the same table name exists in multiple schemas: " +
-                    string.Join("; ", ambiguousBareRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
-                    ". Use schema-qualified table filters.");
+                    "Scaffolding table filter is ambiguous because it matches multiple discovered tables: " +
+                    string.Join("; ", ambiguousRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
+                    ". Use schema-qualified table filters when the ambiguity is across schemas; literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter.");
             }
 
             var selected = tables
@@ -511,6 +510,11 @@ namespace nORM.Scaffolding
         private static bool MatchesTableFilter(ScaffoldTable table, string requested)
             => string.Equals(table.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(table.Schema, table.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static string DisplayTableMatch(ScaffoldTable table)
+            => string.IsNullOrWhiteSpace(table.Schema)
+                ? "<default>." + table.Name
+                : TableKey(table.Schema, table.Name);
 
         private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(IReadOnlyList<ScaffoldSkippedObject> skippedObjects, ScaffoldOptions options)
         {
