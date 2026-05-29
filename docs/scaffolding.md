@@ -85,7 +85,7 @@ must be reviewed and edited like handwritten model code.
   single-column navigations; defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
-  non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
+  non-default SQL Server identity seed/increment settings, non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
   schema; views, routines, and sequences are discovered and reported as skipped
   database objects; likely many-to-many join tables are flagged when they are
   scaffolded as normal entities.
@@ -129,10 +129,11 @@ must be reviewed and edited like handwritten model code.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, views, temporal tables, and keyless
   tables. Defaults, computed/generated columns, check constraints, collations,
-  provider-specific column types, decimal precision/scale, triggers, SQL Server
-  provider-native temporal tables, keyless tables, views, routines, and
-  sequences are discovered and reported in scaffold diagnostics, but not
-  converted into complete provider-neutral model code.
+  provider-specific column types, decimal precision/scale, non-default identity
+  seed/increment settings, triggers, SQL Server provider-native temporal
+  tables, keyless tables, views, routines, and sequences are discovered and
+  reported in scaffold diagnostics, but not converted into complete
+  provider-neutral model code.
 - Provider-specific filtered/partial indexes, expression indexes,
   included-column indexes, and descending index key sort direction. These are
   discovered and reported for review; v1 scaffolding emits provider-neutral

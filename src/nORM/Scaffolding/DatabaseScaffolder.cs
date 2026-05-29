@@ -1178,6 +1178,14 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND ty.name IN ('timestamp', 'rowversion')
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'IdentityStrategy',
+                        'IDENTITY(' + CONVERT(varchar(40), ic.seed_value) + ',' + CONVERT(varchar(40), ic.increment_value) + ')'
+                    FROM sys.identity_columns ic
+                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND (CONVERT(decimal(38,0), ic.seed_value) <> 1 OR CONVERT(decimal(38,0), ic.increment_value) <> 1)
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1532,7 +1540,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default FK referential actions, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- |");
@@ -1621,6 +1629,7 @@ namespace nORM.Scaffolding
                 "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
+                "IdentityStrategy" => "Keep non-default identity seed/increment settings in provider migrations; scaffolded code marks the column as identity but does not recreate provider-specific seed metadata.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
