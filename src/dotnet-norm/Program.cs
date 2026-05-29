@@ -64,7 +64,7 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         {
             await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
         }
-        catch (NormConfigurationException ex) when (ScaffoldWarningsExist(output))
+        catch (NormConfigurationException ex) when (IsScaffoldWarningsFailure(ex, output))
         {
             PrintScaffoldWarningSummary(output);
             return Fail(ex);
@@ -725,6 +725,10 @@ static int Fail(Exception ex, int exitCode = 1)
 static bool ScaffoldWarningsExist(string outputDirectory)
     => File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"))
        || File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"));
+
+static bool IsScaffoldWarningsFailure(NormConfigurationException exception, string outputDirectory)
+    => exception.Message.Contains("Scaffolding produced warnings", StringComparison.Ordinal)
+       && ScaffoldWarningsExist(outputDirectory);
 
 static void PrintScaffoldWarningSummary(string outputDirectory)
 {

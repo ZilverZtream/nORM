@@ -196,6 +196,42 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_no_overwrite_with_stale_warning_report_does_not_print_stale_summary()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_stale_warn_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_stale_warn_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE TABLE CleanRow (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            Directory.CreateDirectory(output);
+            File.WriteAllText(Path.Combine(output, "nORM.ScaffoldWarnings.json"), """{"summary":{"totalWarnings":99},"providerOwnedSchemaFeatures":[]}""");
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --no-overwrite",
+                root);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Contains("stale scaffold warning report", result.Stderr + result.Stdout, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
+            Assert.DoesNotContain("99", result.Stdout, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Scaffold_sqlite_output_builds_as_consumer_project()
     {
         var root = FindRepositoryRoot();
