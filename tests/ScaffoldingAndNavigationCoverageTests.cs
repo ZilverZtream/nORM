@@ -1452,6 +1452,7 @@ public class DatabaseScaffolderPrivateMethodTests
                 Id INTEGER PRIMARY KEY,
                 "value.part" TEXT NOT NULL
             );
+            CREATE INDEX "ix.audit.value" ON "audit.events" ("value.part");
             """;
         cmd.ExecuteNonQuery();
 
@@ -1462,6 +1463,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "AuditEvents.cs"));
             Assert.Contains("[Table(\"audit.events\")]", entityCode);
+            Assert.Contains("[Index(\"ix.audit.value\")]", entityCode);
             Assert.Contains("[Column(\"value.part\")]", entityCode);
             Assert.Contains("public string ValuePart { get; set; } = default!;", entityCode);
         }
