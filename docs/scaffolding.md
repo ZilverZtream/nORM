@@ -57,7 +57,10 @@ must be reviewed and edited like handwritten model code.
   them through `OnModelCreating` while preserving caller-supplied model
   configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; non-cascade delete actions are generated with
-  `cascadeDelete: false`.
+  `cascadeDelete: false`. Relationships are emitted only when the FK targets
+  the generated principal primary key; FK shapes targeting keyless tables or
+  alternate/unique keys are reported for manual configuration instead of
+  emitting unsafe fluent code.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
@@ -92,6 +95,7 @@ must be reviewed and edited like handwritten model code.
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions,
+  relationships that do not target the generated principal primary key,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
   and tables without primary keys are reported as provider-owned schema; SQLite virtual tables and their shadow tables,
   views, routines, sequences, SQL Server synonyms, PostgreSQL materialized
@@ -107,10 +111,10 @@ must be reviewed and edited like handwritten model code.
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
   FK cascade/non-cascade preservation, computed/generated column write
-  exclusion, schema-qualified many-to-many join table preservation,
-  provider-specific partial/expression/included-column/descending index
-  diagnostics, composite-FK, many-to-many candidate, and provider-owned schema
-  diagnostics.
+  exclusion, relationship suppression when the principal key cannot be
+  generated safely, schema-qualified many-to-many join table preservation,
+  provider-specific partial/expression/included-column/descending index diagnostics,
+  composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
@@ -137,7 +141,10 @@ must be reviewed and edited like handwritten model code.
 
 - Composite foreign key relationship navigation generation. Composite FK
   constraints are discovered and reported in scaffold diagnostics.
-- Composite-key and alternate-key modeling beyond provider schema metadata.
+- Composite-key and alternate-key relationship modeling beyond provider schema
+  metadata. Single-column FKs that target an alternate/unique key instead of
+  the generated principal primary key are discovered and reported in scaffold
+  diagnostics.
 - Full FK referential-action modeling beyond tracked-graph cascade on/off.
   Non-cascade delete actions and update actions are discovered and reported in
   scaffold diagnostics; provider DDL remains the source of truth.

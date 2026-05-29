@@ -93,6 +93,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK referential actions", doc, StringComparison.Ordinal);
+        Assert.Contains("relationships that do not target the generated principal primary key", doc, StringComparison.Ordinal);
         Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);
         Assert.Contains("auto_increment", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("nextval(%", source, StringComparison.Ordinal);
@@ -105,6 +106,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("RowVersion", source, StringComparison.Ordinal);
         Assert.Contains("IdentityStrategy", source, StringComparison.Ordinal);
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
+        Assert.Contains("RelationshipPrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
         Assert.Contains("'VirtualTable'", source, StringComparison.Ordinal);

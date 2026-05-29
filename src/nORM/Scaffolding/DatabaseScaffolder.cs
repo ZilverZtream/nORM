@@ -97,6 +97,7 @@ namespace nORM.Scaffolding
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
+                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
@@ -105,6 +106,7 @@ namespace nORM.Scaffolding
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
                     entityByTable,
                     columnPropertiesByTable,
+                    primaryKeyColumnsByTable,
                     memberNamesByTable);
                 var generatedFiles = new List<(string Path, string Content)>();
 
@@ -1526,6 +1528,25 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static void AddRelationshipPrincipalKeyDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable)
+        {
+            foreach (var fk in foreignKeys.Where(fk => fk.ColumnCount == 1))
+            {
+                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
+                if (HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, principalKey, fk.PrincipalColumn))
+                    continue;
+
+                features.Add(new ScaffoldUnsupportedFeature(
+                    TableKey(fk.DependentSchema, fk.DependentTable),
+                    "RelationshipPrincipalKey",
+                    fk.ConstraintName,
+                    $"FK references {principalKey}.{fk.PrincipalColumn}, which is not the generated principal primary key."));
+            }
+        }
+
         private static bool ContainsCheckConstraint(string? createTableSql)
             => !string.IsNullOrWhiteSpace(createTableSql)
                && System.Text.RegularExpressions.Regex.IsMatch(
@@ -1616,7 +1637,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- |");
@@ -1704,6 +1725,7 @@ namespace nORM.Scaffolding
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
+                "RelationshipPrincipalKey" => "Add or scaffold the referenced primary key, or configure the relationship manually against the intended alternate key before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Keep non-default identity seed/increment settings in provider migrations; scaffolded code marks the column as identity but does not recreate provider-specific seed metadata.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
@@ -1944,6 +1966,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var relationships = new List<ScaffoldRelationship>();
@@ -1961,6 +1984,9 @@ namespace nORM.Scaffolding
                 {
                     continue;
                 }
+
+                if (!HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, principalKey, foreignKey.PrincipalColumn))
+                    continue;
 
                 var foreignKeyProperty = GetColumnPropertyName(columnPropertiesByTable, dependentKey, foreignKey.DependentColumn);
                 var principalKeyProperty = GetColumnPropertyName(columnPropertiesByTable, principalKey, foreignKey.PrincipalColumn);
