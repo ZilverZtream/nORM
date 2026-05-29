@@ -217,7 +217,8 @@ public class QueryTranslatorCrossProviderTests : TestBase
 
         var t0 = provider.Escape("T0");
         var orderBy = $"ORDER BY {t0}.{provider.Escape("Id")} ASC";
-        var expected = $"SELECT {provider.Escape("Id")} AS {provider.Escape("Id")}, ROW_NUMBER() OVER ({orderBy}) AS {provider.Escape("RowNumber")} FROM {provider.Escape("Product")} {t0} {orderBy}";
+        var rowNumberSql = provider.GetIntCastSql($"ROW_NUMBER() OVER ({orderBy})", asLong: false);
+        var expected = $"SELECT {provider.Escape("Id")} AS {provider.Escape("Id")}, {rowNumberSql} AS {provider.Escape("RowNumber")} FROM {provider.Escape("Product")} {t0} {orderBy}";
         Assert.Equal(expected, sql);
     }
 

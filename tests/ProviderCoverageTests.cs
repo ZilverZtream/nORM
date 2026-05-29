@@ -168,7 +168,8 @@ public class DatabaseProviderBaseTests
         Assert.Contains("INSERT INTO", sql);
         Assert.Contains("__NormTemporalTags", sql);
         Assert.Contains("@tag", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("datetime('now')", sql);
     }
 
     [Fact]
@@ -431,7 +432,8 @@ public class MySqlProviderCovTests
         var sql = _provider.GetCreateTagSql("@tag", "@ts");
         Assert.Contains("INSERT INTO", sql);
         Assert.Contains("@tag", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("UTC_TIMESTAMP(6)", sql);
     }
 }
 
@@ -891,7 +893,8 @@ public class SqlServerProviderTests
         var sql = _provider.GetCreateTagSql("@tag", "@ts");
         Assert.Contains("INSERT INTO", sql);
         Assert.Contains("@tag", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("SYSUTCDATETIME()", sql);
     }
 
     [Fact]

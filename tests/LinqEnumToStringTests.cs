@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
-using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -12,9 +11,8 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Verifies that calling .ToString() on an enum column in a projection works under
-/// ClientEvaluationPolicy.Allow — the SQL fetches the underlying integer column and the
-/// client side resolves it to the enum name.
+/// Verifies that calling .ToString() on an enum column in a projection is
+/// translated server-side instead of requiring client-evaluation opt-in.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqEnumToStringTests : IAsyncLifetime
@@ -32,8 +30,7 @@ public class LinqEnumToStringTests : IAsyncLifetime
             INSERT INTO EtsRow VALUES (1, 0), (2, 1), (3, 2);
             """;
         await cmd.ExecuteNonQueryAsync();
-        _ctx = new DbContext(_cn, new SqliteProvider(),
-            new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow });
+        _ctx = new DbContext(_cn, new SqliteProvider());
     }
 
     public async Task DisposeAsync()
@@ -43,12 +40,17 @@ public class LinqEnumToStringTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Enum_ToString_in_projection_resolves_client_side()
+    public async Task Enum_ToString_in_projection_translates_to_case_expression()
     {
-        var labels = (await _ctx.Query<EtsRow>().OrderBy(r => r.Id)
-            .Select(r => new { r.Id, Name = r.Status.ToString() })
-            .ToListAsync())
-            .ToArray();
+        var query = _ctx.Query<EtsRow>().OrderBy(r => r.Id)
+            .Select(r => new { r.Id, Name = r.Status.ToString() });
+        var sql = query.ToString();
+        Assert.Contains("CASE", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(nameof(EtsStatus.Active), sql, StringComparison.Ordinal);
+        Assert.Contains(nameof(EtsStatus.Pending), sql, StringComparison.Ordinal);
+        Assert.Contains(nameof(EtsStatus.Archived), sql, StringComparison.Ordinal);
+
+        var labels = (await query.ToListAsync()).ToArray();
         Assert.Equal(3, labels.Length);
         Assert.Equal(nameof(EtsStatus.Active), labels[0].Name);
         Assert.Equal(nameof(EtsStatus.Pending), labels[1].Name);

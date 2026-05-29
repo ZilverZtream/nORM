@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
+using nORM.Core;
 using nORM.Mapping;
 using nORM.Providers;
 
@@ -24,6 +25,8 @@ namespace nORM.Query
         // the principal table's escaped name when no JOIN alias is in scope — SQLite
         // accepts table-qualified outer-scope references even without an explicit AS alias.
         private readonly string _outerAlias;
+        // Used to look up intermediate/dependent-type mappings for multi-hop nav aggregates.
+        private readonly DbContext? _ctx;
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder? _sb;
@@ -41,12 +44,13 @@ namespace nORM.Query
         // use native DECIMAL and don't need this coercion.
         public bool CoerceDecimalProjectionsToReal { get; set; }
 
-        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null)
+        public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _groupBy = groupBy ?? throw new ArgumentNullException(nameof(groupBy));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
             _outerAlias = outerAlias ?? mapping.EscTable;
+            _ctx = ctx;
         }
 
         /// <summary>
@@ -215,8 +219,7 @@ namespace nORM.Query
                 Visit(node.Expression);
                 var dtoSql = sb.ToString(dtoStart, sb.Length - dtoStart);
                 sb.Length = dtoStart;
-                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-                sb.Append(_provider.GetDateTimeOffsetLocalDateTimeSql(dtoSql, localOffset));
+                sb.Append(DateTimeOffsetLocalTimeSql.Build(_provider, dtoSql));
                 return node;
             }
 
@@ -244,10 +247,39 @@ namespace nORM.Query
                     nameof(TimeSpan.TotalHours) => $"({secondsSql} / 3600.0)",
                     nameof(TimeSpan.TotalDays) => $"({secondsSql} / 86400.0)",
                     nameof(TimeSpan.TotalMilliseconds) => $"({secondsSql} * 1000.0)",
-                    nameof(TimeSpan.Days) => $"CAST({secondsSql} / 86400 AS INTEGER)",
-                    nameof(TimeSpan.Hours) => $"(CAST({secondsSql} / 3600 AS INTEGER) % 24)",
-                    nameof(TimeSpan.Minutes) => $"(CAST({secondsSql} / 60 AS INTEGER) % 60)",
-                    nameof(TimeSpan.Seconds) => $"(CAST({secondsSql} AS INTEGER) % 60)",
+                    nameof(TimeSpan.Days) => _provider.GetTruncateToIntSql($"({secondsSql} / 86400)"),
+                    nameof(TimeSpan.Hours) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")} % 24)",
+                    nameof(TimeSpan.Minutes) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 60)")} % 60)",
+                    nameof(TimeSpan.Seconds) => $"({_provider.GetTruncateToIntSql(secondsSql)} % 60)",
+                    _ => null
+                };
+                if (emit != null)
+                {
+                    sb.Append(emit);
+                    return node;
+                }
+            }
+
+            // Stored TimeSpan column members: r.Duration.TotalSeconds, .Hours,
+            // .Minutes, etc. The WHERE visitor already routes these through the
+            // provider seconds hook; projection needs the same handling before
+            // the member name is mistaken for an entity column.
+            if (node.Expression != null
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(TimeSpan))
+            {
+                var spanSql = TranslateProjectionArg(node.Expression);
+                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(spanSql);
+                string? emit = node.Member.Name switch
+                {
+                    nameof(TimeSpan.TotalSeconds) => secondsSql,
+                    nameof(TimeSpan.TotalMinutes) => $"({secondsSql} / 60.0)",
+                    nameof(TimeSpan.TotalHours) => $"({secondsSql} / 3600.0)",
+                    nameof(TimeSpan.TotalDays) => $"({secondsSql} / 86400.0)",
+                    nameof(TimeSpan.TotalMilliseconds) => $"({secondsSql} * 1000.0)",
+                    nameof(TimeSpan.Days) => _provider.GetTruncateToIntSql($"({secondsSql} / 86400)"),
+                    nameof(TimeSpan.Hours) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")} % 24)",
+                    nameof(TimeSpan.Minutes) => $"({_provider.GetTruncateToIntSql($"({secondsSql} / 60)")} % 60)",
+                    nameof(TimeSpan.Seconds) => $"({_provider.GetTruncateToIntSql(secondsSql)} % 60)",
                     _ => null
                 };
                 if (emit != null)
@@ -877,6 +909,34 @@ namespace nORM.Query
                 navFilter = whereLambda;
                 navCandidate = whereCall.Arguments[0];
             }
+
+            // Two-hop: p.Children.SelectMany(c => c.GrandChildren).Count/LongCount/Any
+            // Single-hop nav aggregates emit (SELECT COUNT(*) FROM child WHERE fk=parent.pk).
+            // Two-hop chains a SelectMany between the first navigation and the aggregate,
+            // requiring a second correlated level:
+            //   (SELECT COUNT(*) FROM grandChild g2
+            //    WHERE g2.fk2 IN (SELECT g1.pk2 FROM child g1 WHERE g1.fk1 = outer.pk1))
+            if (_ctx != null
+                && navCandidate is MethodCallExpression twoHopCall
+                && twoHopCall.Method.Name == nameof(Enumerable.SelectMany)
+                && twoHopCall.Arguments.Count == 2
+                && twoHopCall.Arguments[0] is MemberExpression hop1NavMember
+                && hop1NavMember.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(hop1NavMember.Member.Name, out var hop1Relation)
+                && StripQuotes(twoHopCall.Arguments[1]) is LambdaExpression hop2SelectorLambda
+                && hop2SelectorLambda.Body is MemberExpression hop2NavMember
+                && (node.Method.Name is nameof(Queryable.Count)
+                                     or nameof(Queryable.LongCount)
+                                     or nameof(Queryable.Any)))
+            {
+                var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
+                if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
+                {
+                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation);
+                    return node;
+                }
+            }
+
             if (navCandidate is MemberExpression navMember
                 && navMember.Expression is ParameterExpression
                 && _mapping.Relations.TryGetValue(navMember.Member.Name, out var relation)
@@ -1001,10 +1061,29 @@ namespace nORM.Query
                         else
                         {
                             if (seg.ArgIndex >= argExprs.Count) goto fallthrough;
-                            var arg = argExprs[seg.ArgIndex];
+                            var arg = UnwrapFormatObjectConvert(argExprs[seg.ArgIndex]);
                             var inner = TranslateProjectionArg(arg);
-                            if (arg.Type != typeof(string))
+                            if (seg.FormatSpec != null)
+                            {
+                                inner = ApplyFormatSpecToArg(inner, arg.Type, seg.FormatSpec)
+                                    ?? throw new InvalidOperationException(
+                                        $"string.Format spec '{{{seg.ArgIndex}:{seg.FormatSpec}}}' is not supported in projection. " +
+                                        "Supported subset: numeric F<N>/f<N> and DateTime tokens yyyy/yy/MM/dd/HH/mm/ss.");
+                            }
+                            else if (arg.Type != typeof(string))
+                            {
                                 inner = _provider.GetToStringSql(inner);
+                            }
+                            if (seg.Alignment != 0)
+                            {
+                                var width = Math.Abs(seg.Alignment).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                var padded = seg.Alignment > 0
+                                    ? _provider.TranslateFunction(nameof(string.PadLeft), typeof(string), inner, width)
+                                    : _provider.TranslateFunction(nameof(string.PadRight), typeof(string), inner, width);
+                                inner = padded
+                                    ?? throw new InvalidOperationException(
+                                        $"string.Format alignment '{{{seg.ArgIndex},{seg.Alignment}}}' is not supported by provider '{_provider.GetType().Name}'.");
+                            }
                             parts.Add(inner);
                         }
                     }
@@ -1129,6 +1208,42 @@ namespace nORM.Query
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
             }
             sb.Append(')');
+        }
+
+        private void EmitTwoHopNavigationCountSubquery(
+            StringBuilder sb,
+            string methodName,
+            TableMapping.Relation hop1Rel,
+            TableMapping intermediateMapping,
+            TableMapping.Relation hop2Rel)
+        {
+            var hop2DepMapping = _ctx!.GetMapping(hop2Rel.DependentType);
+            var hop1EscTable  = intermediateMapping.EscTable;
+            var hop1Alias     = _provider.Escape("__mhn1");
+            var hop1FkEscCol  = hop1Rel.ForeignKey.EscCol;
+            var hop1PkEscCol  = hop1Rel.PrincipalKey.EscCol;
+            var hop2EscTable  = hop2DepMapping.EscTable;
+            var hop2Alias     = _provider.Escape("__mhn2");
+            var hop2FkEscCol  = hop2Rel.ForeignKey.EscCol;
+            // The inner SELECT returns the PK on the intermediate table that hop2's FK points to.
+            var hop2PkEscCol  = hop2Rel.PrincipalKey.EscCol;
+
+            var innerSql = $"SELECT {hop1Alias}.{hop2PkEscCol} FROM {hop1EscTable} {hop1Alias}" +
+                           $" WHERE {hop1Alias}.{hop1FkEscCol} = {_outerAlias}.{hop1PkEscCol}";
+
+            if (methodName is nameof(Queryable.Any))
+            {
+                sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
+                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
+                  .Append(" IN (").Append(innerSql).Append(')')
+                  .Append(") THEN 1 ELSE 0 END)");
+            }
+            else // Count / LongCount
+            {
+                sb.Append("(SELECT COUNT(*) FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
+                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
+                  .Append(" IN (").Append(innerSql).Append("))");
+            }
         }
 
         private string RenderNavigationFilter(LambdaExpression filter, string depAlias)
@@ -1307,13 +1422,50 @@ namespace nORM.Query
             }
         }
 
+        private static Expression UnwrapFormatObjectConvert(Expression arg)
+        {
+            if (arg is UnaryExpression u
+                && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked)
+                && u.Type == typeof(object))
+            {
+                return u.Operand;
+            }
+
+            return arg;
+        }
+
+        private string? ApplyFormatSpecToArg(string argSql, Type argType, string spec)
+        {
+            var underlying = Nullable.GetUnderlyingType(argType) ?? argType;
+            if (spec.Length >= 2
+                && (spec[0] == 'F' || spec[0] == 'f')
+                && int.TryParse(spec.AsSpan(1), out var digits)
+                && digits >= 0
+                && digits <= 28)
+            {
+                return _provider.FormatFixedDecimalSql(argSql, digits);
+            }
+
+            if (underlying == typeof(DateTime)
+                || underlying == typeof(DateTimeOffset)
+                || underlying == typeof(DateOnly)
+                || underlying == typeof(TimeOnly))
+            {
+                return _provider.FormatDateUsingDotNetPattern(argSql, spec);
+            }
+
+            return null;
+        }
+
         private readonly struct FormatSegment
         {
             public readonly bool IsLiteral;
             public readonly string? Literal;
             public readonly int ArgIndex;
-            public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; }
-            public FormatSegment(int i) { IsLiteral = false; Literal = null; ArgIndex = i; }
+            public readonly string? FormatSpec;
+            public readonly int Alignment;
+            public FormatSegment(string l) { IsLiteral = true; Literal = l; ArgIndex = -1; FormatSpec = null; Alignment = 0; }
+            public FormatSegment(int i, string? f, int a) { IsLiteral = false; Literal = null; ArgIndex = i; FormatSpec = f; Alignment = a; }
         }
 
         /// <summary>
@@ -1376,9 +1528,29 @@ namespace nORM.Query
                     int end = template.IndexOf('}', i + 1);
                     if (end < 0) return null;
                     var inner = template.Substring(i + 1, end - i - 1);
-                    if (inner.Length == 0 || inner.IndexOfAny(new[] { ',', ':' }) >= 0) return null;
-                    if (!int.TryParse(inner, out var argIdx) || argIdx < 0) return null;
-                    segments.Add(new FormatSegment(argIdx));
+                    if (inner.Length == 0) return null;
+                    string indexPart = inner;
+                    string? alignmentPart = null;
+                    string? spec = null;
+                    int colon = inner.IndexOf(':');
+                    if (colon >= 0)
+                    {
+                        spec = inner.Substring(colon + 1);
+                        if (spec.Length == 0) return null;
+                        indexPart = inner.Substring(0, colon);
+                    }
+                    int comma = indexPart.IndexOf(',');
+                    if (comma >= 0)
+                    {
+                        alignmentPart = indexPart.Substring(comma + 1);
+                        indexPart = indexPart.Substring(0, comma);
+                        if (alignmentPart.Length == 0) return null;
+                    }
+                    if (!int.TryParse(indexPart, out var argIdx) || argIdx < 0) return null;
+                    int alignment = 0;
+                    if (alignmentPart != null && !int.TryParse(alignmentPart, out alignment))
+                        return null;
+                    segments.Add(new FormatSegment(argIdx, spec, alignment));
                     i = end + 1;
                 }
                 else if (c == '}')
@@ -1547,26 +1719,16 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                // For DateTimeOffset operands, use integer UTC-epoch-seconds
-                // subtraction (sister of GetDateTimeOffsetUtcEpochSecondsSql
-                // from the equality lowering) to avoid the julianday-delta
-                // double-precision noise that turns FromSeconds(15) into
-                // 14.9999991s. DTO storage is conventionally second-precision,
-                // so integer subtraction loses no information here. DateTime
-                // operands keep the existing julianday path.
+                // For DateTimeOffset operands, use UTC-epoch-microsecond
+                // subtraction (sister of the equality lowering) to avoid the
+                // julianday-delta double-precision noise that turns FromSeconds(15)
+                // into 14.9999991s while still preserving practical sub-second
+                // duration semantics across providers.
                 Type lt = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
                 Type rt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
                 if (lt == typeof(DateTimeOffset) && rt == typeof(DateTimeOffset))
                 {
-                    // `* 1.0` forces REAL coercion in SQLite (sister of the
-                    // TimeSpan-seconds fix). Without it the materialiser's
-                    // ConvertToTimeSpan(long) path treats the diff as ticks and
-                    // returns 15 ticks instead of 15 seconds.
-                    sb.Append("((")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(leftSql))
-                      .Append(" - ")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochSecondsSql(rightSql))
-                      .Append(") * 1.0)");
+                    sb.Append(_provider.GetDateTimeOffsetDifferenceSecondsSql(leftSql, rightSql));
                 }
                 else
                 {

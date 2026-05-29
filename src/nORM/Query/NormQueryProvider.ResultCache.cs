@@ -94,14 +94,11 @@ namespace nORM.Query
             var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
             AppendUtf8(hasher, "DB".AsSpan());
             AppendLengthPrefixedUtf8(hasher, dbIdentity.AsSpan());
-            var tenant = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             if (_ctx.Options.TenantProvider != null)
             {
-                // Null tenant is allowed when the tenant column is nullable (ApplyGlobalFilters
-                // emits IS NULL in that case). Use a distinct cache key segment so null-tenant
-                // results are never confused with non-null-tenant results.
+                var tenant = _ctx.GetRequiredTenantId("result cache key");
                 AppendUtf8(hasher, "TENANT".AsSpan());
-                AppendLengthPrefixedUtf8(hasher, (tenant?.ToString() ?? "<null>").AsSpan());
+                AppendLengthPrefixedUtf8(hasher, tenant.ToString()!.AsSpan());
             }
             // Sort parameters deterministically so identical parameter sets produce the same hash
             // regardless of insertion order.

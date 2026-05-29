@@ -60,12 +60,30 @@ namespace nORM.Query
             {
                 Visit(outerQuery);
             }
+            var currentOuterType = CurrentPostMaterializeElementType ?? _projection?.Body.Type ?? _mapping.Type;
+            var projectsWholeEntity = resultSelector.Body is NewExpression wholeEntityNew
+                                      && wholeEntityNew.Arguments.Any(a => a == resultSelector.Parameters[0] || a == resultSelector.Parameters[1]);
+            if ((IsPostMaterializeTailMode
+                 || projectsWholeEntity
+                 || outerQuery is MethodCallExpression chainedJoinSource && chainedJoinSource.Method.Name == nameof(Queryable.Join))
+                && currentOuterType == outerKeySelector.Parameters[0].Type)
+            {
+                AppendPostMaterializeInnerJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                return node;
+            }
+            if (IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == outerKeySelector.Parameters[0].Type)
+            {
+                AppendPostMaterializeGroupJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                return node;
+            }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-            if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
-                _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var sqlOuterKeySelector = ExpandProjection(outerKeySelector);
+            if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
+                _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
-            var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
+            var outerKeySql = outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
             // Use AddLiteralParameter (see HandleGroupBy / OrderByTranslator): inline constants
             // in a key selector (e.g. COALESCE fallback) must not be re-flagged in
             // _compiledParams or BindPlanParameters treats them as runtime closures and skips
@@ -81,11 +99,71 @@ namespace nORM.Query
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
+            var innerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            var additionalOnSql = innerOnConditions.Count > 0
+                ? string.Join(" AND ", innerOnConditions.Select(c => "(" + c + ")"))
+                : null;
+            var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
             JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            _transparentIdentifier = transparentExpansion;
+            RegisterTransparentIdentifierTail(transparentExpansion, innerMapping, innerAlias);
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "INNER JOIN", outerKeySql, innerKeySql, distinct: _isDistinct, outerFromOverride: outerFromOverride);
+            JoinBuilder.BuildJoinClauseInto(
+                _sql,
+                _projection,
+                _mapping,
+                outerAlias,
+                innerMapping,
+                innerAlias,
+                "INNER JOIN",
+                outerKeySql,
+                innerKeySql,
+                distinct: _isDistinct,
+                outerFromOverride: outerFromOverride,
+                additionalOnConditions: additionalOnSql,
+                translateProjectionExpression: TranslateJoinProjectionExpression,
+                escapeProjectionAlias: _provider.Escape);
             return node;
         }
+
+        private string TranslateJoinProjectionExpression(Expression expression)
+        {
+            if (_projection == null || _projection.Parameters.Count == 0)
+                throw new NormQueryException("Join projection translation requires a result selector.");
+
+            var parameter = _projection.Parameters[0];
+            if (!_correlatedParams.TryGetValue(parameter, out var info))
+                info = (_mapping, EscapeAlias("T0"));
+
+            var vctx = new VisitorContext(
+                _ctx,
+                info.Mapping,
+                _provider,
+                parameter,
+                info.Alias,
+                _correlatedParams,
+                _compiledParams,
+                _paramMap,
+                _recursionDepth,
+                _params.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            try
+            {
+                var sql = visitor.Translate(expression);
+                foreach (var kvp in visitor.GetParameters())
+                {
+                    AddLiteralParameter(kvp.Key, kvp.Value);
+                    AdvanceParameterIndexPast(kvp.Key);
+                }
+
+                return sql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(visitor);
+            }
+        }
+
         private Expression HandleGroupJoin(MethodCallExpression node)
         {
             if (node.Arguments.Count < 5)
@@ -134,12 +212,19 @@ namespace nORM.Query
             {
                 Visit(outerQuery);
             }
+            if (IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == outerKeySelector.Parameters[0].Type)
+            {
+                AppendPostMaterializeGroupJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                return node;
+            }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-            if (!_correlatedParams.ContainsKey(outerKeySelector.Parameters[0]))
-                _correlatedParams[outerKeySelector.Parameters[0]] = (_mapping, outerAlias);
-            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, outerKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var sqlOuterKeySelector = ExpandProjection(outerKeySelector);
+            if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
+                _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
-            var outerKeySql = outerKeyVisitor.Translate(outerKeySelector.Body);
+            var outerKeySql = outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
             // See HandleJoin: AddLiteralParameter so inline constants in the key selector
             // aren't mis-flagged as compiled-runtime placeholders.
             foreach (var kvp in outerKeyVisitor.GetParameters())
@@ -161,6 +246,7 @@ namespace nORM.Query
             // a 2-parameter projection materialiser and crash; the GroupJoin materialiser
             // path uses the compiled `GroupJoinInfo.ResultSelector` Func instead.
             _groupJoinResultSelector = resultSelector;
+            _groupJoinExpansionSelector = ComposeGroupJoinExpansionSelector(resultSelector);
             // The result selector's parameter instances are DIFFERENT from the key-selector's
             // (each lambda has its own scope). Pre-register them in _correlatedParams so a
             // downstream OrderBy/Where that's ExpandProjection-ed through this selector
@@ -173,6 +259,12 @@ namespace nORM.Query
             if (resultSelector.Parameters.Count >= 2
                 && !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
                 _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+            if (_groupJoinExpansionSelector.Parameters.Count > resultSelector.Parameters.Count)
+            {
+                var composedInner = _groupJoinExpansionSelector.Parameters[^1];
+                if (!_correlatedParams.ContainsKey(composedInner))
+                    _correlatedParams[composedInner] = (innerMapping, innerAlias);
+            }
             // Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
             // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
@@ -310,7 +402,7 @@ namespace nORM.Query
                     HandleQuerySyntaxLeftJoin(
                         gj.Arguments[0], gj.Arguments[1],
                         gjOuterKeySel, gjInnerKeySel,
-                        smResultSelector, outerMemberName);
+                        gjResultSel, collectionSelector, smResultSelector, outerMemberName);
                     return node;
                 }
             }
@@ -327,6 +419,13 @@ namespace nORM.Query
             var resultSelector = node.Arguments.Count > 2
                 ? StripQuotes(node.Arguments[2]) as LambdaExpression
                 : null;
+
+            if (IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == collectionSelector.Parameters[0].Type)
+            {
+                AppendPostMaterializeSelectMany(collectionSelector, resultSelector);
+                return node;
+            }
 
             // Check for filtered navigation property: b => b.Posts.Where(p => p.Active)
             // Also check for DefaultIfEmpty for LEFT JOIN: b => b.Posts.DefaultIfEmpty()
@@ -518,6 +617,108 @@ namespace nORM.Query
                 }
                 return node;
             }
+            // Correlated SelectMany: p => ctx.Query<Child>().Where(c => c.FK == p.PK)
+            // The source of the Where is not a nav-property member — it's a query call.
+            // Translate to INNER JOIN Child T1 ON [correlated predicate] instead of CROSS JOIN.
+            if (collectionBody is MethodCallExpression corrWhereCall
+                && corrWhereCall.Method.Name == "Where"
+                && corrWhereCall.Arguments.Count == 2
+                && corrWhereCall.Arguments[0] is not MemberExpression
+                && StripQuotes(corrWhereCall.Arguments[1]) is LambdaExpression corrPredLambda)
+            {
+                var corrInnerType = GetElementType(collectionBody);
+                var corrInnerMapping = TrackMapping(corrInnerType);
+                var corrInnerAlias = EscapeAlias("T" + (++_joinCounter));
+
+                if (resultSelector != null && resultSelector.Parameters.Count > 1)
+                {
+                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                        _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
+                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                        _correlatedParams[resultSelector.Parameters[1]] = (corrInnerMapping, corrInnerAlias);
+                }
+
+                var corrInnerParam = corrPredLambda.Parameters[0];
+                if (!_correlatedParams.ContainsKey(corrInnerParam))
+                    _correlatedParams[corrInnerParam] = (corrInnerMapping, corrInnerAlias);
+
+                var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                var corrPredVisitor = FastExpressionVisitorPool.Get(in vctxCorr);
+                var corrPredSql = corrPredVisitor.Translate(corrPredLambda.Body);
+                foreach (var kvp in corrPredVisitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                FastExpressionVisitorPool.Return(corrPredVisitor);
+
+                _sql.Clear();
+                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                bool corrWroteColumns = false;
+
+                NewExpression? corrProjExpr = (_projection?.Body as NewExpression) ?? (resultSelector?.Body as NewExpression);
+                if (corrProjExpr != null)
+                {
+                    var neededColumns = JoinBuilder.ExtractNeededColumns(corrProjExpr, outerMapping, corrInnerMapping, outerAlias, corrInnerAlias);
+                    if (neededColumns.Count > 0)
+                    {
+                        for (int i = 0; i < neededColumns.Count; i++)
+                        {
+                            if (i > 0) _sql.Append(", ");
+                            _sql.Append(neededColumns[i]);
+                        }
+                        corrWroteColumns = true;
+                    }
+                }
+                else if (resultSelector == null)
+                {
+                    for (int i = 0; i < corrInnerMapping.Columns.Length; i++)
+                    {
+                        if (i > 0) _sql.Append(", ");
+                        _sql.Append(corrInnerAlias).Append('.').Append(corrInnerMapping.Columns[i].EscCol);
+                    }
+                    corrWroteColumns = true;
+                }
+
+                if (!corrWroteColumns)
+                {
+                    bool first = true;
+                    for (int i = 0; i < outerMapping.Columns.Length; i++)
+                    {
+                        if (!first) _sql.Append(", ");
+                        _sql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                    for (int i = 0; i < corrInnerMapping.Columns.Length; i++)
+                    {
+                        if (!first) _sql.Append(", ");
+                        _sql.Append(corrInnerAlias).Append('.').Append(corrInnerMapping.Columns[i].EscCol);
+                        first = false;
+                    }
+                }
+
+                _sql.Append(' ');
+                _sql.Append("FROM ");
+                if (smOuterFromOverride != null)
+                    _sql.Append('(').Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
+                else
+                    _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+                _sql.Append("INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
+                _sql.Append("ON ").Append(corrPredSql);
+
+                if (resultSelector != null)
+                {
+                    var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
+                    _transparentIdentifier = transparentExpansion;
+                    RegisterTransparentIdentifierTail(transparentExpansion, corrInnerMapping, corrInnerAlias);
+                    if (_projection == null)
+                        _projection = resultSelector;
+                }
+                else
+                {
+                    _mapping = corrInnerMapping;
+                    _rootType = corrInnerMapping.Type;
+                }
+                return node;
+            }
+
             // Otherwise treat as CROSS JOIN
             var innerType = GetElementType(collectionSelector.Body);
             var crossMapping = TrackMapping(innerType);
@@ -592,7 +793,9 @@ namespace nORM.Query
                 // downstream Where / Select that consumes `t.l` / `t.r` get rewritten back to
                 // the join's outer/inner parameters. Keep _projection alone so the outer
                 // Select's materializer projection (set BEFORE source visit) survives.
-                _transparentIdentifier = resultSelector;
+                var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
+                _transparentIdentifier = transparentExpansion;
+                RegisterTransparentIdentifierTail(transparentExpansion, crossMapping, crossAlias);
                 if (_projection == null)
                     _projection = resultSelector;
             }
@@ -614,10 +817,20 @@ namespace nORM.Query
             Expression innerQuery,
             LambdaExpression outerKeySel,
             LambdaExpression innerKeySel,
+            LambdaExpression groupJoinResultSelector,
+            LambdaExpression collectionSelector,
             LambdaExpression smResultSelector,
             string outerMemberName)
         {
             Visit(outerQuery);
+            if (IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == outerKeySel.Parameters[0].Type)
+            {
+                AppendPostMaterializeGroupJoin(innerQuery, outerKeySel, innerKeySel, groupJoinResultSelector);
+                AppendPostMaterializeSelectMany(collectionSelector, smResultSelector);
+                return;
+            }
+            outerKeySel = ExpandProjection(outerKeySel);
             var outerMapping = _mapping;
             var outerAlias = EscapeAlias("T0");
             var innerElementType = GetElementType(innerQuery);
@@ -657,7 +870,19 @@ namespace nORM.Query
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, outerMapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, distinct: _isDistinct);
+            JoinBuilder.BuildJoinClauseInto(
+                _sql,
+                _projection,
+                outerMapping,
+                outerAlias,
+                innerMapping,
+                innerAlias,
+                "LEFT JOIN",
+                outerKeySql,
+                innerKeySql,
+                distinct: _isDistinct,
+                translateProjectionExpression: TranslateJoinProjectionExpression,
+                escapeProjectionAlias: _provider.Escape);
         }
 
         private sealed class QuerySyntaxLeftJoinRewriter : ExpressionVisitor
@@ -684,27 +909,31 @@ namespace nORM.Query
 
             protected override Expression VisitConditional(ConditionalExpression node)
             {
-                // Strip idiomatic LEFT JOIN null-guard: `c == null ? null : c.Prop` and the
-                // mirrored `c != null ? c.Prop : null` form. LEFT JOIN already NULLs unmatched
-                // right-side columns, making the null-guard semantically redundant. Stripping it
-                // lets ExtractNeededColumns resolve the column reference and the materializer
-                // correctly maps the column ordinal. Non-trivial fallbacks (e.g. "None") are
-                // not simplified — they fall through to the default visitor.
-                if (IsInnerParam(node.Test, out bool testIsEqual))
+                // `c == null ? null : c.Prop` and mirrored `c != null ? c.Prop : null`:
+                // Strip the null-guard entirely — LEFT JOIN already NULLs unmatched rows.
+                // `c == null ? fallback : c.Prop` and mirrored `c != null ? c.Prop : fallback`
+                // where fallback is a non-null constant: rewrite to COALESCE(c.Prop, fallback).
+                // In SQL a LEFT JOIN null propagates through ALL right-side columns, so
+                // COALESCE correctly substitutes the fallback for unmatched rows. The one
+                // edge case where COALESCE differs from .NET: a matched row where c.Prop
+                // happens to be NULL in the DB also gets the fallback in SQL, whereas .NET
+                // would return null. That distinction is documented as an acceptable
+                // approximation for non-nullable projected columns.
+                if (IsInnerParam(node.Test, out bool testIsEqualParam))
                 {
-                    // Whole test is the inner param itself (treated as c != null)
-                    var propBranch = testIsEqual ? node.IfFalse : node.IfTrue;
-                    var nullBranch = testIsEqual ? node.IfTrue  : node.IfFalse;
+                    var propBranch = testIsEqualParam ? node.IfFalse : node.IfTrue;
+                    var nullBranch = testIsEqualParam ? node.IfTrue  : node.IfFalse;
                     if (IsNullOrDefault(nullBranch))
                         return Visit(propBranch);
+                    return BuildCoalesce(Visit(propBranch), Visit(nullBranch));
                 }
-                else if (IsEntityNullComparison(node.Test, out bool testNullOnLeft, out bool eqOp))
+                else if (IsEntityNullComparison(node.Test, out bool _, out bool eqOp))
                 {
-                    // c == null ? X : Y  →  propBranch = Y when eqOp, X when !eqOp
                     var propBranch = eqOp ? node.IfFalse : node.IfTrue;
                     var nullBranch = eqOp ? node.IfTrue  : node.IfFalse;
                     if (IsNullOrDefault(nullBranch))
                         return Visit(propBranch);
+                    return BuildCoalesce(Visit(propBranch), Visit(nullBranch));
                 }
                 return base.VisitConditional(node);
             }
@@ -750,6 +979,70 @@ namespace nORM.Query
                 || (e is UnaryExpression ue
                     && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked)
                     && ue.Operand is ConstantExpression { Value: null });
+
+            private static Expression BuildCoalesce(Expression valueExpression, Expression fallbackExpression)
+            {
+                var originalValueType = valueExpression.Type;
+                var coalesceLeft = valueExpression;
+                if (coalesceLeft.Type.IsValueType && Nullable.GetUnderlyingType(coalesceLeft.Type) == null)
+                {
+                    coalesceLeft = Expression.Convert(coalesceLeft, typeof(Nullable<>).MakeGenericType(coalesceLeft.Type));
+                }
+
+                var rightTargetType = Nullable.GetUnderlyingType(coalesceLeft.Type) ?? coalesceLeft.Type;
+                var coalesceRight = ConvertIfNeeded(fallbackExpression, rightTargetType);
+                var coalesce = Expression.Coalesce(coalesceLeft, coalesceRight);
+                return coalesce.Type == originalValueType
+                    ? coalesce
+                    : ConvertIfNeeded(coalesce, originalValueType);
+            }
+
+            private static Expression ConvertIfNeeded(Expression expression, Type targetType)
+            {
+                if (expression.Type == targetType)
+                    return expression;
+                if (expression is ConstantExpression { Value: null })
+                    return Expression.Constant(null, targetType);
+                return Expression.Convert(expression, targetType);
+            }
+        }
+
+        // Walks the inner query expression chain and extracts any WHERE predicates,
+        // translating them against the given inner alias. Used by HandleInnerJoin to
+        // push inner-source WHERE conditions into the JOIN ON clause so they are
+        // included in ExecuteDelete/Update subqueries.
+        private System.Collections.Generic.List<string> ExtractInnerWhereConditions(
+            Expression innerQuery, TableMapping innerMapping, string innerAlias)
+        {
+            var conditions = new System.Collections.Generic.List<string>();
+            var source = innerQuery;
+            while (source is MethodCallExpression mce)
+            {
+                if (mce.Method.Name == "Where"
+                    && mce.Arguments.Count == 2
+                    && StripQuotes(mce.Arguments[1]) is LambdaExpression predLambda)
+                {
+                    var param = predLambda.Parameters[0];
+                    if (!_correlatedParams.ContainsKey(param))
+                        _correlatedParams[param] = (innerMapping, innerAlias);
+
+                    var vctx = new VisitorContext(_ctx, innerMapping, _provider, param, innerAlias,
+                        _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    var condSql = visitor.Translate(predLambda.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        _params[kvp.Key] = kvp.Value;
+                    FastExpressionVisitorPool.Return(visitor);
+
+                    conditions.Add(condSql);
+                    source = mce.Arguments[0];
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return conditions;
         }
     }
 }

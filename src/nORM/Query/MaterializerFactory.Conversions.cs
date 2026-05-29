@@ -4,6 +4,7 @@ using System.Data;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using nORM.Mapping;
 
 #nullable enable
@@ -57,6 +58,7 @@ namespace nORM.Query
         /// converts to the enum's underlying integral type first, then calls
         /// <c>Enum.ToObject</c>.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static TEnum ConvertToEnum<TEnum>(object value) where TEnum : struct, Enum
         {
             var underlying = Enum.GetUnderlyingType(typeof(TEnum));
@@ -69,8 +71,10 @@ namespace nORM.Query
         /// materializers where <c>Convert.ChangeType</c> cannot handle DateOnly.
         /// Public so source-generated materializers can call it (SG1 fix).
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DateOnly ConvertToDateOnly(object value)
         {
+            if (value is DateOnly d0) return d0;
             if (value is DateTime dt) return DateOnly.FromDateTime(dt);
             if (value is string s)
             {
@@ -87,8 +91,10 @@ namespace nORM.Query
         /// materializers where <c>Convert.ChangeType</c> cannot handle TimeOnly.
         /// Public so source-generated materializers can call it (SG1 fix).
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static TimeOnly ConvertToTimeOnly(object value)
         {
+            if (value is TimeOnly t0) return t0;
             if (value is TimeSpan ts) return TimeOnly.FromTimeSpan(ts);
             if (value is DateTime dt) return TimeOnly.FromDateTime(dt);
             if (value is string s) return TimeOnly.Parse(s, CultureInfo.InvariantCulture);
@@ -100,6 +106,7 @@ namespace nORM.Query
         /// DateTimeOffset as TEXT and Expression.Convert(object, DateTimeOffset) doesn't
         /// know how to parse the string form.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DateTimeOffset ConvertToDateTimeOffset(object value)
         {
             if (value is DateTimeOffset dto) return dto;
@@ -112,6 +119,7 @@ namespace nORM.Query
         /// Converts a boxed DB value to <see cref="TimeSpan"/>. Providers vary: SQLite uses
         /// TEXT, some store ticks as INTEGER.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static TimeSpan ConvertToTimeSpan(object value)
         {
             if (value is TimeSpan ts) return ts;
@@ -137,6 +145,7 @@ namespace nORM.Query
         /// as single-character TEXT; Expression.Convert(string → char) throws at runtime,
         /// so the optimized reader call routes through this helper instead.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static char ConvertToChar(object value)
         {
             if (value is char ch) return ch;
@@ -164,6 +173,7 @@ namespace nORM.Query
             return (h2 << 32) | h1;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static object? ConvertDbValue(object dbValue, Type targetType)
         {
             if (dbValue == null || dbValue is DBNull)

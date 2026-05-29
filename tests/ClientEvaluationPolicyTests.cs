@@ -99,14 +99,14 @@ public class ClientEvaluationPolicyTests
         var options = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
 
         using var context = new DbContext(connection, new SqliteProvider(), options);
-        var serverSide = await context.Query<ClientEvalUser>()
+        var projected = await context.Query<ClientEvalUser>()
             .Where(u => u.Id == 2)
+            .Select(u => new ClientEvalUser { Id = u.Id, Name = FormatName(u.Name) })
             .ToListAsync();
-        var projected = serverSide.Select(u => FormatName(u.Name)).ToList();
 
-        Assert.Single(serverSide);
-        Assert.Equal(2, serverSide[0].Id);
-        Assert.Equal("GRACE", projected[0]);
+        Assert.Single(projected);
+        Assert.Equal(2, projected[0].Id);
+        Assert.Equal("GRACE", projected[0].Name);
     }
 
     [Fact]
@@ -118,15 +118,15 @@ public class ClientEvaluationPolicyTests
         var options = new DbContextOptions { ClientEvaluationPolicy = ClientEvaluationPolicy.Allow };
         using var context = new DbContext(connection, new SqliteProvider(), options);
 
-        var serverSide = await context.Query<ClientEvalUser>()
+        var projected = await context.Query<ClientEvalUser>()
             .OrderBy(u => u.Id)
             .Take(1)
+            .Select(u => new ClientEvalUser { Id = u.Id, Name = FormatName(u.Name) })
             .ToListAsync();
-        var projected = serverSide.Select(u => FormatName(u.Name)).ToList();
 
-        Assert.Single(serverSide);
-        Assert.Equal(1, serverSide[0].Id);
-        Assert.Equal("ADA", projected[0]);
+        Assert.Single(projected);
+        Assert.Equal(1, projected[0].Id);
+        Assert.Equal("ADA", projected[0].Name);
     }
 
     [Fact]

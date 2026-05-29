@@ -77,7 +77,7 @@ namespace nORM.Query
             var paramNames = new List<string>();
             for (int i = 0; i < pkeys.Length; i++)
             {
-                var pn = $"{_ctx.Provider.ParamPrefix}jlfk{i}";
+                var pn = $"{_ctx.RawProvider.ParamPrefix}jlfk{i}";
                 cmd.AddParam(pn, pkeys[i]!);
                 paramNames.Add(pn);
             }
@@ -86,21 +86,22 @@ namespace nORM.Query
             // Determine tenant filtering for the join table query and right entity query.
             // When multi-tenancy is active on the left entity, scope the join table query to
             // only return rows whose left FK belongs to the current tenant.
-            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             var leftMapping = _ctx.GetMapping(jtm.LeftType);
-            var leftTenantCol = leftMapping.TenantColumn;
+            var tenantActive = _ctx.Options.TenantProvider != null;
+            var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
+            var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
             // M2M requires single-column PK on both sides; guard early.
             if (leftMapping.KeyColumns.Length == 0)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
                     $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
-            var hasTenantFilter = tenantId != null && leftTenantCol != null;
+            var hasTenantFilter = tenantActive;
 
             // Query: SELECT jt.left_fk, jt.right_fk FROM join_table jt [INNER JOIN left_table lt ON ...] WHERE jt.left_fk IN (...)
             if (hasTenantFilter)
             {
-                var tp = $"{_ctx.Provider.ParamPrefix}jttenant";
+                var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
                 cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
                 cmd.AddParam(tp, tenantId!);
             }
@@ -135,7 +136,7 @@ namespace nORM.Query
             var allRightPkList = allRightPks.ToList();
             for (int i = 0; i < allRightPkList.Count; i++)
             {
-                var pn = $"{_ctx.Provider.ParamPrefix}jrpk{i}";
+                var pn = $"{_ctx.RawProvider.ParamPrefix}jrpk{i}";
                 cmd2.AddParam(pn, allRightPkList[i]!);
                 rightParamNames.Add(pn);
             }
@@ -149,11 +150,12 @@ namespace nORM.Query
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;
-            if (tenantId != null && rightTenantCol != null)
+            if (tenantActive)
             {
-                var rtp = $"{_ctx.Provider.ParamPrefix}jrtenant";
+                rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many include right side");
+                var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
-                cmd2.AddParam(rtp, tenantId);
+                cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many include right side"));
             }
             else
             {
@@ -251,27 +253,28 @@ namespace nORM.Query
             var paramNames = new List<string>();
             for (int i = 0; i < pkeys.Length; i++)
             {
-                var pn = $"{_ctx.Provider.ParamPrefix}jlfk{i}";
+                var pn = $"{_ctx.RawProvider.ParamPrefix}jlfk{i}";
                 cmd.AddParam(pn, pkeys[i]!);
                 paramNames.Add(pn);
             }
             var inClause = $"({string.Join(", ", paramNames)})";
 
             // Determine tenant filtering for the join table query and right entity query.
-            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
             var leftMapping = _ctx.GetMapping(jtm.LeftType);
-            var leftTenantCol = leftMapping.TenantColumn;
+            var tenantActive = _ctx.Options.TenantProvider != null;
+            var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
+            var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
             // M2M requires single-column PK on both sides; guard early.
             if (leftMapping.KeyColumns.Length == 0)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
                     $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
-            var hasTenantFilter = tenantId != null && leftTenantCol != null;
+            var hasTenantFilter = tenantActive;
 
             if (hasTenantFilter)
             {
-                var tp = $"{_ctx.Provider.ParamPrefix}jttenant";
+                var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
                 cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
                 cmd.AddParam(tp, tenantId!);
             }
@@ -304,7 +307,7 @@ namespace nORM.Query
             var allRightPkList = allRightPks.ToList();
             for (int i = 0; i < allRightPkList.Count; i++)
             {
-                var pn = $"{_ctx.Provider.ParamPrefix}jrpk{i}";
+                var pn = $"{_ctx.RawProvider.ParamPrefix}jrpk{i}";
                 cmd2.AddParam(pn, allRightPkList[i]!);
                 rightParamNames.Add(pn);
             }
@@ -318,11 +321,12 @@ namespace nORM.Query
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;
-            if (tenantId != null && rightTenantCol != null)
+            if (tenantActive)
             {
-                var rtp = $"{_ctx.Provider.ParamPrefix}jrtenant";
+                rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many include right side");
+                var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
-                cmd2.AddParam(rtp, tenantId);
+                cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many include right side"));
             }
             else
             {
@@ -391,19 +395,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
-            foreach (var (rel, map) in include.Path.Zip(pathMappings))
-                if (map.KeyColumns.Length > 1)
-                    throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
-                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
-                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
-                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
-                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
-                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
-                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
-                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 
@@ -434,7 +426,7 @@ namespace nORM.Query
 
             // Determine optimal batch size based on provider parameter limits and relationship depth
             var keys = parentLookup.Keys.ToArray();
-            var maxParams = _ctx.Provider.MaxParameters;
+            var maxParams = _ctx.RawProvider.MaxParameters;
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
                 : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
@@ -449,7 +441,7 @@ namespace nORM.Query
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
-                    var pn = $"{_ctx.Provider.ParamPrefix}fk{i}";
+                    var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}";
                     cmd.AddParam(pn, keyBatch[i]!);
                     paramNames.Add(pn);
                 }
@@ -482,19 +474,7 @@ namespace nORM.Query
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
 
-            // Composite-PK dependents are not supported; throw early rather than silently corrupting data.
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
-            foreach (var (rel, map) in include.Path.Zip(pathMappings))
-                if (map.KeyColumns.Length > 1)
-                    throw new NormUnsupportedFeatureException(
-                        $"Include on '{map.Type.Name}' with a composite primary key is not supported by " +
-                        "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
-                        "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
-                        "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
-                        "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
-                        "the parent graph client-side; (2) fetch the principals first, then issue a second " +
-                        "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
-                        "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
 
             var firstRelation = include.Path[0];
 
@@ -523,7 +503,7 @@ namespace nORM.Query
                 .ToArray();
 
             var keys = parentLookup.Keys.ToArray();
-            var maxParams = _ctx.Provider.MaxParameters;
+            var maxParams = _ctx.RawProvider.MaxParameters;
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
                 : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
@@ -536,7 +516,7 @@ namespace nORM.Query
                 var paramNames = new List<string>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
-                    var pn = $"{_ctx.Provider.ParamPrefix}fk{i}";
+                    var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}";
                     cmd.AddParam(pn, keyBatch[i]!);
                     paramNames.Add(pn);
                 }
@@ -614,7 +594,7 @@ namespace nORM.Query
 
         private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, DbCommand cmd)
         {
-            var tenantId = _ctx.Options.TenantProvider?.GetCurrentTenantId();
+            var tenantActive = _ctx.Options.TenantProvider != null;
             var current = $"({PooledStringBuilder.Join(paramNames, ",")})";
             var sb = PooledStringBuilder.Rent();
             try
@@ -623,17 +603,17 @@ namespace nORM.Query
                 {
                     var relation = path[i];
                     var map = mappings[i];
-                    var tenantCol = map.TenantColumn;
+                    var tenantCol = tenantActive ? _ctx.RequireTenantColumn(map, "include path load") : null;
 
                     sb.Append("SELECT * FROM ").Append(map.EscTable)
                       .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
                       .Append(" IN ").Append(current);
 
-                    if (tenantId != null && tenantCol != null)
+                    if (tenantActive)
                     {
-                        var tp = $"{_ctx.Provider.ParamPrefix}tkn{i}";
-                        sb.Append(" AND ").Append(tenantCol.EscCol).Append(" = ").Append(tp);
-                        cmd.AddParam(tp, tenantId);
+                        var tp = $"{_ctx.RawProvider.ParamPrefix}tkn{i}";
+                        sb.Append(" AND ").Append(tenantCol!.EscCol).Append(" = ").Append(tp);
+                        cmd.AddParam(tp, _ctx.GetRequiredTenantId(map, "include path load"));
                     }
 
                     // Separate multiple result-set statements with semicolons;
@@ -641,12 +621,19 @@ namespace nORM.Query
                     if (i < path.Count - 1)
                         sb.Append(';');
 
-                    // Include all key columns (composite PK support for multi-level traversal).
-                    var pkCols = string.Join(", ", map.KeyColumns.Select(k => k.EscCol));
-                    var tenantPart = (tenantId != null && tenantCol != null)
-                        ? $" AND {tenantCol.EscCol} = {_ctx.Provider.ParamPrefix}tkn{i}"
-                        : string.Empty;
-                    current = $"(SELECT {pkCols} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
+                    // Build the subquery that feeds the NEXT level's IN clause.
+                    // Select only the single column that the next relation's FK references (the
+                    // next relation's PrincipalKey), not all PK columns of the current mapping.
+                    // Selecting composite PK columns would produce a multi-column subquery that
+                    // the next level's single-column IN cannot consume.
+                    if (i + 1 < path.Count)
+                    {
+                        var nextPrincipalKey = path[i + 1].PrincipalKey.EscCol;
+                        var tenantPart = tenantActive
+                            ? $" AND {tenantCol!.EscCol} = {_ctx.RawProvider.ParamPrefix}tkn{i}"
+                            : string.Empty;
+                        current = $"(SELECT {nextPrincipalKey} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
+                    }
                 }
 
                 return sb.ToString();

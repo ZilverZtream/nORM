@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -148,6 +149,27 @@ namespace nORM.Query
             return factory(capacity);
         }
 
+        private CommandBehavior GetEntityReadBehavior(Type elementType)
+        {
+            if (!elementType.IsClass || elementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal))
+                return CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+
+            for (var current = elementType; current != null && current != typeof(object); current = current.BaseType)
+            {
+                if (!_ctx.IsMapped(current)) continue;
+                var map = _ctx.GetMapping(current);
+                if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
+                    return CommandBehavior.Default | CommandBehavior.SingleResult;
+            }
+
+            return CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+        }
+
+        private static CommandBehavior GetEntityReadBehavior(TableMapping mapping)
+            => mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0
+                ? CommandBehavior.Default | CommandBehavior.SingleResult
+                : CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
+
         /// <summary>
         /// Materializes directly into <c>List&lt;object&gt;</c> to avoid covariant copy
         /// when the caller needs <c>List&lt;object&gt;</c> but the plan's ElementType is a concrete type.
@@ -172,7 +194,7 @@ namespace nORM.Query
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
                 bool isReadOnly = IsReadOnlyQuery();
 
-                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
                 var syncMaterializer = plan.SyncMaterializer;
@@ -211,7 +233,7 @@ namespace nORM.Query
                     // This path is strongly typed as List<object> for the projection
                     // materializer; rebuild rather than reassign so callers still get
                     // a List<object> rather than the transform's element-typed list.
-                    var transformed = plan.PostMaterializeTransform(list);
+                    var transformed = plan.PostMaterializeTransform(_ctx, list);
                     var rebuilt = new List<object>(transformed.Count);
                     foreach (var item in transformed) rebuilt.Add(item!);
                     list = rebuilt;
@@ -238,7 +260,9 @@ namespace nORM.Query
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
                 var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-                var list = CreateList(plan.ElementType, capacity);
+                var list = plan.PostMaterializeTransform != null
+                    ? (IList)new List<object>(capacity)
+                    : CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
@@ -250,7 +274,7 @@ namespace nORM.Query
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
-                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct)
+                await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
                 // Use sync materializer to avoid per-row Task allocation.
@@ -322,7 +346,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
-                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
                 return list;
             }
             catch (Exception ex)
@@ -347,7 +371,9 @@ namespace nORM.Query
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
                 var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-                var list = CreateList(plan.ElementType, capacity);
+                var list = plan.PostMaterializeTransform != null
+                    ? (IList)new List<object>(capacity)
+                    : CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
@@ -360,7 +386,7 @@ namespace nORM.Query
                 bool isReadOnly = IsReadOnlyQuery();
 
                 commandLifetimeTransferred = true;
-                using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, GetEntityReadBehavior(plan.ElementType));
 
                 // Use sync materializer — no Task allocation, no async state machine.
                 var syncMaterializer = plan.SyncMaterializer;
@@ -420,7 +446,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
-                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
                 return list;
             }
             catch (Exception ex)
@@ -435,7 +461,9 @@ namespace nORM.Query
         public IList MaterializePooled(QueryPlan plan, DbCommand command)
         {
             var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-            var list = CreateList(plan.ElementType, capacity);
+            var list = plan.PostMaterializeTransform != null
+                ? (IList)new List<object>(capacity)
+                : CreateList(plan.ElementType, capacity);
 
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
@@ -445,7 +473,7 @@ namespace nORM.Query
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
             bool isReadOnly = IsReadOnlyQuery();
 
-            using var reader = command.ExecuteReaderWithInterception(_ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+            using var reader = command.ExecuteReaderWithInterception(_ctx, GetEntityReadBehavior(plan.ElementType));
             var syncMaterializer = plan.SyncMaterializer;
 
             while (reader.Read())
@@ -523,8 +551,15 @@ namespace nORM.Query
                 var outerColumnCount = outerMap.Columns.Length;
                 var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
                 if (innerKeyOffset < 0)
+                {
+                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
+                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
+                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
+                }
+                if (innerKeyOffset < 0)
                     throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
+                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
@@ -643,6 +678,121 @@ namespace nORM.Query
             }
         }
 
+        internal async IAsyncEnumerable<T> StreamGroupJoinAsync<T>(
+            QueryPlan plan,
+            DbCommand cmd,
+            [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var info = plan.GroupJoinInfo!;
+
+            var trackOuter = !plan.NoTracking && info.OuterType.IsClass &&
+                             !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+            var trackInner = !plan.NoTracking && info.InnerType.IsClass &&
+                             !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+
+            var outerMap = _ctx.GetMapping(info.OuterType);
+            var innerMap = _ctx.GetMapping(info.InnerType);
+
+            var outerColumnCount = outerMap.Columns.Length;
+            var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+            if (innerKeyOffset < 0)
+                throw new InvalidOperationException(
+                    $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+            var innerKeyIndex = outerColumnCount + innerKeyOffset;
+
+            // Non-sequential read: innerKeyIndex may be read before inner columns are consumed.
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
+                    _ctx, CommandBehavior.Default | CommandBehavior.SingleResult, ct)
+                .ConfigureAwait(false);
+
+            object? currentOuter = null;
+            object? currentKey = null;
+            List<object> currentChildren = [];
+
+            var syncMaterializer = plan.SyncMaterializer;
+
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var outer = syncMaterializer(reader);
+                var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+
+                if (currentOuter == null || !Equals(currentKey, key))
+                {
+                    if (currentOuter != null)
+                    {
+                        var childList = BuildInnerList(info.InnerType, currentChildren);
+                        yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+                        currentChildren = [];
+                    }
+
+                    if (trackOuter)
+                    {
+                        var actualMap = _ctx.GetMapping(outer.GetType());
+                        var entry = _ctx.ChangeTracker.Track(outer, EntityState.Unchanged, actualMap);
+                        outer = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(outer, _ctx);
+                    }
+
+                    currentOuter = outer;
+                    currentKey = key;
+                }
+
+                if (!reader.IsDBNull(innerKeyIndex))
+                {
+                    var maxSize = _ctx.Options.MaxGroupJoinSize;
+                    if (currentChildren.Count >= maxSize)
+                        throw new NormQueryException(
+                            $"GroupJoin safety limit exceeded: A single group has more than {maxSize} children. " +
+                            "This may indicate a malformed query or incorrect join keys. " +
+                            "To increase this limit, set DbContextOptions.MaxGroupJoinSize to a higher value. " +
+                            "Review your GroupJoin operation and ensure join keys are correct.");
+
+                    var inner = BuildInnerEntity(reader, innerMap, outerColumnCount, ct);
+                    if (trackInner)
+                    {
+                        var actualMap = _ctx.GetMapping(inner.GetType());
+                        var entry = _ctx.ChangeTracker.Track(inner, EntityState.Unchanged, actualMap);
+                        inner = entry.Entity!;
+                        NavigationPropertyExtensions.EnableLazyLoading(inner, _ctx);
+                    }
+                    currentChildren.Add(inner);
+                }
+            }
+
+            if (currentOuter != null)
+            {
+                var childList = BuildInnerList(info.InnerType, currentChildren);
+                yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+            }
+
+            static object BuildInnerEntity(DbDataReader reader, TableMapping map, int offset, CancellationToken ct)
+            {
+                if (map.DiscriminatorColumn != null && map.TphMappings.Count > 0)
+                {
+                    var discIndex = offset + Array.IndexOf(map.Columns, map.DiscriminatorColumn);
+                    if (!reader.IsDBNull(discIndex))
+                    {
+                        var disc = reader.GetValue(discIndex);
+                        if (disc != null && map.TphMappings.TryGetValue(disc, out var derived))
+                            return BuildInnerEntity(reader, derived, offset, ct);
+                    }
+                }
+
+                if (CompiledMaterializerStore.TryGet(map.Type, map.TableName, out var compiled) && offset == 0)
+                    return compiled(reader, ct).GetAwaiter().GetResult();
+
+                var materializer = _sharedMaterializerFactory.CreateSyncMaterializer(map, map.Type, startOffset: offset);
+                return materializer(reader);
+            }
+
+            static IList BuildInnerList(Type innerType, List<object> items)
+            {
+                var list = CreateList(innerType, items.Count);
+                foreach (var item in items) list.Add(item);
+                return list;
+            }
+        }
+
         private IList MaterializeGroupJoin(QueryPlan plan, DbCommand cmd)
         {
             var info = plan.GroupJoinInfo!;
@@ -664,8 +814,15 @@ namespace nORM.Query
                 var outerColumnCount = outerMap.Columns.Length;
                 var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
                 if (innerKeyOffset < 0)
+                {
+                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
+                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
+                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
+                }
+                if (innerKeyOffset < 0)
                     throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
+                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
@@ -737,6 +894,10 @@ namespace nORM.Query
                     var result = info.ResultSelector(currentOuter, list.Cast<object>());
                     resultList.Add(result);
                 }
+
+                reader.Dispose();
+                if (plan.PostMaterializeTransform != null)
+                    return plan.PostMaterializeTransform(_ctx, resultList);
 
                 return resultList;
             }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = RedactSqlForLogging(cmd.CommandText) });
@@ -812,7 +973,7 @@ namespace nORM.Query
 
                 // Phase 2: Fetch children in batches (to handle SQL parameter limits).
                 // Uses provider's MaxParameters minus DependentQueryParameterReserve for overhead.
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -860,7 +1021,7 @@ namespace nORM.Query
                     continue;
                 }
 
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -897,7 +1058,7 @@ namespace nORM.Query
             for (int i = 0; i < parentIds.Count; i++)
             {
                 if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
                 sql.Append(paramName);
                 cmd.AddParam(paramName, parentIds[i]);
             }
@@ -907,11 +1068,12 @@ namespace nORM.Query
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
             // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            if (_ctx.Options.TenantProvider != null)
             {
-                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
+                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
 
             cmd.CommandText = sql.ToString();
@@ -920,7 +1082,7 @@ namespace nORM.Query
                 cmd.CommandText).TotalSeconds;
 
             using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(
-                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult);
+                _ctx, GetEntityReadBehavior(depQuery.TargetMapping));
 
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
@@ -966,7 +1128,7 @@ namespace nORM.Query
             for (int i = 0; i < parentIds.Count; i++)
             {
                 if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
                 sql.Append(paramName);
                 cmd.AddParam(paramName, parentIds[i]);
             }
@@ -976,11 +1138,12 @@ namespace nORM.Query
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
             // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            if (_ctx.Options.TenantProvider != null)
             {
-                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
+                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
 
             cmd.CommandText = sql.ToString();
@@ -989,7 +1152,7 @@ namespace nORM.Query
                 cmd.CommandText).TotalSeconds;
 
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
-                _ctx, CommandBehavior.SequentialAccess | CommandBehavior.SingleResult, ct).ConfigureAwait(false);
+                _ctx, GetEntityReadBehavior(depQuery.TargetMapping), ct).ConfigureAwait(false);
 
             // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using nORM.Mapping;
 using nORM.Configuration;
+using nORM.Core;
 
 #nullable enable
 
@@ -96,13 +97,11 @@ namespace nORM.Query
         // direction. The DB still scans only N rows (TakeLast) or n - N (SkipLast) so
         // there's no full-table-scan penalty.
         bool PostReverse = false,
-        // DistinctBy uses a client-side dedupe over the materialized list: the SQL
-        // returns every row, then this delegate keeps one row per key (source order).
-        // A future translator pass can emit ROW_NUMBER OVER (PARTITION BY key) WHERE
-        // rn = 1 server-side; the external row-set contract stays the same so callers
-        // don't notice. The delegate captures a compiled keySelector that returns the
-        // grouping key for an arbitrary entity instance.
-        System.Func<System.Collections.IList, System.Collections.IList>? PostMaterializeTransform = null
+        // Post-materialization transforms are reserved for operators whose v1 contract
+        // is explicitly in-memory after a bounded/generated SQL source, such as
+        // standalone DefaultIfEmpty. DistinctBy and the keyed set operators are
+        // server-translated with ROW_NUMBER() and do not use this hook.
+        System.Func<DbContext, System.Collections.IList, System.Collections.IList>? PostMaterializeTransform = null
     );
 
     internal sealed record BulkCudQueryShape(

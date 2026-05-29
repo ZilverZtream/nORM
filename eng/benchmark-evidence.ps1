@@ -102,6 +102,14 @@ if ($csvFiles.Count -eq 0) {
     throw "No BenchmarkDotNet CSV reports found in $ResultsDirectory"
 }
 
+if ($Mode -in @('rc', 'full')) {
+    $fastReports = @($csvFiles | Where-Object { $_.Name -match 'FastNormBenchmarks' })
+    if ($fastReports.Count -gt 0) {
+        $names = ($fastReports | ForEach-Object Name) -join ', '
+        throw "FastNormBenchmarks reports are smoke-test artifacts and cannot be used as public release evidence: $names"
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $commit = (& git -C $root rev-parse HEAD).Trim()
@@ -122,6 +130,7 @@ foreach ($csvFile in $csvFiles) {
 }
 
 $summaries = New-Object System.Collections.Generic.List[object]
+$providerReportFiles = New-Object System.Collections.Generic.List[object]
 foreach ($file in $csvFiles) {
     $rows = Import-Csv $file.FullName -Delimiter ';'
     if (-not $rows -or -not ($rows[0].PSObject.Properties.Name -contains 'Method')) {
@@ -130,6 +139,17 @@ foreach ($file in $csvFiles) {
 
     $providerGroups = $rows | Where-Object { $_.Provider -and $_.Method -and $_.Mean } | Group-Object Provider
     foreach ($group in $providerGroups) {
+        $safeProviderName = $group.Name -replace '[^A-Za-z0-9_.-]', '_'
+        $baseName = [IO.Path]::GetFileNameWithoutExtension($file.Name) -replace '[^A-Za-z0-9_.-]', '_'
+        $providerCsvName = "$baseName.$safeProviderName.csv"
+        $providerCsvPath = Join-Path $OutputDirectory $providerCsvName
+        $group.Group | Export-Csv -LiteralPath $providerCsvPath -Delimiter ';' -NoTypeInformation -Encoding UTF8
+        $providerReportFiles.Add([pscustomobject]@{
+            Provider = $group.Name
+            Report = $file.Name
+            Path = $providerCsvName
+        })
+
         $fastest = $group.Group | Sort-Object { Convert-MeanToNanoseconds $_.Mean } | Select-Object -First 1
         if ($fastest) {
             $summaries.Add([pscustomobject]@{
@@ -153,6 +173,7 @@ $evidence.Add('SdkVersion', $sdkVersion)
 $evidence.Add('OS', $os)
 $evidence.Add('ProcessArchitecture', $processArch)
 $evidence.Add('Reports', [object]$reports.ToArray())
+$evidence.Add('ProviderReports', [object]$providerReportFiles.ToArray())
 $evidence.Add('Providers', [object]$providers)
 $evidence.Add('DriverPackages', [object]$drivers)
 $evidence.Add('FastestByProvider', [object]$summaries.ToArray())
@@ -192,6 +213,14 @@ $lines.Add('## Raw Reports')
 $lines.Add('')
 foreach ($report in $reports) {
     $lines.Add(('- `{0}`' -f $report))
+}
+$lines.Add('')
+$lines.Add('## Provider-Split Reports')
+$lines.Add('')
+$lines.Add('| Provider | Source report | Split CSV |')
+$lines.Add('| --- | --- | --- |')
+foreach ($providerReport in $providerReportFiles) {
+    $lines.Add(('| {0} | `{1}` | `{2}` |' -f $providerReport.Provider, $providerReport.Report, $providerReport.Path))
 }
 $lines.Add('')
 $lines.Add('## Fastest Method By Provider')

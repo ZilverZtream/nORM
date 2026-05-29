@@ -17,8 +17,8 @@ v1-green only when it passes live on every configured provider.
 - ✅ — passes runtime + (where applicable) compiled-query parity on the live
   provider, with row values, ordering, and null semantics matching .NET / the
   documented provider note.
-- ⚠️ — passes with a documented caveat (e.g. snapshot DST for
-  DateTimeOffset.LocalDateTime, second-resolution for DTO instant comparison).
+- ⚠️ — passes with a documented caveat (e.g. range-bounded timezone lowering for
+  DateTimeOffset.LocalDateTime, microsecond-resolution for DTO instant comparison).
 - ❌ — fails on the live provider; see the linked test or commit.
 - 🚧 — coverage gap; the SQLite probe passes but no live-parity test exists yet.
 - — — not applicable to this provider (e.g. provider-specific dialect).
@@ -37,11 +37,15 @@ already exist, the linked file is the live-parity test that backs the claim.
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `Where` predicates | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `ProviderParityMandatoryTests` |
-| `Select` (entity / scalar / DTO / anonymous / `new T { … }`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderIntegrationTests`, `LiveProviderShapeParityTests` |
+| `Select` (entity / scalar / DTO / anonymous / `new T { … }`, constrained client projection tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Custom CLR methods in projection require `ClientEvaluationPolicy.Warn` or `.Allow`; the client tail runs only after server filters/order/page operators. `UseStrictProviderMobility(ClientEvaluationPolicy.Warn)` permits explicit warning-level top projection tails; silent `Allow` remains compatibility-only and is not strict-certified. Member-initialized DTO projections are also covered through strict inner-join and query-syntax left-join live parity. | `LiveProviderIntegrationTests`, `LiveProviderShapeParityTests`, `LiveProviderDtoProjectionParityTests`, `LiveProviderClientEvaluationParityTests`, `LiveProviderJoinSelectManyParityTests` |
 | `OrderBy` / `OrderByDescending` / `ThenBy` / `ThenByDescending` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityQueryPagingTests`, `LiveProviderShapeParityTests` |
-| `Skip` / `Take` (pagination) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SqlServer uses `OFFSET … FETCH NEXT … ROWS`; Postgres/MySQL use `LIMIT/OFFSET`. | `ProviderParityQueryPagingTests` |
+| `Skip` / `Take` (pagination) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SqlServer uses `OFFSET … FETCH NEXT … ROWS`; Postgres/MySQL use `LIMIT/OFFSET`. | `ProviderParityQueryPagingTests`, `LiveProviderSkipTakeParityTests` |
+| `TakeWhile` / `SkipWhile` ordered subset | ✅ | ✅ | ✅ | ✅ | ✅ | — | Requires explicit `OrderBy`/`ThenBy` and the one-argument predicate overload. Lowers to a windowed cumulative break flag; unordered, index-aware, and post-`Take`/`Skip` forms fail closed. | `LinqTakeSkipWhileProviderMobileTests`, `LiveProviderTakeSkipWhileParityTests` |
+| `SequenceEqual` ordered queryable subset | ✅ | ✅ | ✅ | ✅ | ✅ | — | Requires both sources to be provider queryables with explicit ordering and the default equality comparer. Local sequences, unordered sources, and comparer overloads fail closed. | `LinqSequenceEqualProviderMobileTests`, `LiveProviderSequenceEqualParityTests` |
 | `Reverse` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Flips active ORDER BY. | `LinqReverseAndLastTests` (shape), `LiveProviderShapeParityTests` |
 | `Distinct` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `LinqGuidAndDistinctTests` |
+| `DistinctBy` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `ROW_NUMBER() OVER (PARTITION BY key ORDER BY source-order) = 1`; use explicit source ordering for deterministic first-row selection. | `DistinctByProviderShapeTests`, `LinqDistinctByImplementationTests`, `LiveProviderDistinctByParityTests` |
+| `DefaultIfEmpty` standalone | ✅ | ✅ | ✅ | ✅ | ✅ | — | Post-materialization contract: non-empty sources unchanged; empty sources return one null/default element. Left-join DefaultIfEmpty is covered separately. | `LinqDefaultIfEmptyTests`, `LiveProviderDefaultIfEmptyParityTests` |
 
 ### Terminal operators
 
@@ -51,9 +55,11 @@ already exist, the linked file is the live-parity test that backs the claim.
 | `Single` / `SingleOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
 | `Last` / `LastOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Requires explicit OrderBy; flips ORDER BY direction to pick final row. | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests`, `LinqReverseAndLastTests` |
 | `ElementAt` / `ElementAtOrDefault` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Uses `OFFSET N ROWS FETCH NEXT 1 ROWS ONLY` (SqlServer) or `LIMIT 1 OFFSET N` (others). | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
-| `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `AnyAsync` on SQLite known mismatch — use `CountAsync() > 0`. | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
-| `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests` |
+| `Any` / `All` (predicate + parameterless) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
+| `Contains` (column-in-collection + collection-in-row) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null collection element split into `IS NULL` branch. | `TerminalOperatorParityTests`, `LiveProviderContainsParityTests` |
 | `Count` / `LongCount` (parameterless + predicate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderTerminalOpParityTests`, `TerminalOperatorParityTests` |
+| `MinBy` / `MaxBy` | ✅ | ✅ | ✅ | ✅ | ✅ | — | ORDER BY key ascending/descending plus one-row terminal read; empty source throws. | `LinqMinByMaxByTests`, `LiveProviderMinByMaxByParityTests` |
+| `AsAsyncEnumerable` streaming | ✅ | ✅ | ✅ | ✅ | ✅ | — | Streams ordinary query results and GroupJoin results; Include is rejected with `NormUnsupportedFeatureException` because eager loading needs dependent round trips. | `LiveProviderAsyncEnumerableParityTests`, `AsyncEnumerableTests`, `GroupJoinAsyncEnumerableTests` |
 
 ### Aggregates
 
@@ -61,23 +67,30 @@ already exist, the linked file is the live-parity test that backs the claim.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `Sum` / `Average` / `Min` / `Max` (scalar + selector) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Decimal coerced to REAL on SQLite — small float drift. | `LinqGroupAggregateComputedSelectorTests`, `LiveProviderShapeParityTests` |
 | `Sum`/`Min`/`Max`/`Avg` over decimal column | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite: REAL coercion. | `LiveProviderShapeParityTests` |
-| `Sum`/`Min`/`Max`/`Avg` over nullable columns | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Throws "no elements" when result is null & TResult is non-nullable value (commit 57). | `LinqOperatorCardinalityTests` |
+| `Sum`/`Min`/`Max`/`Avg` over nullable columns | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Throws "no elements" when result is null & TResult is non-nullable value (commit 57). | `LinqOperatorCardinalityTests`, `LiveProviderNullableAggregateParityTests` |
 | LINQ `Aggregate` sum-fold (1-arg + seed) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to synthesised `Sum(selector)` via Select-peel rewrite. | `LinqAggregateOperatorTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` min/max-fold (Math.Max/Min + Conditional) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `Max(selector)` / `Min(selector)`; seed acts as ceiling/floor. | `LinqAggregateMinMaxFoldTests`, `LiveProviderRecentScvParityTests` |
 | LINQ `Aggregate` string-concat fold (simple + seed-aware separator) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQL Server/Postgres/MySQL use native ordered aggregate (WITHIN GROUP / inline ORDER BY). SQLite uses outer ORDER BY to guide index scan order for GROUP_CONCAT. | `LinqAggregateStringConcatTests`, `LiveProviderRecentScvParityTests` |
-| LINQ `Aggregate` conditional-fold (`acc + (cond ? weight : 0)`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `SUM(CASE WHEN cond THEN weight ELSE 0 END)` via the existing Add-pattern rewrite. | `LinqAggregateConditionalFoldTests` |
+| LINQ `Aggregate` conditional-fold (`acc + (cond ? weight : 0)`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `SUM(CASE WHEN cond THEN weight ELSE 0 END)` via the existing Add-pattern rewrite. | `LinqAggregateConditionalFoldTests`, `LiveProviderRecentScvParityTests` |
 
 ### GroupBy / joins / set ops
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
+| `GroupBy` single key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Raw `GroupBy(key).ToListAsync()` returns `IGrouping<K,V>` via client-side grouping after provider fetch; aggregate projections remain server-side SQL GROUP BY. | `LiveProviderGroupByParityTests`, `LinqGroupByProjectionTests` |
 | `GroupBy` composite anon key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqCompositeGroupByTests`, `LinqGroupMultiAggregateTests` |
 | `GroupBy` HAVING (`Where(g => agg)`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderGroupByParityTests`, `LinqHavingTests` |
+| Navigation collection aggregates (`Children.Any` / `All` / `Count` / `LongCount`, including filtered count projection) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Emits correlated `EXISTS` / `NOT EXISTS` / scalar count subqueries from mapped navigation metadata. `All` preserves LINQ vacuous-truth semantics for parents with no children. | `LiveProviderNavigationAggregateParityTests`, `LinqNavigationAggregateTests`, `LinqMultiHopNavAggregateInProjectionTests` |
 | `Join` inner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderJoinSelectManyParityTests`, `CompiledJoinDiagnosticTest` |
 | `GroupJoin` simple key | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bounded by `MaxGroupJoinSize`. `CommandBehavior.SequentialAccess` replaced with `Default` to avoid backward-seek on Npgsql when innerKeyIndex > first inner col. | `LiveProviderJoinSelectManyParityTests`, `GroupJoinTests`, `GroupJoinCompiledMaterializerTests` |
-| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests` |
+| `SelectMany` cross / nav-join / nav + DefaultIfEmpty / query-syntax left join / correlated expansion | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Bare-MemberAccess selector covered by afef68a. Correlated query expansion lowers to INNER JOIN with the correlated predicate in ON. | `LiveProviderJoinSelectManyParityTests`, `SelectManyTests`, `LinqLeftJoinTests`, `LinqCrossJoinTests`, `LinqCorrelatedSelectManyTests` |
+| Window functions (`WithRowNumber` / `WithRank` / `WithDenseRank` / `WithLag` / `WithLead`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Use explicit OrderBy/ThenBy before the window call for deterministic results. | `LiveProviderJsonWindowParityTests`, `QueryTranslatorCrossProviderTests`, `WindowFunctionParameterTests` |
+| `Include` / `ThenInclude` with `AsSplitQuery` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Eager loading is explicit: Include without `AsSplitQuery` leaves navigation collections at defaults; split-query Include loads collection navigations and nested ThenInclude paths. | `LiveProviderIncludeParityTests`, `LinqMultiLevelIncludeTests`, `IncludeContractTests` |
+| Raw SQL composition (`FromSqlRawAsync<T>`, `FromSqlInterpolatedAsync<T>`, `QueryUnchangedInterpolatedAsync<T>`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Provider-bound compatibility API, not generated provider-mobile surface. Caller owns SQL shape and tenant predicates; nORM validates the query gate and binds values through provider parameters. `UseStrictProviderMobility()` rejects this path before execution. | `LiveProviderRawSqlParityTests`, `RawSqlNameBasedMaterializationTests`, `TransactionIsolationTests` |
+| `ExecuteUpdateAsync` / `ExecuteDeleteAsync` filtered and join-sourced, including composite PK | ✅ | ✅ | ✅ | ✅ | ✅ | — | Composite-PK join-source CUD uses row-tuple IN on SQLite/Postgres/MySQL and a JOIN target form on SQL Server. Grouped/ordered/distinct/paged/aggregated CUD remains rejected. | `LiveProviderCompositePkBulkCudParityTests`, `ExecuteDeleteUpdateJoinSourceTests`, `LinqCompositePkExecuteCudTests` |
 | `Union` / `Intersect` / `Except` / `Concat` (incl. ordered/paged tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Trailing `Where` wraps as derived table. `Intersect`/`Except` require MySQL 8.0+; nORM's `MySqlProvider` gate blocks 5.x. | `LiveProviderSetOpParityTests`, `QueryTranslatorCrossProviderTests`, `LinqSetOpCompositionTests` |
+| Keyed set operators (`ExceptBy`, `IntersectBy`, `UnionBy`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ExceptBy`/`IntersectBy` local key-set overloads lower to provider-side `IN`/`NOT IN` plus server-side `DistinctBy`. `UnionBy` local entity sequences are parameterized as a derived table before row-number key dedupe. | `DistinctByProviderShapeTests`, `LinqExceptByIntersectByUnionByImplementationTests`, `LiveProviderDistinctByParityTests` |
+| `OfType<T>` / `Cast<T>` identity plus TPH derived filter | ✅ | ✅ | ✅ | ✅ | ✅ | — | Constrained to identity/base casts and `[DiscriminatorColumn]` + `[DiscriminatorValue]` TPH derived filters. Unsupported downcasts throw deterministically. | `LiveProviderOfTypeParityTests`, `LinqCastOfTypeTests`, `LinqUnsupportedShapeContractTests` |
 
 ### Post-Take/Skip family (silent-wrongness pins)
 
@@ -90,42 +103,56 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `string` methods (Contains, StartsWith, EndsWith, Substring, Trim*, Concat, Compare, ToUpper/Lower, char.ToUpperInvariant) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `TypeConversionParityTests` |
+| `string` methods (Contains, StartsWith, EndsWith, Substring, Trim*, Replace, IndexOf, Concat, Compare, CompareOrdinal, CompareTo, ToUpper/Lower, char.ToUpperInvariant, `string.Format`, interpolated projections) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `string.Format` support is the documented constant-template subset from `linq-support.md`. `string.Compare` includes literal/captured `StringComparison` and `bool ignoreCase` modes. `CompareOrdinal`, `IndexOf(value, StringComparison)`, and case-sensitive `Replace(old,new,StringComparison)` have all-four live evidence. | `LiveProviderShapeParityTests`, `TypeConversionParityTests`, `LiveProviderCharStringPredicateParityTests`, `LiveProviderValueFunctionParityTests`, `LiveProviderStringFunctionParityTests`, `LiveProviderStringFormatParityTests` |
+| `Regex.IsMatch` simple provider-mobile subset | ✅ | ✅ | ✅ | ✅ | ✅ | — | Constrained row: PostgreSQL/MySQL have native regex predicates; SQLite uses deterministic nORM-registered managed `REGEXP`; SQL Server lowers the documented ASCII-safe subset to `LIKE` / `LEN` / `RIGHT` predicates, including anchored class-plus-fixed-suffix shapes such as `^[A-Z]+\d{2}$`, and throws for complex regex constructs. | `RegexIsMatchProviderShapeTests`, `RegexOptionsCaseInsensitiveProviderShapeTests`, `LiveProviderRegexIsMatchParityTests` |
+| `Regex.Replace` literal provider-mobile subset | ✅ | ✅ | ✅ | ✅ | ✅ | — | Constrained row: PostgreSQL/MySQL have native regex-replace primitives; SQLite uses deterministic nORM-registered managed `regexp_replace`; SQL Server lowers literal-pattern/literal-replacement shapes to `REPLACE` and throws for regex constructs, captures, or replacement substitutions. | `RegexReplaceProviderShapeTests`, `RegexOptionsCaseInsensitiveProviderShapeTests`, `LiveProviderRegexIsMatchParityTests` |
 | `char.IsDigit` / `char.IsLetter` / `char.IsWhiteSpace` on column character | ✅ | ✅ | ✅ | ✅ | ✅ | — | ASCII-range BETWEEN comparisons; Unicode characters outside ASCII are not matched. | `LiveProviderCharStringPredicateParityTests` |
 | `string.IsNullOrEmpty` / `string.IsNullOrWhiteSpace` on nullable column | ✅ | ✅ | ✅ | ✅ | ✅ | — | `IsNullOrEmpty` uses `DATALENGTH(col) = 0` on SQL Server (trailing-space equality rule makes `'   ' = ''` TRUE on SQL Server). All others use `col = ''`. `IsNullOrWhiteSpace` uses `LTRIM(RTRIM(col)) = ''` on all providers. | `LiveProviderCharStringPredicateParityTests`, `LinqWhereStringIsNullOrEmptyTests` |
 | `string.Length` comparison (`col.Length > N`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite/Postgres: `LENGTH`; SQL Server: `LEN`; MySQL: `CHAR_LENGTH`. | `LiveProviderCharStringPredicateParityTests` |
-| `DateTime` arithmetic, parts, AddDays/Months/Years/Hours/Minutes/Seconds | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
-| `DateOnly` / `TimeOnly` arithmetic + parts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityDepthTests` |
-| `TimeSpan` column ops (Total*, components, Negate/Duration/unary-negate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqTimeSpanInstanceNegateAndAbsTests` (SQLite); cross-provider via `ProviderParityDepthTests` |
+| `Convert.ToInt32` / `ToInt64` / `ToString` / `ToBoolean` / `ToDouble` / `ToDecimal` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Uses provider-specific casts; string-to-bool matches case-insensitive `true` semantics. | `LiveProviderConvertFunctionParityTests`, `LinqConversionAndCompareTests` |
+| `Math` functions (`Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate`) | ✅ | ✅ | ✅ | ✅ | ✅ | — | `Sqrt` is NULL-guarded on SQL Server/PostgreSQL so negative non-matching rows do not abort predicates. MySQL banker-rounding uses `CAST(... AS SIGNED)`. | `LinqMathFunctionTranslationTests`, `LiveProviderValueFunctionParityTests` |
+| Conditional expressions and arithmetic operators in predicates/projections/aggregate selectors | ✅ | ✅ | ✅ | ✅ | ✅ | — | Conditional expressions lower to `CASE WHEN`; arithmetic uses provider numeric semantics. | `LiveProviderConditionalArithmeticParityTests`, `LinqEnumAndConditionalTests`, `LinqGroupAggregateComputedSelectorTests` |
+| `DateTime` arithmetic, parts, AddDays/Months/Years/Hours/Minutes/Seconds, `UtcNow`/`Now`/`Today` static values | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `UtcNow`/`Now`/`Today` are captured as bound client parameters, not database clock functions. | `ProviderParityDepthTests`, `LiveProviderValueFunctionParityTests`, `LiveProviderStaticValuePredicateParityTests` |
+| `DateOnly` / `TimeOnly` arithmetic + parts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Native provider `DateOnly`/`TimeOnly` values materialize directly; SQLite text values parse through invariant culture. | `ProviderParityDepthTests`, `LiveProviderValueFunctionParityTests` |
+| `TimeSpan` column ops (Total*, components, Negate/Duration/unary-negate) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQL Server `TIME` columns are time-of-day values; live component/Total* parity is pinned for sub-day durations. | `LiveProviderTimeSpanMemberParityTests`, `LinqTimeSpanInstanceNegateAndAbsTests` |
 | `TimeSpan` col `<`/`>`/`<=`/`>=`/`==` col (cross-column ordering) | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite TEXT lex-ordering is wrong for multi-day; `NormalizeTimeSpanForCompare` converts both sides to fractional seconds. SQL Server/Postgres/MySQL use native types. | `LinqTimeSpanColumnComparisonTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `DateTime` - `DateTime` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Julianday delta on SQLite (sub-second precision). | `ProviderParityDepthTests` |
-| `DateTimeOffset.UtcDateTime` / `.LocalDateTime` / `.ToOffset` | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ (Local: ⚠️ DST snapshot) | ✅ | — | LocalDateTime uses snapshot offset, not per-instant historical TZ. | `LinqDateTimeOffsetLocalDateTimeTests`, `LinqDateTimeOffsetLocalDateTimeInWhereTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `DateTimeOffset` col `==` / `!=` DateTime literal (UTC-instant equality) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Second-resolution; sub-second fidelity is future work. MySQL hook uses `TIMESTAMPDIFF(SECOND,'1970-01-01',col)` to avoid session-TZ dependence of `UNIX_TIMESTAMP`. | `LinqDateTimeOffsetEqualsDateTimeLiteralTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `DateTimeOffset` col >/</>=/<= DateTime literal | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Existing `NormalizeDateTimeForCompare` covers it. | `ProviderParityDepthTests` |
-| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | — | Integer epoch-seconds diff for second-resolution accuracy. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTime` - `DateTime` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite uses julianday REAL arithmetic; assertions allow 1ms tolerance. SQL Server/MySQL use microsecond diff hooks. | `ProviderParityDepthTests`, `LiveProviderDateTimeSubtractionPrecisionTests` |
+| `DateTimeOffset.UtcDateTime` / `.LocalDateTime` / `.ToOffset` | ✅ | ✅ | ✅ | ✅ | ✅ | — | LocalDateTime uses nORM-generated `TimeZoneInfo.Local` offset ranges for per-instant DST-aware behavior in the documented 1900-2100 range; outside that range it falls back to the current local offset. | `LinqDateTimeOffsetLocalDateTimeTests`, `LinqDateTimeOffsetLocalDateTimeInWhereTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTimeOffset` col `==` / `!=` DateTime literal (UTC-instant equality) | ✅ | ✅ | ✅ | ✅ | ✅ | — | Microsecond-resolution; full .NET 100ns tick equality is not portable. MySQL hook uses `TIMESTAMPDIFF(MICROSECOND,'1970-01-01',col)` to avoid session-TZ dependence of `UNIX_TIMESTAMP`. | `LinqDateTimeOffsetEqualsDateTimeLiteralTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `DateTimeOffset` members and col >/</>=/<= DateTime literal | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | DateTime literal comparisons normalize to UTC-instant ordering. | `LiveProviderDateTimeOffsetMemberParityTests`, `ProviderParityDepthTests` |
+| `DateTimeOffset` - `DateTimeOffset` → TimeSpan | ✅ | ✅ | ✅ | ✅ | ✅ | — | Epoch-microsecond diff; assertions allow sub-microsecond floating-point tolerance. | `LinqDateTimeOffsetColumnSubtractionTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `DateTimeOffset` col +/- `TimeSpan` col | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite preserves original offset via substr-suffix hook. | `LinqDateTimeOffsetPlusTimeSpanColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `decimal` comparisons, ordering, aggregates, distinct, set ops | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite REAL coercion documented. | `TypeConversionParityTests`, `LiveProviderShapeParityTests` |
-| `Guid` comparisons, equality, IN | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqGuidAndDistinctTests`, `TypeConversionParityTests` |
-| `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests` |
-| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | Lowers to `(col IN ('Name1', ...))`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
+| `Guid` comparisons, equality, IN, static constants, `Guid.NewGuid()` server generation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `Guid.NewGuid()` is a database execution-time value using `NEWID()`, `gen_random_uuid()`, `UUID()`, or canonical SQLite random GUID text; precompute in CLR when one fixed value should be reused across the whole query. | `GuidNewGuidProviderShapeTests`, `LinqGuidAndDistinctTests`, `TypeConversionParityTests`, `LiveProviderStaticValuePredicateParityTests` |
+| `Json.Value<T>(jsonColumn, constantPath)` | ✅ | ✅ | ✅ | ✅ | ✅ | — | SQLite requires JSON1; JSON path must be constant and validated before SQL generation. | `LiveProviderJsonWindowParityTests`, `JsonPathValidationTests` |
+| `enum` comparisons, ToString, Parse, IsDefined, HasFlag | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqEnumAndConditionalTests`, `LinqEnumToStringTests`, `LiveProviderEnumParityTests` |
+| `Enum.TryParse<T>(col, out _)` parseability check | ✅ | ✅ | ✅ | ✅ | ✅ | — | 2-arg lowers to a provider-forced case-sensitive enum-name comparison; 3-arg constant/captured `ignoreCase` lowers to `LOWER(col) IN (...)`. | `LinqEnumTryParseOutParamTests` (SQLite), `LiveProviderRecentScvParityTests` |
 | `Convert.ChangeType(col, typeof(T))` | ✅ | ✅ | ✅ | ✅ | ✅ | — | Type-constant second arg pattern-matched; runtime-variable target type unsupported. | `LinqConvertChangeTypeOnColumnTests` (SQLite), `LiveProviderRecentScvParityTests` |
-| `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests` |
-| local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderShapeParityTests` |
+| `NormFunctions.Like` / `NormFunctions.ILike` | ✅ | ✅ | ✅ | ✅ | ✅ | — | `Like` does not auto-escape SQL wildcards. `ILike` uses native PostgreSQL `ILIKE`; other providers use `LOWER(value) LIKE LOWER(pattern)`. | `LiveProviderNormFunctionsLikeParityTests`, `LinqNormFunctionsLikeTests`, `LinqWhereNormIlikeTests` |
+| `bool?` / nullable predicates (three-valued logic) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LinqPagingAndNullableBoolTests`, `LiveProviderNullableBoolParityTests` |
+| local collection `Contains` (incl. nulls) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Null-bearing collection expands to `(col IN (…) OR col IS NULL)`. | `LiveProviderContainsParityTests` |
 
 ### Compiled-query parity
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Tests |
 | --- | --- | --- | --- | --- | --- |
-| Compiled-query equivalent of every runtime row above | ✅ for the existing matrix; SCV additions (DTO ops, Enum.TryParse, Convert.ChangeType, Aggregate folds, Post-Take/Skip family) are marked `—` — compiled form not required. | | | | `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
+| Compiled-query rows marked ✅ in the matrix above | ✅ | ✅ | ✅ | ✅ | `LiveProviderCompiledQueryParityTests`, `CompileTimeQueryParameterParityTests`, `LinqCompiledQueryExpandedParityTests`, `CompiledQuerySqlShapeParityTests` |
 
-## Open parity gaps (🚧)
+Rows marked `—` in the Compiled column are runtime-only v1 contracts, not
+implicit compiled-query claims. Coverage rows are not substitutes for live
+provider gates: each v1-green row above must cite a live-provider test for SQL
+Server, SQLite, PostgreSQL, and MySQL. `docs/linq-support-coverage.md` remains
+the supplemental provider-neutral test map, not the evidence used to promote a
+row in this live parity report.
+
+## Parity gap tracking
 
 No open 🚧 rows remain in the matrix above. Every row is either ✅ (passes on all
 four live providers) or ⚠️ (passes with a documented deterministic caveat).
 
-The compiled-query row carries a note that SCV-additions features are intentionally
-marked `—` in the Compiled column — their query shape is not supported in the
-compiled-query path, which is consistent with their individual row entries.
+Rows with `—` in the Compiled column are intentionally excluded from the v1
+compiled-query contract. If one of those shapes is promoted later, add a focused
+compiled-query live-provider test and flip the row in the same commit.
 
 When a future addition creates a new 🚧, add it here with a root-cause note and
 flip it to ✅/⚠️ in the same commit once the live tests pass.

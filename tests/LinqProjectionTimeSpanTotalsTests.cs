@@ -128,6 +128,86 @@ public class LinqProjectionTimeSpanTotalsTests : IAsyncLifetime
         Assert.Equal(new[] { 2, 3, 5 }, result.Select(r => r.Id).ToArray());
     }
 
+    [Fact]
+    public async Task Select_column_TimeSpan_TotalDays_projects_fractional_days()
+    {
+        // Row 1 = 30min = 30/1440 days; Row 3 = 2h = 2/24 days.
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, D = i.Duration.TotalDays })
+            .ToListAsync();
+        Assert.Equal(5, result.Count);
+        Assert.Equal(30.0 / 1440.0, result[0].D, 10);
+        Assert.Equal(2.0 / 24.0,    result[2].D, 10);
+    }
+
+    [Fact]
+    public async Task Select_column_TimeSpan_TotalMilliseconds_projects_total_ms()
+    {
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, Ms = i.Duration.TotalMilliseconds })
+            .ToListAsync();
+        Assert.Equal(5, result.Count);
+        Assert.Equal(1_800_000.0, result[0].Ms);
+        Assert.Equal(45_000.0,    result[3].Ms);
+    }
+
+    [Fact]
+    public async Task Select_column_TimeSpan_Days_projects_integer_day_component()
+    {
+        // Row 1..5 are all sub-day, so .Days == 0 for all.
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, D = i.Duration.Days })
+            .ToListAsync();
+        Assert.All(result, r => Assert.Equal(0, r.D));
+    }
+
+    [Fact]
+    public async Task Select_column_TimeSpan_Hours_projects_hour_component()
+    {
+        // 0:30 -> Hours=0; 1:30 -> Hours=1; 2:00 -> Hours=2; 0:00:45 -> Hours=0; 3:15:30 -> Hours=3
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, H = i.Duration.Hours })
+            .ToListAsync();
+        Assert.Equal(new[] { 0, 1, 2, 0, 3 }, result.Select(r => r.H).ToArray());
+    }
+
+    [Fact]
+    public async Task Select_column_TimeSpan_Minutes_projects_minute_component()
+    {
+        // 0:30 -> Minutes=30; 1:30 -> Minutes=30; 2:00 -> Minutes=0; 0:00:45 -> Minutes=0; 3:15:30 -> Minutes=15
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, M = i.Duration.Minutes })
+            .ToListAsync();
+        Assert.Equal(new[] { 30, 30, 0, 0, 15 }, result.Select(r => r.M).ToArray());
+    }
+
+    [Fact]
+    public async Task Select_column_TimeSpan_Seconds_projects_seconds_component()
+    {
+        // 0:30:00 -> Seconds=0; 3:15:30 -> Seconds=30; 0:00:45 -> Seconds=45
+        var result = await _ctx.Query<PttItem>()
+            .OrderBy(i => i.Id)
+            .Select(i => new { i.Id, S = i.Duration.Seconds })
+            .ToListAsync();
+        Assert.Equal(new[] { 0, 0, 0, 45, 30 }, result.Select(r => r.S).ToArray());
+    }
+
+    [Fact]
+    public async Task Where_column_TimeSpan_Hours_filters_by_hour_component()
+    {
+        // Only rows with Hours >= 2: Id 3 (2h), Id 5 (3h15m30s).
+        var result = await _ctx.Query<PttItem>()
+            .Where(i => i.Duration.Hours >= 2)
+            .OrderBy(i => i.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 3, 5 }, result.Select(r => r.Id).ToArray());
+    }
+
     [Table("PttItem")]
     public sealed class PttItem
     {

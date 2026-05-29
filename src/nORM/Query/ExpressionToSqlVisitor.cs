@@ -90,6 +90,31 @@ namespace nORM.Query
             }
             return false;
         }
+        private static bool TryResolveStringCompareMode(Expression comparisonArg, out bool ignoreCase, out bool forceCaseSensitive)
+        {
+            ignoreCase = false;
+            forceCaseSensitive = false;
+            if (!TryGetConstantValue(comparisonArg, out var v))
+                return false;
+
+            if (v is bool boolIgnoreCase)
+            {
+                ignoreCase = boolIgnoreCase;
+                forceCaseSensitive = !boolIgnoreCase;
+                return true;
+            }
+
+            if (v is StringComparison sc)
+            {
+                ignoreCase = sc is StringComparison.OrdinalIgnoreCase
+                    or StringComparison.InvariantCultureIgnoreCase
+                    or StringComparison.CurrentCultureIgnoreCase;
+                forceCaseSensitive = !ignoreCase;
+                return true;
+            }
+
+            return false;
+        }
         internal ExpressionToSqlVisitor() { }
         public ExpressionToSqlVisitor(DbContext ctx, TableMapping mapping, DatabaseProvider provider,
                                       ParameterExpression parameter, string tableAlias,
@@ -456,6 +481,9 @@ namespace nORM.Query
                     return Visit(asContains);
                 }
             }
+            if (TryEmitDateTimeOffsetLiteralComparison(node))
+                return node;
+
             if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
             {
                 bool leftNull  = IsNullExpression(node.Left);
@@ -482,15 +510,15 @@ namespace nORM.Query
                 // For reference types (string, class): only expand when BOTH sides could be null
                 // at runtime (i.e., neither side is a known non-null constant or parameter).
                 // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
-                // DateTimeOffset col == DateTime literal: SQLite stores DTOs as
+                // DateTimeOffset col vs DateTime literal: SQLite stores DTOs as
                 // text with an offset suffix and the literal binds as offset-less
                 // text, so naive equality misses rows storing the same UTC instant
-                // in a different offset. Lower to UTC epoch-seconds comparison via
+                // in a different offset. Lower to UTC epoch-microsecond comparison via
                 // a provider hook. .NET's DateTime→DateTimeOffset implicit conv
                 // treats Utc-kind as offset 0 and Unspecified/Local as the local
-                // offset (we use the snapshot offset, consistent with
-                // GetDateTimeOffsetLocalDateTimeSql).
-                if (TryEmitDateTimeOffsetEqualsLiteral(node))
+                // offset. LocalDateTime member access uses a full offset-range
+                // CASE expression; DateTime literals remain a single value.
+                if (TryEmitDateTimeOffsetLiteralComparison(node))
                     return node;
 
                 if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
@@ -1047,18 +1075,21 @@ namespace nORM.Query
 
         protected override Expression VisitMember(MemberExpression node)
         {
+            if (node.Expression == null && node.Member.DeclaringType == typeof(Guid) && node.Member.Name == nameof(Guid.Empty))
+            {
+                _sql.Append('\'').Append(Guid.Empty.ToString("D", CultureInfo.InvariantCulture)).Append('\'');
+                return node;
+            }
             // dtoCol.LocalDateTime — sister of the projection-side handler in
-            // SelectClauseVisitor (1f06ac1). Snapshot semantics: local offset
-            // captured at query-build time and baked into the SQL shift.
-            // See [[dto-local-datetime]] for the DST trade-off.
+            // SelectClauseVisitor (1f06ac1). Per-instant local timezone semantics are lowered through
+            // DateTimeOffsetLocalTimeSql using TimeZoneInfo.Local offset ranges.
             if (node.Member.Name == nameof(DateTimeOffset.LocalDateTime)
                 && node.Member.DeclaringType == typeof(DateTimeOffset)
                 && node.Expression != null
                 && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(DateTimeOffset))
             {
                 var dtoSql = GetSql(node.Expression);
-                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-                _sql.Append(_provider.GetDateTimeOffsetLocalDateTimeSql(dtoSql, localOffset));
+                _sql.Append(DateTimeOffsetLocalTimeSql.Build(_provider, dtoSql));
                 return node;
             }
             // `entity.GetType().Name/FullName/Namespace/AssemblyQualifiedName` --
@@ -1108,6 +1139,22 @@ namespace nORM.Query
                 {
                     return node;
                 }
+            }
+
+            // TimeSpan stored-column member access: r.Duration.TotalSeconds, .Days, etc.
+            // The subtraction path above handles (end - start).MemberName. This path handles
+            // a mapped column (or any non-subtraction expression) whose CLR type is TimeSpan.
+            // GetTimeSpanColumnSecondsSql wraps the column reference in provider-specific SQL
+            // that evaluates to total fractional seconds, then TryEmitTimeSpanMemberFromSeconds
+            // applies the same unit-conversion math as the subtraction path.
+            if (node.Expression != null
+                && !(node.Expression is BinaryExpression { NodeType: ExpressionType.Subtract })
+                && (Nullable.GetUnderlyingType(node.Expression.Type) ?? node.Expression.Type) == typeof(TimeSpan))
+            {
+                var storedColSql = GetSql(node.Expression);
+                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(storedColSql);
+                if (TryEmitTimeSpanMemberFromSeconds(node.Member.Name, secondsSql))
+                    return node;
             }
 
             // Nullable<T> structural members: HasValue -> IS NOT NULL, Value -> operand itself.
@@ -1459,6 +1506,30 @@ namespace nORM.Query
             }
         }
 
+        private string GetRegexPatternSql(Expression patternExpr)
+        {
+            if (_provider is SqlServerProvider
+                && TryGetConstantValue(patternExpr, out var raw)
+                && raw is string pattern)
+            {
+                return "\'" + pattern.Replace("\'", "\'\'") + "\'";
+            }
+
+            return GetSql(patternExpr);
+        }
+
+        private string GetRegexReplacementSql(Expression replacementExpr)
+        {
+            if (_provider is SqlServerProvider
+                && TryGetConstantValue(replacementExpr, out var raw)
+                && raw is string replacement)
+            {
+                return "\'" + replacement.Replace("\'", "\'\'") + "\'";
+            }
+
+            return GetSql(replacementExpr);
+        }
+
         private static bool TryGetConstantValue(Expression expr, out object? value)
         {
             value = null;
@@ -1530,6 +1601,21 @@ namespace nORM.Query
                 _sql.Append("(NOT(");
                 Visit(node.Operand);
                 _sql.Append("))");
+                return node;
+            }
+            if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
+            {
+                var operandType = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (operandType == typeof(TimeSpan))
+                {
+                    var operandSql = GetSql(node.Operand);
+                    _sql.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(operandSql)).Append(')');
+                    return node;
+                }
+
+                _sql.Append("-(");
+                Visit(node.Operand);
+                _sql.Append(')');
                 return node;
             }
             // Numeric / enum conversions in projections: (int)entity.Status, (long)e.Count, etc.
@@ -1679,7 +1765,7 @@ namespace nORM.Query
                     && optsRaw is System.Text.RegularExpressions.RegexOptions opts
                     && (opts & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0;
                 var inputSql = GetSql(node.Arguments[0]);
-                var patternSql = GetSql(node.Arguments[1]);
+                var patternSql = GetRegexPatternSql(node.Arguments[1]);
                 _sql.Append(ignoreCase
                     ? _provider.GetRegexMatchIgnoreCaseSql(inputSql, patternSql)
                     : _provider.GetRegexMatchSql(inputSql, patternSql));
@@ -1698,8 +1784,8 @@ namespace nORM.Query
                     && optsR is System.Text.RegularExpressions.RegexOptions optsR2
                     && (optsR2 & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0;
                 var inputSql = GetSql(node.Arguments[0]);
-                var patternSql = GetSql(node.Arguments[1]);
-                var replSql = GetSql(node.Arguments[2]);
+                var patternSql = GetRegexPatternSql(node.Arguments[1]);
+                var replSql = GetRegexReplacementSql(node.Arguments[2]);
                 _sql.Append(ignoreCase
                     ? _provider.GetRegexReplaceIgnoreCaseSql(inputSql, patternSql, replSql)
                     : _provider.GetRegexReplaceSql(inputSql, patternSql, replSql));
@@ -2129,20 +2215,26 @@ namespace nORM.Query
             // predicate "is parseable" check. Lower to col IN ('Name1', ...).
             // The out parameter is ignored at the SQL level; callers wanting
             // the parsed value should use Enum.Parse<T> or write
-            // `col == "Active"` directly. Case sensitivity: SQLite TEXT
-            // comparison is binary by default which matches Enum.Parse's
-            // case-sensitive overload; the 3-arg ignoreCase form is not
-            // recognised here (use upper(col) IN (...) for case-insensitive).
+            // `col == "Active"` directly. The 3-arg ignoreCase overload is
+            // supported when the bool is a constant/captured value.
             if (node.Method.Name == nameof(Enum.TryParse)
                 && node.Method.DeclaringType == typeof(Enum)
                 && node.Method.IsGenericMethod
                 && node.Method.GetGenericArguments() is { Length: 1 } tryParseGenericArgs
                 && tryParseGenericArgs[0].IsEnum
-                // 2-arg form: TryParse<T>(string, out T). 3-arg ignoreCase form
-                // not supported — fall through.
-                && node.Arguments.Count == 2)
+                // 2-arg form: TryParse<T>(string, out T). 3-arg form:
+                // TryParse<T>(string, ignoreCase, out T).
+                && (node.Arguments.Count == 2 || node.Arguments.Count == 3))
             {
                 var nameSql = GetSql(node.Arguments[0]);
+                var ignoreCase = false;
+                if (node.Arguments.Count == 3)
+                {
+                    if (!TryGetConstantValue(node.Arguments[1], out var ignoreCaseRaw) || ignoreCaseRaw is not bool ignoreCaseValue)
+                        throw new NormUnsupportedFeatureException("Enum.TryParse<T>(value, ignoreCase, out result) requires a constant or captured ignoreCase value.");
+                    ignoreCase = ignoreCaseValue;
+                }
+
                 var names = Enum.GetNames(tryParseGenericArgs[0]);
                 if (names.Length == 0)
                 {
@@ -2150,11 +2242,13 @@ namespace nORM.Query
                 }
                 else
                 {
-                    _sql.Append("(").Append(nameSql).Append(" IN (");
+                    var compareSql = ignoreCase ? $"LOWER({nameSql})" : _provider.ForceCaseSensitiveStringComparison(nameSql);
+                    _sql.Append("(").Append(compareSql).Append(" IN (");
                     for (int i = 0; i < names.Length; i++)
                     {
                         if (i > 0) _sql.Append(", ");
-                        _sql.Append('\'').Append(names[i].Replace("'", "''")).Append('\'');
+                        var name = ignoreCase ? names[i].ToLowerInvariant() : names[i];
+                        _sql.Append('\'').Append(name.Replace("'", "''")).Append('\'');
                     }
                     _sql.Append("))");
                 }
@@ -2184,14 +2278,14 @@ namespace nORM.Query
                 return node;
             }
             if (!IsTranslatableMethod(node.Method))
-                // ErrorMessages.QueryTranslationFailed is "Failed to translate LINQ query to SQL: {0}".
-                // The {0} argument below is a detail message, not a duplicate prefix.
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Method '{node.Method.Name}' cannot be translated to SQL"));
+                throw new NormUnsupportedFeatureException(
+                    $"Method '{node.Method.Name}' cannot be translated to SQL by the nORM v1 query translator. " +
+                    "See docs/linq-support.md for the supported method matrix.");
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
                 return TranslateWithNullCheck(node);
             }
-            if (TryGetConstantValueSafe(node, out var constVal))
+            if (!IsNonDeterministicServerMethod(node.Method) && TryGetConstantValueSafe(node, out var constVal))
             {
                 return CreateSafeParameter(constVal);
             }
@@ -2327,14 +2421,35 @@ namespace nORM.Query
                     }
                     return node;
                 }
-                // static string.Compare(a, b) and instance a.CompareTo(b) -> CASE WHEN a<b THEN -1 WHEN a>b THEN 1 ELSE 0 END
-                if (node.Method.Name == nameof(string.Compare) || node.Method.Name == nameof(string.CompareTo))
+                // static string.Compare(a, b), string.Compare(a, b, StringComparison),
+                // string.Compare(a, b, bool ignoreCase), string.CompareOrdinal(a, b), and instance a.CompareTo(b)
+                // -> CASE WHEN a<b THEN -1 WHEN a>b THEN 1 ELSE 0 END. The comparison
+                // mode must be a literal or closure value so translation is fixed at
+                // query-build time rather than changing collation semantics per row.
+                if (node.Method.Name == nameof(string.Compare) || node.Method.Name == nameof(string.CompareTo) || node.Method.Name == nameof(string.CompareOrdinal))
                 {
                     string lhs, rhs;
-                    if (node.Object == null && node.Arguments.Count == 2)
+                    bool ignoreCase = false;
+                    bool forceCaseSensitive = false;
+                    if (node.Object == null && node.Method.Name == nameof(string.CompareOrdinal) && node.Arguments.Count == 2)
                     {
                         lhs = GetSql(node.Arguments[0]);
                         rhs = GetSql(node.Arguments[1]);
+                        forceCaseSensitive = true;
+                    }
+                    else if (node.Object == null && node.Arguments.Count is 2 or 3)
+                    {
+                        lhs = GetSql(node.Arguments[0]);
+                        rhs = GetSql(node.Arguments[1]);
+                        if (node.Arguments.Count == 3)
+                        {
+                            if (!TryResolveStringCompareMode(node.Arguments[2], out ignoreCase, out forceCaseSensitive))
+                            {
+                                throw new NormUnsupportedFeatureException(
+                                    "string.Compare comparison mode must be a constant or captured bool/StringComparison value.");
+                            }
+                            ReserveCompiledParamSlotIfClosure(this, node.Arguments[2]);
+                        }
                     }
                     else if (node.Object != null && node.Arguments.Count == 1)
                     {
@@ -2345,6 +2460,16 @@ namespace nORM.Query
                     {
                         throw new NormUnsupportedFeatureException(
                             $"Overload of {node.Method.Name} with {node.Arguments.Count} arguments is not supported.");
+                    }
+                    if (ignoreCase)
+                    {
+                        lhs = $"LOWER({lhs})";
+                        rhs = $"LOWER({rhs})";
+                    }
+                    else if (forceCaseSensitive)
+                    {
+                        lhs = _provider.ForceCaseSensitiveStringComparison(lhs);
+                        rhs = _provider.ForceCaseSensitiveStringComparison(rhs);
                     }
                     _sql.Append("(CASE WHEN ").Append(lhs).Append(" < ").Append(rhs)
                         .Append(" THEN -1 WHEN ").Append(lhs).Append(" > ").Append(rhs)
@@ -2465,6 +2590,70 @@ namespace nORM.Query
                     _sql.Append(concatSql);
                     return node;
                 }
+                if (node.Object != null
+                    && node.Method.Name == nameof(string.IndexOf)
+                    && node.Arguments.Count == 2
+                    && node.Arguments[1].Type == typeof(StringComparison))
+                {
+                    if (!TryResolveStringCompareMode(node.Arguments[1], out var ignoreCase, out var forceCaseSensitive))
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "string.IndexOf comparison mode must be a constant or captured StringComparison value.");
+                    }
+                    ReserveCompiledParamSlotIfClosure(this, node.Arguments[1]);
+                    var haystack = GetSql(node.Object);
+                    var needle = GetSql(node.Arguments[0]);
+                    if (ignoreCase)
+                    {
+                        haystack = $"LOWER({haystack})";
+                        needle = $"LOWER({needle})";
+                    }
+                    else if (forceCaseSensitive)
+                    {
+                        haystack = _provider.ForceCaseSensitiveStringComparison(haystack);
+                        needle = _provider.ForceCaseSensitiveStringComparison(needle);
+                    }
+                    var indexOfSql = _provider.TranslateFunction(nameof(string.IndexOf), typeof(string), haystack, needle);
+                    if (indexOfSql != null)
+                    {
+                        _sql.Append(indexOfSql);
+                        return node;
+                    }
+                    throw new NormUnsupportedFeatureException("string.IndexOf(value, StringComparison) is not supported by this provider.");
+                }
+                if (node.Object != null
+                    && node.Method.Name == nameof(string.Replace)
+                    && node.Arguments.Count == 3
+                    && node.Arguments[2].Type == typeof(StringComparison))
+                {
+                    if (!TryResolveStringCompareMode(node.Arguments[2], out var ignoreCase, out _))
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "string.Replace comparison mode must be a constant or captured StringComparison value.");
+                    }
+                    ReserveCompiledParamSlotIfClosure(this, node.Arguments[2]);
+                    if (ignoreCase)
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "string.Replace(old, new, StringComparison) with an ignore-case mode is not provider-mobile: " +
+                            "native REPLACE primitives do not preserve .NET's case-insensitive replacement semantics on every provider.");
+                    }
+                    var source = GetSql(node.Object);
+                    var oldValue = GetSql(node.Arguments[0]);
+                    var newValue = GetSql(node.Arguments[1]);
+                    if (_provider is SqlServerProvider)
+                    {
+                        source = _provider.ForceCaseSensitiveStringComparison(source);
+                        oldValue = _provider.ForceCaseSensitiveStringComparison(oldValue);
+                    }
+                    var replaceSql = _provider.TranslateFunction(nameof(string.Replace), typeof(string), source, oldValue, newValue);
+                    if (replaceSql != null)
+                    {
+                        _sql.Append(replaceSql);
+                        return node;
+                    }
+                    throw new NormUnsupportedFeatureException("string.Replace(old, new, StringComparison) is not supported by this provider.");
+                }
                 var strArgs = new List<string>();
                 if (node.Object != null)
                     strArgs.Add(GetSql(node.Object));
@@ -2481,45 +2670,49 @@ namespace nORM.Query
             if (node.Method.DeclaringType == typeof(Convert) && node.Arguments.Count == 1)
             {
                 var inner = GetSql(node.Arguments[0]);
-                var sqlType = node.Method.Name switch
+                var convertSql = node.Method.Name switch
                 {
-                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => "INTEGER",
-                    nameof(Convert.ToInt64) => "BIGINT",
-                    nameof(Convert.ToString) => "TEXT",
-                    nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => "REAL",
-                    nameof(Convert.ToDecimal) => "DECIMAL",
-                    nameof(Convert.ToBoolean) => "BOOLEAN",
+                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => _provider.GetIntCastSql(inner),
+                    nameof(Convert.ToInt64) => _provider.GetIntCastSql(inner, asLong: true),
+                    nameof(Convert.ToString) => _provider.GetToStringSql(inner),
+                    nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => _provider.GetRealCastSql(inner),
+                    nameof(Convert.ToDecimal) => _provider.GetRealCastSql(inner, asDecimal: true),
+                    nameof(Convert.ToBoolean) => node.Arguments[0].Type == typeof(string)
+                        ? GetStringToBoolSql(inner)
+                        : _provider.GetBoolCastSql(inner),
                     _ => null
                 };
-                if (sqlType != null)
+                if (convertSql != null)
                 {
-                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(sqlType).Append(')');
+                    _sql.Append(convertSql);
                     return node;
                 }
             }
-            // Convert.ChangeType(value, typeof(T)) — sister of the single-arg
-            // Convert.ToXxx path; the target type is a Type constant in the
-            // expression tree so we can pattern-match it at build time.
+            // Convert.ChangeType(value, typeof(T)) / captured Type value -- sister of
+            // the single-arg Convert.ToXxx path; the target type is known at
+            // query-build time so we can pattern-match it before SQL emission.
             if (node.Method.DeclaringType == typeof(Convert)
                 && node.Method.Name == nameof(Convert.ChangeType)
                 && node.Arguments.Count == 2
-                && node.Arguments[1] is ConstantExpression ctTypeConst
-                && ctTypeConst.Value is Type ctTargetType)
+                && TryGetConstantValue(node.Arguments[1], out var ctTypeRaw)
+                && ctTypeRaw is Type ctTargetType)
             {
                 var inner = GetSql(node.Arguments[0]);
-                var ctSqlType = ctTargetType switch
+                var ctSql = ctTargetType switch
                 {
-                    var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => "INTEGER",
-                    var t when t == typeof(long) => "BIGINT",
-                    var t when t == typeof(string) => "TEXT",
-                    var t when t == typeof(double) || t == typeof(float) => "REAL",
-                    var t when t == typeof(decimal) => "DECIMAL",
-                    var t when t == typeof(bool) => "BOOLEAN",
+                    var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => _provider.GetIntCastSql(inner),
+                    var t when t == typeof(long) => _provider.GetIntCastSql(inner, asLong: true),
+                    var t when t == typeof(string) => _provider.GetToStringSql(inner),
+                    var t when t == typeof(double) || t == typeof(float) => _provider.GetRealCastSql(inner),
+                    var t when t == typeof(decimal) => _provider.GetRealCastSql(inner, asDecimal: true),
+                    var t when t == typeof(bool) => node.Arguments[0].Type == typeof(string)
+                        ? GetStringToBoolSql(inner)
+                        : _provider.GetBoolCastSql(inner),
                     _ => null
                 };
-                if (ctSqlType != null)
+                if (ctSql != null)
                 {
-                    _sql.Append("CAST(").Append(inner).Append(" AS ").Append(ctSqlType).Append(')');
+                    _sql.Append(ctSql);
                     return node;
                 }
             }
@@ -2844,6 +3037,12 @@ namespace nORM.Query
             var custom = node.Method.GetCustomAttribute<SqlFunctionAttribute>();
             if (custom != null)
             {
+                if (_ctx.IsStrictProviderMobility && node.Method.DeclaringType != typeof(NormFunctions))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"Custom SQL function '{node.Method.DeclaringType?.FullName}.{node.Method.Name}' is outside nORM's strict provider mobility contract. " +
+                        "Use built-in nORM functions with provider translations, or keep the custom SQL function in ProviderMobilityMode.Compatibility with per-provider evidence.");
+                }
                 var formatted = string.Format(custom.Format, argsArr);
                 _sql.Append(formatted);
                 return node;
@@ -3198,7 +3397,7 @@ namespace nORM.Query
             // Admit DateOnly/TimeOnly so their statics (FromDateTime,
             // FromDayNumber, ParseExact, IsBetween, etc.) reach the WHERE
             // path. The provider switch already has the emits.
-            typeof(DateOnly), typeof(TimeOnly)
+            typeof(DateOnly), typeof(TimeOnly), typeof(Guid)
         }.ToFrozenSet();
 
         /// <summary>
@@ -3245,8 +3444,15 @@ namespace nORM.Query
             var secondsSql = useTimeOnly
                 ? _provider.GetTimeOnlyDifferenceSecondsSql(endSql, startSql)
                 : _provider.GetDateTimeDifferenceSecondsSql(endSql, startSql);
-            // Total* return fractional values; Days/Hours/Minutes/Seconds are the integer
-            // component matching System.TimeSpan's semantics (truncate toward zero).
+            return TryEmitTimeSpanMemberFromSeconds(memberName, secondsSql);
+        }
+
+        // Shared emit logic for both (end-start).MemberName and storedColumn.MemberName.
+        // secondsSql is total fractional seconds from any source.
+        // Total* return fractional values; Days/Hours/Minutes/Seconds match TimeSpan
+        // integer-component semantics (truncate toward zero with modular wrap).
+        private bool TryEmitTimeSpanMemberFromSeconds(string memberName, string secondsSql)
+        {
             switch (memberName)
             {
                 case nameof(TimeSpan.TotalSeconds):
@@ -3265,16 +3471,16 @@ namespace nORM.Query
                     _sql.Append('(').Append(secondsSql).Append(" * 1000.0)");
                     return true;
                 case nameof(TimeSpan.Days):
-                    _sql.Append("CAST(").Append(secondsSql).Append(" / 86400 AS INTEGER)");
+                    _sql.Append(_provider.GetTruncateToIntSql($"({secondsSql} / 86400)"));
                     return true;
                 case nameof(TimeSpan.Hours):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 3600 AS INTEGER) % 24)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql($"({secondsSql} / 3600)")).Append(" % 24)");
                     return true;
                 case nameof(TimeSpan.Minutes):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" / 60 AS INTEGER) % 60)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql($"({secondsSql} / 60)")).Append(" % 60)");
                     return true;
                 case nameof(TimeSpan.Seconds):
-                    _sql.Append("(CAST(").Append(secondsSql).Append(" AS INTEGER) % 60)");
+                    _sql.Append('(').Append(_provider.GetTruncateToIntSql(secondsSql)).Append(" % 60)");
                     return true;
                 default:
                     return false;
@@ -3363,6 +3569,12 @@ namespace nORM.Query
             }
             return false;
         }
+        private static bool IsNonDeterministicServerMethod(MethodInfo method)
+            => method.DeclaringType == typeof(Guid) && method.Name == nameof(Guid.NewGuid)
+               || method.DeclaringType == typeof(NormFunctions)
+                  && (method.Name == nameof(NormFunctions.ServerNewGuid)
+                      || method.Name == nameof(NormFunctions.ServerUtcNow)
+                      || method.Name == nameof(NormFunctions.ServerRandom));
         private Expression TranslateWithNullCheck(MethodCallExpression node)
         {
             if (node.Object == null) return base.VisitMethodCall(node);
@@ -3560,28 +3772,39 @@ namespace nORM.Query
             return segment;
         }
 
+        private string GetStringToBoolSql(string innerSql)
+            => $"(LOWER(LTRIM(RTRIM({_provider.GetToStringSql(innerSql)}))) = 'true')";
+
+        private static long ToUnixTimeMicroseconds(DateTimeOffset value)
+            => (value.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) / 10;
+
         // dtoCol [==/!=] dateTimeLiteral — see Bxxxx commit message: SQLite text
         // storage of DTOs needs UTC-instant comparison, not byte equality of
-        // canonical text. Snapshot semantics mirror [[dto-local-datetime]] for
-        // the DateTime.Kind=Unspecified / Local conversion.
-        private bool TryEmitDateTimeOffsetEqualsLiteral(BinaryExpression node)
+        // canonical text. Unspecified / Local DateTime literals use the local offset
+        // for that literal wall-clock instant.
+        private bool TryEmitDateTimeOffsetLiteralComparison(BinaryExpression node)
         {
-            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual))
+            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual))
                 return false;
 
             var leftType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
             var rightType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
 
             Expression colSide; Expression litSide;
+            bool columnOnLeft;
             if (leftType == typeof(DateTimeOffset) && IsColumnReference(node.Left))
             {
                 colSide = node.Left;
                 litSide = node.Right;
+                columnOnLeft = true;
             }
             else if (rightType == typeof(DateTimeOffset) && IsColumnReference(node.Right))
             {
                 colSide = node.Right;
                 litSide = node.Left;
+                columnOnLeft = false;
             }
             else return false;
 
@@ -3600,23 +3823,42 @@ namespace nORM.Query
                     utcInstant = new DateTimeOffset(dt, TimeSpan.Zero);
                 else
                 {
-                    var snap = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-                    utcInstant = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), snap);
+                    var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified));
+                    utcInstant = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified), localOffset);
                 }
             }
             else if (raw is DateTimeOffset dto) utcInstant = dto;
             else return false;
 
-            var epochSec = utcInstant.ToUnixTimeSeconds();
+            var epochUs = ToUnixTimeMicroseconds(utcInstant);
             var colSql = GetSql(colSide);
-            var epochSql = _provider.GetDateTimeOffsetUtcEpochSecondsSql(colSql);
+            var epochSql = _provider.GetDateTimeOffsetUtcEpochMicrosecondsSql(colSql);
             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-            _sql.Append("(").Append(epochSql);
-            _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
-            _sql.AppendParameterizedValue(paramName, epochSec, _paramSink);
+            _sql.Append("(");
+            if (columnOnLeft)
+            {
+                _sql.Append(epochSql).Append(ComparisonSql(node.NodeType));
+                _sql.AppendParameterizedValue(paramName, epochUs, _paramSink);
+            }
+            else
+            {
+                _sql.AppendParameterizedValue(paramName, epochUs, _paramSink);
+                _sql.Append(ComparisonSql(node.NodeType)).Append(epochSql);
+            }
             _sql.Append(")");
             return true;
         }
+
+        private static string ComparisonSql(ExpressionType nodeType) => nodeType switch
+        {
+            ExpressionType.Equal => " = ",
+            ExpressionType.NotEqual => " <> ",
+            ExpressionType.GreaterThan => " > ",
+            ExpressionType.GreaterThanOrEqual => " >= ",
+            ExpressionType.LessThan => " < ",
+            ExpressionType.LessThanOrEqual => " <= ",
+            _ => throw new InvalidOperationException($"Unsupported comparison node '{nodeType}'.")
+        };
         /// <summary>
         /// Delegates to the shared ExpressionValueExtractor utility for consistent behavior.
         /// </summary>

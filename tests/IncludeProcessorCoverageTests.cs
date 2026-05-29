@@ -372,11 +372,11 @@ public class IncludeProcessorCoverageTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // Group 3 — CompositeKey throws NotSupportedException
+    // Group 3 — CompositeKey dependent Include works (single-column FK)
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task EagerLoadAsync_CompositePkDependent_ThrowsNormUnsupportedFeatureException()
+    public async Task EagerLoadAsync_CompositePkDependent_LoadsChildrenCorrectly()
     {
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE IPC_CompositeParent (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)");
@@ -395,18 +395,21 @@ public class IncludeProcessorCoverageTests
         };
         using var ctx = new DbContext(cn, new AsyncSqliteProvider(), opts);
 
-        Exec(cn, "INSERT INTO IPC_CompositeParent VALUES(1,'CP1')");
-        Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'CK1')");
+        Exec(cn, "INSERT INTO IPC_CompositeParent VALUES(1,'CP1'),(2,'CP2')");
+        Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'CK1'),(1,2,'CK2'),(2,1,'CK3')");
 
-        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
-                .AsSplitQuery()
-                .Include(p => p.Children)
-                .ToListAsync());
+        var parents = await ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
+            .AsSplitQuery()
+            .Include(p => p.Children)
+            .ToListAsync();
+
+        Assert.Equal(2, parents.Count);
+        Assert.Equal(2, parents.First(p => p.Name == "CP1").Children.Count);
+        Assert.Single(parents.First(p => p.Name == "CP2").Children);
     }
 
     [Fact]
-    public void EagerLoad_Sync_CompositePkDependent_ThrowsNormUnsupportedFeatureException()
+    public void EagerLoad_Sync_CompositePkDependent_LoadsChildrenCorrectly()
     {
         using var cn = OpenDb();
         Exec(cn, "CREATE TABLE IPC_CompositeParent (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)");
@@ -426,13 +429,15 @@ public class IncludeProcessorCoverageTests
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
         Exec(cn, "INSERT INTO IPC_CompositeParent VALUES(1,'SP1')");
-        Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'SK1')");
+        Exec(cn, "INSERT INTO IPC_CompositeChild VALUES(1,1,'SK1'),(1,2,'SK2')");
 
-        Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
-                .AsSplitQuery()
-                .Include(p => p.Children)
-                .ToList());
+        var parents = ((INormQueryable<IpcCompositeParent>)ctx.Query<IpcCompositeParent>())
+            .AsSplitQuery()
+            .Include(p => p.Children)
+            .ToList();
+
+        Assert.Single(parents);
+        Assert.Equal(2, parents[0].Children.Count);
     }
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -80,6 +80,12 @@ public class DocumentationContractTests
         Assert.DoesNotContain("beats raw ADO", readme, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Enterprise Ready", readme, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("built-in pooling", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Zero-Allocation", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("maximum performance", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Lightning-Fast", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Superior Bulk", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("substantially faster", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Entity Framework performance", readme, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Benchmark Governance", readme, StringComparison.Ordinal);
         Assert.Contains("Documented LINQ Support", readme, StringComparison.Ordinal);
     }
@@ -289,7 +295,7 @@ public class DocumentationContractTests
         Assert.Contains("provider-aware", contract, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SELECT", contract, StringComparison.Ordinal);
         Assert.Contains("Privileged Escape Hatches", contract, StringComparison.Ordinal);
-        Assert.Contains("ValidateRawQuerySql(sql, ctx.Provider", rawSql, StringComparison.Ordinal);
+        Assert.Contains("ValidateRawQuerySql(sql, ctx.RawProvider", rawSql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -515,9 +521,12 @@ public class DocumentationContractTests
 
         Assert.Contains("eng/rc-artifact-manifest.ps1", gates, StringComparison.Ordinal);
         Assert.Contains("artifacts/v1-rc/", gates, StringComparison.Ordinal);
+        Assert.Contains("provider-specific slices", gates, StringComparison.Ordinal);
         Assert.Contains("rc-artifacts.md", checklist, StringComparison.Ordinal);
         Assert.Contains("RC artifact manifest", gateScript, StringComparison.Ordinal);
         Assert.Contains("rc-artifact-manifest.ps1", gateScript, StringComparison.Ordinal);
+        Assert.Contains("run-provider-benchmark-slice.ps1", gateScript, StringComparison.Ordinal);
+        Assert.Contains("provider-slices", gateScript, StringComparison.Ordinal);
         Assert.Contains("TestResults", manifestScript, StringComparison.Ordinal);
         Assert.Contains("BenchmarkArtifacts", manifestScript, StringComparison.Ordinal);
         Assert.Contains("ReleaseEvidence", manifestScript, StringComparison.Ordinal);

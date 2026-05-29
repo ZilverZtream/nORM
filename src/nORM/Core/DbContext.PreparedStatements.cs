@@ -44,12 +44,12 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             var mapping = GetMapping(typeof(T));
-            if (Database.CurrentTransaction == null && Transaction.Current != null)
+            if (CurrentTransaction == null && Transaction.Current != null)
             {
                 await using var ambientScope = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
             }
 
-            var transaction = Database.CurrentTransaction;
+            var transaction = CurrentTransaction;
             var preparedInsert = await CreatePreparedInsertCommandAsync(
                 mapping, transaction, hydrateGeneratedKeys, ct).ConfigureAwait(false);
             return new PreparedOperation<T>(preparedInsert);
@@ -87,7 +87,7 @@ namespace nORM.Core
             CancellationToken ct)
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            var cmd = Connection.CreateCommand();
+            var cmd = RawConnection.CreateCommand();
             try
             {
                 if (transaction != null)
@@ -209,9 +209,9 @@ namespace nORM.Core
                 _hydrateGeneratedKeys = hydrateGeneratedKeys && HasDbGeneratedKey(_mapping.KeyColumns);
                 _hydrateGeneratedKeysFromCommand = hydrateGeneratedKeysFromCommand && _hydrateGeneratedKeys;
 
-                var insertCols = _context.Provider.GetInsertColumns(_mapping);
+                var insertCols = _context.RawProvider.GetInsertColumns(_mapping);
                 _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
-                var prefix = _context.Provider.ParamPrefix;
+                var prefix = _context.RawProvider.ParamPrefix;
 
                 for (int i = 0; i < insertCols.Length; i++)
                 {
@@ -248,6 +248,13 @@ namespace nORM.Core
                     return ExecuteWithHydrateAsync(entity, ct);
                 }
 
+                if (_context.RawProvider.PrefersSyncFastPathExecution
+                    && _context.Options.CommandInterceptors.Count == 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    return Task.FromResult(_command.ExecuteNonQuery());
+                }
+
                 return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
             }
 
@@ -274,6 +281,14 @@ namespace nORM.Core
                     return;
                 }
 
+                if (value is Guid guid && parameter is Microsoft.Data.Sqlite.SqliteParameter)
+                {
+                    parameter.DbType = DbType.String;
+                    parameter.Size = 36;
+                    parameter.Value = guid.ToString("D");
+                    return;
+                }
+
                 if (value is byte[] bytes)
                 {
                     if (parameter.Size >= 0 && bytes.Length > parameter.Size)
@@ -294,11 +309,32 @@ namespace nORM.Core
             {
                 if (_hydrateGeneratedKeysFromCommand)
                 {
+                    if (_context.RawProvider.PrefersSyncFastPathExecution
+                        && _context.Options.CommandInterceptors.Count == 0)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var recordsAffectedSync = _command.ExecuteNonQuery();
+                        var commandGeneratedIdSync = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
+                        if (commandGeneratedIdSync != null && commandGeneratedIdSync != DBNull.Value)
+                            _mapping.SetPrimaryKey(entity, commandGeneratedIdSync);
+                        return recordsAffectedSync;
+                    }
+
                     var recordsAffected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
-                    var commandGeneratedId = _context.Provider.GetCommandGeneratedKey(_command, _mapping);
+                    var commandGeneratedId = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
                     if (commandGeneratedId != null && commandGeneratedId != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, commandGeneratedId);
                     return recordsAffected;
+                }
+
+                if (_context.RawProvider.PrefersSyncFastPathExecution
+                    && _context.Options.CommandInterceptors.Count == 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var newIdSync = _command.ExecuteScalar();
+                    if (newIdSync != null && newIdSync != DBNull.Value)
+                        _mapping.SetPrimaryKey(entity, newIdSync);
+                    return 1;
                 }
 
                 var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);

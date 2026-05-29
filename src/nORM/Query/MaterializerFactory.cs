@@ -923,7 +923,7 @@ namespace nORM.Query
                 && projectionCtor.GetParameters().Length == columns.Length)
             {
                 var projectionCtorParams = projectionCtor.GetParameters();
-                return CreateProjectionConstructorMaterializer(projectionCtor, projectionCtorParams, startOffset);
+                return CreateProjectionConstructorMaterializer(projectionCtor, projectionCtorParams, projectionNew.Arguments, columns, startOffset);
             }
 
             var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
@@ -1263,6 +1263,8 @@ namespace nORM.Query
         private static Func<DbDataReader, object> CreateProjectionConstructorMaterializer(
             ConstructorInfo ctor,
             ParameterInfo[] parameters,
+            IReadOnlyList<Expression> arguments,
+            IReadOnlyList<Column> columns,
             int startOffset)
         {
             var reader = Expression.Parameter(typeof(DbDataReader), "reader");
@@ -1272,13 +1274,55 @@ namespace nORM.Query
             {
                 var paramType = parameters[i].ParameterType;
                 var readValue = GetOptimizedReaderCall(reader, paramType, i + startOffset);
-                var defaultValue = Expression.Default(paramType);
-                var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
-                args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+                if (CanSkipDbNullCheck(parameters[i], arguments[i], columns[i]))
+                {
+                    args[i] = readValue;
+                }
+                else
+                {
+                    var defaultValue = Expression.Default(paramType);
+                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                    args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
+                }
             }
 
             var body = Expression.Convert(Expression.New(ctor, args), typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(body, reader).Compile();
+        }
+
+        private static bool CanSkipDbNullCheck(ParameterInfo parameter, Expression argument, Column column)
+        {
+            // SQL expressions such as SUM/AVG over no matching rows can return NULL even
+            // when the CLR projection member is non-nullable. Only skip the reader null
+            // guard for direct mapped column projections whose mapping says NOT NULL.
+            if (argument is not MemberExpression || column.IsNullable)
+                return false;
+
+            var parameterType = parameter.ParameterType;
+            if (parameterType.IsValueType)
+                return Nullable.GetUnderlyingType(parameterType) == null;
+
+            var nullabilityCtx = _nullabilityInfoContext;
+            if (nullabilityCtx == null)
+                return false;
+
+            try
+            {
+                NullabilityInfo nullabilityInfo;
+                lock (_nullabilityInfoContextLock)
+                {
+                    nullabilityInfo = nullabilityCtx.Create(parameter);
+                }
+                return nullabilityInfo.ReadState == NullabilityState.NotNull;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
         }
 
         /// <summary>

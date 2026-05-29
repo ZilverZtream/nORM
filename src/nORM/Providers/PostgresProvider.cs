@@ -24,7 +24,10 @@ namespace nORM.Providers
     public sealed partial class PostgresProvider : BulkOperationProvider
     {
         internal override bool SupportsFastPathPreparedCommandCache => true;
+        internal override bool SupportsQueryPlanPreparedCommandCache => true;
         internal override bool PrefersSyncFastPathExecution => true;
+
+        internal override bool PrefersSyncCompiledQueryExecution => true;
 
         internal override bool PrefersSyncQueryPlanExecution => true;
 
@@ -195,6 +198,10 @@ namespace nORM.Providers
         /// <summary>PostgreSQL TEXT is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 
+        /// <summary>PostgreSQL numeric-to-integer casts round; TRUNC preserves .NET TimeSpan component semantics.</summary>
+        public override string GetTruncateToIntSql(string numericSql)
+            => $"CAST(TRUNC({numericSql}) AS INTEGER)";
+
         /// <summary>Postgres puts ORDER BY inside the aggregate function arguments.</summary>
         public override string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
             => $"STRING_AGG({expr}, {sepLiteral} ORDER BY {orderBySql})";
@@ -299,6 +306,12 @@ namespace nORM.Providers
         /// <inheritdoc/>
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"CAST(EXTRACT(EPOCH FROM {dtoSql}) AS BIGINT)";
+
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"FLOOR(EXTRACT(EPOCH FROM {dtoSql}) * 1000.0)::bigint";
+
+        internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+            => $"FLOOR(EXTRACT(EPOCH FROM {dtoSql}) * 1000000.0)::bigint";
 
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
@@ -516,16 +529,19 @@ namespace nORM.Providers
 
             if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
             {
+                var source = declaringType == typeof(DateTimeOffset)
+                    ? $"({args[0]} AT TIME ZONE 'UTC')"
+                    : args[0];
                 return name switch
                 {
-                    nameof(DateTime.Year) => $"EXTRACT(YEAR FROM {args[0]})",
-                    nameof(DateTime.Month) => $"EXTRACT(MONTH FROM {args[0]})",
-                    nameof(DateTime.Day) => $"EXTRACT(DAY FROM {args[0]})",
-                    nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
-                    nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
-                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {args[0]})",
-                    nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {args[0]})",
-                    nameof(DateTime.Date) => $"DATE_TRUNC('day', {args[0]})",
+                    nameof(DateTime.Year) => $"EXTRACT(YEAR FROM {source})",
+                    nameof(DateTime.Month) => $"EXTRACT(MONTH FROM {source})",
+                    nameof(DateTime.Day) => $"EXTRACT(DAY FROM {source})",
+                    nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {source})",
+                    nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {source})",
+                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {source})",
+                    nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {source})",
+                    nameof(DateTime.Date) => $"DATE_TRUNC('day', {source})",
                     nameof(DateTime.AddDays) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 day')",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 month')",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 year')",
@@ -536,10 +552,10 @@ namespace nORM.Providers
                     nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 millisecond')",
                     // Postgres EXTRACT(MILLISECONDS FROM ts) returns SS*1000+ms;
                     // modulo 1000 yields the millisecond component matching .NET.
-                    nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
+                    nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {source})::int % 1000)",
                     // EXTRACT(MICROSECONDS FROM ts) returns SS*1e6+us; %1000
                     // yields the microsecond within the current millisecond.
-                    nameof(DateTime.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {args[0]}))::bigint % 1000)",
+                    nameof(DateTime.Microsecond) => $"((EXTRACT(MICROSECONDS FROM {source}))::bigint % 1000)",
                     // PostgreSQL timestamps have microsecond precision; the
                     // sub-microsecond Nanosecond is always zero.
                     nameof(DateTime.Nanosecond) => "0",
@@ -547,7 +563,7 @@ namespace nORM.Providers
                     // ticks/10 gives microseconds (truncating sub-microsecond precision).
                     nameof(DateTime.AddTicks) when args.Length == 2 => $"({args[0]} + (({args[1]}) / 10) * INTERVAL '1 microsecond')",
                     // PostgreSQL EXTRACT(DOW) returns 0=Sunday..6=Saturday — matches System.DayOfWeek.
-                    nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {args[0]})",
+                    nameof(DateTime.DayOfWeek) => $"EXTRACT(DOW FROM {source})",
                     // Compare / CompareTo: signed -1/0/1 sentinel via CASE.
                     nameof(DateTime.Compare) when args.Length == 2 =>
                         $"(CASE WHEN {args[0]} < {args[1]} THEN -1 WHEN {args[0]} > {args[1]} THEN 1 ELSE 0 END)",
@@ -639,6 +655,9 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(Guid) && name == nameof(Guid.NewGuid) && args.Length == 0)
+                return "gen_random_uuid()";
+
             if (declaringType == typeof(Math))
             {
                 return name switch
@@ -648,7 +667,7 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]})",
-                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT(CASE WHEN {args[0]} < 0 THEN NULL ELSE {args[0]} END)",
                     nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
                     nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
                     nameof(Math.Log) when args.Length == 1 => $"LN({args[0]})",
@@ -1034,6 +1053,32 @@ CREATE TABLE {historyTable} (
         }
 
         /// <summary>
+        /// Use a timestamp column for temporal tag lookups so tag timestamps have
+        /// the same UTC-without-kind contract as generated history rows.
+        /// </summary>
+        public override string GetCreateTagsTableSql()
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"CREATE TABLE IF NOT EXISTS {table} ({tagCol} TEXT NOT NULL, {tsCol} TIMESTAMP NOT NULL, PRIMARY KEY ({tagCol}))";
+        }
+
+        /// <summary>
+        /// Creates temporal tags using the PostgreSQL UTC database clock so tag
+        /// timestamps are comparable to trigger-generated history windows.
+        /// </summary>
+        public override string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, (now() at time zone 'utc'))";
+        }
+
+        internal override bool UsesDatabaseClockForTemporalTags => true;
+
+        /// <summary>
         /// Produces the trigger definitions required to track changes in the temporal history table.
         /// </summary>
         /// <param name="mapping">The mapping describing the target table.</param>
@@ -1081,6 +1126,53 @@ DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalTrigger")} ON {tabl
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalTrigger")}
 AFTER INSERT OR UPDATE OR DELETE ON {table}
 FOR EACH ROW EXECUTE FUNCTION {functionName}();";
+        }
+
+        /// <inheritdoc />
+        public override bool SupportsNativeTenantSessionContext => true;
+
+        /// <inheritdoc />
+        public override string GetSetNativeTenantSessionContextSql(string sessionKey, string tenantParameterName)
+        {
+            EnsureValidParameterName(tenantParameterName, nameof(tenantParameterName));
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+            return $"SELECT set_config('{sessionKey}', {tenantParameterName}, false);";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateNativeTenantPolicySql(TableMapping mapping, string sessionKey)
+        {
+            var tenantCol = mapping.TenantColumn
+                ?? throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native PostgreSQL RLS.");
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+
+            var table = Escape(mapping.TableName);
+            var policy = Escape("norm_rls_" + mapping.TableName);
+            return $@"
+ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {table} FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS {policy} ON {table};
+CREATE POLICY {policy} ON {table}
+USING ({tenantCol.EscCol}::text = current_setting('{sessionKey}', true))
+WITH CHECK ({tenantCol.EscCol}::text = current_setting('{sessionKey}', true));";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateDropNativeTenantPolicySql(TableMapping mapping)
+        {
+            if (mapping.TenantColumn == null)
+                throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native PostgreSQL RLS.");
+
+            var table = Escape(mapping.TableName);
+            var policy = Escape("norm_rls_" + mapping.TableName);
+            return $@"
+DROP POLICY IF EXISTS {policy} ON {table};
+ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;";
         }
 
         /// <summary>

@@ -57,7 +57,7 @@ namespace nORM.Core
         {
             ArgumentNullException.ThrowIfNull(context);
 
-            var existingTransaction = context.Database.CurrentTransaction;
+            var existingTransaction = context.CurrentTransaction;
             var ambientTransaction = System.Transactions.Transaction.Current;
             var ownsTransaction = existingTransaction == null && ambientTransaction == null;
 
@@ -71,7 +71,7 @@ namespace nORM.Core
             if (ownsTransaction)
             {
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var connection = context.Connection ?? throw new InvalidOperationException("Database connection is not initialized.");
+                var connection = context.RawConnection ?? throw new InvalidOperationException("Database connection is not initialized.");
                 transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
 
                 // Create a linked CTS that cancels if the caller's token fires.
@@ -85,7 +85,7 @@ namespace nORM.Core
                 // in the TransactionScope and roll back correctly if the scope is disposed without
                 // Complete(). The enlistment failure policy is configurable via AmbientTransactionPolicy.
                 await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-                var connection = context.Connection;
+                var connection = context.RawConnection;
                 var policy = context.Options.AmbientTransactionPolicy;
 
                 if (policy == AmbientTransactionEnlistmentPolicy.Ignore)

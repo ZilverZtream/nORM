@@ -318,6 +318,38 @@ public class LiveProviderSavepointMigrationTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public async Task LiveProvider_StrictWrappedSavepoint_RollbackToSavepoint_WriteMadeAfterSavepointIsGone(string kind)
+    {
+        var (cn, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        using (cn)
+        await using (var ctx = new DbContext(cn!, provider!, new DbContextOptions().UseStrictProviderMobility()))
+        {
+            Exec(cn!, SpItemDdl(kind));
+            Exec(cn!, "DELETE FROM SP_Item");
+
+            await using var tx = await ctx.Database.BeginTransactionAsync();
+            await ctx.InsertAsync(new SpItem { Id = 1, Label = "before-savepoint" });
+            await tx.CreateSavepointAsync("sp1");
+            await ctx.InsertAsync(new SpItem { Id = 2, Label = "after-savepoint" });
+
+            Assert.Equal(2, await ctx.Query<SpItem>().CountAsync());
+
+            await tx.RollbackToSavepointAsync("sp1");
+
+            Assert.Equal(1, await ctx.Query<SpItem>().CountAsync());
+            await tx.CommitAsync();
+
+            Assert.Equal(1L, CountRows(cn!, "SP_Item"));
+        }
+    }
+
     // SP-2: Write made BEFORE a savepoint survives rollback-to-savepoint
     // ══════════════════════════════════════════════════════════════════════════
 

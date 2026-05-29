@@ -1767,7 +1767,7 @@ public class TenantContextChurnTests
         {
             using var cn = new SqliteConnection(connStr);
             cn.Open();
-            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid) };
+            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid), TenantColumnName = "Id" };
             using var ctx = new DbContext(cn, new SqliteProvider(), opts);
             var r = await compiled(ctx, tid);
             Assert.Single(r);
@@ -1779,7 +1779,7 @@ public class TenantContextChurnTests
         {
             using var cn = new SqliteConnection(connStr);
             cn.Open();
-            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid) };
+            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid), TenantColumnName = "Id" };
             using var ctx = new DbContext(cn, new SqliteProvider(), opts);
             var r = await compiled(ctx, tid);
             Assert.Single(r);
@@ -1812,7 +1812,7 @@ public class TenantContextChurnTests
         {
             using var cn = new SqliteConnection(connStr);
             cn.Open();
-            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid) };
+            var opts = new DbContextOptions { TenantProvider = new FixedTenantProvider(tid), TenantColumnName = "Id" };
             using var ctx = new DbContext(cn, new SqliteProvider(), opts);
             for (int call = 0; call < 3; call++)
             {

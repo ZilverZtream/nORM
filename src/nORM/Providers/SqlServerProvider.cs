@@ -62,6 +62,13 @@ namespace nORM.Providers
 
         internal override bool PrefersSyncQueryPlanExecution => true;
 
+        // SQL Server T-SQL does not support row-tuple comparisons in WHERE IN
+        // (e.g. WHERE (pk1, pk2) IN (SELECT ...)). Composite-PK CUD uses a JOIN form instead.
+        internal override bool SupportsRowTupleComparison => false;
+
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"{sql} COLLATE Latin1_General_100_BIN2";
+
         private readonly IDbParameterFactory? _parameterFactory;
         private readonly bool _isDialectOnly;
 
@@ -367,6 +374,12 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"DATEDIFF_BIG(SECOND, CAST('1970-01-01 00:00:00 +00:00' AS DATETIMEOFFSET), {dtoSql})";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"DATEDIFF_BIG(MILLISECOND, CAST('1970-01-01 00:00:00 +00:00' AS DATETIMEOFFSET), {dtoSql})";
+
+        internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+            => $"DATEDIFF_BIG(MICROSECOND, CAST('1970-01-01 00:00:00 +00:00' AS DATETIMEOFFSET), {dtoSql})";
+
         /// <summary>SQL Server uses DATEADD(DAY, N, col) for date arithmetic on DATE columns.</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"DATEADD(DAY, {daysSqlFragment}, {dateOnlySql})";
@@ -403,6 +416,10 @@ namespace nORM.Providers
                 ? $"CAST({innerSql} AS DECIMAL(38, 10))"
                 : $"CAST({innerSql} AS FLOAT)";
 
+        /// <summary>SQL Server ROUND(x, 0, 1) truncates toward zero.</summary>
+        public override string GetTruncateToIntSql(string numericSql)
+            => $"CAST(ROUND({numericSql}, 0, 1) AS INT)";
+
         /// <summary>SQL Server uses IF NOT EXISTS for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"IF NOT EXISTS (SELECT 1 FROM {escTable} WHERE {escC1} = {p1} AND {escC2} = {p2}) INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2})";
@@ -437,14 +454,14 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// DATEDIFF(SECOND) overflows around 68 years; for the LINQ use-case (TotalHours,
-        /// TotalDays) that's well within range. CAST the result to FLOAT so subsequent
-        /// divisions (e.g. TotalHours = sec / 3600) stay fractional.
+        /// DATEDIFF_BIG(MICROSECOND) preserves sub-second deltas while avoiding
+        /// DATEDIFF(SECOND)'s integer truncation. Divide by 1,000,000.0 so Total*
+        /// projections and TimeSpan materialisation receive fractional seconds.
         /// </summary>
         /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
         /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
-            => $"CAST(DATEDIFF(SECOND, {startSql}, {endSql}) AS FLOAT)";
+            => $"(CAST(DATEDIFF_BIG(MICROSECOND, {startSql}, {endSql}) AS FLOAT) / 1000000.0)";
 
         /// <summary>T-SQL DATETIME2FROMPARTS with precision 7 matches .NET DateTime ticks.</summary>
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
@@ -474,28 +491,335 @@ namespace nORM.Providers
             => $"TIMEFROMPARTS({hourSql}, {minuteSql}, {secondSql}, {millisecondSql}, 3)";
 
         /// <summary>
-        /// T-SQL has no native regex primitive. The supported workarounds are
-        /// a CLR scalar function (sql_clr assembly providing RegExMatch) or
-        /// a rewrite to LIKE for simple patterns. nORM cannot detect either
-        /// at translation time, so surface a clear unsupported-feature
-        /// exception rather than emitting broken SQL.
+        /// T-SQL has no native regex primitive. nORM translates a deliberately
+        /// small ASCII-safe Regex.IsMatch subset to LIKE/PATINDEX-compatible
+        /// patterns: literal text, ^ / $ anchors, simple bracket classes such
+        /// as [A-Z], \d / \w, and anchored class+fixed-count suffix shapes
+        /// such as ^[A-Z]+\d{2}$. More complex regex constructs still throw
+        /// instead of drifting into provider-specific semantics.
         /// </summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
-            => throw new NormUnsupportedFeatureException(
-                "Regex.IsMatch is not translatable on SQL Server: T-SQL has no built-in regex " +
-                "primitive. Workarounds: (a) deploy a CLR scalar function (RegExMatch) and call " +
-                "it via [SqlFunction], (b) rewrite the predicate as a LIKE pattern when the " +
-                "shape allows, or (c) materialise the rows first and filter in memory.");
+        {
+            if (TryBuildSqlServerRegexMatchSql(inputSql, patternLiteral, ignoreCase: false, out var sql))
+                return sql;
+
+            throw new NormUnsupportedFeatureException(
+                "Regex.IsMatch is not translatable on SQL Server for this pattern: T-SQL has no " +
+                "built-in regex primitive. nORM supports only a provider-mobile simple subset " +
+                "(literal text, ^/$ anchors, simple ASCII bracket classes, \\d, \\w). Workarounds: " +
+                "(a) deploy a CLR scalar function (RegExMatch) and call it via [SqlFunction], " +
+                "(b) rewrite the predicate as StartsWith/EndsWith/Contains/Like when the shape " +
+                "allows, or (c) materialise the rows first and filter in memory.");
+        }
 
         /// <summary>
-        /// T-SQL has no regexp_replace primitive. Same workarounds as GetRegexMatchSql.
+        /// Case-insensitive SQL Server Regex.IsMatch for the same simple subset
+        /// as <see cref="GetRegexMatchSql"/>. The input is lowered and the pattern
+        /// is folded to lower-case before conversion to LIKE.
+        /// </summary>
+        public override string GetRegexMatchIgnoreCaseSql(string inputSql, string patternLiteral)
+        {
+            if (TryBuildSqlServerRegexMatchSql(inputSql, patternLiteral, ignoreCase: true, out var sql))
+                return sql;
+
+            throw new NormUnsupportedFeatureException(
+                "Regex.IsMatch(..., RegexOptions.IgnoreCase) is not translatable on SQL Server " +
+                "for this pattern. nORM supports only a provider-mobile simple subset " +
+                "(literal text, ^/$ anchors, simple ASCII bracket classes, \\d, \\w).");
+        }
+
+        private bool TryBuildSqlServerRegexMatchSql(string inputSql, string patternLiteral, bool ignoreCase, out string sql)
+        {
+            sql = string.Empty;
+            if (!TryDecodeSqlStringLiteral(patternLiteral, out var pattern))
+                return false;
+
+            if (ignoreCase)
+            {
+                inputSql = $"LOWER({inputSql})";
+                pattern = pattern.ToLowerInvariant();
+            }
+            else
+            {
+                inputSql = $"({inputSql} COLLATE Latin1_General_BIN2)";
+            }
+
+            if (TryConvertAnchoredQuantifiedRegexToSqlServerPredicate(inputSql, pattern, out sql))
+                return true;
+
+            if (!TryConvertSimpleRegexToLikePattern(pattern, out var likePattern))
+                return false;
+
+            var escapedLike = QuoteSqlString(likePattern);
+            var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar);
+            sql = $"({inputSql} LIKE {escapedLike} ESCAPE '{esc}')";
+            return true;
+        }
+
+        private bool TryConvertAnchoredQuantifiedRegexToSqlServerPredicate(string inputSql, string pattern, out string sql)
+        {
+            sql = string.Empty;
+            if (pattern.Length < 6 || pattern[0] != '^' || pattern[^1] != '$' || IsEscaped(pattern, pattern.Length - 1))
+                return false;
+
+            var end = pattern.Length - 1;
+            var index = 1;
+            if (!TryReadSimpleSqlServerLikeClass(pattern, ref index, end, out var repeatedClass))
+                return false;
+            if (index >= end || pattern[index++] != '+')
+                return false;
+            if (!TryReadSimpleSqlServerLikeClass(pattern, ref index, end, out var suffixClass))
+                return false;
+            if (index >= end || pattern[index++] != '{')
+                return false;
+
+            var countStart = index;
+            while (index < end && char.IsDigit(pattern[index]))
+                index++;
+            if (countStart == index || index >= end || pattern[index++] != '}' || index != end)
+                return false;
+            if (!int.TryParse(pattern.Substring(countStart, index - countStart - 1), out var suffixCount) || suffixCount <= 0 || suffixCount > 32)
+                return false;
+            if (!TryNegateSimpleSqlServerLikeClass(repeatedClass, out var negatedRepeatedClass))
+                return false;
+
+            var suffixPattern = string.Concat(Enumerable.Repeat(suffixClass, suffixCount));
+            var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar);
+            sql = $"(LEN({inputSql}) >= {suffixCount + 1} AND " +
+                  $"RIGHT({inputSql}, {suffixCount}) LIKE {QuoteSqlString(suffixPattern)} ESCAPE '{esc}' AND " +
+                  $"LEFT({inputSql}, CASE WHEN LEN({inputSql}) > {suffixCount} THEN LEN({inputSql}) - {suffixCount} ELSE 0 END) NOT LIKE {QuoteSqlString("%" + negatedRepeatedClass + "%")} ESCAPE '{esc}')";
+            return true;
+        }
+
+        private static bool TryReadSimpleSqlServerLikeClass(string pattern, ref int index, int end, out string likeClass)
+        {
+            likeClass = string.Empty;
+            if (index >= end)
+                return false;
+
+            if (pattern[index] == '\\')
+            {
+                index++;
+                if (index >= end)
+                    return false;
+                likeClass = pattern[index++] switch
+                {
+                    'd' => "[0-9]",
+                    'w' => "[A-Za-z0-9_]",
+                    's' => "[ ]",
+                    _ => string.Empty
+                };
+                return likeClass.Length != 0;
+            }
+
+            if (pattern[index] != '[')
+                return false;
+            var close = pattern.IndexOf(']', index + 1);
+            if (close <= index + 1 || close >= end)
+                return false;
+            var cls = pattern.Substring(index, close - index + 1);
+            if (!IsSimpleAsciiBracketClass(cls))
+                return false;
+            likeClass = cls;
+            index = close + 1;
+            return true;
+        }
+
+        private static bool TryNegateSimpleSqlServerLikeClass(string likeClass, out string negated)
+        {
+            negated = string.Empty;
+            if (likeClass.Length < 3 || likeClass[0] != '[' || likeClass[^1] != ']' || likeClass[1] == '^')
+                return false;
+            negated = "[^" + likeClass.Substring(1, likeClass.Length - 2) + "]";
+            return true;
+        }
+
+        private bool TryConvertSimpleRegexToLikePattern(string pattern, out string likePattern)
+        {
+            likePattern = string.Empty;
+            var anchoredStart = pattern.Length > 0 && pattern[0] == '^';
+            var anchoredEnd = pattern.Length > 0 && pattern[^1] == '$' && !IsEscaped(pattern, pattern.Length - 1);
+            var start = anchoredStart ? 1 : 0;
+            var end = anchoredEnd ? pattern.Length - 1 : pattern.Length;
+
+            var sb = new System.Text.StringBuilder(pattern.Length + 2);
+            if (!anchoredStart) sb.Append('%');
+
+            for (var i = start; i < end; i++)
+            {
+                var c = pattern[i];
+                if (c == '\\')
+                {
+                    if (++i >= end)
+                        return false;
+
+                    var escaped = pattern[i];
+                    if (escaped == 'd') sb.Append("[0-9]");
+                    else if (escaped == 'w') sb.Append("[A-Za-z0-9_]");
+                    else if (escaped == 's') sb.Append(' ');
+                    else if (IsRegexMeta(escaped)) AppendEscapedLikeLiteral(sb, escaped);
+                    else AppendEscapedLikeLiteral(sb, escaped);
+                    continue;
+                }
+
+                if (c == '[')
+                {
+                    var close = pattern.IndexOf(']', i + 1);
+                    if (close <= i + 1)
+                        return false;
+
+                    var cls = pattern.Substring(i, close - i + 1);
+                    if (!IsSimpleAsciiBracketClass(cls))
+                        return false;
+
+                    sb.Append(cls);
+                    i = close;
+                    continue;
+                }
+
+                if (IsRegexMeta(c))
+                    return false;
+
+                AppendEscapedLikeLiteral(sb, c);
+            }
+
+            if (!anchoredEnd) sb.Append('%');
+            likePattern = sb.ToString();
+            return true;
+        }
+
+        private void AppendEscapedLikeLiteral(System.Text.StringBuilder sb, char c)
+        {
+            var s = c.ToString();
+            sb.Append(EscapeLikePattern(s));
+        }
+
+        private static bool TryDecodeSqlStringLiteral(string sqlLiteral, out string value)
+        {
+            value = string.Empty;
+            var text = sqlLiteral.Trim();
+            if (text.Length < 2 || text[0] != '\'' || text[^1] != '\'')
+                return false;
+
+            value = text.Substring(1, text.Length - 2).Replace("''", "'");
+            return true;
+        }
+
+        private static string QuoteSqlString(string value)
+            => "'" + value.Replace("'", "''") + "'";
+
+        private static bool IsRegexMeta(char c)
+            => c is '.' or '*' or '+' or '?' or '(' or ')' or '|' or '{' or '}';
+
+        private static bool IsEscaped(string text, int index)
+        {
+            var slashCount = 0;
+            for (var i = index - 1; i >= 0 && text[i] == '\\'; i--)
+                slashCount++;
+            return (slashCount & 1) == 1;
+        }
+
+        private static bool IsSimpleAsciiBracketClass(string cls)
+        {
+            if (cls.Length < 3 || cls[0] != '[' || cls[^1] != ']')
+                return false;
+            if (cls[1] == '^')
+                return false;
+
+            for (var i = 1; i < cls.Length - 1; i++)
+            {
+                var c = cls[i];
+                if (c > 127)
+                    return false;
+                if (c is '[' or ']' or '\\')
+                    return false;
+                if (c == '-' && (i == 1 || i == cls.Length - 2))
+                    return false;
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// SQL Server has no regexp_replace primitive. nORM translates the safe
+        /// literal-pattern subset to T-SQL REPLACE with explicit collation and
+        /// rejects regex constructs, captures, and replacement substitutions.
         /// </summary>
         public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
-            => throw new NormUnsupportedFeatureException(
-                "Regex.Replace is not translatable on SQL Server: T-SQL has no built-in regex " +
-                "primitive. Workarounds: (a) deploy a CLR scalar function (RegExReplace) and " +
-                "call it via [SqlFunction], (b) materialise the rows first and apply Regex.Replace " +
-                "in memory.");
+        {
+            if (TryBuildSqlServerRegexReplaceSql(inputSql, patternLiteral, replacementLiteral, ignoreCase: false, out var sql))
+                return sql;
+
+            throw new NormUnsupportedFeatureException(
+                "Regex.Replace is not translatable on SQL Server for this pattern/replacement. " +
+                "nORM supports only literal patterns with literal replacements. Workarounds: " +
+                "(a) deploy a CLR scalar function (RegExReplace) and call it via [SqlFunction], " +
+                "or (b) materialise the rows first and apply Regex.Replace in memory.");
+        }
+
+        /// <summary>
+        /// Case-insensitive SQL Server Regex.Replace for the same literal-pattern
+        /// subset, using a deterministic case-insensitive collation.
+        /// </summary>
+        public override string GetRegexReplaceIgnoreCaseSql(string inputSql, string patternLiteral, string replacementLiteral)
+        {
+            if (TryBuildSqlServerRegexReplaceSql(inputSql, patternLiteral, replacementLiteral, ignoreCase: true, out var sql))
+                return sql;
+
+            throw new NormUnsupportedFeatureException(
+                "Regex.Replace(..., RegexOptions.IgnoreCase) is not translatable on SQL Server " +
+                "for this pattern/replacement. nORM supports only literal patterns with literal replacements.");
+        }
+
+        private bool TryBuildSqlServerRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral, bool ignoreCase, out string sql)
+        {
+            sql = string.Empty;
+            if (!TryDecodeSqlStringLiteral(patternLiteral, out var pattern)
+                || !TryDecodeSqlStringLiteral(replacementLiteral, out var replacement))
+            {
+                return false;
+            }
+
+            if (replacement.Contains('$'))
+                return false;
+
+            if (!TryConvertRegexLiteralPattern(pattern, out var literalPattern))
+                return false;
+
+            var collation = ignoreCase ? "Latin1_General_CI_AS" : "Latin1_General_BIN2";
+            sql = $"REPLACE(({inputSql} COLLATE {collation}), {QuoteSqlString(literalPattern)}, {QuoteSqlString(replacement)})";
+            return true;
+        }
+
+        private static bool TryConvertRegexLiteralPattern(string pattern, out string literal)
+        {
+            literal = string.Empty;
+            var sb = new System.Text.StringBuilder(pattern.Length);
+            for (var i = 0; i < pattern.Length; i++)
+            {
+                var c = pattern[i];
+                if (c == '\\')
+                {
+                    if (++i >= pattern.Length)
+                        return false;
+
+                    var escaped = pattern[i];
+                    if (escaped is 'd' or 'D' or 'w' or 'W' or 's' or 'S')
+                        return false;
+                    sb.Append(escaped);
+                    continue;
+                }
+
+                if (c is '^' or '$' or '[' or ']')
+                    return false;
+                if (IsRegexMeta(c))
+                    return false;
+
+                sb.Append(c);
+            }
+
+            literal = sb.ToString();
+            return literal.Length > 0;
+        }
 
         /// <summary>
         /// SQL Server stores TimeOnly as TIME(7). DATEDIFF(SECOND, t1, t2) on
@@ -769,6 +1093,9 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(Guid) && name == nameof(Guid.NewGuid) && args.Length == 0)
+                return "NEWID()";
+
             if (declaringType == typeof(Math))
             {
                 return name switch
@@ -778,7 +1105,7 @@ namespace nORM.Providers
                     nameof(Math.Floor) => $"FLOOR({args[0]})",
                     nameof(Math.Round) when args.Length > 1 => $"ROUND({args[0]}, {args[1]})",
                     nameof(Math.Round) => $"ROUND({args[0]}, 0)",
-                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT({args[0]})",
+                    nameof(Math.Sqrt) when args.Length == 1 => $"SQRT(CASE WHEN {args[0]} < 0 THEN NULL ELSE {args[0]} END)",
                     nameof(Math.Pow) when args.Length == 2 => $"POWER({args[0]}, {args[1]})",
                     nameof(Math.Exp) when args.Length == 1 => $"EXP({args[0]})",
                     nameof(Math.Log) when args.Length == 1 => $"LOG({args[0]})",
@@ -923,6 +1250,20 @@ namespace nORM.Providers
             return $@"IF OBJECT_ID(N'__NormTemporalTags', N'U') IS NULL
 CREATE TABLE {table} ({tagCol} NVARCHAR(450) NOT NULL, {tsCol} DATETIME2 NOT NULL, PRIMARY KEY ({tagCol}))";
         }
+
+        /// <summary>
+        /// Creates temporal tags using the SQL Server UTC database clock so tag
+        /// timestamps are comparable to trigger-generated history windows.
+        /// </summary>
+        public override string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, SYSUTCDATETIME())";
+        }
+
+        internal override bool UsesDatabaseClockForTemporalTags => true;
 
         /// <summary>
         /// SQL Server uses SELECT TOP 1, not LIMIT 1.
@@ -1093,6 +1434,126 @@ BEGIN
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
     SELECT @Now, @Now, 'D', {deletedColumns} FROM deleted d;
 END;";
+        }
+
+        /// <inheritdoc />
+        public override bool SupportsProviderNativeTemporalTables => true;
+
+        /// <inheritdoc />
+        public override string GenerateProviderNativeTemporalBootstrapSql(TableMapping mapping)
+        {
+            if (mapping.KeyColumns.Length == 0)
+                throw new NormConfigurationException(
+                    $"SQL Server system-versioned temporal table '{mapping.Type.Name}' requires a primary key.");
+
+            var (schema, tableName) = SplitSchemaTable(mapping.TableName, "dbo");
+            var escapedTable = Escape(mapping.TableName);
+            var escapedHistory = Escape(schema + "." + tableName + "_SystemHistory");
+            var startColumn = Escape("__NormSysStartTime");
+            var endColumn = Escape("__NormSysEndTime");
+            var startConstraint = Escape("DF_" + tableName + "_NormSysStart");
+            var endConstraint = Escape("DF_" + tableName + "_NormSysEnd");
+            var qualifiedName = (schema + "." + tableName).Replace("'", "''", StringComparison.Ordinal);
+
+            return $@"
+IF COL_LENGTH(N'{qualifiedName}', N'__NormSysStartTime') IS NULL
+BEGIN
+    ALTER TABLE {escapedTable} ADD
+        {startColumn} DATETIME2 GENERATED ALWAYS AS ROW START HIDDEN NOT NULL
+            CONSTRAINT {startConstraint} DEFAULT SYSUTCDATETIME(),
+        {endColumn} DATETIME2 GENERATED ALWAYS AS ROW END HIDDEN NOT NULL
+            CONSTRAINT {endConstraint} DEFAULT CONVERT(DATETIME2, '9999-12-31 23:59:59.9999999'),
+        PERIOD FOR SYSTEM_TIME ({startColumn}, {endColumn});
+END;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables
+    WHERE object_id = OBJECT_ID(N'{qualifiedName}') AND temporal_type = 2
+)
+BEGIN
+    ALTER TABLE {escapedTable}
+        SET (SYSTEM_VERSIONING = ON (
+            HISTORY_TABLE = {escapedHistory},
+            DATA_CONSISTENCY_CHECK = ON
+        ));
+END;";
+        }
+
+        /// <inheritdoc />
+        public override string GetProviderNativeTemporalAsOfFromClause(TableMapping mapping, string timestampParameterName)
+        {
+            EnsureValidParameterName(timestampParameterName, nameof(timestampParameterName));
+            return $"{Escape(mapping.TableName)} FOR SYSTEM_TIME AS OF {timestampParameterName}";
+        }
+
+        /// <inheritdoc />
+        public override bool SupportsNativeTenantSessionContext => true;
+
+        /// <inheritdoc />
+        public override string GetSetNativeTenantSessionContextSql(string sessionKey, string tenantParameterName)
+        {
+            EnsureValidParameterName(tenantParameterName, nameof(tenantParameterName));
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+            return $"EXEC sys.sp_set_session_context @key = N'{sessionKey}', @value = {tenantParameterName};";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateNativeTenantPolicySql(TableMapping mapping, string sessionKey)
+        {
+            var tenantCol = mapping.TenantColumn
+                ?? throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native SQL Server RLS.");
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+
+            var baseTableName = mapping.TableName.Contains('.', StringComparison.Ordinal)
+                ? mapping.TableName[(mapping.TableName.LastIndexOf('.') + 1)..]
+                : mapping.TableName;
+            var predicateFunction = Escape("dbo.fn_norm_rls_" + baseTableName);
+            var policy = Escape("dbo.sp_norm_rls_" + baseTableName);
+            var table = Escape(mapping.TableName.Contains('.', StringComparison.Ordinal)
+                ? mapping.TableName
+                : "dbo." + mapping.TableName);
+            var sqlType = GetSqlType(tenantCol.Prop.PropertyType);
+            return $@"
+CREATE OR ALTER FUNCTION {predicateFunction}(@TenantId {sqlType})
+RETURNS TABLE
+WITH SCHEMABINDING
+AS
+RETURN SELECT 1 AS fn_securitypredicate_result
+WHERE CONVERT(NVARCHAR(4000), @TenantId) = CONVERT(NVARCHAR(4000), SESSION_CONTEXT(N'{sessionKey}'));
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.security_policies WHERE name = N'sp_norm_rls_{baseTableName}' AND SCHEMA_NAME(schema_id) = N'dbo')
+BEGIN
+    CREATE SECURITY POLICY {policy}
+    ADD FILTER PREDICATE {predicateFunction}({tenantCol.EscCol}) ON {table},
+    ADD BLOCK PREDICATE {predicateFunction}({tenantCol.EscCol}) ON {table} AFTER INSERT,
+    ADD BLOCK PREDICATE {predicateFunction}({tenantCol.EscCol}) ON {table} AFTER UPDATE
+    WITH (STATE = ON);
+END;";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateDropNativeTenantPolicySql(TableMapping mapping)
+        {
+            if (mapping.TenantColumn == null)
+                throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native SQL Server RLS.");
+
+            var baseTableName = mapping.TableName.Contains('.', StringComparison.Ordinal)
+                ? mapping.TableName[(mapping.TableName.LastIndexOf('.') + 1)..]
+                : mapping.TableName;
+            var predicateFunction = Escape("dbo.fn_norm_rls_" + baseTableName);
+            var policy = Escape("dbo.sp_norm_rls_" + baseTableName);
+            return $@"
+IF EXISTS (SELECT 1 FROM sys.security_policies WHERE name = N'sp_norm_rls_{baseTableName}' AND SCHEMA_NAME(schema_id) = N'dbo')
+    DROP SECURITY POLICY {policy};
+
+IF OBJECT_ID(N'dbo.fn_norm_rls_{baseTableName}', N'IF') IS NOT NULL
+    DROP FUNCTION {predicateFunction};";
         }
 
         /// <summary>

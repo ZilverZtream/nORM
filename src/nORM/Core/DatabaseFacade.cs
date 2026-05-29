@@ -21,7 +21,22 @@ namespace nORM.Core
         /// <summary>
         /// Gets the active <see cref="DbTransaction"/> for the context, if one exists.
         /// </summary>
-        public DbTransaction? CurrentTransaction => _context.CurrentTransaction;
+        public DbTransaction? CurrentTransaction
+        {
+            get
+            {
+                _context.ThrowIfStrictProviderMobilityEscapeHatch(nameof(CurrentTransaction));
+                return _context.CurrentTransaction;
+            }
+        }
+
+        /// <summary>
+        /// Gets the active nORM-managed transaction wrapper for the context, if one exists.
+        /// This property does not expose the underlying provider transaction handle and is
+        /// safe to use with strict provider mobility.
+        /// </summary>
+        public DbContextTransaction? CurrentContextTransaction
+            => _context.CurrentContextTransaction;
 
         /// <summary>
         /// Begins a new database transaction for the current context.
@@ -34,9 +49,10 @@ namespace nORM.Core
             if (_context.CurrentTransaction != null)
                 throw new NormUsageException("A transaction is already active.");
             await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            var transaction = await _context.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-            _context.CurrentTransaction = transaction;
-            return new DbContextTransaction(transaction, _context);
+            var transaction = await _context.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            var contextTransaction = new DbContextTransaction(transaction, _context);
+            _context.SetCurrentTransaction(transaction, contextTransaction);
+            return contextTransaction;
         }
     }
 }

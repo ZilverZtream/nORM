@@ -58,9 +58,9 @@ public class LinqKeyedSetOpsTranslatabilityTests : IAsyncLifetime
     [Fact]
     public async Task DistinctBy_returns_one_row_per_key_first_in_source_order()
     {
-        // Originally pinned as "throws actionable error" -- subsequently flipped
-        // to a positive translate path via a post-materialize compiled key
-        // selector. Source ordered by Id; first per Category: A -> 1, B -> 3.
+        // Source ordered by Id; first per Category: A -> 1, B -> 3.
+        // The provider-shape tests pin that this is now server-side ROW_NUMBER,
+        // not a post-materialize dedupe.
         var result = await _ctx.Query<KsoItem>()
             .OrderBy(i => i.Id)
             .DistinctBy(i => i.Category)

@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using nORM.Providers;
 using Xunit;
@@ -93,6 +94,7 @@ public class TemporalProviderBootstrapTests
         Assert.Contains("\"__NormTemporalTags\"", sql);
         Assert.Contains("\"TagName\"", sql);
         Assert.Contains("\"Timestamp\"", sql);
+        Assert.Contains("@p0", sql);
         Assert.DoesNotContain("__NormTemporalTags\"", sql.Replace("\"__NormTemporalTags\"", "")); // confirm escaped form
     }
 
@@ -239,13 +241,14 @@ public class TemporalProviderBootstrapTests
  // Insert a tag using provider-escaped SQL
         var p0 = provider.ParamPrefix + "p0";
         var p1 = provider.ParamPrefix + "p1";
+        var before = DateTime.UtcNow.AddSeconds(-2);
         using (var cmd = cn.CreateCommand())
         {
             cmd.CommandText = provider.GetCreateTagSql(p0, p1);
             cmd.Parameters.Add(new SqliteParameter(p0, "release-1.0"));
-            cmd.Parameters.Add(new SqliteParameter(p1, "2024-01-15T12:00:00"));
             cmd.ExecuteNonQuery();
         }
+        var after = DateTime.UtcNow.AddSeconds(2);
 
  // Look up the tag using provider-escaped SQL
         using var lookupCmd = cn.CreateCommand();
@@ -254,7 +257,8 @@ public class TemporalProviderBootstrapTests
         var result = lookupCmd.ExecuteScalar();
 
         Assert.NotNull(result);
-        Assert.Equal("2024-01-15T12:00:00", result!.ToString());
+        var timestamp = DateTime.Parse(result!.ToString()!, CultureInfo.InvariantCulture);
+        Assert.InRange(timestamp, before, after);
     }
 
  // ── MySQL: temporal bootstrap SQL ────────────────────────────────────────
@@ -303,7 +307,7 @@ public class TemporalProviderBootstrapTests
     }
 
     //<summary>
-    //MySQL GetCreateTagSql must use backtick-escaped identifiers and include both param names.
+    //MySQL GetCreateTagSql must use backtick-escaped identifiers and the server UTC clock.
     //</summary>
     [Fact]
     public void MySqlProvider_GetCreateTagSql_UsesBacktickEscaping()
@@ -315,7 +319,8 @@ public class TemporalProviderBootstrapTests
         Assert.Contains("`TagName`", sql);
         Assert.Contains("`Timestamp`", sql);
         Assert.Contains("@p0", sql);
-        Assert.Contains("@p1", sql);
+        Assert.DoesNotContain("@p1", sql);
+        Assert.Contains("UTC_TIMESTAMP(6)", sql);
     }
 
     //<summary>
@@ -388,7 +393,7 @@ public class TemporalProviderBootstrapTests
     }
 
     //<summary>
-    //PostgreSQL GetCreateTagSql must use double-quote-escaped identifiers and include both param names.
+    //PostgreSQL GetCreateTagSql must use double-quote-escaped identifiers and the database UTC clock.
     //</summary>
     [Fact]
     public void PostgresProvider_GetCreateTagSql_UsesDoubleQuoteEscaping()
@@ -400,7 +405,8 @@ public class TemporalProviderBootstrapTests
         Assert.Contains("\"TagName\"", sql);
         Assert.Contains("\"Timestamp\"", sql);
         Assert.Contains("@p0", sql);
-        Assert.Contains("@p1", sql);
+        Assert.DoesNotContain("@p1", sql);
+        Assert.Contains("now() at time zone 'utc'", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     //<summary>

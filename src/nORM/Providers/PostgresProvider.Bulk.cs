@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -28,7 +28,7 @@ namespace nORM.Providers
         /// <returns>The number of rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -39,11 +39,11 @@ namespace nORM.Providers
             var operationKey = $"Postgres_BulkInsert_{m.Type.Name}";
 
             var npgConnType = Type.GetType("Npgsql.NpgsqlConnection, Npgsql");
-            if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.Connection))
+            if (npgConnType != null && npgConnType.IsInstanceOfType(ctx.RawConnection))
             {
                 var copySql = $"COPY {m.EscTable} ({string.Join(", ", cols.Select(c => c.EscCol))}) FROM STDIN (FORMAT BINARY)";
-                var beginMethod = ctx.Connection.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
-                var importerObj = beginMethod?.Invoke(ctx.Connection, new object[] { copySql });
+                var beginMethod = ctx.RawConnection.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
+                var importerObj = beginMethod?.Invoke(ctx.RawConnection, new object[] { copySql });
                 if (importerObj == null) throw new InvalidOperationException("BeginBinaryImport not available");
                 try
                 {
@@ -153,7 +153,7 @@ namespace nORM.Providers
         /// <returns>Count of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
@@ -174,7 +174,7 @@ namespace nORM.Providers
             var totalUpdated = 0;
             var ownedTx = ctx.CurrentTransaction == null;
             DbTransaction? transaction = ownedTx
-                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                ? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false)
                 : ctx.CurrentTransaction;
             try
             {
@@ -212,17 +212,20 @@ namespace nORM.Providers
                         sb.Append(") WHERE ");
 
                         // Add tenant predicate to prevent cross-tenant bulk updates
-                        var tenantParam = ctx.Options.TenantProvider != null && m.TenantColumn != null
+                        var tenantCol = ctx.Options.TenantProvider != null
+                            ? ctx.RequireTenantColumn(m, "PostgreSQL bulk update")
+                            : null;
+                        var tenantParam = tenantCol != null
                             ? $"{ParamPrefix}__tenant_bulk"
                             : null;
                         sb.Append(BuildBulkUpdateWhereClause(
                             keyCols.Select(c => c.EscCol),
                             m.TimestampColumn?.EscCol,
-                            m.TenantColumn?.EscCol,
+                            tenantCol?.EscCol,
                             tenantParam));
-                        if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                        if (tenantParam != null)
                         {
-                            cmd.AddParam(tenantParam!, ctx.Options.TenantProvider.GetCurrentTenantId());
+                            cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "PostgreSQL bulk update"));
                         }
 
                         cmd.CommandText = sb.ToString();
@@ -286,7 +289,7 @@ namespace nORM.Providers
         /// <returns>Number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
@@ -304,7 +307,7 @@ namespace nORM.Providers
             var totalDeleted = 0;
             var ownedTx = ctx.CurrentTransaction == null;
             DbTransaction? transaction = ownedTx
-                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                ? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false)
                 : ctx.CurrentTransaction;
             try
             {
@@ -322,14 +325,15 @@ namespace nORM.Providers
                     cmd.Parameters.Add(p);
                     var deleteSql = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} = ANY({pName})";
                     // Add tenant predicate to prevent cross-tenant bulk deletes
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    if (ctx.Options.TenantProvider != null)
                     {
+                        var tenantCol = ctx.RequireTenantColumn(m, "PostgreSQL bulk delete");
                         var tenantParam = $"{ParamPrefix}__tenant_bulk";
                         var tp = cmd.CreateParameter();
                         tp.ParameterName = tenantParam;
-                        tp.Value = ctx.Options.TenantProvider.GetCurrentTenantId() ?? (object)DBNull.Value;
+                        tp.Value = ctx.GetRequiredTenantId(m, "PostgreSQL bulk delete");
                         cmd.Parameters.Add(tp);
-                        deleteSql += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                        deleteSql += $" AND {tenantCol.EscCol} = {tenantParam}";
                     }
                     cmd.CommandText = deleteSql;
                     var batchSw = Stopwatch.StartNew();

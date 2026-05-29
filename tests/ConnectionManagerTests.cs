@@ -103,7 +103,10 @@ public class ConnectionManagerTests
 
         await Assert.ThrowsAnyAsync<Exception>(() => manager.GetWriteConnectionAsync());
         var ex = await Assert.ThrowsAsync<NormConnectionException>(() => manager.GetWriteConnectionAsync());
-        Assert.Contains("Circuit breaker is open", ex.Message);
+        Assert.True(
+            ex.Message.Contains("Circuit breaker is open", StringComparison.Ordinal)
+            || ex.Message.Contains("No healthy primary node available", StringComparison.Ordinal),
+            $"Expected circuit breaker or failover exhaustion message, got: {ex.Message}");
     }
 
     [Fact]

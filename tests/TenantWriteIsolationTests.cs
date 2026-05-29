@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
@@ -166,5 +167,39 @@ public class TenantWriteIsolationTests
         var affected = await ctx.SaveChangesAsync();
         Assert.Equal(1, affected);
         Assert.Equal("Updated", await ReadNameAsync(cn, 4));
+    }
+
+    [Fact]
+    public async Task ExecuteUpdate_CrossTenantKnownId_DoesNotModifyRow()
+    {
+        var (cn, ctx) = await CreateContextAsync("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        await InsertRawAsync(cn, 5, "OtherTenant", "B");
+
+        var affected = await ctx.Query<TwItem>()
+            .Where(i => i.Id == 5)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.Name, "Blocked"));
+
+        Assert.Equal(0, affected);
+        Assert.Equal("OtherTenant", await ReadNameAsync(cn, 5));
+    }
+
+    [Fact]
+    public async Task ExecuteDelete_CrossTenantKnownId_DoesNotDeleteRow()
+    {
+        var (cn, ctx) = await CreateContextAsync("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        await InsertRawAsync(cn, 6, "OtherTenant", "B");
+
+        var affected = await ctx.Query<TwItem>()
+            .Where(i => i.Id == 6)
+            .ExecuteDeleteAsync();
+
+        Assert.Equal(0, affected);
+        Assert.Equal(1L, await CountAsync(cn, 6, "B"));
     }
 }

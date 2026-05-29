@@ -31,16 +31,17 @@ namespace nORM.Core
         public Task<List<T>> QueryUnchangedAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
         {
             ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(QueryUnchangedAsync));
             return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                await using var cmd = CommandPool.Get(ctx.RawConnection, sql);
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                NormValidator.ValidateRawQuerySql(sql, ctx.Provider, paramDict);
+                NormValidator.ValidateRawQuerySql(sql, ctx.RawProvider, paramDict);
 
                 var list = new List<T>();
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
@@ -169,16 +170,17 @@ namespace nORM.Core
         public Task<List<T>> FromSqlRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters) where T : class, new()
         {
             ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(FromSqlRawAsync));
             return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, sql);
+                await using var cmd = CommandPool.Get(ctx.RawConnection, sql);
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
                 var paramDict = ctx.AddParametersFast(cmd, parameters);
-                NormValidator.ValidateRawQuerySql(sql, ctx.Provider, paramDict);
+                NormValidator.ValidateRawQuerySql(sql, ctx.RawProvider, paramDict);
 
                 var mapping = ctx.GetMapping(typeof(T));
                 var list = new List<T>();
@@ -230,11 +232,12 @@ namespace nORM.Core
         public Task<List<T>> ExecuteStoredProcedureAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null) where T : class, new()
         {
             ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteStoredProcedureAsync));
             return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                await using var cmd = CommandPool.Get(ctx.RawConnection, procedureName);
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;
@@ -277,6 +280,7 @@ namespace nORM.Core
         public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
         {
             ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteStoredProcedureAsAsyncEnumerable));
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             await using var cmd = CommandPool.Get(Connection, procedureName);
@@ -325,11 +329,12 @@ namespace nORM.Core
         public Task<StoredProcedureResult<T>> ExecuteStoredProcedureWithOutputAsync<T>(string procedureName, CancellationToken ct = default, object? parameters = null, params OutputParameter[] outputParameters) where T : class, new()
         {
             ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteStoredProcedureWithOutputAsync));
             return _executionStrategy.ExecuteAsync(async (ctx, token) =>
             {
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
-                await using var cmd = CommandPool.Get(ctx.Connection, procedureName);
+                await using var cmd = CommandPool.Get(ctx.RawConnection, procedureName);
                 if (ctx.CurrentTransaction != null)
                     cmd.Transaction = ctx.CurrentTransaction;
                 cmd.CommandType = ctx._p.StoredProcedureCommandType;

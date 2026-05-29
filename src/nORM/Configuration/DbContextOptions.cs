@@ -65,6 +65,26 @@ namespace nORM.Configuration
     }
 
     /// <summary>
+    /// Controls whether a context permits provider-bound escape hatches or enforces
+    /// nORM's strict provider mobility contract.
+    /// </summary>
+    public enum ProviderMobilityMode
+    {
+        /// <summary>
+        /// Preserve the full public API surface, including explicit provider-bound
+        /// escape hatches such as raw SQL, stored procedures and provider-native DDL.
+        /// </summary>
+        Compatibility,
+
+        /// <summary>
+        /// Permit only generated nORM paths whose semantics are translated,
+        /// emulated or rejected deterministically by nORM before execution.
+        /// Provider-bound escape hatches throw <see cref="NormUnsupportedFeatureException"/>.
+        /// </summary>
+        Strict
+    }
+
+    /// <summary>
     /// Represents the configurable options for a <see cref="DbContext"/> instance.
     /// These settings control behavior such as command timeouts, logging, caching and
     /// how entities are tracked and filtered across the context.
@@ -90,6 +110,28 @@ namespace nORM.Configuration
 
         private int _bulkBatchSize = DefaultBulkBatchSize;
         private bool _temporalVersioningEnabled;
+        private TemporalStorageMode _temporalStorageMode = TemporalStorageMode.NormManaged;
+        private NativeTenantSecurityMode _nativeTenantSecurityMode = NativeTenantSecurityMode.Disabled;
+        private ClientEvaluationPolicy _clientEvaluationPolicy = ClientEvaluationPolicy.Throw;
+        private ProviderMobilityMode _providerMobilityMode = ProviderMobilityMode.Compatibility;
+
+        /// <summary>
+        /// Gets or sets the storage engine used when temporal versioning is enabled.
+        /// The default is provider-neutral nORM-managed history tables and triggers.
+        /// </summary>
+        public TemporalStorageMode TemporalStorageMode
+        {
+            get => _temporalStorageMode;
+            set
+            {
+                if (!Enum.IsDefined(typeof(TemporalStorageMode), value))
+                    throw new NormConfigurationException($"Unsupported temporal storage mode '{value}'.");
+                if (_providerMobilityMode == ProviderMobilityMode.Strict && value == TemporalStorageMode.ProviderNative)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility requires nORM-managed temporal storage. Provider-native temporal storage is provider-bound.");
+                _temporalStorageMode = value;
+            }
+        }
         // MEMORY SAFETY: Reduced default from 100,000 to 10,000 to prevent OOM.
         // 10 concurrent GroupJoins x 10k records x 1KB/record = ~100MB (safe for most environments).
         // Previous default (100k) could cause 1GB+ memory usage with concurrent queries.
@@ -184,6 +226,33 @@ namespace nORM.Configuration
         public string TenantColumnName { get; set; } = "TenantId";
 
         /// <summary>
+        /// Gets or sets optional provider-native tenant security integration.
+        /// When set to <see cref="NativeTenantSecurityMode.SessionContext"/>,
+        /// nORM writes the current tenant ID into provider session state before
+        /// generated commands execute. Database-native RLS policies can then use
+        /// that value as defense in depth.
+        /// </summary>
+        public NativeTenantSecurityMode NativeTenantSecurityMode
+        {
+            get => _nativeTenantSecurityMode;
+            set
+            {
+                if (!Enum.IsDefined(typeof(NativeTenantSecurityMode), value))
+                    throw new NormConfigurationException($"Unsupported native tenant security mode '{value}'.");
+                if (_providerMobilityMode == ProviderMobilityMode.Strict && value != NativeTenantSecurityMode.Disabled)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility does not allow provider-native tenant security modes. Use generated-path tenant enforcement.");
+                _nativeTenantSecurityMode = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the provider-native session key used by
+        /// <see cref="NativeTenantSecurityMode.SessionContext"/>.
+        /// </summary>
+        public string NativeTenantSessionKey { get; set; } = "norm.tenant_id";
+
+        /// <summary>
         /// Gets or sets a callback invoked during model creation allowing additional
         /// configuration of the model.
         /// </summary>
@@ -219,7 +288,50 @@ namespace nORM.Configuration
         /// materialization. Filters, joins, grouping, ordering and paging are still
         /// translated server-side before any allowed client projection is applied.
         /// </summary>
-        public ClientEvaluationPolicy ClientEvaluationPolicy { get; set; } = ClientEvaluationPolicy.Throw;
+        public ClientEvaluationPolicy ClientEvaluationPolicy
+        {
+            get => _clientEvaluationPolicy;
+            set
+            {
+                if (!Enum.IsDefined(typeof(ClientEvaluationPolicy), value))
+                    throw new NormConfigurationException($"Unsupported client evaluation policy '{value}'.");
+                if (_providerMobilityMode == ProviderMobilityMode.Strict && value == ClientEvaluationPolicy.Allow)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility does not allow silent client evaluation. Use ClientEvaluationPolicy.Throw, or ClientEvaluationPolicy.Warn for explicit top-level projection tails after server filtering/paging.");
+                _clientEvaluationPolicy = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the context allows provider-bound escape hatches or
+        /// enforces the strict provider mobility contract. The default preserves
+        /// compatibility; release certification should use <see cref="ProviderMobilityMode.Strict"/>.
+        /// </summary>
+        public ProviderMobilityMode ProviderMobilityMode
+        {
+            get => _providerMobilityMode;
+            set
+            {
+                if (!Enum.IsDefined(typeof(ProviderMobilityMode), value))
+                    throw new NormConfigurationException($"Unsupported provider mobility mode '{value}'.");
+                if (value == ProviderMobilityMode.Strict)
+                {
+                    if (_temporalStorageMode == TemporalStorageMode.ProviderNative)
+                        throw new NormConfigurationException(
+                            "Strict provider mobility requires nORM-managed temporal storage. Provider-native temporal storage is provider-bound.");
+                    if (_nativeTenantSecurityMode != NativeTenantSecurityMode.Disabled)
+                        throw new NormConfigurationException(
+                            "Strict provider mobility does not allow provider-native tenant security modes. Use generated-path tenant enforcement.");
+                    if (CommandInterceptors.Count > 0)
+                        throw new NormConfigurationException(
+                            "Strict provider mobility does not allow command interceptors because they can inspect, rewrite, or suppress generated DbCommand execution.");
+                    if (_clientEvaluationPolicy == ClientEvaluationPolicy.Allow)
+                        throw new NormConfigurationException(
+                            "Strict provider mobility does not allow silent client evaluation. Use ClientEvaluationPolicy.Throw, or ClientEvaluationPolicy.Warn for explicit top-level projection tails after server filtering/paging.");
+                }
+                _providerMobilityMode = value;
+            }
+        }
 
         /// <summary>
         /// Gets the collection of command interceptors that will be invoked for every
@@ -259,6 +371,62 @@ namespace nORM.Configuration
         }
 
         /// <summary>
+        /// Enforces nORM's strict provider mobility contract for this context.
+        /// In strict mode, generated nORM query/write/temporal paths may translate,
+        /// emulate or fail deterministically, while raw SQL, stored procedures,
+        /// provider-native RLS and provider-native temporal storage are rejected.
+        /// Client projection tails remain rejected by default; callers may opt
+        /// into <see cref="Configuration.ClientEvaluationPolicy.Warn"/> for
+        /// explicit top-level projection tails after server filters, ordering and
+        /// paging have run.
+        /// </summary>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
+        public DbContextOptions UseStrictProviderMobility()
+        {
+            ClientEvaluationPolicy = ClientEvaluationPolicy.Throw;
+            ProviderMobilityMode = ProviderMobilityMode.Strict;
+            return this;
+        }
+
+        /// <summary>
+        /// Enforces nORM's strict provider mobility contract while selecting the
+        /// client-evaluation policy for top-level projection tails. Strict mode
+        /// permits <see cref="Configuration.ClientEvaluationPolicy.Throw"/> and
+        /// <see cref="Configuration.ClientEvaluationPolicy.Warn"/> only; silent
+        /// <see cref="Configuration.ClientEvaluationPolicy.Allow"/> remains a
+        /// compatibility-mode setting.
+        /// </summary>
+        /// <param name="clientEvaluationPolicy">
+        /// Either <see cref="Configuration.ClientEvaluationPolicy.Throw"/> to
+        /// reject projection tails or <see cref="Configuration.ClientEvaluationPolicy.Warn"/>
+        /// to log and apply top-level projection tails after server-side filters,
+        /// ordering and paging.
+        /// </param>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
+        public DbContextOptions UseStrictProviderMobility(ClientEvaluationPolicy clientEvaluationPolicy)
+        {
+            if (clientEvaluationPolicy == ClientEvaluationPolicy.Allow)
+                throw new NormConfigurationException(
+                    "Strict provider mobility does not allow silent client evaluation. Use ClientEvaluationPolicy.Throw, or ClientEvaluationPolicy.Warn for explicit top-level projection tails after server filtering/paging.");
+            ClientEvaluationPolicy = clientEvaluationPolicy;
+            ProviderMobilityMode = ProviderMobilityMode.Strict;
+            return this;
+        }
+
+        /// <summary>
+        /// Enables provider-native tenant session context integration for
+        /// database-native RLS policies.
+        /// </summary>
+        /// <param name="sessionKey">Provider session key used to store the tenant ID.</param>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
+        public DbContextOptions EnableNativeTenantSessionContext(string sessionKey = "norm.tenant_id")
+        {
+            NativeTenantSecurityMode = NativeTenantSecurityMode.SessionContext;
+            NativeTenantSessionKey = sessionKey;
+            return this;
+        }
+
+        /// <summary>
         /// Enables temporal versioning for all entities in the context. When enabled the
         /// provider generates history tables and triggers to track changes over time.
         /// </summary>
@@ -266,6 +434,19 @@ namespace nORM.Configuration
         public DbContextOptions EnableTemporalVersioning()
         {
             _temporalVersioningEnabled = true;
+            TemporalStorageMode = TemporalStorageMode.NormManaged;
+            return this;
+        }
+
+        /// <summary>
+        /// Enables temporal versioning using the selected storage mode.
+        /// </summary>
+        /// <param name="storageMode">Temporal storage engine to use.</param>
+        /// <returns>The current <see cref="DbContextOptions"/> instance for chaining.</returns>
+        public DbContextOptions EnableTemporalVersioning(TemporalStorageMode storageMode)
+        {
+            _temporalVersioningEnabled = true;
+            TemporalStorageMode = storageMode;
             return this;
         }
 
@@ -371,6 +552,36 @@ namespace nORM.Configuration
 
             if (string.IsNullOrWhiteSpace(TenantColumnName))
                 throw new NormConfigurationException("TenantColumnName cannot be null or empty.");
+            if (!Enum.IsDefined(typeof(TemporalStorageMode), TemporalStorageMode))
+                throw new NormConfigurationException($"Unsupported temporal storage mode '{TemporalStorageMode}'.");
+            if (!Enum.IsDefined(typeof(ProviderMobilityMode), ProviderMobilityMode))
+                throw new NormConfigurationException($"Unsupported provider mobility mode '{ProviderMobilityMode}'.");
+            if (!Enum.IsDefined(typeof(ClientEvaluationPolicy), ClientEvaluationPolicy))
+                throw new NormConfigurationException($"Unsupported client evaluation policy '{ClientEvaluationPolicy}'.");
+            if (ProviderMobilityMode == ProviderMobilityMode.Strict)
+            {
+                if (ClientEvaluationPolicy == ClientEvaluationPolicy.Allow)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility does not allow silent client evaluation. Use ClientEvaluationPolicy.Throw, or ClientEvaluationPolicy.Warn for explicit top-level projection tails after server filtering/paging.");
+                if (TemporalStorageMode == TemporalStorageMode.ProviderNative)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility requires nORM-managed temporal storage. Provider-native temporal storage is provider-bound.");
+                if (NativeTenantSecurityMode != NativeTenantSecurityMode.Disabled)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility does not allow provider-native tenant security modes. Use generated-path tenant enforcement.");
+                if (CommandInterceptors.Count > 0)
+                    throw new NormConfigurationException(
+                        "Strict provider mobility does not allow command interceptors because they can inspect, rewrite, or suppress generated DbCommand execution.");
+            }
+            if (NativeTenantSecurityMode != NativeTenantSecurityMode.Disabled)
+            {
+                if (TenantProvider == null)
+                    throw new NormConfigurationException(
+                        "Native tenant security requires TenantProvider to be configured.");
+                if (string.IsNullOrWhiteSpace(NativeTenantSessionKey))
+                    throw new NormConfigurationException(
+                        "NativeTenantSessionKey cannot be null or empty when native tenant security is enabled.");
+            }
 
             if (CacheExpiration <= TimeSpan.Zero)
                 throw new NormConfigurationException("CacheExpiration must be positive.");

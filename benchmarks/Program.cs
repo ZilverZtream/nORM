@@ -112,6 +112,7 @@ namespace nORM.Benchmarks
                 Console.WriteLine("• Check that SQLite is available");
                 Console.WriteLine("• Run with --quick flag for basic functionality test");
                 Console.WriteLine("• Run with --fast flag for nORM-only debugging");
+                throw;
             }
 
             Console.WriteLine();
@@ -137,6 +138,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  --norm-only       Same as --fast");
             Console.WriteLine("  --complex         Focused complex-query comparison");
             Console.WriteLine("  --provider-matrix Run full provider matrix comparison across SQLite, SQL Server, PostgreSQL, MySQL");
+            Console.WriteLine("  --provider <name> Limit provider matrix to Sqlite, SqlServer, Postgres, or MySql");
             Console.WriteLine("  --filter <pattern> Run benchmarks matching a BenchmarkDotNet filter");
             Console.WriteLine("  --help            Show this help");
             Console.WriteLine();
@@ -145,7 +147,7 @@ namespace nORM.Benchmarks
             Console.WriteLine("  dotnet run --fast       # Debug nORM performance only");
             Console.WriteLine("  dotnet run --fast Query_Complex_Compiled");
             Console.WriteLine("  dotnet run --complex    # Compare complex-query implementations");
-            Console.WriteLine("  dotnet run -- --provider-matrix --filter *Query_Complex*");
+            Console.WriteLine("  dotnet run -- --provider-matrix --provider Postgres --filter *Query_Complex*");
             Console.WriteLine("  dotnet run              # Full comparison benchmark");
         }
 
@@ -206,17 +208,30 @@ namespace nORM.Benchmarks
                 {
                     Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
                 }
+
+                throw;
             }
         }
 
         private static void RunProviderMatrixBenchmarks(string[] benchmarkArgs)
         {
+            var (provider, remainingArgs) = ExtractProviderArgument(benchmarkArgs);
+            if (provider != null)
+            {
+                ProviderMatrixBenchmarks.SelectedProviders = new[] { provider };
+                Console.WriteLine($"Provider filter: {provider}");
+            }
+            else
+            {
+                ProviderMatrixBenchmarks.SelectedProviders = new[] { "Sqlite", "SqlServer", "Postgres", "MySql" };
+            }
+
             var config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithOptions(ConfigOptions.DisableOptimizationsValidator);
 
-            var argsToRun = benchmarkArgs.Length == 0
+            var argsToRun = remainingArgs.Length == 0
                 ? new[] { "--filter", "*ProviderMatrixBenchmarks*" }
-                : benchmarkArgs;
+                : remainingArgs;
 
             var summaries = BenchmarkSwitcher
                 .FromTypes(new[] { typeof(ProviderMatrixBenchmarks) })
@@ -225,6 +240,38 @@ namespace nORM.Benchmarks
             if (summaries.Any(HasBenchmarkFailures))
                 throw new InvalidOperationException("Provider matrix benchmark validation failed.");
         }
+
+        private static (string? Provider, string[] RemainingArgs) ExtractProviderArgument(string[] args)
+        {
+            var remaining = new System.Collections.Generic.List<string>(args.Length);
+            string? provider = null;
+
+            for (var i = 0; i < args.Length; i++)
+            {
+                if (args[i].Equals("--provider", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (i + 1 >= args.Length)
+                        throw new ArgumentException("--provider requires one of: Sqlite, SqlServer, Postgres, MySql.");
+
+                    provider = NormalizeProviderName(args[++i]);
+                    continue;
+                }
+
+                remaining.Add(args[i]);
+            }
+
+            return (provider, remaining.ToArray());
+        }
+
+        private static string NormalizeProviderName(string provider)
+            => provider.ToLowerInvariant() switch
+            {
+                "sqlite" => "Sqlite",
+                "sqlserver" or "sql-server" or "mssql" => "SqlServer",
+                "postgres" or "postgresql" => "Postgres",
+                "mysql" => "MySql",
+                _ => throw new ArgumentException($"Unsupported provider '{provider}'. Use Sqlite, SqlServer, Postgres, or MySql.")
+            };
 
         private static bool HasBenchmarkFailures(object summary)
         {

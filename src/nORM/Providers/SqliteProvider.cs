@@ -1,9 +1,10 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,10 +25,12 @@ namespace nORM.Providers
     public class SqliteProvider : DatabaseProvider
     {
         /// <summary>
-        /// SQLite has no true async I/O â€” all async methods are synchronous wrappers.
+        /// SQLite has no true async I/O — all async methods are synchronous wrappers.
         /// Using sync calls eliminates ~50-100ns of async state machine overhead per Read().
         /// </summary>
         public override bool PrefersSyncExecution => true;
+
+        internal override bool SupportsQueryPlanPreparedCommandCache => true;
 
         /// <summary>
         /// Bare boolean predicates avoid steering SQLite toward low-selectivity boolean indexes
@@ -119,7 +122,10 @@ namespace nORM.Providers
         /// <summary>SQLite TEXT affinity is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 
-        /// <summary>SQLite has no XOR operator â€” synthesize via `(a | b) - (a &amp; b)`.</summary>
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"{sql} COLLATE BINARY";
+
+        /// <summary>SQLite has no XOR operator — synthesize via `(a | b) - (a &amp; b)`.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"(({left} | {right}) - ({left} & {right}))";
 
         /// <summary>
@@ -252,6 +258,22 @@ namespace nORM.Providers
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => $"CAST(strftime('%s', {dtoSql}) AS INTEGER)";
 
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"CAST(ROUND((julianday({dtoSql}) - 2440587.5) * 86400000.0) AS INTEGER)";
+
+        internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+        {
+            var fractionalTail = $"substr({dtoSql}, 21)";
+            var fractionalLength =
+                $"CASE WHEN instr({fractionalTail}, '+') > 0 THEN instr({fractionalTail}, '+') - 1 " +
+                $"WHEN instr({fractionalTail}, '-') > 0 THEN instr({fractionalTail}, '-') - 1 " +
+                $"WHEN instr({fractionalTail}, 'Z') > 0 THEN instr({fractionalTail}, 'Z') - 1 " +
+                $"ELSE length({fractionalTail}) END";
+            return $"((CAST(strftime('%s', {dtoSql}) AS INTEGER) * 1000000) + " +
+                   $"CAST(CASE WHEN substr({dtoSql}, 20, 1) = '.' " +
+                   $"THEN substr(substr({fractionalTail}, 1, {fractionalLength}) || '000000', 1, 6) ELSE '0' END AS INTEGER))";
+        }
+
         /// <inheritdoc/>
         public override string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             // Force REAL coercion. TimeSpanColumnTotalSecondsSql returns INTEGER
@@ -319,19 +341,18 @@ namespace nORM.Providers
 
         /// <summary>
         /// SQLite REGEXP is an infix operator backed by a user-defined function;
-        /// Microsoft.Data.Sqlite doesn't register one by default, so callers must
-        /// supply one via <c>SqliteConnection.CreateFunction("regexp", ...)</c>
-        /// before executing queries that use this method. The emitted SQL is
-        /// still the canonical operator form so the contract is portable.
+        /// nORM registers the deterministic backing function during SQLite provider
+        /// initialization, so generated LINQ regex predicates execute without
+        /// caller-owned connection setup. The emitted SQL stays the canonical
+        /// operator form so the contract is portable.
         /// </summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
             => $"({inputSql} REGEXP {patternLiteral})";
 
         /// <summary>
-        /// SQLite has no built-in regex_replace; callers must register a custom
-        /// function (e.g. via <c>SqliteConnection.CreateFunction</c>) before
-        /// executing queries that use this method. The emitted shape stays
-        /// portable with PostgreSQL's <c>regexp_replace</c>.
+        /// SQLite has no built-in regex_replace; nORM registers a deterministic
+        /// managed backing function during SQLite provider initialization. The
+        /// emitted shape stays portable with PostgreSQL's <c>regexp_replace</c>.
         /// </summary>
         public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
             => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral})";
@@ -364,7 +385,7 @@ namespace nORM.Providers
             return AddSecondsToTimeOnlySql(timeOnlySql, seconds);
         }
 
-        /// <summary>SQLite REAL handles both float and decimal â€” no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
+        /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 
         /// <summary>SQLite supports INSERT OR IGNORE for idempotent join-table inserts.</summary>
@@ -399,6 +420,7 @@ namespace nORM.Providers
         public override async Task InitializeConnectionAsync(DbConnection connection, CancellationToken ct)
         {
             await base.InitializeConnectionAsync(connection, ct).ConfigureAwait(false);
+            RegisterProviderFunctions(connection);
             await using var pragmaCmd = connection.CreateCommand();
             pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
             await pragmaCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -411,9 +433,27 @@ namespace nORM.Providers
         public override void InitializeConnection(DbConnection connection)
         {
             base.InitializeConnection(connection);
+            RegisterProviderFunctions(connection);
             using var pragmaCmd = connection.CreateCommand();
             pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = ON; PRAGMA temp_store = MEMORY; PRAGMA cache_size = -2000000; PRAGMA busy_timeout = 5000;";
             pragmaCmd.ExecuteNonQuery();
+        }
+
+        private static void RegisterProviderFunctions(DbConnection connection)
+        {
+            if (connection is not SqliteConnection sqlite)
+                return;
+
+            sqlite.CreateFunction<string?, string?, bool>(
+                "regexp",
+                static (pattern, input) => pattern is not null && input is not null && Regex.IsMatch(input, pattern),
+                isDeterministic: true);
+            sqlite.CreateFunction<string?, string?, string?, string?>(
+                "regexp_replace",
+                static (input, pattern, replacement) => input is null || pattern is null
+                    ? input
+                    : Regex.Replace(input, pattern, replacement ?? string.Empty),
+                isDeterministic: true);
         }
         
         /// <summary>
@@ -467,6 +507,8 @@ namespace nORM.Providers
         /// <returns>A configured <see cref="SqliteParameter"/>.</returns>
         public override DbParameter CreateParameter(string name, object? value)
         {
+            if (value is Guid guid)
+                value = guid.ToString("D");
             return new SqliteParameter(name, value ?? DBNull.Value);
         }
 
@@ -807,6 +849,9 @@ namespace nORM.Providers
                     return unscale(roundCore);
             }
         }
+
+        private static string NewGuidSql()
+            => "(lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))))";
 
         /// <summary>
         /// Attempts to translate a .NET method into its SQLite SQL equivalent.
@@ -1306,6 +1351,11 @@ namespace nORM.Providers
                 return args[0];
             }
 
+            if (declaringType == typeof(Guid) && name == nameof(Guid.NewGuid) && args.Length == 0)
+            {
+                return NewGuidSql();
+            }
+
 
             if (declaringType == typeof(NormFunctions))
             {
@@ -1321,7 +1371,7 @@ namespace nORM.Providers
                     // GetFieldValue<Guid>() reader path; random()/9.22e18
                     // squeezes the 64-bit signed result into [0, 1).
                     nameof(NormFunctions.ServerUtcNow) when args.Length == 0 => "datetime('now')",
-                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => "randomblob(16)",
+                    nameof(NormFunctions.ServerNewGuid) when args.Length == 0 => NewGuidSql(),
                     nameof(NormFunctions.ServerRandom) when args.Length == 0 => "(ABS(random()) / 9223372036854775808.0)",
                     _ => null
                 };
@@ -1563,7 +1613,7 @@ namespace nORM.Providers
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet â€” return empty list so caller falls back to CLR defaults.
+                // Table does not exist yet — return empty list so caller falls back to CLR defaults.
             }
             return result;
         }
@@ -1648,6 +1698,20 @@ END;";
         }
 
         /// <summary>
+        /// Creates temporal tags using SQLite's database clock so tag timestamps
+        /// are comparable to trigger-generated history windows.
+        /// </summary>
+        public override string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, datetime('now'))";
+        }
+
+        internal override bool UsesDatabaseClockForTemporalTags => true;
+
+        /// <summary>
         /// Verifies that the provided connection is a <see cref="SqliteConnection"/>, as required
         /// by this provider.
         /// </summary>
@@ -1719,7 +1783,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken â€” a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -1741,7 +1805,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken â€” a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -1765,7 +1829,7 @@ END;";
         /// <returns>Total number of rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var entityList = entities as ICollection<T> ?? entities.ToList();
             if (entityList.Count == 0) return 0;
             var sw = ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
@@ -1777,14 +1841,14 @@ END;";
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 if (cols.Length == 0)
                 {
-                    // All columns are DB-generated â€” use DEFAULT VALUES syntax.
+                    // All columns are DB-generated — use DEFAULT VALUES syntax.
                     // DEFAULT VALUES does not support batching so we loop per entity.
-                    await using var cmd = ctx.Connection.CreateCommand();
+                    await using var cmd = ctx.RawConnection.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandText = $"INSERT INTO {m.EscTable} DEFAULT VALUES";
                     foreach (var _ in entityList)
@@ -1793,9 +1857,9 @@ END;";
                 else
                 {
                     // 2. Create ONE command and ONE set of parameters that will be reused.
-                    await using var cmd = ctx.Connection.CreateCommand();
+                    await using var cmd = ctx.RawConnection.CreateCommand();
                     cmd.Transaction = transaction;
-                    // Use INSERT without RETURNING â€” bulk path uses ExecuteNonQuery
+                    // Use INSERT without RETURNING — bulk path uses ExecuteNonQuery
                     // and doesn't hydrate generated keys, so RETURNING output is wasted work.
                     cmd.CommandText = BuildInsert(m, hydrateGeneratedKeys: false);
 
@@ -1846,7 +1910,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -1870,7 +1934,7 @@ END;";
         /// <returns>Number of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -1884,12 +1948,12 @@ END;";
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 // Create temp table with same schema
                 var colDefs = string.Join(", ", m.Columns.Select(c => $"{Escape(c.PropName)} {GetSqliteType(c.Prop.PropertyType)}"));
-                await using (var cmd = ctx.Connection.CreateCommand())
+                await using (var cmd = ctx.RawConnection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     cmd.CommandText = $"CREATE TEMP TABLE {tempTableName} ({colDefs})";
@@ -1897,7 +1961,7 @@ END;";
                 }
 
                 // Insert entities into temp table using prepared statement
-                await using (var cmd = ctx.Connection.CreateCommand())
+                await using (var cmd = ctx.RawConnection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     var insertCols = m.Columns.ToArray();
@@ -1927,7 +1991,7 @@ END;";
                 }
 
                 // Perform bulk update using temp table join
-                await using (var cmd = ctx.Connection.CreateCommand())
+                await using (var cmd = ctx.RawConnection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     var keyMatchConditions = string.Join(" AND ", keyCols.Select(k => $"{tempTableName}.{Escape(k.PropName)} = {m.EscTable}.{k.EscCol}"));
@@ -1940,18 +2004,19 @@ END;";
                     var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = (SELECT {Escape(c.PropName)} FROM {tempTableName} WHERE {keyMatchConditions})"));
                     var whereClause = $"EXISTS (SELECT 1 FROM {tempTableName} WHERE {keyMatchConditions}{tsCondition})";
                     // X1: Add tenant predicate to prevent cross-tenant modifications
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    if (ctx.Options.TenantProvider != null)
                     {
+                        var tenantCol = ctx.RequireTenantColumn(m, "SQLite bulk update");
                         var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
-                        whereClause += $" AND {m.EscTable}.{m.TenantColumn.EscCol} = {tenantParam}";
+                        cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "SQLite bulk update"));
+                        whereClause += $" AND {m.EscTable}.{tenantCol.EscCol} = {tenantParam}";
                     }
                     cmd.CommandText = $"UPDATE {m.EscTable} SET {setClause} WHERE {whereClause}";
                     totalUpdated = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
 
                 // Clean up temp table
-                await using (var cmd = ctx.Connection.CreateCommand())
+                await using (var cmd = ctx.RawConnection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     cmd.CommandText = $"DROP TABLE {tempTableName}";
@@ -1979,7 +2044,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -2016,7 +2081,7 @@ END;";
         /// <returns>Total number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -2034,7 +2099,7 @@ END;";
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 if (m.KeyColumns.Length == 1)
@@ -2044,7 +2109,7 @@ END;";
                     for (int i = 0; i < entityList.Count; i += batchSize)
                     {
                         var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                        await using var cmd = ctx.Connection.CreateCommand();
+                        await using var cmd = ctx.RawConnection.CreateCommand();
                         cmd.Transaction = transaction;
                         cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
@@ -2060,11 +2125,12 @@ END;";
 
                         // X1: Add tenant predicate to prevent cross-tenant deletes
                         var tenantSuffix = "";
-                        if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                        if (ctx.Options.TenantProvider != null)
                         {
+                            var tenantCol = ctx.RequireTenantColumn(m, "SQLite bulk delete");
                             var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                            cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
-                            tenantSuffix = $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                            cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "SQLite bulk delete"));
+                            tenantSuffix = $" AND {tenantCol.EscCol} = {tenantParam}";
                         }
                         cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)}){tenantSuffix}";
                         totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
@@ -2073,7 +2139,8 @@ END;";
                 else
                 {
                     // X1: Build delete SQL with optional tenant predicate
-                    bool hasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+                    bool hasTenant = ctx.Options.TenantProvider != null;
+                    var tenantColumn = hasTenant ? ctx.RequireTenantColumn(m, "SQLite bulk delete") : null;
                     string compositeDeleteSql;
                     if (hasTenant)
                     {
@@ -2083,7 +2150,7 @@ END;";
                             var tc = m.TimestampColumn;
                             whereParts.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                         }
-                        whereParts.Add($"{m.TenantColumn!.EscCol}={ParamPrefix}__tenant_bulk");
+                        whereParts.Add($"{tenantColumn!.EscCol}={ParamPrefix}__tenant_bulk");
                         compositeDeleteSql = $"DELETE FROM {m.EscTable} WHERE {string.Join(" AND ", whereParts)}";
                     }
                     else
@@ -2091,7 +2158,7 @@ END;";
                         compositeDeleteSql = BuildDelete(m);
                     }
 
-                    await using var cmd = ctx.Connection.CreateCommand();
+                    await using var cmd = ctx.RawConnection.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandText = compositeDeleteSql;
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
@@ -2110,7 +2177,7 @@ END;";
                         }
                         if (hasTenant)
                         {
-                            cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.Options.TenantProvider!.GetCurrentTenantId());
+                            cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.GetRequiredTenantId(m, "SQLite bulk delete"));
                         }
                         totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
@@ -2137,7 +2204,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {

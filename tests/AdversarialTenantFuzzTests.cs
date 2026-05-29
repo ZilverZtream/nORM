@@ -484,7 +484,7 @@ public class AdversarialTenantFuzzTests
     }
 
     [Fact]
-    public void AMT_NullTenantProvider_StringColumn_EmitsIsNullFilter()
+    public void AMT_NullTenantProvider_StringColumn_ThrowsNormConfigurationException()
     {
         // When the tenant provider returns null and the CLR column type is string (nullable reference type),
         // nORM emits a "TenantId IS NULL" filter rather than throwing. Rows with non-null TenantId are hidden.
@@ -507,9 +507,9 @@ public class AdversarialTenantFuzzTests
         };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
-        // IS NULL filter hides all rows (none have NULL TenantId)
-        var results = ctx.Query<AMTItem>().ToList();
-        Assert.Empty(results);
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ctx.Query<AMTItem>().ToList());
+        Assert.Contains("fails closed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

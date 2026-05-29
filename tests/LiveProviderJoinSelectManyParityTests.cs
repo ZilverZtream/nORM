@@ -99,6 +99,20 @@ public class LiveProviderJoinSelectManyParityTests
         public int DeptId { get; set; }
     }
 
+    private sealed class JsmJoinDto
+    {
+        public string EmpName { get; set; } = "";
+        public string DeptName { get; set; } = "";
+        public int Score { get; set; }
+    }
+
+    private sealed class JsmLeftJoinDto
+    {
+        public string DeptName { get; set; } = "";
+        public int EmpId { get; set; }
+        public string EmpName { get; set; } = "";
+    }
+
     // ── 1: Inner Join ─────────────────────────────────────────────────────────
 
     [Theory]
@@ -174,6 +188,48 @@ public class LiveProviderJoinSelectManyParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Join_inner_memberinit_dto_with_computed_projection_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var setup = new DbContext(connection, provider))
+        {
+            await SetupAsync(setup, kind);
+            try
+            {
+                var options = new nORM.Configuration.DbContextOptions().UseStrictProviderMobility();
+                using var ctx = new DbContext(connection, provider, options);
+                var rows = (await ctx.Query<JsmEmp>()
+                    .Join(ctx.Query<JsmDept>(),
+                          e => e.DeptId,
+                          d => d.Id,
+                          (e, d) => new JsmJoinDto
+                          {
+                              EmpName = e.Name,
+                              DeptName = d.Name,
+                              Score = e.Id + d.Id
+                          })
+                    .ToListAsync())
+                    .OrderBy(r => r.EmpName)
+                    .ToArray();
+
+                Assert.Equal(3, rows.Length);
+                Assert.Equal(("Alice", "Eng", 2), (rows[0].EmpName, rows[0].DeptName, rows[0].Score));
+                Assert.Equal(("Bob", "Sales", 4), (rows[1].EmpName, rows[1].DeptName, rows[1].Score));
+                Assert.Equal(("Carol", "Eng", 4), (rows[2].EmpName, rows[2].DeptName, rows[2].Score));
+            }
+            finally { await TeardownAsync(setup, kind); }
+        }
+    }
+
     // ── 3: GroupJoin (left outer join) ───────────────────────────────────────
 
     [Theory]
@@ -212,6 +268,48 @@ public class LiveProviderJoinSelectManyParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Query_syntax_left_join_memberinit_dto_with_null_fallback_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var setup = new DbContext(connection, provider))
+        {
+            await SetupAsync(setup, kind);
+            try
+            {
+                var options = new nORM.Configuration.DbContextOptions().UseStrictProviderMobility();
+                using var ctx = new DbContext(connection, provider, options);
+                var rows = (await (
+                    from d in ctx.Query<JsmDept>()
+                    join e in ctx.Query<JsmEmp>() on d.Id equals e.DeptId into emps
+                    from e in emps.DefaultIfEmpty()
+                    select new JsmLeftJoinDto
+                    {
+                        DeptName = d.Name,
+                        EmpId = e == null ? 0 : e.Id,
+                        EmpName = e == null ? "(none)" : e.Name
+                    }).ToListAsync())
+                    .OrderBy(r => r.DeptName)
+                    .ThenBy(r => r.EmpId)
+                    .ToArray();
+
+                Assert.Contains(rows, row => row.DeptName == "Eng" && row.EmpName == "Alice");
+                Assert.Contains(rows, row => row.DeptName == "Eng" && row.EmpName == "Carol");
+                Assert.Contains(rows, row => row.DeptName == "HR" && row.EmpId == 0 && row.EmpName == "(none)");
+                Assert.Contains(rows, row => row.DeptName == "Sales" && row.EmpName == "Bob");
+            }
+            finally { await TeardownAsync(setup, kind); }
+        }
+    }
+
     // ── 4: SelectMany cross join ──────────────────────────────────────────────
 
     [Theory]
@@ -237,6 +335,40 @@ public class LiveProviderJoinSelectManyParityTests
                     .ToListAsync();
 
                 Assert.Equal(12, rows.Count);
+            }
+            finally { await TeardownAsync(ctx, kind); }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task SelectMany_correlated_query_expansion_filters_by_outer_row_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupAsync(ctx, kind);
+            try
+            {
+                var rows = (await ctx.Query<JsmDept>()
+                    .SelectMany(
+                        d => ctx.Query<JsmEmp>().Where(e => e.DeptId == d.Id),
+                        (d, e) => new { DeptName = d.Name, EmpName = e.Name })
+                    .ToListAsync())
+                    .OrderBy(r => r.DeptName).ThenBy(r => r.EmpName)
+                    .ToArray();
+
+                Assert.Equal(3, rows.Length);
+                Assert.Equal(("Eng", "Alice"), (rows[0].DeptName, rows[0].EmpName));
+                Assert.Equal(("Eng", "Carol"), (rows[1].DeptName, rows[1].EmpName));
+                Assert.Equal(("Sales", "Bob"), (rows[2].DeptName, rows[2].EmpName));
             }
             finally { await TeardownAsync(ctx, kind); }
         }

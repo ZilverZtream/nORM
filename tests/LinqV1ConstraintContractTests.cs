@@ -8,12 +8,6 @@ namespace nORM.Tests;
 /// Pins the LINQ matrix in <c>docs/linq-support.md</c> as the v1 contract for query-shape
 /// support. The matrix must not silently drift - either by claiming shapes that aren't
 /// implemented or by dropping the documented Constrained/Supported labels readers depend on.
-///
-/// Several constrained shapes (composite-key dependent includes, streaming IGrouping, batched
-/// GroupJoin correlated subcollections, CROSS APPLY / LATERAL / UNNEST SelectMany expansion)
-/// throw <c>NormUnsupportedFeatureException</c> in v1. The deferred translator work for those
-/// shapes is tracked outside this contract; this test only enforces that the documented
-/// behavior stays consistent with what callers can rely on.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqV1ConstraintContractTests
@@ -34,32 +28,18 @@ public class LinqV1ConstraintContractTests
     [InlineData("Inner joins", "Supported")]
     [InlineData("Set operations: `Union`, `Intersect`, `Except`", "Supported")]
     [InlineData("`AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf`", "Supported")]
+    [InlineData("Group joins", "Supported")]
+    [InlineData("`AsAsyncEnumerable`", "Supported")]
+    [InlineData("`Include`, `ThenInclude`", "Supported")]
+    [InlineData("`SelectMany`", "Supported")]
+    [InlineData("`ExecuteUpdateAsync`", "Supported")]
+    [InlineData("`ExecuteDeleteAsync`", "Supported")]
+    [InlineData("`GroupBy`", "Supported")]
     public void Matrix_marks_v1_supported_shape(string feature, string status)
     {
         var doc = Doc();
         var probe = $"| {feature} | {status} |";
         Assert.Contains(probe, doc, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("`GroupBy`", "Constrained")]
-    [InlineData("Group joins", "Constrained")]
-    [InlineData("`SelectMany`", "Constrained")]
-    [InlineData("`Include`, `ThenInclude`", "Constrained")]
-    [InlineData("`AsAsyncEnumerable`", "Constrained")]
-    public void Matrix_marks_v1_constrained_shape(string feature, string status)
-    {
-        var doc = Doc();
-        var probe = $"| {feature} | {status} |";
-        Assert.Contains(probe, doc, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Matrix_documents_deferred_Include_shape()
-    {
-        var doc = Doc();
-        Assert.Contains("Composite-key dependent includes", doc, StringComparison.Ordinal);
-        Assert.Contains("NormUnsupportedFeatureException", doc, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -68,5 +48,13 @@ public class LinqV1ConstraintContractTests
         var doc = Doc();
         Assert.Contains("Arbitrary client evaluation before server filtering", doc, StringComparison.Ordinal);
         Assert.Contains("Unsupported", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Matrix_documents_Include_unmapped_nav_prop_throws()
+    {
+        var doc = Doc();
+        Assert.Contains("NormUnsupportedFeatureException", doc, StringComparison.Ordinal);
+        Assert.Contains("`Include`, `ThenInclude` | Supported", doc, StringComparison.Ordinal);
     }
 }

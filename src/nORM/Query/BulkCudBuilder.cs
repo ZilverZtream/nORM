@@ -293,7 +293,7 @@ namespace nORM.Query
                 }
                 else if (TryGetSetValue(call.Arguments[1], out var value))
                 {
-                    var pName = _ctx.Provider.ParamPrefix + "u" + paramIndex++;
+                    var pName = _ctx.RawProvider.ParamPrefix + "u" + paramIndex++;
                     parameters[pName] = value ?? DBNull.Value;
                     assigns.Add((column, pName, value, null));
                 }
@@ -368,10 +368,10 @@ namespace nORM.Query
                         int ai = 0;
                         if (mc.Object != null) fnArgs[ai++] = Render(mc.Object);
                         for (int i = 0; i < mc.Arguments.Count; i++) fnArgs[ai++] = Render(mc.Arguments[i]);
-                        var fnSql = _ctx.Provider.TranslateFunction(mc.Method.Name, dt, fnArgs);
+                        var fnSql = _ctx.RawProvider.TranslateFunction(mc.Method.Name, dt, fnArgs);
                         if (fnSql == null)
                             throw new NormUnsupportedFeatureException(
-                                $"{dt.Name}.{mc.Method.Name}({mc.Arguments.Count} args) is not translatable on provider {_ctx.Provider.GetType().Name}.");
+                                $"{dt.Name}.{mc.Method.Name}({mc.Arguments.Count} args) is not translatable on provider {_ctx.RawProvider.GetType().Name}.");
                         return fnSql;
 
                     case BinaryExpression be:
@@ -382,7 +382,7 @@ namespace nORM.Query
                             && be.Left.Type == typeof(string)
                             && be.Right.Type == typeof(string))
                         {
-                            return _ctx.Provider.GetConcatSql(Render(be.Left), Render(be.Right));
+                            return _ctx.RawProvider.GetConcatSql(Render(be.Left), Render(be.Right));
                         }
                         // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE.
                         if (be.NodeType == ExpressionType.Coalesce)
@@ -448,7 +448,7 @@ namespace nORM.Query
             {
                 null => "NULL",
                 string s => "'" + s.Replace("'", "''") + "'",
-                bool b => b ? _ctx.Provider.BooleanTrueLiteral : _ctx.Provider.BooleanFalseLiteral,
+                bool b => b ? _ctx.RawProvider.BooleanTrueLiteral : _ctx.RawProvider.BooleanFalseLiteral,
                 IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
                 _ => System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "NULL",
             };
@@ -483,7 +483,7 @@ namespace nORM.Query
 
                     case MemberExpression pm when pm.Type == typeof(bool):
                         // Bare boolean column: emit `col = TRUE`.
-                        return $"({Render(pm)} = {_ctx.Provider.BooleanTrueLiteral})";
+                        return $"({Render(pm)} = {_ctx.RawProvider.BooleanTrueLiteral})";
 
                     default:
                         return Render(p);

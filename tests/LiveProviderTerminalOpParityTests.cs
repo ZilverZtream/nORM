@@ -1,7 +1,9 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -74,6 +76,26 @@ public class LiveProviderTerminalOpParityTests
         catch { /* best-effort */ }
     }
 
+    private static async Task WithStrictContextAsync(ProviderKind kind, Func<DbContext, Task> action)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var setup = new DbContext(connection, provider, null, ownsConnection: false))
+        {
+            await SetupAsync(setup, kind);
+            try
+            {
+                var strictOptions = new DbContextOptions().UseStrictProviderMobility();
+                using var strict = new DbContext(connection, provider, strictOptions, ownsConnection: false);
+                await action(strict);
+            }
+            finally { await TeardownAsync(setup, kind); }
+        }
+    }
+
     [Table(Table)]
     private sealed class TopRow
     {
@@ -91,22 +113,12 @@ public class LiveProviderTerminalOpParityTests
     [InlineData(ProviderKind.Sqlite)]
     public async Task First_ordered_returns_row_with_smallest_val_on_live_provider(ProviderKind kind)
     {
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
-
-        var (connection, provider) = live!.Value;
-        await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        await WithStrictContextAsync(kind, async ctx =>
         {
-            await SetupAsync(ctx, kind);
-            try
-            {
-                var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).FirstAsync();
-                Assert.Equal(1, row.Id);
-                Assert.Equal(10, row.Val);
-            }
-            finally { await TeardownAsync(ctx, kind); }
-        }
+            var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).FirstAsync();
+            Assert.Equal(1, row.Id);
+            Assert.Equal(10, row.Val);
+        });
     }
 
     // ── 2: FirstOrDefault returns null on empty ───────────────────────────────
@@ -118,21 +130,11 @@ public class LiveProviderTerminalOpParityTests
     [InlineData(ProviderKind.Sqlite)]
     public async Task FirstOrDefault_returns_null_for_no_match_on_live_provider(ProviderKind kind)
     {
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
-
-        var (connection, provider) = live!.Value;
-        await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        await WithStrictContextAsync(kind, async ctx =>
         {
-            await SetupAsync(ctx, kind);
-            try
-            {
-                var row = await ctx.Query<TopRow>().Where(r => r.Val > 9999).FirstOrDefaultAsync();
-                Assert.Null(row);
-            }
-            finally { await TeardownAsync(ctx, kind); }
-        }
+            var row = await ctx.Query<TopRow>().Where(r => r.Val > 9999).FirstOrDefaultAsync();
+            Assert.Null(row);
+        });
     }
 
     // ── 3: Last returns last ordered row ──────────────────────────────────────
@@ -147,24 +149,14 @@ public class LiveProviderTerminalOpParityTests
     [InlineData(ProviderKind.Sqlite)]
     public async Task Last_ordered_returns_row_with_largest_val_on_live_provider(ProviderKind kind)
     {
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
-
-        var (connection, provider) = live!.Value;
-        await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        await WithStrictContextAsync(kind, async ctx =>
         {
-            await SetupAsync(ctx, kind);
-            try
-            {
-                // Last must flip ORDER BY to DESC to pick the final row efficiently.
-                var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).LastAsync();
-                // Distinct from First: if Last accidentally returns First, Id==1 not 5.
-                Assert.Equal(5, row.Id);
-                Assert.Equal(50, row.Val);
-            }
-            finally { await TeardownAsync(ctx, kind); }
-        }
+            // Last must flip ORDER BY to DESC to pick the final row efficiently.
+            var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).LastAsync();
+            // Distinct from First: if Last accidentally returns First, Id==1 not 5.
+            Assert.Equal(5, row.Id);
+            Assert.Equal(50, row.Val);
+        });
     }
 
     // ── 4: LastOrDefault with no match ────────────────────────────────────────
@@ -176,21 +168,11 @@ public class LiveProviderTerminalOpParityTests
     [InlineData(ProviderKind.Sqlite)]
     public async Task LastOrDefault_returns_null_for_no_match_on_live_provider(ProviderKind kind)
     {
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
-
-        var (connection, provider) = live!.Value;
-        await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        await WithStrictContextAsync(kind, async ctx =>
         {
-            await SetupAsync(ctx, kind);
-            try
-            {
-                var row = await ctx.Query<TopRow>().Where(r => r.Cat == "zzz").OrderBy(r => r.Val).LastOrDefaultAsync();
-                Assert.Null(row);
-            }
-            finally { await TeardownAsync(ctx, kind); }
-        }
+            var row = await ctx.Query<TopRow>().Where(r => r.Cat == "zzz").OrderBy(r => r.Val).LastOrDefaultAsync();
+            Assert.Null(row);
+        });
     }
 
     // ── 5: ElementAt returns correct offset row ───────────────────────────────
@@ -204,22 +186,12 @@ public class LiveProviderTerminalOpParityTests
     [InlineData(ProviderKind.Sqlite)]
     public async Task ElementAt_returns_zero_based_offset_row_on_live_provider(ProviderKind kind)
     {
-        var live = LiveProviderFactory.OpenLive(kind);
-        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
-
-        var (connection, provider) = live!.Value;
-        await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        await WithStrictContextAsync(kind, async ctx =>
         {
-            await SetupAsync(ctx, kind);
-            try
-            {
-                var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).ElementAtAsync(2);
-                Assert.Equal(3, row.Id);
-                Assert.Equal(30, row.Val);
-            }
-            finally { await TeardownAsync(ctx, kind); }
-        }
+            var row = await ctx.Query<TopRow>().OrderBy(r => r.Val).ElementAtAsync(2);
+            Assert.Equal(3, row.Id);
+            Assert.Equal(30, row.Val);
+        });
     }
 
     // ── 6: Count with predicate ───────────────────────────────────────────────
@@ -295,11 +267,11 @@ public class LiveProviderTerminalOpParityTests
             try
             {
                 // Val > 45 → only Id=5 (Val=50) matches → true
-                var hasHigh = await ctx.Query<TopRow>().Where(r => r.Val > 45).CountAsync() > 0;
+                var hasHigh = await ctx.Query<TopRow>().AnyAsync(r => r.Val > 45);
                 Assert.True(hasHigh);
 
                 // Val > 9999 → no match → false
-                var hasMissing = await ctx.Query<TopRow>().Where(r => r.Val > 9999).CountAsync() > 0;
+                var hasMissing = await ctx.Query<TopRow>().AnyAsync(r => r.Val > 9999);
                 Assert.False(hasMissing);
             }
             finally { await TeardownAsync(ctx, kind); }

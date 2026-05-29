@@ -15,7 +15,10 @@ Set-Location $root
 
 $solutionPath = Join-Path $root 'nORM.sln'
 $testsProjectPath = Join-Path (Join-Path $root 'tests') 'nORM.Tests.csproj'
+$benchmarkProjectDir = Join-Path $root 'benchmarks'
 $benchmarkProjectPath = Join-Path (Join-Path $root 'benchmarks') 'nORM.Benchmarks.csproj'
+$benchmarkResultsPath = Join-Path (Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts') 'results'
+$benchmarkEvidencePath = Join-Path (Join-Path $root 'BenchmarkDotNet.Artifacts') 'v1-evidence'
 $runtimeProjectPath = Join-Path (Join-Path $root 'src') 'nORM.csproj'
 $toolProjectPath = Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') 'dotnet-norm.csproj'
 $testResultsPath = Join-Path (Join-Path (Join-Path $root 'tests') 'TestResults') 'v1-release-gate'
@@ -57,6 +60,12 @@ function Invoke-Step {
 function Get-TrxLogFileName {
     param([string]$Name)
     return (($Name -replace '[^A-Za-z0-9_.-]', '_') + '.trx')
+}
+
+function Get-DuplicateBenchmarkProjects {
+    $expectedProject = [System.IO.Path]::GetFullPath($benchmarkProjectPath)
+    return @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'nORM.Benchmarks.csproj' |
+        Where-Object { [System.IO.Path]::GetFullPath($_.FullName) -ne $expectedProject })
 }
 
 function Invoke-TestStep {
@@ -118,6 +127,57 @@ function Clear-PackageOutput {
 
     Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.nupkg" | Remove-Item -Force
     Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.snupkg" | Remove-Item -Force
+}
+
+function Invoke-BenchmarkStep {
+    param(
+        [string[]]$Arguments
+    )
+
+    $workingBenchmarkProjectDir = $benchmarkProjectDir
+    $tempRoot = $null
+    $benchmarkExitCode = 0
+
+    $duplicateBenchmarkProjects = Get-DuplicateBenchmarkProjects
+    if ($duplicateBenchmarkProjects.Count -gt 0) {
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('norm-bench-gate-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        Write-Host "Duplicate benchmark projects detected under repo; running isolated benchmark worktree at $tempRoot"
+        git -C $root worktree add --detach $tempRoot HEAD | Write-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create isolated benchmark worktree at $tempRoot."
+        }
+
+        $workingBenchmarkProjectDir = Join-Path $tempRoot 'benchmarks'
+    }
+
+    try {
+        Push-Location $workingBenchmarkProjectDir
+        try {
+            dotnet run -c $Configuration -- @Arguments
+            $benchmarkExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+        }
+        finally {
+            Pop-Location
+        }
+
+        if ($tempRoot) {
+            $tempArtifacts = Join-Path $workingBenchmarkProjectDir 'BenchmarkDotNet.Artifacts'
+            $localArtifacts = Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts'
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $localArtifacts
+            if (Test-Path $tempArtifacts) {
+                Copy-Item -LiteralPath $tempArtifacts -Destination $benchmarkProjectDir -Recurse -Force
+            }
+        }
+    }
+    finally {
+        if ($tempRoot) {
+            git -C $root worktree remove --force $tempRoot | Write-Host
+        }
+    }
+
+    if ($benchmarkExitCode -ne 0) {
+        throw "Benchmark command failed with exit code $benchmarkExitCode."
+    }
 }
 
 function Assert-CurrentPackageOutput {
@@ -288,7 +348,13 @@ if ($Mode -eq 'rc') {
 }
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
-    Invoke-Step 'fast complex query benchmark' { dotnet run --project $benchmarkProjectPath -c $Configuration -- --fast Query_Complex }
+    Invoke-Step 'clean benchmark outputs before run' {
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
+            (Join-Path $root 'BenchmarkDotNet.Artifacts'),
+            (Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts')
+    }
+
+    Invoke-Step 'fast complex query benchmark' { Invoke-BenchmarkStep @('--fast', 'Query_Complex') }
 }
 
 if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'rc') {
@@ -296,23 +362,42 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
         throw 'Provider matrix benchmark requires SQL Server, PostgreSQL, and MySQL live connection strings.'
     }
 
-    Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark' {
-        dotnet run --project $benchmarkProjectPath -c $Configuration -- --provider-matrix --filter $ProviderMatrixBenchmarkFilter
+    Invoke-Step 'SQLite/SQL Server/PostgreSQL/MySQL provider matrix benchmark slices' {
+        $sliceRoot = Join-Path $root 'BenchmarkDotNet.Artifacts/provider-slices'
+        & (Join-Path $root 'eng/run-provider-benchmark-slice.ps1') `
+            -Providers 'Sqlite,SqlServer,Postgres,MySql' `
+            -Filters $ProviderMatrixBenchmarkFilter `
+            -Configuration $Configuration `
+            -OutputRoot $sliceRoot
+
+        $latestSlice = Get-ChildItem -LiteralPath $sliceRoot -Directory |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+        if (-not $latestSlice) {
+            throw "Provider matrix benchmark slices produced no run directory under $sliceRoot."
+        }
+
+        $script:benchmarkResultsPath = Join-Path $latestSlice.FullName 'results'
     }
 }
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     Invoke-Step 'benchmark evidence manifest' {
-        & (Join-Path $root 'eng/benchmark-evidence.ps1') -BenchmarkFilter $ProviderMatrixBenchmarkFilter -Mode $Mode
+        & (Join-Path $root 'eng/benchmark-evidence.ps1') `
+            -ResultsDirectory $benchmarkResultsPath `
+            -OutputDirectory $benchmarkEvidencePath `
+            -BenchmarkFilter $ProviderMatrixBenchmarkFilter `
+            -Mode $Mode
     }
 
     Invoke-Step 'benchmark threshold gate' {
-        $thresholdArgs = @(
-            '-ThresholdFile',
-            (Join-Path $root 'eng/benchmark-thresholds.json')
-        )
+        $thresholdArgs = @{
+            ResultsDirectory = $benchmarkResultsPath
+            OutputDirectory = $benchmarkEvidencePath
+            ThresholdFile = (Join-Path $root 'eng/benchmark-thresholds.json')
+        }
         if ($Mode -ne 'rc') {
-            $thresholdArgs += '-AllowMissingRules'
+            $thresholdArgs.AllowMissingRules = $true
         }
 
         & (Join-Path $root 'eng/check-benchmark-thresholds.ps1') @thresholdArgs

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -29,7 +29,7 @@ namespace nORM.Query
 
         // Overload that accepts pre-computed fixedParams to avoid:
         // 1. Expensive QueryPlan.GetHashCode() in _compiledParamSets ConcurrentDictionary on every call
-        //    (QueryPlan is a sealed record with 20+ properties — auto-generated GetHashCode costs ~200ns)
+        //    (QueryPlan is a sealed record with 20+ properties � auto-generated GetHashCode costs ~200ns)
         // 2. HashSet.Contains per parameter on every call (fixed params pre-filtered at compile time)
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
@@ -89,6 +89,8 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
                 result = ConvertScalarResult<TResult>(scalarResult)!;
@@ -193,10 +195,11 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
             {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
-            // Dispatch directly to materialization — avoids wrapping in another async method.
+            // Dispatch directly to materialization � avoids wrapping in another async method.
             // MaterializeAsObjectListAsync/MaterializeAsync handle cmd disposal via 'await using'.
             if (!plan.IsScalar && typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
             {
@@ -238,6 +241,7 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
             {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
@@ -267,7 +271,7 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPreparedSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, ct);
 
-            // Synchronous command setup — same as non-compiled ExecuteQueryFromPlanAsync
+            // Synchronous command setup � same as non-compiled ExecuteQueryFromPlanAsync
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -276,12 +280,12 @@ namespace nORM.Query
             // Dispatch directly to the same materializer methods used by non-compiled queries.
             if (plan.IsScalar)
             {
-                if (_ctx.Provider.PrefersSyncExecution)
+                if (_ctx.RawProvider.PrefersSyncExecution)
                     return ExecuteScalarPlanSync<TResult>(plan, cmd, null);
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct);
             }
             // Sync materialization for providers without true async I/O
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.RawProvider.PrefersSyncExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, null);
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 return (Task<TResult>)(object)ExecuteObjectListPlanAsync(plan, cmd, null, ct);
@@ -298,7 +302,7 @@ namespace nORM.Query
 
             if (plan.IsScalar)
             {
-                if (_ctx.Provider.PrefersSyncExecution)
+                if (_ctx.RawProvider.PrefersSyncExecution)
                     return await ExecuteScalarPlanSync<TResult>(plan, cmd, null).ConfigureAwait(false);
                 return await ExecuteScalarPlanAsync<TResult>(plan, cmd, null, ct).ConfigureAwait(false);
             }
@@ -318,27 +322,36 @@ namespace nORM.Query
             var compiledParams = plan.CompiledParameters;
             if (fixedParams != null)
             {
-                // Fast path: pre-computed fixed params — no HashSet lookup needed
+                // Fast path: pre-computed fixed params � no HashSet lookup needed
                 for (int i = 0; i < fixedParams.Length; i++)
                     cmd.AddOptimizedParam(fixedParams[i].Key, fixedParams[i].Value);
             }
             else
             {
-                // Fallback: no pre-computed fixedParams available, add all plan parameters unfiltered
+                // Fallback: no pre-computed fixedParams available, add only SQL-visible constants.
+                var compiledSet = compiledParams.Count == 0
+                    ? null
+                    : new HashSet<string>(compiledParams, StringComparer.Ordinal);
                 foreach (var p in plan.Parameters)
+                {
+                    if (compiledSet?.Contains(p.Key) == true) continue;
                     cmd.AddOptimizedParam(p.Key, p.Value);
+                }
             }
 
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
         }
 
         /// <summary>
         /// Compiled query execution with command pooling. The DbCommand is created once
-        /// (with Prepare()) and reused across calls — only parameter values are updated.
-        /// This eliminates per-call costs of: DbCommand allocation (~0.5µs), DbParameter creation
-        /// (~0.3µs per param), and SQL compilation via sqlite3_prepare_v2 (~2-5µs).
+        /// (with Prepare()) and reused across calls � only parameter values are updated.
+        /// This eliminates per-call costs of: DbCommand allocation (~0.5�s), DbParameter creation
+        /// (~0.3�s per param), and SQL compilation via sqlite3_prepare_v2 (~2-5�s).
         /// Falls back to standard path for retry policies, caching, and first-call initialization.
         /// </summary>
         internal Task<TResult> ExecuteCompiledPooledAsync<TResult>(
@@ -366,22 +379,22 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPooledSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, state, ct);
 
-            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
+            if (_ctx.RawProvider.PrefersSyncCompiledQueryExecution)
                 return ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams);
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
 
-            // Only update compiled parameter values — fixed params are already set
+            // Only update compiled parameter values � fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
             cmd.Transaction = _ctx.CurrentTransaction;
 
-            // Inline materialization — command returned to pool after use
+            // Inline materialization � command returned to pool after use
             if (plan.IsScalar)
                 return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledScalarAsync<TResult>(plan, cmd, ct));
             // Sync materialization for providers without true async I/O
-            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
+            if (_ctx.RawProvider.PrefersSyncCompiledQueryExecution)
             {
                 try
                 {
@@ -404,7 +417,7 @@ namespace nORM.Query
             CompiledQueryState state, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            if (_ctx.Provider.PrefersSyncCompiledQueryExecution)
+            if (_ctx.RawProvider.PrefersSyncCompiledQueryExecution)
                 return await ExecuteCompiledFreshSync<TResult>(plan, parameterValues, fixedParams).ConfigureAwait(false);
 
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
@@ -449,9 +462,13 @@ namespace nORM.Query
             }
             else
             {
-                // No compiled params — add all plan parameters
+                // No pre-computed fixed params: add only SQL-visible constants.
+                var compiledSet = plan.CompiledParameters.Count == 0
+                    ? null
+                    : new HashSet<string>(plan.CompiledParameters, StringComparer.Ordinal);
                 foreach (var kvp in plan.Parameters)
                 {
+                    if (compiledSet?.Contains(kvp.Key) == true) continue;
                     var p = cmd.CreateParameter();
                     p.ParameterName = kvp.Key;
                     ParameterAssign.AssignValue(p, kvp.Value);
@@ -464,6 +481,7 @@ namespace nORM.Query
             // such as Npgsql infer prepared-statement parameter types during Prepare().
             for (int i = 0; i < plan.CompiledParameters.Count; i++)
             {
+                if (IsUnusedCompiledParameter(plan.CompiledParameters[i])) continue;
                 var p = cmd.CreateParameter();
                 p.ParameterName = plan.CompiledParameters[i];
                 if (i < parameterValues.Length)
@@ -473,8 +491,8 @@ namespace nORM.Query
                 cmd.Parameters.Add(p);
             }
 
-            // Prepare the command — compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
-            // Prepare() is optional — some providers (e.g., in-memory) throw NotSupportedException.
+            // Prepare the command � compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
+            // Prepare() is optional � some providers (e.g., in-memory) throw NotSupportedException.
             ApplyPreparedParameterSizeHints(cmd);
             try { cmd.Prepare(); } catch (Exception) { }
 
@@ -498,9 +516,11 @@ namespace nORM.Query
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             // P1 fix: call AssignValue (not direct .Value assignment) so that DbType and Size
             // are reset when the value is null, preventing stale metadata carry-over.
+            var slot = fixedParamCount;
             for (int i = 0; i < count; i++)
             {
-                var parameter = cmd.Parameters[fixedParamCount + i];
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
+                var parameter = cmd.Parameters[slot++];
                 ParameterAssign.AssignValue(parameter, parameterValues[i]);
                 ApplyPreparedParameterSizeHint(cmd, parameter);
             }
@@ -545,7 +565,7 @@ namespace nORM.Query
             }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
-            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
 
             if (plan.SingleResult)
                 return Task.FromResult((TResult)HandleSingleResult(plan, list));
@@ -594,16 +614,25 @@ namespace nORM.Query
             }
             else
             {
-                // No compiled params — add all plan parameters
+                // No pre-computed fixed params: add only SQL-visible constants.
+                var compiledSet = plan.CompiledParameters.Count == 0
+                    ? null
+                    : new HashSet<string>(plan.CompiledParameters, StringComparer.Ordinal);
                 foreach (var kvp in plan.Parameters)
+                {
+                    if (compiledSet?.Contains(kvp.Key) == true) continue;
                     cmd.AddOptimizedParam(kvp.Key, kvp.Value);
+                }
             }
 
             // Bind compiled parameters (values from the caller)
             var compiledParams = plan.CompiledParameters;
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+            }
 
             if (plan.IsScalar)
             {
@@ -613,13 +642,15 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return Task.FromResult(GetZeroOfTargetType<TResult>());
                     return Task.FromResult(default(TResult)!);
                 }
 
                 return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
             }
 
-            // Sync materialization — no async state machine overhead
+            // Sync materialization � no async state machine overhead
             var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
             var list = _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;
@@ -641,7 +672,7 @@ namespace nORM.Query
                 list.Add(materializer(reader));
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
-            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
 
             // Handle List<object> covariant case
             if (typeof(TResult) == typeof(List<object>) && list is IList nonGenericList && list.GetType() != typeof(List<object>))
@@ -683,7 +714,7 @@ namespace nORM.Query
             }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
-            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+            if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
 
             if (plan.SingleResult)
             {
@@ -708,7 +739,7 @@ namespace nORM.Query
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
             if (plan.PostMaterializeTransform != null)
             {
-                var transformed = plan.PostMaterializeTransform(list);
+                var transformed = plan.PostMaterializeTransform(_ctx, list);
                 var rebuilt = new List<object>(transformed.Count);
                 foreach (var item in transformed) rebuilt.Add(item!);
                 list = rebuilt;
@@ -726,6 +757,8 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
+                if (plan.MethodName == "Sum")
+                    return GetZeroOfTargetType<TResult>();
                 return default(TResult)!;
             }
             return ConvertScalarResult<TResult>(scalarResult)!;
@@ -758,6 +791,8 @@ namespace nORM.Query
                     if (plan.MethodName is "Min" or "Max" or "Average" &&
                         typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                         throw new InvalidOperationException("Sequence contains no elements");
+                    if (plan.MethodName == "Sum")
+                        return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
                 result = ConvertScalarResult<TResult>(scalarResult)!;
@@ -813,7 +848,10 @@ namespace nORM.Query
         {
             var dict = new Dictionary<string, object>(plan.Parameters);
             for (int i = 0; i < plan.CompiledParameters.Count && i < parameterValues.Length; i++)
+            {
+                if (IsUnusedCompiledParameter(plan.CompiledParameters[i])) continue;
                 dict[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+            }
 
             var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, dict);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;

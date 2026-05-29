@@ -84,15 +84,21 @@ public sealed class ProviderMatrixEfContext : EfDbContext
 [MemoryDiagnoser]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
-[SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]
+[SimpleJob(RuntimeMoniker.Net80, launchCount: 3, warmupCount: 3, iterationCount: 20)]
 public class ProviderMatrixBenchmarks
 {
-    private const int UserCount = 1000;
+    private static readonly string[] AllProviders = ["Sqlite", "SqlServer", "Postgres", "MySql"];
+    private const int UserCount = 12_000;
     private const int OrderCount = 2000;
+    private const int ParallelThroughputWorkers = 8;
     private readonly List<BenchmarkUser> _testUsers = new();
     private readonly List<BenchmarkOrder> _testOrders = new();
 
-    [Params("Sqlite", "SqlServer", "Postgres", "MySql")]
+    public static IReadOnlyList<string> SelectedProviders { get; set; } = AllProviders;
+
+    public static IEnumerable<string> Providers() => SelectedProviders;
+
+    [ParamsSource(nameof(Providers))]
     public string Provider { get; set; } = "Sqlite";
 
     private string _connectionString = string.Empty;
@@ -155,18 +161,17 @@ public class ProviderMatrixBenchmarks
 
         _efContext = new ProviderMatrixEfContext(Provider, _connectionString);
         await _efContext.Database.OpenConnectionAsync();
+        await ApplyBenchmarkConnectionSettingsAsync(Provider, _efContext.Database.GetDbConnection());
         _efContext.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
 
-        _normConnection = CreateConnection(Provider, _connectionString);
-        await _normConnection.OpenAsync();
+        _normConnection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
         _normContext = new nORM.Core.DbContext(_normConnection, CreateNormProvider(Provider), new nORM.Configuration.DbContextOptions
         {
             BulkBatchSize = 50,
             TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
         });
 
-        _adoConnection = CreateConnection(Provider, _connectionString);
-        await _adoConnection.OpenAsync();
+        _adoConnection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
         PrepareCommands();
     }
 
@@ -217,8 +222,7 @@ public class ProviderMatrixBenchmarks
             }
         }
 
-        await using var connection = CreateConnection(Provider, _connectionString);
-        await connection.OpenAsync();
+        await using var connection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
         foreach (var sql in SplitStatements(GetResetSql()))
             await connection.ExecuteAsync(sql);
     }
@@ -246,8 +250,7 @@ public class ProviderMatrixBenchmarks
 
     private async Task SeedDatabaseAsync()
     {
-        await using var connection = CreateConnection(Provider, _connectionString);
-        await connection.OpenAsync();
+        await using var connection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
         await using var transaction = await connection.BeginTransactionAsync();
 
         var userSql = InsertUserSql();
@@ -349,6 +352,10 @@ public class ProviderMatrixBenchmarks
     public Task<List<BenchmarkUser>> Query_Simple_RawAdo_Optimized()
         => ReadUsersOptimizedAsync(QuerySimpleSql(prepared: false));
 
+    [Benchmark(Description = "Query Simple Raw ADO (Typed NoBox)")]
+    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_TypedNoBox()
+        => ReadUsersTypedNoBoxAsync(QuerySimpleSql(prepared: false));
+
     [Benchmark(Description = "Query Simple EF Core (Compiled)")]
     public async Task<List<BenchmarkUser>> Query_Simple_EfCore_Compiled()
     {
@@ -367,6 +374,13 @@ public class ProviderMatrixBenchmarks
     {
         _adoSimpleTakeParam!.Value = 10;
         return ReadUsersOptimizedAsync(_adoSimplePrepared!);
+    }
+
+    [Benchmark(Description = "Query Simple Raw ADO (Prepared Typed NoBox)")]
+    public Task<List<BenchmarkUser>> Query_Simple_RawAdo_PreparedTypedNoBox()
+    {
+        _adoSimpleTakeParam!.Value = 10;
+        return ReadUsersTypedNoBoxAsync(_adoSimplePrepared!);
     }
 
     [Benchmark]
@@ -400,6 +414,10 @@ public class ProviderMatrixBenchmarks
     public Task<List<BenchmarkUser>> Query_Complex_RawAdo_Optimized()
         => ReadUsersOptimizedAsync(QueryComplexSql(), ("@Age", DbType.Int32, 25), ("@City", DbType.String, "New York"));
 
+    [Benchmark(Description = "Query Complex Raw ADO (Typed NoBox)")]
+    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_TypedNoBox()
+        => ReadUsersTypedNoBoxAsync(QueryComplexSql(), ("@Age", DbType.Int32, 25), ("@City", DbType.String, "New York"));
+
     [Benchmark(Description = "Query Complex EF Core (Compiled)")]
     public async Task<List<BenchmarkUser>> Query_Complex_EfCore_Compiled()
     {
@@ -419,6 +437,14 @@ public class ProviderMatrixBenchmarks
         _adoComplexAgeParam!.Value = 25;
         _adoComplexCityParam!.Value = "New York";
         return ReadUsersOptimizedAsync(_adoComplexPrepared!);
+    }
+
+    [Benchmark(Description = "Query Complex Raw ADO (Prepared Typed NoBox)")]
+    public Task<List<BenchmarkUser>> Query_Complex_RawAdo_PreparedTypedNoBox()
+    {
+        _adoComplexAgeParam!.Value = 25;
+        _adoComplexCityParam!.Value = "New York";
+        return ReadUsersTypedNoBoxAsync(_adoComplexPrepared!);
     }
 
     [Benchmark]
@@ -484,6 +510,89 @@ public class ProviderMatrixBenchmarks
         command.CommandText = $"SELECT COUNT(*) FROM {UserTable()} WHERE {Col("IsActive")} = @IsActive";
         AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
         return Convert.ToInt32(await command.ExecuteScalarAsync());
+    }
+
+    [Benchmark(Description = "Query Scale 1K - nORM")]
+    public Task<List<BenchmarkUser>> Query_Scale1k_nORM()
+        => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
+            .AsNoTracking()
+            .OrderBy(u => u.Id)
+            .Take(1_000));
+
+    [Benchmark(Description = "Query Scale 1K - Dapper")]
+    public async Task<List<BenchmarkUser>> Query_Scale1k_Dapper()
+        => (await _adoConnection!.QueryAsync<BenchmarkUser>(QueryScaleSql(1_000))).ToList();
+
+    [Benchmark(Description = "Query Scale 1K - Raw ADO Typed NoBox")]
+    public Task<List<BenchmarkUser>> Query_Scale1k_RawAdo_TypedNoBox()
+        => ReadUsersTypedNoBoxWithoutActiveAsync(QueryScaleSql(1_000));
+
+    [Benchmark(Description = "Query Scale 10K - nORM")]
+    public Task<List<BenchmarkUser>> Query_Scale10k_nORM()
+        => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
+            .AsNoTracking()
+            .OrderBy(u => u.Id)
+            .Take(10_000));
+
+    [Benchmark(Description = "Query Scale 10K - Dapper")]
+    public async Task<List<BenchmarkUser>> Query_Scale10k_Dapper()
+        => (await _adoConnection!.QueryAsync<BenchmarkUser>(QueryScaleSql(10_000))).ToList();
+
+    [Benchmark(Description = "Query Scale 10K - Raw ADO Typed NoBox")]
+    public Task<List<BenchmarkUser>> Query_Scale10k_RawAdo_TypedNoBox()
+        => ReadUsersTypedNoBoxWithoutActiveAsync(QueryScaleSql(10_000));
+
+    [Benchmark(Description = "Parallel Throughput - nORM")]
+    public async Task<int> Query_ParallelThroughput_nORM()
+    {
+        var tasks = Enumerable.Range(0, ParallelThroughputWorkers).Select(async _ =>
+        {
+            await using var connection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
+            using var context = new nORM.Core.DbContext(connection, CreateNormProvider(Provider), new nORM.Configuration.DbContextOptions
+            {
+                BulkBatchSize = 50,
+                TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
+            });
+            var rows = await NormAsyncExtensions.ToListAsync(context.Query<BenchmarkUser>()
+                .AsNoTracking()
+                .Where(u => u.IsActive == true)
+                .OrderBy(u => u.Id)
+                .Take(100));
+            return rows.Count;
+        });
+
+        return (await Task.WhenAll(tasks)).Sum();
+    }
+
+    [Benchmark(Description = "Parallel Throughput - Dapper")]
+    public async Task<int> Query_ParallelThroughput_Dapper()
+    {
+        var sql = QuerySimpleOrderedSql(100);
+        var tasks = Enumerable.Range(0, ParallelThroughputWorkers).Select(async _ =>
+        {
+            await using var connection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
+            var rows = await connection.QueryAsync<BenchmarkUser>(sql, new { IsActive = ActiveValue() });
+            return rows.Count();
+        });
+
+        return (await Task.WhenAll(tasks)).Sum();
+    }
+
+    [Benchmark(Description = "Parallel Throughput - Raw ADO Typed NoBox")]
+    public async Task<int> Query_ParallelThroughput_RawAdo_TypedNoBox()
+    {
+        var sql = QuerySimpleOrderedSql(100);
+        var tasks = Enumerable.Range(0, ParallelThroughputWorkers).Select(async _ =>
+        {
+            await using var connection = await OpenBenchmarkConnectionAsync(Provider, _connectionString);
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
+            var rows = await ReadUsersTypedNoBoxAsync(command);
+            return rows.Count;
+        });
+
+        return (await Task.WhenAll(tasks)).Sum();
     }
 
     [Benchmark(Description = "BulkInsert Naive - EF per row")]
@@ -652,6 +761,16 @@ public class ProviderMatrixBenchmarks
               LIMIT 50
               """;
 
+    private string QueryScaleSql(int take)
+        => Provider == "SqlServer"
+            ? $"SELECT TOP({take}) * FROM {UserTable()} ORDER BY {Col("Id")}"
+            : $"SELECT * FROM {UserTable()} ORDER BY {Col("Id")} LIMIT {take}";
+
+    private string QuerySimpleOrderedSql(int take)
+        => Provider == "SqlServer"
+            ? $"SELECT TOP({take}) * FROM {UserTable()} WHERE {Col("IsActive")} = @IsActive ORDER BY {Col("Id")}"
+            : $"SELECT * FROM {UserTable()} WHERE {Col("IsActive")} = @IsActive ORDER BY {Col("Id")} LIMIT {take}";
+
     private string InsertUserSql() => $"""
         INSERT INTO {UserTable()} ({Col("Name")}, {Col("Email")}, {Col("CreatedAt")}, {Col("IsActive")}, {Col("Age")}, {Col("City")}, {Col("Department")}, {Col("Salary")})
         VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)
@@ -708,6 +827,37 @@ public class ProviderMatrixBenchmarks
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
             users.Add(ReadUserOptimized(reader));
+        return users;
+    }
+
+    private async Task<List<BenchmarkUser>> ReadUsersTypedNoBoxAsync(string sql, params (string Name, DbType Type, object Value)[] parameters)
+    {
+        await using var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        AddParameter(command, "@IsActive", DbType.Boolean, ActiveValue());
+        foreach (var (name, type, value) in parameters)
+            AddParameter(command, name, type, value);
+        return await ReadUsersTypedNoBoxAsync(command);
+    }
+
+    private async Task<List<BenchmarkUser>> ReadUsersTypedNoBoxAsync(DbCommand command)
+    {
+        EnsureActiveParameter(command);
+        var users = new List<BenchmarkUser>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            users.Add(ReadUserTypedNoBox(reader));
+        return users;
+    }
+
+    private async Task<List<BenchmarkUser>> ReadUsersTypedNoBoxWithoutActiveAsync(string sql)
+    {
+        await using var command = _adoConnection!.CreateCommand();
+        command.CommandText = sql;
+        var users = new List<BenchmarkUser>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            users.Add(ReadUserTypedNoBox(reader));
         return users;
     }
 
@@ -790,6 +940,19 @@ public class ProviderMatrixBenchmarks
         Salary = reader.GetDouble(8)
     };
 
+    private static BenchmarkUser ReadUserTypedNoBox(DbDataReader reader) => new()
+    {
+        Id = reader.GetInt32(0),
+        Name = reader.GetString(1),
+        Email = reader.GetString(2),
+        CreatedAt = reader.GetDateTime(3),
+        IsActive = reader.GetBoolean(4),
+        Age = reader.GetInt32(5),
+        City = reader.GetString(6),
+        Department = reader.GetString(7),
+        Salary = reader.GetDouble(8)
+    };
+
     private static DateTime ReadDateTime(DbDataReader reader, int ordinal)
     {
         var value = reader.GetValue(ordinal);
@@ -826,6 +989,11 @@ public class ProviderMatrixBenchmarks
         parameter.Value = value;
         if (size.HasValue)
             parameter.Size = size.Value;
+        if (command is SqlClient.SqlCommand && type == DbType.Decimal && parameter is SqlClient.SqlParameter sqlParameter)
+        {
+            sqlParameter.Precision = 18;
+            sqlParameter.Scale = 4;
+        }
         else if (command is SqlClient.SqlCommand && parameter.Size == 0)
             parameter.Size = 1;
         command.Parameters.Add(parameter);
@@ -986,6 +1154,31 @@ public class ProviderMatrixBenchmarks
             "MySql" => new MySqlConnection(connectionString),
             _ => throw new InvalidOperationException($"Unsupported benchmark provider '{provider}'.")
         };
+
+    private static async Task<DbConnection> OpenBenchmarkConnectionAsync(string provider, string connectionString)
+    {
+        var connection = CreateConnection(provider, connectionString);
+        await connection.OpenAsync();
+        await ApplyBenchmarkConnectionSettingsAsync(provider, connection);
+        return connection;
+    }
+
+    private static async Task ApplyBenchmarkConnectionSettingsAsync(string provider, DbConnection connection)
+    {
+        if (provider != "Sqlite")
+            return;
+
+        foreach (var sql in SplitStatements("""
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA busy_timeout = 5000;
+            """))
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await command.ExecuteNonQueryAsync();
+        }
+    }
 
     private static DatabaseProvider CreateNormProvider(string provider)
         => provider switch

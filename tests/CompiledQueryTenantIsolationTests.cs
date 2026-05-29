@@ -225,10 +225,10 @@ public class CompiledQueryTenantIsolationTests
         setup.ExecuteNonQuery();
 
  // TenantKey is an int column; use a string tenant provider to test type coercion path
-        var opts1 = new DbContextOptions { TenantProvider = new FixedTenantProvider("T1") };
+        var opts1 = new DbContextOptions { TenantProvider = new FixedTenantProvider("1"), TenantColumnName = "TenantKey" };
         using var ctx1 = new DbContext(cn, new SqliteProvider(), opts1);
 
-        var opts2 = new DbContextOptions { TenantProvider = new FixedTenantProvider("T2") };
+        var opts2 = new DbContextOptions { TenantProvider = new FixedTenantProvider("2"), TenantColumnName = "TenantKey" };
         using var ctx2 = new DbContext(cn, new SqliteProvider(), opts2);
 
         var compiled = Norm.CompileQuery((DbContext ctx, int minId) =>
@@ -241,5 +241,7 @@ public class CompiledQueryTenantIsolationTests
 
         Assert.Null(ex1);
         Assert.Null(ex2);
+        Assert.Equal("Alpha", (await compiled(ctx1, 1)).Single().Name);
+        Assert.Equal("Beta", (await compiled(ctx2, 1)).Single().Name);
     }
 }

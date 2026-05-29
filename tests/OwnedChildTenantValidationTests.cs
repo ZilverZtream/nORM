@@ -97,7 +97,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-2: Null child tenant throws ─────────────────────────────────────
 
     [Fact]
-    public async Task NullChildTenant_ThrowsInvalidOperationException()
+    public async Task NullChildTenant_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -114,14 +114,14 @@ public class OwnedChildTenantValidationTests
         owner.Children[0].TenantId = null!;
 
         ctx.Add(owner);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("null", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── SAVE1-3: Mismatched child tenant throws ───────────────────────────────
 
     [Fact]
-    public async Task MismatchedChildTenant_ThrowsInvalidOperationException()
+    public async Task MismatchedChildTenant_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -135,7 +135,7 @@ public class OwnedChildTenantValidationTests
             }
         };
         ctx.Add(owner);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("T2", ex.Message);
         Assert.Contains("T1", ex.Message);
     }
@@ -168,7 +168,7 @@ public class OwnedChildTenantValidationTests
     // ── SAVE1-5: Update path revalidates children ─────────────────────────────
 
     [Fact]
-    public async Task Update_MismatchedChildTenant_ThrowsInvalidOperationException()
+    public async Task Update_MismatchedChildTenant_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
         await using var ctx = MakeCtx(cn, "T1");
@@ -187,7 +187,7 @@ public class OwnedChildTenantValidationTests
         owner.Name = "owner2_updated";
         owner.Children[0].TenantId = "T9"; // bad tenant on update
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("T9", ex.Message);
     }
 }

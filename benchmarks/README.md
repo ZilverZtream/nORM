@@ -3,6 +3,27 @@
 This project compares nORM against Entity Framework Core, Dapper, and Raw
 ADO.NET for the operations that matter for v1.0 release validation.
 
+## Running From A Repository With Agent Worktrees
+
+> **Important.** If this repository contains agent worktrees under
+> `.claude/worktrees/`, each one carries its own copy of
+> `nORM.Benchmarks.csproj`. BenchmarkDotNet's project discovery then becomes
+> ambiguous and the run fails before measuring anything. In that situation run
+> benchmarks through `eng/run-benchmark-isolated.ps1`, which transparently runs
+> the benchmark in a clean detached `git worktree` under the temp directory and
+> copies the reports back. Do **not** delete the user's worktrees to work around
+> this. The plain `dotnet run` commands below are correct only in a clean clone
+> with no extra `nORM.Benchmarks.csproj` files under the repository root.
+
+```powershell
+# Isolated equivalents of the commands in this README:
+eng/run-benchmark-isolated.ps1 -- --fast Query_Complex
+eng/run-benchmark-isolated.ps1 -- --provider-matrix --provider Sqlite --filter "*ProviderMatrixBenchmarks.Insert_Single*"
+eng/run-benchmark-isolated.ps1 -- --filter "*TenantTemporalBenchmarks*"
+```
+
+See `docs/benchmark-governance.md` for the full policy.
+
 ## Benchmark Suites
 
 ### SQLite Full Comparison
@@ -41,6 +62,7 @@ SQLite, SQL Server, PostgreSQL, and MySQL. Each provider compares:
 - Dapper
 - Raw ADO.NET convenience mapping
 - Raw ADO.NET optimized mapping
+- Raw ADO.NET typed/no-box mapping
 
 Covered scenarios:
 
@@ -52,13 +74,32 @@ Covered scenarios:
   when Dapper performs result materialization.
 - Join query
 - Count query
+- 1k/10k row materialization scaling
+- Parallel read throughput under pooled live-provider connections
 - Naive, batched, prepared, and idiomatic bulk insert variants
 
-Use BenchmarkDotNet filters for focused provider runs:
+Use `--provider` plus BenchmarkDotNet filters for focused provider runs. This
+keeps result tables provider-specific and avoids noisy four-provider summaries
+while investigating regressions:
 
 ```powershell
-dotnet run -c Release -- --provider-matrix --filter "*ProviderMatrixBenchmarks.Query_Complex*"
-dotnet run -c Release -- --provider-matrix --filter "*ProviderMatrixBenchmarks.BulkInsert*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.Query_Complex*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.Query_Join*"
+dotnet run -c Release -- --provider-matrix --provider Sqlite --filter "*ProviderMatrixBenchmarks.Query_Join*"
+dotnet run -c Release -- --provider-matrix --provider SqlServer --filter "*ProviderMatrixBenchmarks.Insert_Single*"
+dotnet run -c Release -- --provider-matrix --provider Postgres --filter "*ProviderMatrixBenchmarks.BulkInsert_Batched*"
+```
+
+For repeatable focused evidence, prefer the checked-in slice runner. It runs one
+provider/filter pair at a time, preserves each provider's logs and raw reports,
+merges the CSV reports into a single evidence folder, and can run the threshold
+checker with missing unrelated rules allowed:
+
+```powershell
+eng/run-provider-benchmark-slice.ps1 `
+  -Providers "Postgres,Sqlite" `
+  -Filters "*ProviderMatrixBenchmarks.Query_Join*" `
+  -CheckThresholds
 ```
 
 ## Test Data
@@ -83,7 +124,11 @@ substantially less than EF Core on comparable no-tracking query paths.
 Provider-specific runtime fast paths may beat compiled/prepared paths; that is
 acceptable when the full matrix stays healthy. Public claims must name the exact
 category being compared, for example `RawAdo_Convenience`,
-`RawAdo_Optimized`, or `RawAdo_PreparedOptimized`, and must come from generated
-BenchmarkDotNet reports rather than hand-copied numbers.
+`RawAdo_Optimized`, `RawAdo_TypedNoBox`, `RawAdo_PreparedOptimized`, or
+`RawAdo_PreparedTypedNoBox`, and must come from generated BenchmarkDotNet
+reports rather than hand-copied numbers. SQLite runs apply identical
+`journal_mode = WAL`, `synchronous = NORMAL`, and `busy_timeout` settings to
+EF Core, nORM, Dapper, and Raw ADO connections so single-insert rows measure
+data-layer overhead rather than mismatched durability settings.
 
 BenchmarkDotNet writes reports to `BenchmarkDotNet.Artifacts/results/`.

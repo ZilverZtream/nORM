@@ -13,7 +13,7 @@ migrations, savepoints, and ambient `TransactionScope`.
 | Direct writes without an active transaction | nORM per operation | nORM | Operation result is durable when call returns |
 | Direct writes with an explicit transaction | Caller | Caller | Caller controls durability |
 | Bulk operations with an explicit transaction | Caller | Caller | Caller controls durability |
-| Raw SQL with `Database.CurrentTransaction` | Caller | Caller | n/a |
+| Raw SQL with raw `Database.CurrentTransaction` | Caller | Caller | n/a |
 | Migrations | Migration runner | Migration runner | n/a |
 | `TransactionScope` with successful enlistment | Ambient scope | Caller scope | Deferred until ambient scope completes |
 | `TransactionScope` with `BestEffort` failed enlistment | Provider operation | Provider operation | Accepted because writes commit independently |
@@ -23,12 +23,18 @@ migrations, savepoints, and ambient `TransactionScope`.
 
 Use `await ctx.Database.BeginTransactionAsync()` when one unit of work must span
 multiple nORM calls. A context can have only one active explicit transaction.
-A second `BeginTransactionAsync` call while `Database.CurrentTransaction` is set
-throws `InvalidOperationException`.
+A second `BeginTransactionAsync` call while a context transaction is active
+throws `NormUsageException`.
 
 `DbContextTransaction.CommitAsync` and `RollbackAsync` always clear
-`Database.CurrentTransaction`, even if the provider throws during commit or
-rollback. This prevents a failed completion attempt from poisoning the context.
+the context transaction, even if the provider throws during commit or rollback.
+This prevents a failed completion attempt from poisoning the context.
+
+Use `Database.CurrentContextTransaction` when application code needs to inspect
+or reuse the active nORM transaction wrapper. It is safe in strict provider
+mobility mode because it does not expose the underlying provider transaction.
+`Database.CurrentTransaction` returns the raw `DbTransaction` for compatibility
+code and is rejected by strict provider mobility.
 
 Commit and rollback use `CancellationToken.None` once completion begins. At that
 point cancellation cannot reliably distinguish "not committed" from "committed
@@ -51,17 +57,21 @@ is active:
 
 ## Command Binding
 
-Commands created by nORM must bind to `Database.CurrentTransaction` when it is
+Commands created by nORM must bind to the active context transaction when it is
 present. This includes query execution, raw SQL, stored procedures, direct
 writes, and bulk operations. Migration runners pass the active migration
 transaction directly to migration bodies.
 
 ## Savepoints
 
-Savepoints are explicit provider operations. Callers pass the `DbTransaction`
-they want to operate on to `CreateSavepointAsync` and `RollbackToSavepointAsync`.
-Provider support varies; unsupported providers throw a provider-specific
-unsupported-feature exception.
+Savepoints are provider-backed transaction operations. Prefer the nORM-owned
+`DbContextTransaction.CreateSavepointAsync(name)` and
+`DbContextTransaction.RollbackToSavepointAsync(name)` wrapper APIs; they keep the
+raw provider transaction handle hidden and are allowed in strict provider
+mobility mode. The older `DbContext.CreateSavepointAsync(DbTransaction, ...)`
+and `RollbackToSavepointAsync(DbTransaction, ...)` overloads remain compatibility
+APIs for code that already owns a raw transaction, and strict mode rejects those
+raw-handle overloads.
 
 | Provider | Savepoint Support |
 | --- | --- |
@@ -72,7 +82,8 @@ unsupported-feature exception.
 
 ## Guidance
 
-- Prefer explicit `DbTransaction` for application-level atomicity.
+- Prefer `Database.BeginTransactionAsync()` and the `DbContextTransaction`
+  wrapper for application-level atomicity.
 - Use ambient `TransactionScope` only with providers and deployment environments
   known to support enlistment.
 - Treat `BestEffort` and `Ignore` as explicit opt-ins to provider-specific

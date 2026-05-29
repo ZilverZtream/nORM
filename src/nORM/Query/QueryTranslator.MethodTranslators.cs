@@ -26,6 +26,8 @@ namespace nORM.Query
             { "ThenByDescending", new OrderByTranslator() },
             { "Take", new TakeTranslator() },
             { "Skip", new SkipTranslator() },
+            { "TakeWhile", new TakeSkipWhileTranslator(takeWhile: true) },
+            { "SkipWhile", new TakeSkipWhileTranslator(takeWhile: false) },
             { "TakeLast", new TakeLastTranslator() },
             { "SkipLast", new SkipLastTranslator() },
             { "Join", new JoinTranslator(false) },
@@ -44,6 +46,7 @@ namespace nORM.Query
             { "Except", new SetOperationTranslator() },
             { "Any", new SetPredicateTranslator() },
             { "Contains", new SetPredicateTranslator() },
+            { "SequenceEqual", new SequenceEqualTranslator() },
             { "ElementAt", new ElementAtTranslator() },
             { "ElementAtOrDefault", new ElementAtTranslator() },
             { "First", new FirstSingleTranslator() },
@@ -308,15 +311,30 @@ namespace nORM.Query
                 if (originalProjection != null
                     && node.Arguments[0] is MethodCallExpression gb
                     && gb.Method.Name == nameof(Queryable.GroupBy)
-                    && gb.Arguments.Count == 2
+                    && gb.Arguments.Count is 2 or 3
                     && originalProjection.Parameters.Count == 1
                     && originalProjection.Parameters[0].Type.IsGenericType
                     && originalProjection.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>))
                 {
+                    if (t.IsPostMaterializeTailMode)
+                    {
+                        var groupedSource = t.Visit(node.Arguments[0]);
+                        if (t.IsPostMaterializeTailMode
+                            && t.CurrentPostMaterializeElementType == originalProjection.Parameters[0].Type)
+                        {
+                            t.AppendPostMaterializeSelect(originalProjection);
+                            return groupedSource;
+                        }
+                    }
+
                     var rewritten = RewriteGroupByThenSelect(gb, originalProjection);
                     return t.Visit(rewritten);
                 }
 
+                LambdaExpression? pendingProjection = null;
+                Func<object, object>? pendingClientProjection = null;
+                Type? pendingClientProjectionResultType = null;
+                var shouldLogClientEvaluation = false;
                 if (originalProjection != null)
                 {
                     // Try to split the projection into server and client parts
@@ -349,29 +367,49 @@ namespace nORM.Query
                                 "`.Allow`. Warn logs each occurrence; Allow runs silently.");
                         }
 
-                        // Store both projections plus the original lambda's result type so the
-                        // plan's elementType reflects what the caller actually receives.
-                        t._projection = serverProjection;
-                        t._clientProjection = clientProjection;
-                        t._clientProjectionResultType = originalProjection.Body.Type;
-
-                        if (t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Warn)
-                        {
-                            t._ctx.Options.Logger?.LogQuery(
-                                "-- CLIENT-EVAL: Projection split for client-side evaluation",
-                                EmptyParamDict,
-                                TimeSpan.Zero,
-                                0);
-                        }
+                        pendingProjection = serverProjection;
+                        pendingClientProjection = clientProjection;
+                        pendingClientProjectionResultType = originalProjection.Body.Type;
+                        shouldLogClientEvaluation = t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Warn;
                     }
                     else
                     {
                         // Use original projection (fully translatable to SQL)
-                        t._projection = originalProjection;
+                        pendingProjection = originalProjection;
                     }
                 }
 
-                return t.Visit(node.Arguments[0]);
+                var source = t.Visit(node.Arguments[0]);
+                if (originalProjection != null
+                    && t.IsPostMaterializeTailMode
+                    && t.CurrentPostMaterializeElementType == originalProjection.Parameters[0].Type)
+                {
+                    t.AppendPostMaterializeSelect(originalProjection);
+                    return source;
+                }
+
+                if (pendingProjection != null)
+                {
+                    pendingProjection = t.ExpandProjection(pendingProjection);
+
+                    // Apply the projection after translating the source so source-side
+                    // Where/OrderBy/Take/Skip lambdas are not expanded through the
+                    // projected row shape. Downstream operators that run after Select
+                    // still see _projection when their translators resume.
+                    t._projection = pendingProjection;
+                    t._clientProjection = pendingClientProjection;
+                    t._clientProjectionResultType = pendingClientProjectionResultType;
+                    if (shouldLogClientEvaluation)
+                    {
+                        t._ctx.Options.Logger?.LogQuery(
+                            "-- CLIENT-EVAL: Projection split for client-side evaluation",
+                            EmptyParamDict,
+                            TimeSpan.Zero,
+                            0);
+                    }
+                }
+
+                return source;
             }
 
             private static MethodCallExpression RewriteGroupByThenSelect(
@@ -380,15 +418,34 @@ namespace nORM.Query
             {
                 var groupingType = selectLambda.Parameters[0].Type;
                 var keyType = groupingType.GetGenericArguments()[0];
-                var sourceType = groupingType.GetGenericArguments()[1];
+                var elementType = groupingType.GetGenericArguments()[1];
+                var sourceType = QueryTranslator.GetElementType(groupByCall.Arguments[0]);
                 var resultType = selectLambda.Body.Type;
 
                 var keyParam = Expression.Parameter(keyType, "k");
-                var groupParam = Expression.Parameter(typeof(IEnumerable<>).MakeGenericType(sourceType), "g");
+                var groupParam = Expression.Parameter(typeof(IEnumerable<>).MakeGenericType(elementType), "g");
 
                 var rewriter = new GroupingProjectionRewriter(selectLambda.Parameters[0], keyParam, groupParam);
                 var newBody = rewriter.Visit(selectLambda.Body)!;
                 var resultSelector = Expression.Lambda(newBody, keyParam, groupParam);
+
+                if (groupByCall.Arguments.Count == 3)
+                {
+                    var groupByMethodWithElement = typeof(Queryable).GetMethods()
+                        .First(m => m.Name == nameof(Queryable.GroupBy)
+                                    && m.IsGenericMethodDefinition
+                                    && m.GetGenericArguments().Length == 4
+                                    && m.GetParameters().Length == 4
+                                    && m.GetParameters()[3].ParameterType.IsGenericType
+                                    && m.GetParameters()[3].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 3)
+                        .MakeGenericMethod(sourceType, keyType, elementType, resultType);
+
+                    return Expression.Call(groupByMethodWithElement,
+                        groupByCall.Arguments[0],
+                        groupByCall.Arguments[1],
+                        groupByCall.Arguments[2],
+                        Expression.Quote(resultSelector));
+                }
 
                 // GroupBy<TSource, TKey, TResult>(source, keySelector, resultSelector) — disambiguate
                 // from the per-element overload by looking for a 2-arg inner Func on the result selector.
@@ -427,8 +484,24 @@ namespace nORM.Query
                     return base.VisitMember(node);
                 }
 
+                protected override Expression VisitMethodCall(MethodCallExpression node)
+                {
+                    if (node.Arguments.Count > 0
+                        && node.Arguments[0] == _oldGrouping
+                        && node.Method.DeclaringType == typeof(Enumerable))
+                    {
+                        var args = new Expression[node.Arguments.Count];
+                        args[0] = _newGroup;
+                        for (int i = 1; i < node.Arguments.Count; i++)
+                            args[i] = Visit(node.Arguments[i]);
+                        return node.Update(node.Object, args);
+                    }
+
+                    return base.VisitMethodCall(node);
+                }
+
                 protected override Expression VisitParameter(ParameterExpression node)
-                    => node == _oldGrouping ? _newGroup : base.VisitParameter(node);
+                    => node == _oldGrouping ? Expression.Constant(null, _oldGrouping.Type) : base.VisitParameter(node);
             }
         }
 
@@ -546,6 +619,26 @@ namespace nORM.Query
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {
+                    if (t.IsPostMaterializeTailMode
+                        && t.CurrentPostMaterializeElementType == keySelector.Parameters[0].Type)
+                    {
+                        var thenBy = node.Method.Name is nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending);
+                        t.AppendPostMaterializeOrder(keySelector, !node.Method.Name.Contains("Descending"), thenBy);
+                        return source;
+                    }
+
+                    if (keySelector.Parameters.Count == 1
+                        && keySelector.Body is MemberExpression projectedMember
+                        && projectedMember.Expression == keySelector.Parameters[0]
+                        && t._projection != null
+                        && keySelector.Parameters[0].Type == t._projection.Body.Type
+                        && t.ProjectionContainsMember(projectedMember.Member.Name))
+                    {
+                        var ascendingAlias = !node.Method.Name.Contains("Descending");
+                        t._orderBy.Add((t._provider.Escape(projectedMember.Member.Name), ascendingAlias));
+                        return source;
+                    }
+
                     keySelector = t.ExpandProjection(keySelector);
                     var param = keySelector.Parameters[0];
                     if (!t._correlatedParams.TryGetValue(param, out var info))
@@ -610,7 +703,7 @@ namespace nORM.Query
                         && navMember.Expression is ParameterExpression
                         && t._mapping.Relations.ContainsKey(navMember.Member.Name))
                     {
-                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias);
+                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias, ctx: t._ctx);
                         var navSql = scv.Translate(navAggCall);
                         t._orderBy.Add((navSql, ascending));
                         FastExpressionVisitorPool.Return(visitor);
@@ -673,6 +766,13 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
+                if (t.IsPostMaterializeTailMode && QueryTranslator.TryGetIntValue(node.Arguments[1], out var clientTake))
+                {
+                    if (clientTake < 0) throw new ArgumentOutOfRangeException(nameof(clientTake), clientTake, "Take count must be non-negative.");
+                    t.AppendPostMaterializeTake(clientTake);
+                    return source;
+                }
+
                 if (t.TryBindPagingParameter(node.Arguments[1], out var tName))
                 {
                     t._takeParam = tName;
@@ -765,6 +865,125 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Implements the ordered subset of <c>TakeWhile</c> and <c>SkipWhile</c> with
+        /// a cumulative break flag. Without an upstream ordering these operators have
+        /// no deterministic relational meaning, so the translator still fails closed.
+        /// </summary>
+        private sealed class TakeSkipWhileTranslator(bool takeWhile) : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                if (node.Arguments.Count != 2 || StripQuotes(node.Arguments[1]) is not LambdaExpression predicate)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.");
+                }
+                if (predicate.Parameters.Count is not (1 or 2))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.");
+                }
+                if (SourceHasTakeOrSkip(node.Arguments[0]))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} after Take/Skip is not part of the v1 provider-mobile contract.");
+                }
+
+                var orderKeys = ExtractOrderByKeys(node.Arguments[0]);
+                if (orderKeys.Count == 0)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} requires an explicit OrderBy/ThenBy chain so provider-mobile SQL has a deterministic row sequence.");
+                }
+
+                var subPlan = t.TranslateInSubContext(
+                    node.Arguments[0],
+                    t._mapping,
+                    t._parameterManager.Index,
+                    t._joinCounter,
+                    t._recursionDepth + 1,
+                    out var subMapping);
+                t._mapping = subMapping;
+                t.MergeSubPlanParameters(subPlan);
+
+                var srcAlias = t.EscapeAlias("__twsrc" + t._joinCounter++);
+                var indexedAlias = t.EscapeAlias("__twidx" + t._joinCounter++);
+                var outerAlias = t.EscapeAlias(takeWhile ? "__takewhile" + t._joinCounter++ : "__skipwhile" + t._joinCounter++);
+                var indexAlias = t._provider.Escape("__norm_while_index");
+                var flagAlias = t._provider.Escape("__norm_while_break");
+
+                var predParam = predicate.Parameters[0];
+                t._correlatedParams[predParam] = (subMapping, indexedAlias);
+                if (predicate.Parameters.Count == 2)
+                    t._paramMap[predicate.Parameters[1]] = $"{indexedAlias}.{indexAlias}";
+                var predCtx = new VisitorContext(t._ctx, subMapping, t._provider, predParam, indexedAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var predVisitor = FastExpressionVisitorPool.Get(in predCtx);
+                var predSql = predVisitor.Translate(predicate.Body);
+                foreach (var kvp in predVisitor.GetParameters())
+                    t._params[kvp.Key] = kvp.Value;
+                if (t._params.Count > t._parameterManager.Index)
+                    t._parameterManager.Index = t._params.Count;
+                FastExpressionVisitorPool.Return(predVisitor);
+                if (predicate.Parameters.Count == 2)
+                    t._paramMap.Remove(predicate.Parameters[1]);
+
+                var orderByForSourceWindow = BuildWhileOrderBy(t, orderKeys, subMapping, srcAlias);
+                var orderByForCumulativeWindow = BuildWhileOrderBy(t, orderKeys, subMapping, indexedAlias);
+                var orderByForOuter = BuildWhileOrderBy(t, orderKeys, subMapping, outerAlias);
+                var sourceSql = RemoveTrailingOrderBy(subPlan.Sql);
+
+                t._sql.Append("SELECT * FROM (SELECT ").Append(indexedAlias).Append(".*, ")
+                    .Append("SUM(CASE WHEN NOT (").Append(predSql).Append(") THEN 1 ELSE 0 END) OVER (ORDER BY ")
+                    .Append(PooledStringBuilder.JoinOrderBy(orderByForCumulativeWindow)).Append(" ROWS UNBOUNDED PRECEDING) AS ").Append(flagAlias)
+                    .Append(" FROM (SELECT ").Append(srcAlias).Append(".*, (ROW_NUMBER() OVER (ORDER BY ")
+                    .Append(PooledStringBuilder.JoinOrderBy(orderByForSourceWindow)).Append(") - 1) AS ").Append(indexAlias)
+                    .Append(" FROM (").Append(sourceSql).Append(") AS ").Append(srcAlias)
+                    .Append(") AS ").Append(indexedAlias)
+                    .Append(") AS ").Append(outerAlias)
+                    .Append(" WHERE ").Append(outerAlias).Append('.').Append(flagAlias)
+                    .Append(takeWhile ? " = 0" : " > 0");
+
+                foreach (var (sql, asc) in orderByForOuter)
+                    t._orderBy.Add((sql, asc));
+
+                return node;
+            }
+
+            private static List<(string col, bool asc)> BuildWhileOrderBy(
+                QueryTranslator t,
+                IReadOnlyList<(LambdaExpression KeySelector, bool Ascending)> orderKeys,
+                TableMapping mapping,
+                string alias)
+            {
+                var result = new List<(string col, bool asc)>(orderKeys.Count);
+                foreach (var (keySelector, ascending) in orderKeys)
+                {
+                    var param = keySelector.Parameters[0];
+                    t._correlatedParams[param] = (mapping, alias);
+                    var vctx = new VisitorContext(t._ctx, mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctx);
+                    var sql = visitor.Translate(keySelector.Body);
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
+                    var keyType = Nullable.GetUnderlyingType(keySelector.Body.Type) ?? keySelector.Body.Type;
+                    if (keyType == typeof(decimal))
+                        sql = t._provider.NormalizeDecimalForCompare(sql);
+                    result.Add((sql, ascending));
+                }
+                return result;
+            }
+
+            private static string RemoveTrailingOrderBy(string sql)
+            {
+                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+                return idx < 0 ? sql : sql[..idx];
+            }
+        }
+
+        /// <summary>
         /// Implements <c>TakeLast(source, n)</c>. SQL has no native "last N rows"
         /// operator, so we flip the ORDER BY direction of the source's existing
         /// ordering, apply LIMIT n on the reversed sequence (the DB scans only N
@@ -851,14 +1070,6 @@ namespace nORM.Query
             return source;
         }
 
-        /// <summary>
-        /// v1 DistinctBy: SQL fetches every row, then a compiled key selector
-        /// dedupes the materialized list keeping the first occurrence per key
-        /// (LINQ semantics). The contract -- "one row per distinct key, full row
-        /// preserved" -- is correct; for large tables a future translator pass can
-        /// emit `ROW_NUMBER() OVER (PARTITION BY key) WHERE rn = 1` server-side
-        /// without breaking the caller.
-        /// </summary>
         private sealed class DistinctByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -868,62 +1079,289 @@ namespace nORM.Query
                         ErrorMessages.QueryTranslationFailed,
                         "DistinctBy requires a key selector lambda."));
 
-                // Compile the key selector to an open delegate operating on object so the
-                // dedupe loop in the executor doesn't need to know the element type.
-                var entityType = keyLambda.Parameters[0].Type;
-                var keyType = keyLambda.Body.Type;
-                var entityObjParam = Expression.Parameter(typeof(object), "entity");
-                var castEntity = Expression.Convert(entityObjParam, entityType);
-                var body = new ParameterReplacer(keyLambda.Parameters[0], castEntity).Visit(keyLambda.Body)!;
-                var boxedBody = keyType.IsValueType ? (Expression)Expression.Convert(body, typeof(object)) : body;
-                var keySelector = Expression.Lambda<Func<object, object?>>(boxedBody, entityObjParam).Compile();
+                var subPlan = t.TranslateInSubContext(
+                    node.Arguments[0],
+                    t._mapping,
+                    t._parameterManager.Index,
+                    t._joinCounter,
+                    t._recursionDepth + 1,
+                    out var subMapping);
+                t._mapping = subMapping;
+                t.MergeSubPlanParameters(subPlan);
 
-                System.Collections.IList Dedupe(System.Collections.IList list)
+                var sourceAlias = t.EscapeAlias("__dbsrc" + t._joinCounter++);
+                var outerAlias = t.EscapeAlias("__distinctby" + t._joinCounter++);
+                var rowAlias = t._provider.Escape("__norm_distinctby_rn");
+                var keySql = BuildDistinctByKeySql(t, keyLambda, subMapping, sourceAlias);
+                var orderSql = BuildDistinctByOrderSql(t, node.Arguments[0], subMapping, sourceAlias);
+                var outerOrder = BuildDistinctByOrderSql(t, node.Arguments[0], subMapping, outerAlias);
+                var sourceSql = RemoveTrailingOrderBy(node.Arguments[0], subPlan.Sql);
+                var outerSelect = PooledStringBuilder.Join(subMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}"));
+
+                t._sql.Append("SELECT ").Append(outerSelect).Append(" FROM (SELECT ")
+                    .Append(sourceAlias).Append(".*, ROW_NUMBER() OVER (PARTITION BY ")
+                    .Append(keySql).Append(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(orderSql))
+                    .Append(") AS ").Append(rowAlias)
+                    .Append(" FROM (").Append(sourceSql).Append(") AS ").Append(sourceAlias)
+                    .Append(") AS ").Append(outerAlias)
+                    .Append(" WHERE ").Append(outerAlias).Append('.').Append(rowAlias).Append(" = 1");
+
+                foreach (var order in outerOrder)
+                    t._orderBy.Add(order);
+
+                return node;
+            }
+
+            private static string BuildDistinctByKeySql(
+                QueryTranslator t,
+                LambdaExpression keyLambda,
+                TableMapping mapping,
+                string alias)
+            {
+                var parts = new List<string>();
+                if (keyLambda.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                 {
-                    if (list.Count <= 1) return list;
-                    // Build a fresh list of the same element type so the caller gets
-                    // back e.g. List<DbiItem> rather than List<object>. Reuse the
-                    // executor's CreateList factory via the element type captured here.
-                    var deduped = QueryExecutor.CreateList(entityType, list.Count);
-                    var seen = new HashSet<object?>(EqualityComparer<object?>.Default);
-                    foreach (var item in list)
-                    {
-                        var key = item is null ? null : keySelector(item);
-                        if (seen.Add(key))
-                            deduped.Add(item);
-                    }
-                    return deduped;
+                    foreach (var arg in newKey.Arguments)
+                        parts.Add(BuildSql(t, keyLambda.Parameters[0], arg, mapping, alias));
+                }
+                else
+                {
+                    parts.Add(BuildSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias));
+                }
+                return string.Join(", ", parts);
+            }
+
+            private static List<(string col, bool asc)> BuildDistinctByOrderSql(
+                QueryTranslator t,
+                Expression source,
+                TableMapping mapping,
+                string alias)
+            {
+                var orderKeys = ExtractOrderByKeys(source);
+                var result = new List<(string col, bool asc)>();
+                if (orderKeys.Count == 0)
+                {
+                    foreach (var key in mapping.KeyColumns)
+                        result.Add(($"{alias}.{key.EscCol}", true));
+                    return result;
                 }
 
-                t._postMaterializeTransform = Dedupe;
-                return t.Visit(node.Arguments[0]);
+                foreach (var (keyLambda, ascending) in orderKeys)
+                {
+                    result.Add((BuildSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias), ascending));
+                }
+                return result;
+            }
+
+            private static string BuildSql(
+                QueryTranslator t,
+                ParameterExpression parameter,
+                Expression expression,
+                TableMapping mapping,
+                string alias)
+            {
+                t._correlatedParams[parameter] = (mapping, alias);
+                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var visitor = FastExpressionVisitorPool.Get(in vctx);
+                var sql = visitor.Translate(expression);
+                foreach (var kvp in visitor.GetParameters())
+                    t._params[kvp.Key] = kvp.Value;
+                if (t._params.Count > t._parameterManager.Index)
+                    t._parameterManager.Index = t._params.Count;
+                FastExpressionVisitorPool.Return(visitor);
+                var type = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
+                return type == typeof(decimal) ? t._provider.NormalizeDecimalForCompare(sql) : sql;
+            }
+
+            private static string RemoveTrailingOrderBy(Expression source, string sql)
+            {
+                if (SourceHasTakeOrSkip(source))
+                    return sql;
+                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+                return idx < 0 ? sql : sql[..idx];
             }
         }
 
         /// <summary>
-        /// v1 ExceptBy / IntersectBy / UnionBy. All three share the same shape as
-        /// DistinctBy: a compiled key selector wraps a post-materialize transform
-        /// that applies the LINQ set-op semantics in memory. ExceptBy and IntersectBy
-        /// take an <c>IEnumerable&lt;TKey&gt;</c> as the second arg; UnionBy takes an
-        /// <c>IEnumerable&lt;TSource&gt;</c> and appends its by-key-new rows after
-        /// the source.
+        /// ExceptBy/IntersectBy translate as provider-side key filters plus
+        /// server-side DistinctBy. UnionBy with a local second entity sequence lowers
+        /// that sequence to a parameterized derived table, then applies the same
+        /// row-number key dedupe with source rows ordered before appended rows.
         /// </summary>
         private sealed class ExceptByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
-                => InstallKeyedSetOp(t, node, KeyedSetOp.Except);
+                => RewriteKeyedFilterSetOp(t, node, keepMatches: false);
         }
 
         private sealed class IntersectByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
-                => InstallKeyedSetOp(t, node, KeyedSetOp.Intersect);
+                => RewriteKeyedFilterSetOp(t, node, keepMatches: true);
         }
 
         private sealed class UnionByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
-                => InstallKeyedSetOp(t, node, KeyedSetOp.Union);
+            {
+                if (TryTranslateLocalUnionBy(t, node, out var translated))
+                    return translated;
+
+                return InstallKeyedSetOp(t, node, KeyedSetOp.Union);
+            }
+
+            private static bool TryTranslateLocalUnionBy(QueryTranslator t, MethodCallExpression node, out Expression translated)
+            {
+                translated = node;
+                if (node.Arguments.Count < 3
+                    || StripQuotes(node.Arguments[2]) is not LambdaExpression keyLambda
+                    || !TryGetConstantValue(node.Arguments[1], out var secondValue)
+                    || secondValue is not System.Collections.IEnumerable secondEnumerable)
+                {
+                    return false;
+                }
+
+                var secondRows = new List<object>();
+                foreach (var item in secondEnumerable)
+                {
+                    if (item is null)
+                        return false;
+                    secondRows.Add(item);
+                }
+
+                if (secondRows.Count == 0)
+                {
+                    var sourceType = keyLambda.Parameters[0].Type;
+                    var keyType = keyLambda.Body.Type;
+                    var distinctByMethod = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .First(m => m.Name == nameof(Queryable.DistinctBy)
+                                    && m.GetParameters().Length == 2
+                                    && m.GetGenericArguments().Length == 2)
+                        .MakeGenericMethod(sourceType, keyType);
+                    translated = t.Visit(Expression.Call(distinctByMethod, node.Arguments[0], Expression.Quote(keyLambda)));
+                    return true;
+                }
+
+                var subPlan = t.TranslateInSubContext(
+                    node.Arguments[0],
+                    t._mapping,
+                    t._parameterManager.Index,
+                    t._joinCounter,
+                    t._recursionDepth + 1,
+                    out var subMapping);
+                t._mapping = subMapping;
+                t.MergeSubPlanParameters(subPlan);
+
+                var sourceAlias = t.EscapeAlias("__ubsrc" + t._joinCounter++);
+                var combinedAlias = t.EscapeAlias("__ubc" + t._joinCounter++);
+                var rankedAlias = t.EscapeAlias("__ubr" + t._joinCounter++);
+                var srcFlag = t._provider.Escape("__norm_union_src");
+                var ordFlag = t._provider.Escape("__norm_union_ord");
+                var rnFlag = t._provider.Escape("__norm_union_rn");
+                var sourceSql = RemoveTrailingOrderBy(node.Arguments[0], subPlan.Sql);
+                var sourceOrder = BuildUnionOrderSql(t, node.Arguments[0], subMapping, sourceAlias);
+                var sourceSelectCols = string.Join(", ", subMapping.Columns.Select(c => $"{sourceAlias}.{c.EscCol}"));
+                var finalSelectCols = PooledStringBuilder.Join(subMapping.Columns.Select(c => $"{rankedAlias}.{c.EscCol}"));
+
+                var combined = PooledStringBuilder.Rent();
+                try
+                {
+                    combined.Append("SELECT ").Append(sourceSelectCols)
+                        .Append(", 0 AS ").Append(srcFlag)
+                        .Append(", ROW_NUMBER() OVER (ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(sourceOrder))
+                        .Append(") AS ").Append(ordFlag)
+                        .Append(" FROM (").Append(sourceSql).Append(") AS ").Append(sourceAlias);
+
+                    for (var rowIndex = 0; rowIndex < secondRows.Count; rowIndex++)
+                    {
+                        combined.Append(" UNION ALL SELECT ");
+                        for (var colIndex = 0; colIndex < subMapping.Columns.Length; colIndex++)
+                        {
+                            if (colIndex > 0)
+                                combined.Append(", ");
+                            var column = subMapping.Columns[colIndex];
+                            var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                            t.AddLiteralParameter(pName, column.Prop.GetValue(secondRows[rowIndex]));
+                            combined.Append(pName).Append(" AS ").Append(column.EscCol);
+                        }
+                        combined.Append(", 1 AS ").Append(srcFlag)
+                            .Append(", ").Append(rowIndex.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                            .Append(" AS ").Append(ordFlag);
+                    }
+
+                    var keySql = BuildUnionKeySql(t, keyLambda, subMapping, combinedAlias);
+                    t._sql.Append("SELECT ").Append(finalSelectCols).Append(" FROM (SELECT ")
+                        .Append(combinedAlias).Append(".*, ROW_NUMBER() OVER (PARTITION BY ")
+                        .Append(keySql).Append(" ORDER BY ").Append(combinedAlias).Append('.').Append(srcFlag)
+                        .Append(" ASC, ").Append(combinedAlias).Append('.').Append(ordFlag).Append(" ASC) AS ").Append(rnFlag)
+                        .Append(" FROM (").Append(combined.ToString()).Append(") AS ").Append(combinedAlias)
+                        .Append(") AS ").Append(rankedAlias)
+                        .Append(" WHERE ").Append(rankedAlias).Append('.').Append(rnFlag).Append(" = 1");
+
+                    t._orderBy.Add(($"{rankedAlias}.{srcFlag}", true));
+                    t._orderBy.Add(($"{rankedAlias}.{ordFlag}", true));
+                    translated = node;
+                    return true;
+                }
+                finally
+                {
+                    PooledStringBuilder.Return(combined);
+                }
+            }
+
+            private static string BuildUnionKeySql(QueryTranslator t, LambdaExpression keyLambda, TableMapping mapping, string alias)
+            {
+                var parts = new List<string>();
+                if (keyLambda.Body is NewExpression newKey && newKey.Arguments.Count > 0)
+                {
+                    foreach (var arg in newKey.Arguments)
+                        parts.Add(BuildUnionSql(t, keyLambda.Parameters[0], arg, mapping, alias));
+                }
+                else
+                {
+                    parts.Add(BuildUnionSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias));
+                }
+                return string.Join(", ", parts);
+            }
+
+            private static List<(string col, bool asc)> BuildUnionOrderSql(QueryTranslator t, Expression source, TableMapping mapping, string alias)
+            {
+                var orderKeys = ExtractOrderByKeys(source);
+                var result = new List<(string col, bool asc)>();
+                if (orderKeys.Count == 0)
+                {
+                    foreach (var key in mapping.KeyColumns)
+                        result.Add(($"{alias}.{key.EscCol}", true));
+                    return result;
+                }
+
+                foreach (var (keyLambda, ascending) in orderKeys)
+                    result.Add((BuildUnionSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias), ascending));
+                return result;
+            }
+
+            private static string BuildUnionSql(QueryTranslator t, ParameterExpression parameter, Expression expression, TableMapping mapping, string alias)
+            {
+                t._correlatedParams[parameter] = (mapping, alias);
+                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var visitor = FastExpressionVisitorPool.Get(in vctx);
+                var sql = visitor.Translate(expression);
+                foreach (var kvp in visitor.GetParameters())
+                    t._params[kvp.Key] = kvp.Value;
+                if (t._params.Count > t._parameterManager.Index)
+                    t._parameterManager.Index = t._params.Count;
+                FastExpressionVisitorPool.Return(visitor);
+                var type = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
+                return type == typeof(decimal) ? t._provider.NormalizeDecimalForCompare(sql) : sql;
+            }
+
+            private static string RemoveTrailingOrderBy(Expression source, string sql)
+            {
+                if (SourceHasTakeOrSkip(source))
+                    return sql;
+                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+                return idx < 0 ? sql : sql[..idx];
+            }
         }
 
         /// <summary>
@@ -947,7 +1385,7 @@ namespace nORM.Query
                 }
 
                 var captured = defaultVal;
-                System.Collections.IList ApplyDefault(System.Collections.IList list)
+                System.Collections.IList ApplyDefault(DbContext ctx, System.Collections.IList list)
                 {
                     if (list.Count == 0)
                         list.Add(captured);
@@ -960,6 +1398,47 @@ namespace nORM.Query
         }
 
         private enum KeyedSetOp { Except, Intersect, Union }
+
+        private static Expression RewriteKeyedFilterSetOp(QueryTranslator t, MethodCallExpression node, bool keepMatches)
+        {
+            if (node.Arguments.Count < 3)
+            {
+                throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"{node.Method.Name} requires a second key collection and a key selector."));
+            }
+
+            var keyLambda = StripQuotes(node.Arguments[2]) as LambdaExpression
+                ?? throw new NormQueryException(string.Format(
+                    ErrorMessages.QueryTranslationFailed,
+                    $"{node.Method.Name} requires a key selector lambda."));
+
+            var sourceType = keyLambda.Parameters[0].Type;
+            var keyType = keyLambda.Body.Type;
+            var containsMethod = typeof(Enumerable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .First(m => m.Name == nameof(Enumerable.Contains)
+                            && m.GetParameters().Length == 2
+                            && m.GetGenericArguments().Length == 1)
+                .MakeGenericMethod(keyType);
+            Expression contains = Expression.Call(containsMethod, node.Arguments[1], keyLambda.Body);
+            var predicateBody = keepMatches ? contains : Expression.Not(contains);
+            var predicate = Expression.Lambda(predicateBody, keyLambda.Parameters);
+
+            var whereMethod = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .First(m => m.Name == nameof(Queryable.Where)
+                            && m.GetParameters().Length == 2
+                            && m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 2)
+                .MakeGenericMethod(sourceType);
+            var filtered = Expression.Call(whereMethod, node.Arguments[0], Expression.Quote(predicate));
+
+            var distinctByMethod = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .First(m => m.Name == nameof(Queryable.DistinctBy)
+                            && m.GetParameters().Length == 2
+                            && m.GetGenericArguments().Length == 2)
+                .MakeGenericMethod(sourceType, keyType);
+            var distinct = Expression.Call(distinctByMethod, filtered, Expression.Quote(keyLambda));
+            return t.Visit(distinct);
+        }
 
         private static Expression InstallKeyedSetOp(QueryTranslator t, MethodCallExpression node, KeyedSetOp op)
         {
@@ -997,7 +1476,7 @@ namespace nORM.Query
                 : Expression.Convert(secondExpr, typeof(System.Collections.IEnumerable));
             var secondLookup = Expression.Lambda<Func<System.Collections.IEnumerable?>>(secondCast).Compile();
 
-            System.Collections.IList Transform(System.Collections.IList sourceList)
+            System.Collections.IList Transform(DbContext ctx, System.Collections.IList sourceList)
             {
                 var second = secondLookup() ?? throw new NormQueryException(string.Format(
                     ErrorMessages.QueryTranslationFailed,
@@ -1367,6 +1846,205 @@ namespace nORM.Query
             }
         }
 
+        private sealed class SequenceEqualTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                if (node.Arguments.Count != 2)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "SequenceEqual comparer overloads are not provider-mobile; compare materialized sequences in CLR when a custom comparer is required.");
+                }
+
+                if (ExtractOrderByKeys(node.Arguments[0]).Count == 0)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "SequenceEqual requires the queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.");
+                }
+
+                if (TryTranslateLocalSequenceEqual(t, node, out var translated))
+                    return translated;
+
+                if (ExtractOrderByKeys(node.Arguments[1]).Count == 0)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "SequenceEqual requires the second queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.");
+                }
+
+                var leftPlan = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var leftMapping);
+                t.MergeSubPlanParameters(leftPlan);
+                var rightPlan = t.TranslateInSubContext(node.Arguments[1], leftMapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var rightMapping);
+                t.MergeSubPlanParameters(rightPlan);
+
+                if (leftMapping.Columns.Length != rightMapping.Columns.Length)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "SequenceEqual requires both sources to project the same provider-mobile row shape.");
+                }
+
+                var leftAlias = t.EscapeAlias("__seql" + t._joinCounter++);
+                var rightAlias = t.EscapeAlias("__seqr" + t._joinCounter++);
+                var rn = t._provider.Escape("__norm_seq_rn");
+                var leftNumbered = BuildNumberedSequence(t, node.Arguments[0], leftPlan.Sql, leftMapping, leftAlias, rn);
+                var rightNumbered = BuildNumberedSequence(t, node.Arguments[1], rightPlan.Sql, rightMapping, rightAlias, rn);
+                var d1 = t._provider.Escape("__seqd1");
+                var d2 = t._provider.Escape("__seqd2");
+                var diff = t._provider.Escape("__seqdiff");
+
+                t._sql.Append("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM (SELECT * FROM (")
+                    .Append(leftNumbered).Append(" EXCEPT ").Append(rightNumbered).Append(") AS ").Append(d1)
+                    .Append(" UNION ALL SELECT * FROM (")
+                    .Append(rightNumbered).Append(" EXCEPT ").Append(leftNumbered).Append(") AS ").Append(d2)
+                    .Append(") AS ").Append(diff).Append(") THEN 1 ELSE 0 END");
+                t._isAggregate = true;
+                t._singleResult = true;
+                return node;
+            }
+
+            private static bool TryTranslateLocalSequenceEqual(QueryTranslator t, MethodCallExpression node, out Expression translated)
+            {
+                translated = node;
+                if (!TryGetConstantValue(node.Arguments[1], out var rightValue)
+                    || rightValue is not System.Collections.IEnumerable rightEnumerable
+                    || rightValue is IQueryable)
+                {
+                    return false;
+                }
+
+                var rightRows = new List<object>();
+                foreach (var item in rightEnumerable)
+                {
+                    if (item is null)
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "SequenceEqual against a local sequence containing null rows is not provider-mobile; compare materialized sequences in CLR.");
+                    }
+                    rightRows.Add(item);
+                }
+
+                var leftPlan = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var leftMapping);
+                t.MergeSubPlanParameters(leftPlan);
+
+                if (rightRows.Count == 0)
+                {
+                    var emptyAlias = t.EscapeAlias("__seqempty" + t._joinCounter++);
+                    t._sql.Append("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM (")
+                        .Append(RemoveTrailingOrderBy(node.Arguments[0], leftPlan.Sql))
+                        .Append(") AS ").Append(emptyAlias)
+                        .Append(") THEN 1 ELSE 0 END");
+                    t._isAggregate = true;
+                    t._singleResult = true;
+                    return true;
+                }
+
+                var leftAlias = t.EscapeAlias("__seql" + t._joinCounter++);
+                var rn = t._provider.Escape("__norm_seq_rn");
+                var leftNumbered = BuildNumberedSequence(t, node.Arguments[0], leftPlan.Sql, leftMapping, leftAlias, rn);
+                var rightNumbered = BuildLocalNumberedSequence(t, leftMapping, rightRows, rn);
+                var rightWrappedAlias1 = t._provider.Escape("__seqlocal1");
+                var rightWrappedAlias2 = t._provider.Escape("__seqlocal2");
+                var rightWrapped1 = "SELECT * FROM (" + rightNumbered + ") AS " + rightWrappedAlias1;
+                var rightWrapped2 = "SELECT * FROM (" + rightNumbered + ") AS " + rightWrappedAlias2;
+                var d1 = t._provider.Escape("__seqd1");
+                var d2 = t._provider.Escape("__seqd2");
+                var diff = t._provider.Escape("__seqdiff");
+
+                t._sql.Append("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM (SELECT * FROM (")
+                    .Append(leftNumbered).Append(" EXCEPT ").Append(rightWrapped1).Append(") AS ").Append(d1)
+                    .Append(" UNION ALL SELECT * FROM (")
+                    .Append(rightWrapped2).Append(" EXCEPT ").Append(leftNumbered).Append(") AS ").Append(d2)
+                    .Append(") AS ").Append(diff).Append(") THEN 1 ELSE 0 END");
+                t._isAggregate = true;
+                t._singleResult = true;
+                return true;
+            }
+
+            private static string BuildLocalNumberedSequence(
+                QueryTranslator t,
+                TableMapping mapping,
+                IReadOnlyList<object> rows,
+                string rowNumberAlias)
+            {
+                var sb = PooledStringBuilder.Rent();
+                try
+                {
+                    for (var rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+                    {
+                        if (rowIndex > 0)
+                            sb.Append(" UNION ALL ");
+                        sb.Append("SELECT ").Append((rowIndex + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))
+                            .Append(" AS ").Append(rowNumberAlias);
+                        foreach (var column in mapping.Columns)
+                        {
+                            var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                            t.AddLiteralParameter(pName, column.Prop.GetValue(rows[rowIndex]));
+                            sb.Append(", ").Append(pName).Append(" AS ").Append(column.EscCol);
+                        }
+                    }
+                    return sb.ToString();
+                }
+                finally
+                {
+                    PooledStringBuilder.Return(sb);
+                }
+            }
+
+            private static string BuildNumberedSequence(
+                QueryTranslator t,
+                Expression source,
+                string sourceSql,
+                TableMapping mapping,
+                string alias,
+                string rowNumberAlias)
+            {
+                var orderBy = BuildSequenceOrderBy(t, source, mapping, alias);
+                var selectCols = string.Join(", ", mapping.Columns.Select(c => $"{alias}.{c.EscCol} AS {c.EscCol}"));
+                var sql = RemoveTrailingOrderBy(source, sourceSql);
+                return "SELECT ROW_NUMBER() OVER (ORDER BY " + PooledStringBuilder.JoinOrderBy(orderBy) + ") AS " + rowNumberAlias +
+                       ", " + selectCols + " FROM (" + sql + ") AS " + alias;
+            }
+
+            private static List<(string col, bool asc)> BuildSequenceOrderBy(
+                QueryTranslator t,
+                Expression source,
+                TableMapping mapping,
+                string alias)
+            {
+                var result = new List<(string col, bool asc)>();
+                foreach (var (keyLambda, ascending) in ExtractOrderByKeys(source))
+                    result.Add((BuildSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias), ascending));
+                return result;
+            }
+
+            private static string BuildSql(
+                QueryTranslator t,
+                ParameterExpression parameter,
+                Expression expression,
+                TableMapping mapping,
+                string alias)
+            {
+                t._correlatedParams[parameter] = (mapping, alias);
+                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var visitor = FastExpressionVisitorPool.Get(in vctx);
+                var sql = visitor.Translate(expression);
+                foreach (var kvp in visitor.GetParameters())
+                    t._params[kvp.Key] = kvp.Value;
+                if (t._params.Count > t._parameterManager.Index)
+                    t._parameterManager.Index = t._params.Count;
+                FastExpressionVisitorPool.Return(visitor);
+                var type = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
+                return type == typeof(decimal) ? t._provider.NormalizeDecimalForCompare(sql) : sql;
+            }
+
+            private static string RemoveTrailingOrderBy(Expression source, string sql)
+            {
+                if (SourceHasTakeOrSkip(source))
+                    return sql;
+                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+                return idx < 0 ? sql : sql[..idx];
+            }
+        }
+
         private sealed class ElementAtTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -1397,7 +2075,7 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"));
                 }
                 t._take = 1;
-                var pNameEa = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                var pNameEa = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
                 t._params[pNameEa] = 1;
                 t._takeParam = pNameEa;
                 t._takeSetByTerminal = true;
@@ -1450,7 +2128,7 @@ namespace nORM.Query
                 }
 
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._takeSetByTerminal = true;
@@ -1526,7 +2204,7 @@ namespace nORM.Query
                     t._where.Append('(').Append(winPredSql).Append(')');
                     var isSingleW = t._methodName == "Single" || t._methodName == "SingleOrDefault";
                     t._take = isSingleW ? 2 : 1;
-                    var pNameW = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                    var pNameW = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pNameW] = t._take;
                     t._takeParam = pNameW;
                     t._takeSetByTerminal = true;
@@ -1558,7 +2236,7 @@ namespace nORM.Query
                 // First/FirstOrDefault only need 1 row.
                 var isSingle = t._methodName == "Single" || t._methodName == "SingleOrDefault";
                 t._take = isSingle ? 2 : 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = t._take;
                 t._takeParam = pName;
                 // Mark this _take as set by a terminal so the post-Take/Skip pin family
@@ -1690,7 +2368,7 @@ namespace nORM.Query
                             t._orderBy.Add(($"{lastAlias}.{key.EscCol}", false));
                     }
                     t._take = 1;
-                    var pNameLW = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                    var pNameLW = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;
                     t._params[pNameLW] = 1;
                     t._takeParam = pNameLW;
                     t._takeSetByTerminal = true;
@@ -1735,7 +2413,7 @@ namespace nORM.Query
                         t._orderBy.Add((key.EscCol, false));
                 }
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._takeSetByTerminal = true;
@@ -1772,7 +2450,7 @@ namespace nORM.Query
                     t._orderBy.Add((keySql, ascending));
                 }
                 t._take = 1;
-                var pName = t._ctx.Provider.ParamPrefix + "p" + t._parameterManager.Index++;
+                var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;
                 t._params[pName] = 1;
                 t._takeParam = pName;
                 t._takeSetByTerminal = true;
@@ -2080,18 +2758,6 @@ namespace nORM.Query
                         var propName = member.Member.Name;
                         if (t._mapping != null && t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
-                            // Guard against composite-PK dependents early at translation time.
-                            var depMap = t._ctx.GetMapping(relation.DependentType);
-                            if (depMap.KeyColumns.Length > 1)
-                                throw new NormUnsupportedFeatureException(
-                                    $"Include on '{depMap.Type.Name}' with a composite primary key is not supported by " +
-                                    "the eager-loader. The IN-batched parent-key fetch matches one column; composite " +
-                                    "PKs need a tuple-IN predicate that nORM doesn't emit. Workarounds: " +
-                                    "(1) write an explicit join with projection: `from p in ctx.Query<Parent>() join c " +
-                                    "in ctx.Query<Child>() on p.Id equals c.ParentId select new { p, c }` and rebuild " +
-                                    "the parent graph client-side; (2) fetch the principals first, then issue a second " +
-                                    "`ctx.Query<Child>().Where(c => parentIds.Contains(c.ParentId)).ToListAsync()` and " +
-                                    "associate manually; (3) reshape the dependent so its PK is a single surrogate column.");
                             t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
                             t.TrackMapping(relation.DependentType);
                         }
@@ -2139,11 +2805,6 @@ namespace nORM.Query
                             var parentMap = t.TrackMapping(lastRelation.DependentType);
                             if (parentMap.Relations.TryGetValue(propName, out var relation))
                             {
-                                // Guard against composite-PK dependents early at translation time.
-                                var depMap = t._ctx.GetMapping(relation.DependentType);
-                                if (depMap.KeyColumns.Length > 1)
-                                    throw new NormUnsupportedFeatureException(
-                                        $"Include with composite primary key is not supported for '{relation.DependentType.Name}'.");
                                 lastInclude.Path.Add(relation);
                                 t.TrackMapping(relation.DependentType);
                             }
@@ -2237,12 +2898,16 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Temporal snapshots represent historical state, not the current
+                // live row. Tracking them by primary key can alias the snapshot to
+                // an already-tracked current entity and silently return current state.
+                t._noTracking = true;
                 var timeTravelArg = node.Arguments[1];
                 if (QueryTranslator.TryGetConstantValue(timeTravelArg, out var value))
                 {
                     if (value is DateTime dt)
                     {
-                        t._asOfTimestamp = dt;
+                        t._asOfTimestamp = DateTime.SpecifyKind(dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt, DateTimeKind.Unspecified);
                     }
                     else if (value is string tagName)
                     {

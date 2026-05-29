@@ -416,7 +416,7 @@ namespace nORM.Navigation
         /// <returns>A list containing the materialized dependent entities.</returns>
         private async Task<List<object>> LoadRelatedDataBatch(TableMapping.Relation relation, List<object?> keys, CancellationToken ct)
         {
-            if (_context.Provider.PrefersSyncExecution)
+            if (_context.RawProvider.PrefersSyncExecution)
                 return LoadRelatedDataBatchSync(relation, keys, ct);
 
             var mapping = _context.GetMapping(relation.DependentType);
@@ -425,7 +425,7 @@ namespace nORM.Navigation
             // X2 fix: Chunk keys by the provider's parameter limit to avoid provider-specific
             // "too many variables" errors. SQLite allows ≤ 999 params, SQL Server ≤ 2100,
             // PostgreSQL ≤ 32767. Reserve 10 params for any ambient predicates (e.g. tenant).
-            var maxParams = _context.Provider.MaxParameters;
+            var maxParams = _context.RawProvider.MaxParameters;
             var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, maxParams - 10);
 
             using var translator = Query.QueryTranslator.Rent(_context);
@@ -450,7 +450,7 @@ namespace nORM.Navigation
             var mapping = _context.GetMapping(relation.DependentType);
             _context.EnsureConnection();
 
-            var maxParams = _context.Provider.MaxParameters;
+            var maxParams = _context.RawProvider.MaxParameters;
             var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, maxParams - 10);
 
             using var translator = Query.QueryTranslator.Rent(_context);
@@ -481,7 +481,7 @@ namespace nORM.Navigation
             CancellationToken ct)
         {
             using var cmd = _context.CreateCommand();
-            var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+            var where = _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
@@ -508,7 +508,7 @@ namespace nORM.Navigation
             CancellationToken ct)
         {
             using var cmd = _context.CreateCommand();
-            var where = _context.Provider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+            var where = _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);

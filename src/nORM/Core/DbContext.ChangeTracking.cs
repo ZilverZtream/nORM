@@ -321,7 +321,7 @@ namespace nORM.Core
                             continue;
                     }
 
-                    await using var commandScope = new CommandScope(Connection, transaction);
+                    await using var commandScope = new CommandScope(RawConnection, transaction);
 
                     // Include tenant param in per-entity count for Modified/Deleted so that
                     // batch sizing does not overflow MaxParameters on bounded providers.
@@ -531,7 +531,7 @@ namespace nORM.Core
                 {
                     // DELETE existing owned items � use a dedicated command so that the
                     // INSERT command below starts fully fresh (no prepared-statement residue).
-                    await using var delScope = new CommandScope(Connection, transaction);
+                    await using var delScope = new CommandScope(RawConnection, transaction);
                     await using var delCmd = delScope.CreateCommand();
                     var delSql = $"DELETE FROM {ownedMap.EscTable} WHERE {ownedMap.EscForeignKeyColumn} = @ownerPk";
                     var dp = delCmd.CreateParameter();
@@ -541,15 +541,16 @@ namespace nORM.Core
 
                     // X1: Scope DELETE to current tenant when multi-tenancy is configured
                     // on the owned child table, preventing cross-tenant data destruction.
-                    Column? ownedTenantCol = null;
-                    if (Options.TenantProvider != null && Options.TenantColumnName != null)
-                        ownedTenantCol = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName);
-                    if (ownedTenantCol != null)
+                    if (Options.TenantProvider != null)
                     {
+                        var ownedTenantCol = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
+                            ?? throw new NormConfigurationException(
+                                $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' " +
+                                $"does not map tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned deletes.");
                         delSql += $" AND {ownedTenantCol.EscCol} = @tenantId";
                         var tp = delCmd.CreateParameter();
                         tp.ParameterName = "@tenantId";
-                        tp.Value = Options.TenantProvider!.GetCurrentTenantId();
+                        tp.Value = GetRequiredTenantId(ownedTenantCol, ownedMap.OwnedType, "owned collection delete");
                         delCmd.Parameters.Add(tp);
                     }
 
@@ -571,11 +572,13 @@ namespace nORM.Core
                 // SAVE1: Detect tenant column on owned table once before the INSERT loop.
                 Column? insertTenantCol = null;
                 object? insertTenantId = null;
-                if (Options.TenantProvider != null && Options.TenantColumnName != null)
+                if (Options.TenantProvider != null)
                 {
-                    insertTenantCol = Array.Find(insertCols, c => c.PropName == Options.TenantColumnName);
-                    if (insertTenantCol != null)
-                        insertTenantId = Options.TenantProvider.GetCurrentTenantId();
+                    insertTenantCol = Array.Find(insertCols, c => c.PropName == Options.TenantColumnName)
+                        ?? throw new NormConfigurationException(
+                            $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' " +
+                            $"does not map tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned inserts.");
+                    insertTenantId = GetRequiredTenantId(insertTenantCol, ownedMap.OwnedType, "owned collection insert");
                 }
 
                 // INSERT each item individually � avoids multi-statement batch issues
@@ -587,15 +590,15 @@ namespace nORM.Core
                     {
                         var childTenant = insertTenantCol.Getter(item);
                         if (childTenant == null)
-                            throw new InvalidOperationException(
+                            throw new NormConfigurationException(
                                 $"Tenant ID is required on owned child entity before saving but was null. " +
                                 "Explicitly set the tenant ID on the child entity.");
                         if (!TenantIdsEqual(childTenant, insertTenantId))
-                            throw new InvalidOperationException(
+                            throw new NormConfigurationException(
                                 $"Owned child tenant '{childTenant}' does not match current tenant '{insertTenantId}'.");
                     }
 
-                    await using var insScope = new CommandScope(Connection, transaction);
+                    await using var insScope = new CommandScope(RawConnection, transaction);
                     await using var insCmd = insScope.CreateCommand();
                     var valuePlaceholders = new StringBuilder("@ownerFk");
                     var fkp = insCmd.CreateParameter();
@@ -662,10 +665,10 @@ namespace nORM.Core
             // This ensures join table DELETE operations are scoped to rows whose left FK belongs to
             // the current tenant, preventing cross-tenant join row modification when different tenants
             // share the same PK space.
-            var tenantId = Options.TenantProvider?.GetCurrentTenantId();
-            var leftTenantCol = map.TenantColumn;
+            var tenantId = Options.TenantProvider != null ? GetRequiredTenantId(map, "many-to-many sync") : null;
+            var leftTenantCol = Options.TenantProvider != null ? RequireTenantColumn(map, "many-to-many sync") : null;
             var leftPkCol = map.KeyColumns.Length > 0 ? map.KeyColumns[0] : null;
-            var hasTenantFilter = tenantId != null && leftTenantCol != null && leftPkCol != null;
+            var hasTenantFilter = Options.TenantProvider != null && leftPkCol != null;
 
             foreach (var jtm in map.ManyToManyJoins)
             {
@@ -677,7 +680,7 @@ namespace nORM.Core
                     ? $" AND {jtm.EscLeftFkColumn} IN (SELECT {leftPkCol!.EscCol} FROM {map.EscTable} WHERE {leftPkCol.EscCol} = {_p.ParamPrefix}lpk AND {leftTenantCol!.EscCol} = {_p.ParamPrefix}jtenant)"
                     : "";
 
-                await using var cmdScope = new CommandScope(Connection, transaction);
+                await using var cmdScope = new CommandScope(RawConnection, transaction);
                 await using var cmd = cmdScope.CreateCommand();
 
                 if (entry.State == EntityState.Deleted)
@@ -749,22 +752,19 @@ namespace nORM.Core
                 {
                     // SEC1: Validate right entity tenant before inserting the join row to prevent
                     // cross-tenant join-table contamination when tenancy is active on the left side.
-                    if (tenantId != null && rightEntityByPk.TryGetValue(addedPk, out var rightEntity))
+                    if (Options.TenantProvider != null && rightEntityByPk.TryGetValue(addedPk, out var rightEntity))
                     {
                         var rightMap = GetMapping(jtm.RightType);
-                        var rightTenantCol = rightMap.TenantColumn;
-                        if (rightTenantCol != null)
-                        {
-                            var rightTenant = rightTenantCol.Getter(rightEntity);
-                            if (rightTenant == null)
-                                throw new InvalidOperationException(
-                                    $"Cannot add M2M relation: related entity '{jtm.RightType.Name}' has null tenant ID. " +
-                                    "Explicitly set the tenant ID on the related entity.");
-                            if (!TenantIdsEqual(rightTenant, tenantId))
-                                throw new InvalidOperationException(
-                                    $"Cannot add cross-tenant M2M relation: related entity tenant '{rightTenant}' " +
-                                    $"does not match current tenant '{tenantId}'.");
-                        }
+                        var rightTenantCol = RequireTenantColumn(rightMap, "many-to-many sync right side");
+                        var rightTenant = rightTenantCol.Getter(rightEntity);
+                        if (rightTenant == null)
+                            throw new NormConfigurationException(
+                                $"Cannot add M2M relation: related entity '{jtm.RightType.Name}' has null tenant ID. " +
+                                "Explicitly set the tenant ID on the related entity.");
+                        if (!TenantIdsEqual(rightTenant, tenantId!))
+                            throw new NormConfigurationException(
+                                $"Cannot add cross-tenant M2M relation: related entity tenant '{rightTenant}' " +
+                                $"does not match current tenant '{tenantId}'.");
                     }
 
                     cmd.Parameters.Clear();
@@ -824,8 +824,11 @@ namespace nORM.Core
                 // X1: Scope SELECT to current tenant when multi-tenancy is configured
                 // on the owned child table, preventing cross-tenant data leakage.
                 Column? ownedTenantColLoad = null;
-                if (Options.TenantProvider != null && Options.TenantColumnName != null)
-                    ownedTenantColLoad = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName);
+                if (Options.TenantProvider != null)
+                    ownedTenantColLoad = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
+                        ?? throw new NormConfigurationException(
+                            $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' " +
+                            $"does not map tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned loads.");
                 if (ownedTenantColLoad != null)
                     sqlBuilder.Append(" AND ").Append(ownedTenantColLoad.EscCol)
                               .Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
@@ -845,7 +848,7 @@ namespace nORM.Core
                 {
                     var tp = cmd.CreateParameter();
                     tp.ParameterName = _p.ParamPrefix + "tenantId";
-                    tp.Value = Options.TenantProvider!.GetCurrentTenantId();
+                    tp.Value = GetRequiredTenantId(ownedTenantColLoad, ownedMap.OwnedType, "owned collection load");
                     cmd.Parameters.Add(tp);
                 }
 
@@ -1272,12 +1275,13 @@ namespace nORM.Core
             // X1 fix: Parenthesize the OR-chain so the tenant predicate applies to ALL
             // disjuncts, not just the last one. Without parens, SQL AND binds tighter than OR,
             // causing the tenant restriction to apply only to the final row condition.
-            if (Options.TenantProvider != null && map.TenantColumn != null)
+            if (Options.TenantProvider != null)
             {
+                var tenantCol = RequireTenantColumn(map, "OCC batch verification");
                 sb.Append('(');
                 sb.Append(string.Join(" OR ", conditions));
-                sb.Append($") AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerify");
-                cmd.AddParam($"{_p.ParamPrefix}tenantVerify", Options.TenantProvider.GetCurrentTenantId());
+                sb.Append($") AND {tenantCol.EscCol} = {_p.ParamPrefix}tenantVerify");
+                cmd.AddParam($"{_p.ParamPrefix}tenantVerify", GetRequiredTenantId(map, "OCC batch verification"));
             }
             else
             {
@@ -1330,10 +1334,11 @@ namespace nORM.Core
             // the tenant WHERE clause filtered it out) is correctly classified as a concurrency
             // conflict rather than a benign same-value update. Without this, the verifier may
             // find a foreign-tenant row with the same PK+token and return count=1, masking the error.
-            if (Options.TenantProvider != null && map.TenantColumn != null)
+            if (Options.TenantProvider != null)
             {
-                sb.Append($" AND {map.TenantColumn.EscCol} = {_p.ParamPrefix}tenantVerifySingle");
-                cmd.AddParam($"{_p.ParamPrefix}tenantVerifySingle", Options.TenantProvider.GetCurrentTenantId());
+                var tenantCol = RequireTenantColumn(map, "OCC single verification");
+                sb.Append($" AND {tenantCol.EscCol} = {_p.ParamPrefix}tenantVerifySingle");
+                cmd.AddParam($"{_p.ParamPrefix}tenantVerifySingle", GetRequiredTenantId(map, "OCC single verification"));
             }
             cmd.CommandText = sb.ToString();
 

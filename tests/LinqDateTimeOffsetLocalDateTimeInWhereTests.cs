@@ -11,11 +11,10 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins <c>dtoCol.LocalDateTime &lt; literal</c> (and ORDER BY by
-/// LocalDateTime) — sister of the projection-side support (1f06ac1).
-/// Uses snapshot semantics: the local offset is captured at query-build
-/// time and baked into the SQL shift, consistent with the projection
-/// path. See [[dto-local-datetime]] for the DST trade-off.
+/// <summary>
+/// Pins <c>dtoCol.LocalDateTime</c> in WHERE and ORDER BY. nORM preserves
+/// per-instant local timezone semantics by lowering TimeZoneInfo.Local offset
+/// ranges to provider SQL.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqDateTimeOffsetLocalDateTimeInWhereTests : IAsyncLifetime
@@ -46,37 +45,32 @@ public class LinqDateTimeOffsetLocalDateTimeInWhereTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LocalDateTime_in_WHERE_filters_by_snapshot_local_wall_clock()
+    public async Task LocalDateTime_in_WHERE_filters_by_per_instant_local_wall_clock()
     {
-        var snap = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-        // Threshold = noon local wall-clock on the same date.
-        var noonLocal = new DateTime(2026, 5, 25, 12, 0, 0);
+        var noonLocal = new DateTimeOffset(2026, 5, 25, 12, 0, 0, TimeSpan.Zero).LocalDateTime;
         var rows = await _ctx.Query<DowRow>()
             .Where(r => r.Dto.LocalDateTime >= noonLocal)
             .OrderBy(r => r.Id)
             .ToListAsync();
-        // Row 1 UTC 06:00, row 2 UTC 12:00, row 3 UTC 18:00. After local-shift by snap,
-        // figure out which rows have wall-clock >= noon.
-        var matchedIds = new[] { 1, 2, 3 }
-            .Where(id => {
-                var utc = id == 1 ? 6 : id == 2 ? 12 : 18;
-                var localWall = new DateTime(2026, 5, 25, utc, 0, 0).Add(snap);
-                return localWall >= noonLocal;
-            })
+
+        var matchedIds = new[]
+            {
+                (Id: 1, Utc: new DateTimeOffset(2026, 5, 25, 6, 0, 0, TimeSpan.Zero)),
+                (Id: 2, Utc: new DateTimeOffset(2026, 5, 25, 12, 0, 0, TimeSpan.Zero)),
+                (Id: 3, Utc: new DateTimeOffset(2026, 5, 25, 18, 0, 0, TimeSpan.Zero))
+            }
+            .Where(row => row.Utc.LocalDateTime >= noonLocal)
+            .Select(row => row.Id)
             .ToArray();
         Assert.Equal(matchedIds, rows.Select(r => r.Id).ToArray());
     }
 
     [Fact]
-    public async Task LocalDateTime_in_OrderBy_orders_by_snapshot_local_wall_clock()
+    public async Task LocalDateTime_in_OrderBy_orders_by_local_wall_clock()
     {
-        var snap = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
         var rows = await _ctx.Query<DowRow>()
             .OrderBy(r => r.Dto.LocalDateTime)
             .ToListAsync();
-        // Local wall-clock order = UTC-instant order for same-offset rows. All rows here
-        // share +00:00 storage so the snapshot shift is uniform — order should still match
-        // UTC order 06:00 < 12:00 < 18:00 → IDs 1, 2, 3.
         Assert.Equal(new[] { 1, 2, 3 }, rows.Select(r => r.Id).ToArray());
     }
 

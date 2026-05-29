@@ -1,4 +1,4 @@
-# nORM (The Norm) - High-Performance ORM for .NET
+# nORM (The Norm) - Performance-Focused ORM for .NET
 
 nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being tuned for low-overhead hot paths while keeping familiar ORM features such as LINQ queries, change tracking, migrations, multi-tenancy, and provider-specific bulk operations.
 
@@ -13,11 +13,63 @@ nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being 
 - **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
 - **Connection Management**: context-level connection ownership plus database-driver pooling
 - **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
+- **Provider Mobility Contract**: supported portable shapes must translate,
+  emulate, or fail deterministically across the supported provider matrix
+- **Strict Provider Mobility Mode**: certification can run with
+  `UseStrictProviderMobility()` so generated nORM paths are portable while raw
+  SQL, stored procedures, direct connection access, provider-native DDL, and
+  client-eval escape hatches are explicit migration findings through the shared
+  [provider mobility translation layer](docs/provider-mobility-translation-layer.md)
 - **Smart Relationship Handling**: Automatic relationship discovery and lazy loading (see [docs/linq-support.md](docs/linq-support.md) for relationship loading constraints)
 - **Flexible Configuration**: Fluent API and attribute-based configuration
 - **Developer Tools**: Preview database scaffolding and reverse engineering
 - **Modern Features**: JSON querying, window functions, temporal queries
 - **Operational Features**: Multi-tenancy, caching, retry policies, and interceptors with explicit support contracts
+- **Tenant/Temporal Hardening**: generated-path tenant isolation, optional SQL Server/PostgreSQL native tenant session context/RLS DDL with explicit apply/drop APIs, nORM-managed temporal history, and explicit SQL Server native temporal mode/bootstrap
+- **Product-Proof Sample**: `samples/nORM.Sample.Store` is a provider-swappable tenant and temporal web app with a browser frontend, authenticated tenant flow, and verification mode.
+
+## Sample Store App
+
+Run the RC3 product-proof sample locally with SQLite:
+
+```bash
+dotnet run --project samples/nORM.Sample.Store -- --provider sqlite
+```
+
+The same app can target SQL Server, PostgreSQL, or MySQL by setting
+`NORM_SAMPLE_*` or `NORM_TEST_*` connection strings and changing only
+`--provider`. The sample demonstrates generated-path tenant boundaries,
+representative LINQ, bulk insert, compiled query, `Include().AsSplitQuery()`,
+and nORM-managed temporal `AsOf(tag)`. See
+[samples/nORM.Sample.Store/README.md](samples/nORM.Sample.Store/README.md),
+[Tenant Boundary](docs/tenant-boundary.md), and
+[Temporal Versioning](docs/temporal-versioning.md).
+
+For the strict provider-swap release gate, see
+[Provider Mobility Contract](docs/provider-mobility-contract.md). The sample
+can emit a certification artifact:
+
+```powershell
+dotnet run --project samples/nORM.Sample.Store -c Release --no-build -- certify-provider-swap --report ../../artifacts/provider-swap/sample-store.json
+```
+
+Provider-bound assets in existing applications, such as SQL Server stored
+procedures or provider-specific raw SQL, should be inventoried as migration
+findings. nORM should translate or emulate generated nORM features; arbitrary
+caller-authored database language needs a generated nORM rewrite or an explicit
+human-reviewed remediation.
+
+Existing applications can run the reusable certification scanner through the
+tool package:
+
+```powershell
+norm portability certify --scan-path src/MyApp --assembly bin/Release/net8.0/MyApp.dll --report artifacts/provider-mobility.json --html artifacts/provider-mobility.html
+```
+
+The report includes source findings, schema metadata findings, provider target
+profiles, live server-version evidence when connection strings are supplied,
+feature probes such as JSON availability, and concrete translation-strategy
+rows for dialect differences.
 
 ## Performance Validation
 
@@ -76,10 +128,10 @@ public class User
 }
 ```
 
-### High-Performance LINQ Queries
+### LINQ Queries
 
 ```csharp
-// Familiar EF Core-style syntax with lower runtime overhead on tuned paths
+// Familiar EF Core-style syntax on provider-tested query paths
 var users = await context.Query<User>()
     .Where(u => u.Name.StartsWith("John"))
     .Include(u => u.Orders)
@@ -93,14 +145,14 @@ var userStats = await context.Query<User>()
     .Select(g => new { Date = g.Key, Count = g.Count() })
     .ToListAsync();
 
-// Compiled queries for maximum performance
+// Compiled queries for warm-path execution
 var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User>(
     (ctx, since) => ctx.Query<User>()
         .Where(u => u.CreatedAt > since)
 );
 ```
 
-### Lightning-Fast CRUD Operations
+### CRUD Operations
 
 > **Note:** nORM is async-first for writes. Only `SaveChangesAsync()` is provided; there is no synchronous `SaveChanges()`. Use `await ctx.SaveChangesAsync()` in all contexts, including console apps: `ctx.SaveChangesAsync().GetAwaiter().GetResult()` can cause deadlocks in some synchronization contexts. Synchronous query helpers such as `ToListSync()` and `CountSync()` remain supported for legacy synchronous callers; see [Sync and Async Policy](docs/sync-policy.md).
 
@@ -115,7 +167,7 @@ await context.UpdateAsync(user);
 await context.DeleteAsync(user);
 ```
 
-### Superior Bulk Operations
+### Bulk Operations
 
 ```csharp
 // Process thousands of records efficiently
@@ -188,7 +240,10 @@ options.RetryPolicy = new RetryPolicy
 Multi-tenancy is enforced on ORM-generated query and write paths. Raw SQL,
 stored procedures, migrations, scaffolding, and direct connection access are
 caller-controlled privileged paths. See the
-[Multi-Tenancy Security Contract](docs/multi-tenancy-security.md).
+[Multi-Tenancy Security Contract](docs/multi-tenancy-security.md),
+[Tenant Boundary](docs/tenant-boundary.md),
+[Tenant Deployment Patterns](docs/tenant-deployment-patterns.md), and
+[Tenant Database-Native RLS](docs/tenant-database-native-rls.md).
 
 ### Temporal Queries & Versioning
 
@@ -207,7 +262,8 @@ var releaseData = await context.Query<Product>()
 
 Temporal versioning is implemented with nORM-managed history tables and
 provider-specific triggers. See [Temporal Versioning](docs/temporal-versioning.md)
-for the stable v1 contract.
+and [Temporal Precision](docs/temporal-precision.md) for the stable v1
+contract.
 
 ## Database Providers
 
@@ -485,21 +541,21 @@ public class MyDbContext : nORM.Core.DbContext
 
 ## Performance Design
 
-- **Advanced IL Materialization**: Hand-optimized IL generation eliminates reflection overhead
-- **Zero-Allocation Query Execution**: Memory-efficient query processing reduces GC pressure  
+- **Advanced IL Materialization**: IL-generated materializers avoid reflection on tuned paths
+- **Low-Allocation Query Execution**: Memory-conscious query processing reduces avoidable GC pressure
 - **Intelligent Caching**: Multi-layered caching strategy for query plans and metadata
 - **Driver Pooling**: Uses ADO.NET provider-native pooling instead of a custom public pool
 - **Native Bulk Operations**: Database-specific bulk operation implementations
-- **Compiled Query Support**: Pre-compile frequently used queries for maximum speed
+- **Compiled Query Support**: Pre-compile frequently used queries for warm-path reuse
 
 ## Performance Targets
 
 nORM is being tuned toward these release goals:
 
-- **Query latency**: stay competitive with Dapper on simple and joined reads
-- **Compiled queries**: make warm-path execution consistently faster than uncompiled LINQ
-- **Memory usage**: keep allocations well below EF Core on read-heavy paths
-- **Bulk operations**: remain substantially faster than EF Core and competitive with Dapper transaction-based inserts
+- **Query latency**: keep simple, joined, and complex read paths inside the versioned benchmark budgets
+- **Compiled queries**: keep warm-path execution inside the compiled-query benchmark budgets
+- **Memory usage**: keep read-heavy allocations inside the versioned benchmark budgets
+- **Bulk operations**: keep idiomatic `BulkInsertAsync` inside the provider-specific benchmark budgets
 
 Benchmark claims must follow the reproducibility and baseline rules in
 [Benchmark Governance](docs/benchmark-governance.md).
@@ -540,4 +596,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-*nORM - Entity Framework performance, without the Entity Framework overhead* 
+*nORM - familiar ORM ergonomics with provider-tested LINQ and benchmark-governed performance*

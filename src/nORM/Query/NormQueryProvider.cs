@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
@@ -62,7 +62,7 @@ namespace nORM.Query
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, CacheLockCleanupInterval, CacheLockCleanupInterval);
         // Cache GetElementType results to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
-        // Singleton MaterializerFactory — only wraps static caches, no instance state.
+        // Singleton MaterializerFactory � only wraps static caches, no instance state.
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
         // Cache constructor existence checks to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, bool> _constrainedQueryableCache = new();
@@ -96,12 +96,14 @@ namespace nORM.Query
 
         private sealed class PooledPlanCommand
         {
-            public PooledPlanCommand(DbCommand command)
+            public PooledPlanCommand(DbCommand command, int fixedParameterCount)
             {
                 Command = command;
+                FixedParameterCount = fixedParameterCount;
             }
 
             public DbCommand Command { get; }
+            public int FixedParameterCount { get; }
             public object Lock { get; } = new();
         }
 
@@ -121,10 +123,10 @@ namespace nORM.Query
         public void Dispose()
         {
             foreach (var entry in _pooledCountCommands.Values)
-                try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed — safe to ignore */ }
+                try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed � safe to ignore */ }
             _pooledCountCommands.Clear();
             foreach (var entry in _pooledPlanCommands.Values)
-                try { entry.Command.Dispose(); } catch (ObjectDisposedException) { /* already disposed — safe to ignore */ }
+                try { entry.Command.Dispose(); } catch (ObjectDisposedException) { /* already disposed � safe to ignore */ }
             _pooledPlanCommands.Clear();
 
             // C1: stop background timers when the last provider is disposed so the process
@@ -211,7 +213,7 @@ namespace nORM.Query
 
             // Remove in separate pass to avoid concurrent modification.
             // Use value-matching TryRemove so we don't accidentally remove a
-            // concurrently re-inserted semaphore for the same key. Do NOT dispose —
+            // concurrently re-inserted semaphore for the same key. Do NOT dispose �
             // threads holding a reference obtained via GetOrAdd before this removal can
             // still call Wait/WaitAsync safely on the semaphore. GC will collect it once
             // all references drop. SemaphoreSlim only allocates its underlying event lazily
@@ -253,7 +255,7 @@ namespace nORM.Query
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
-            // Queryable.Aggregate with a sum-fold accumulator — rewrite to
+            // Queryable.Aggregate with a sum-fold accumulator � rewrite to
             // SUM at translation time so we don't materialise the full result
             // set client-side. Supported shapes: 1-arg `(acc, x) => acc + x`
             // and 2-arg `seed, (acc, x) => acc + sub(x)`. Other Aggregate
@@ -284,7 +286,7 @@ namespace nORM.Query
                 return false;
 
             // Three Aggregate overloads: 2 args (source, func), 3 args (source, seed, func),
-            // 4 args (source, seed, func, resultSelector — unsupported).
+            // 4 args (source, seed, func, resultSelector � unsupported).
             LambdaExpression? fold;
             object? seed;
             Type seedType;
@@ -342,7 +344,7 @@ namespace nORM.Query
             if (ReferencesParameter(sub, accParam)) return false;
 
             // Build the equivalent Queryable.Sum call. nORM's DirectAggregate
-            // translator only emits SUM SQL when given a selector lambda — the
+            // translator only emits SUM SQL when given a selector lambda � the
             // no-selector overload Sum(IQueryable<T>) materialises the list
             // and aggregates client-side. Always synthesize the selector form
             // so the aggregation happens on the server.
@@ -462,7 +464,7 @@ namespace nORM.Query
             result = default!;
             // Try to detect "isMax" (true = MAX, false = MIN, null = no match).
             bool? isMax = null;
-            // Math.Max(acc, x) / Math.Min(acc, x) — order-insensitive args.
+            // Math.Max(acc, x) / Math.Min(acc, x) � order-insensitive args.
             if (fold.Body is MethodCallExpression mathCall
                 && mathCall.Method.DeclaringType == typeof(Math)
                 && mathCall.Arguments.Count == 2
@@ -472,7 +474,7 @@ namespace nORM.Query
                 if (mathCall.Method.Name == nameof(Math.Max)) isMax = true;
                 else if (mathCall.Method.Name == nameof(Math.Min)) isMax = false;
             }
-            // Conditional: x [>/<] acc ? x : acc — or acc [>/<] x ? acc : x.
+            // Conditional: x [>/<] acc ? x : acc � or acc [>/<] x ? acc : x.
             else if (fold.Body is ConditionalExpression cond
                      && cond.Test is BinaryExpression cmp
                      && (cmp.NodeType == ExpressionType.GreaterThan
@@ -481,8 +483,8 @@ namespace nORM.Query
                          || cmp.NodeType == ExpressionType.LessThanOrEqual))
             {
                 bool isGreater = cmp.NodeType is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual;
-                // Test == "x > acc"  : IfTrue=x, IfFalse=acc → MAX
-                // Test == "acc > x"  : IfTrue=acc, IfFalse=x → MAX
+                // Test == "x > acc"  : IfTrue=x, IfFalse=acc ? MAX
+                // Test == "acc > x"  : IfTrue=acc, IfFalse=x ? MAX
                 // (and mirrored for <)
                 if (cmp.Left == elemParam && cmp.Right == accParam
                     && cond.IfTrue == elemParam && cond.IfFalse == accParam) isMax = isGreater;
@@ -587,7 +589,8 @@ namespace nORM.Query
                 decimal a = System.Convert.ToDecimal(seed), b = System.Convert.ToDecimal(sqlValue);
                 return isMax ? Math.Max(a, b) : Math.Min(a, b);
             }
-            throw new NotSupportedException($"Aggregate min/max fold accumulator type '{accType.Name}' is not supported.");
+            throw new NormUnsupportedFeatureException(
+                $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
         }
 
         private bool TryRewriteStringConcatAggregate<TResult>(
@@ -670,7 +673,7 @@ namespace nORM.Query
             if (groupByMethod == null) throw new InvalidOperationException("DBG-SC6: groupByMethod is null");
             var groupByCall = Expression.Call(groupByMethod.MakeGenericMethod(sourceGenArg, typeof(int)), groupedSource, Expression.Quote(groupKeyLambda));
 
-            // Inside the result selector: g.Select(<projLambda>) — Enumerable.Select
+            // Inside the result selector: g.Select(<projLambda>) � Enumerable.Select
             // (NOT Queryable.Select; the second param is Func<,>, not Expression<Func<,>>).
             var iGroupingType = typeof(System.Linq.IGrouping<,>).MakeGenericType(typeof(int), sourceGenArg);
             var enumerableSelect = typeof(System.Linq.Enumerable).GetMethods()
@@ -695,11 +698,11 @@ namespace nORM.Query
             if (stringJoinMethod == null) throw new InvalidOperationException("DBG-SC8: stringJoinMethod null");
             var joinCall = Expression.Call(stringJoinMethod, Expression.Constant(sep), innerSelectCall);
 
-            // Wrap in Select(g => new { V = string.Join(...) }) — the existing
+            // Wrap in Select(g => new { V = string.Join(...) }) � the existing
             // IGrouping-projection path emits BOTH groupKey AND value columns
             // for a scalar MethodCall body (Aggregates.cs:184). The single-
             // field NewExpression takes the NewExpression branch which only
-            // emits the explicit args — exactly one column (the joined value)
+            // emits the explicit args � exactly one column (the joined value)
             // so the scalar materialiser reads it correctly.
             var anonType = typeof(StringConcatAggResult);
             var anonCtor = anonType.GetConstructor(new[] { typeof(string) })!;
@@ -747,7 +750,7 @@ namespace nORM.Query
             sep = "";
             // Direct string constant: ", "
             if (TryEvaluateConstant(sepExpr, out var v) && v is string s1) { sep = s1; return true; }
-            // Conditional: (acc == "" ? "" : sep) — extract the non-empty branch.
+            // Conditional: (acc == "" ? "" : sep) � extract the non-empty branch.
             if (sepExpr is ConditionalExpression cond)
             {
                 if (TryEvaluateConstant(cond.IfTrue, out var t) && t is string tStr
@@ -808,7 +811,8 @@ namespace nORM.Query
             if (accType == typeof(double))  return (double)System.Convert.ToDouble(seed) + (double)System.Convert.ToDouble(sumValue);
             if (accType == typeof(float))   return (float)System.Convert.ToSingle(seed)  + (float)System.Convert.ToSingle(sumValue);
             if (accType == typeof(decimal)) return (decimal)System.Convert.ToDecimal(seed) + (decimal)System.Convert.ToDecimal(sumValue);
-            throw new NotSupportedException($"Aggregate sum-fold accumulator type '{accType.Name}' is not supported.");
+            throw new NormUnsupportedFeatureException(
+                $"Aggregate sum-fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
         }
         public object? Execute(Expression expression) => Execute<object>(expression);
         public Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken ct)
@@ -820,7 +824,7 @@ namespace nORM.Query
                 return ExecuteCountAsync<TResult>(countSql, countParameters, ct);
             }
 
-            // Fast path – bypass translator for recognized simple patterns
+            // Fast path � bypass translator for recognized simple patterns
             if (TryExecuteFastPath<TResult>(expression, ct, out var fastResult))
                 return fastResult;
             // Simple query path (slightly higher overhead than fast path but handles more patterns)
@@ -988,7 +992,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             // For cached queries, use the closure-based path (rare).
-            // For non-cached queries (common), return task directly — no async state machine needed.
+            // For non-cached queries (common), return task directly � no async state machine needed.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
                 return ExecuteInternalCachedAsync<TResult>(plan, paramValues, sw, ct);
@@ -1005,7 +1009,7 @@ namespace nORM.Query
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
         }
         /// <summary>
-        /// Non-async entry point — does synchronous command setup when connection is ready,
+        /// Non-async entry point � does synchronous command setup when connection is ready,
         /// then dispatches to the appropriate async materializer. Avoids one async state machine
         /// allocation on the hot path.
         /// </summary>
@@ -1016,10 +1020,10 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteQueryFromPlanSlowAsync<TResult>(ensureTask, plan, paramValues, sw, ct);
 
-            if (CanUsePooledPlanCommand(plan, paramValues))
-                return ExecutePooledQueryPlanSync<TResult>(plan, sw, ct);
+            if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
+                return ExecutePooledQueryPlanSync<TResult>(plan, paramValues, sw, ct);
 
-            // Synchronous command setup — no async state machine needed
+            // Synchronous command setup � no async state machine needed
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -1030,18 +1034,18 @@ namespace nORM.Query
             // inspecting the token; the sync dispatchers below never check it either.
             ct.ThrowIfCancellationRequested();
 
-            // Dispatch directly to materializer — avoids wrapping in another async method
+            // Dispatch directly to materializer � avoids wrapping in another async method
             if (plan.IsScalar)
             {
                 // Sync scalar for providers without true async I/O (SQLite)
-                if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+                if (_ctx.RawProvider.PrefersSyncExecution || _ctx.RawProvider.PrefersSyncQueryPlanExecution)
                     return ExecuteScalarPlanSync<TResult>(plan, cmd, sw);
                 return ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct);
             }
 
             // For providers that don't support true async I/O (SQLite), use fully synchronous
-            // materialization to eliminate per-row ReadAsync state machine overhead (~50ns × N rows).
-            if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+            // materialization to eliminate per-row ReadAsync state machine overhead (~50ns � N rows).
+            if (_ctx.RawProvider.PrefersSyncExecution || _ctx.RawProvider.PrefersSyncQueryPlanExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw);
 
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
@@ -1050,12 +1054,12 @@ namespace nORM.Query
             return ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct);
         }
 
-        /// <summary>PERF: Slow path — connection needs initialization.</summary>
+        /// <summary>PERF: Slow path � connection needs initialization.</summary>
         private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
-            if (CanUsePooledPlanCommand(plan, paramValues))
-                return await ExecutePooledQueryPlanSync<TResult>(plan, sw, ct).ConfigureAwait(false);
+            if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
+                return await ExecutePooledQueryPlanSync<TResult>(plan, paramValues, sw, ct).ConfigureAwait(false);
 
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -1064,7 +1068,7 @@ namespace nORM.Query
 
             if (plan.IsScalar)
             {
-                if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+                if (_ctx.RawProvider.PrefersSyncExecution || _ctx.RawProvider.PrefersSyncQueryPlanExecution)
                     return await ExecuteScalarPlanSync<TResult>(plan, cmd, sw).ConfigureAwait(false);
                 return await ExecuteScalarPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
             }
@@ -1072,17 +1076,16 @@ namespace nORM.Query
             if (typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
                 return (TResult)(object)await ExecuteObjectListPlanAsync(plan, cmd, sw, ct).ConfigureAwait(false);
 
-            if (_ctx.Provider.PrefersSyncExecution || _ctx.Provider.PrefersSyncQueryPlanExecution)
+            if (_ctx.RawProvider.PrefersSyncExecution || _ctx.RawProvider.PrefersSyncQueryPlanExecution)
                 return await ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw).ConfigureAwait(false);
 
             return await ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct).ConfigureAwait(false);
         }
 
-        private bool CanUsePooledPlanCommand(QueryPlan plan, IReadOnlyList<object?>? paramValues)
-            => _ctx.Provider.SupportsQueryPlanPreparedCommandCache &&
+        private bool CanUsePooledPlanCommand<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues)
+            => _ctx.RawProvider.SupportsQueryPlanPreparedCommandCache &&
                _ctx.Options.CommandInterceptors.Count == 0 &&
-               paramValues == null &&
-               plan.CompiledParameters.Count == 0 &&
+               (plan.CompiledParameters.Count == 0 || paramValues != null) &&
                !plan.IsScalar &&
                !plan.SingleResult &&
                plan.GroupJoinInfo == null &&
@@ -1090,16 +1093,25 @@ namespace nORM.Query
                !plan.SplitQuery &&
                plan.DependentQueries is not { Count: > 0 } &&
                plan.M2MIncludes is not { Count: > 0 } &&
-               plan.ClientProjection == null;
+               plan.ClientProjection == null &&
+               plan.PostMaterializeTransform == null &&
+               typeof(TResult) != typeof(List<object>) &&
+               (!plan.ElementType.IsClass ||
+                !_ctx.IsMapped(plan.ElementType) ||
+                _ctx.GetMapping(plan.ElementType).OwnedCollections.Count == 0);
 
-        private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, Stopwatch? sw, CancellationToken ct)
+        private Task<TResult> ExecutePooledQueryPlanSync<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             var pooled = _pooledPlanCommands.GetOrAdd(plan.Fingerprint, _ => CreatePooledPlanCommand(plan));
             lock (pooled.Lock)
             {
                 ct.ThrowIfCancellationRequested();
                 pooled.Command.Transaction = _ctx.CurrentTransaction;
+                if (paramValues != null)
+                    BindPooledCompiledParameters(pooled.Command, pooled.FixedParameterCount, plan, paramValues);
                 var list = _executor.MaterializePooled(plan, pooled.Command);
+                if (plan.PostMaterializeTransform != null)
+                    list = plan.PostMaterializeTransform(_ctx, list);
                 sw?.Stop();
                 _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
                 return Task.FromResult((TResult)(object)list);
@@ -1112,11 +1124,44 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, null);
+            var fixedParameterCount = cmd.Parameters.Count;
+            foreach (var parameterName in plan.CompiledParameters)
+            {
+                if (IsUnusedCompiledParameter(parameterName))
+                    continue;
+                cmd.AddOptimizedParam(parameterName, DBNull.Value);
+            }
             try { cmd.Prepare(); } catch (Exception) { }
-            return new PooledPlanCommand(cmd);
+            return new PooledPlanCommand(cmd, fixedParameterCount);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void BindPooledCompiledParameters(
+            DbCommand cmd,
+            int fixedParameterCount,
+            QueryPlan plan,
+            IReadOnlyList<object?> paramValues)
+        {
+            var compiledParams = plan.CompiledParameters;
+            var count = Math.Min(compiledParams.Count, paramValues.Count);
+            var boundIndex = 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (IsUnusedCompiledParameter(compiledParams[i]))
+                    continue;
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], paramValues[i] ?? DBNull.Value);
+                boundIndex++;
+            }
+
+            for (; boundIndex < cmd.Parameters.Count - fixedParameterCount; boundIndex++)
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], DBNull.Value);
         }
 
         /// <summary>PERF: Extracted parameter binding to share between fast and slow paths.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsUnusedCompiledParameter(string parameterName)
+            => parameterName.EndsWith("_unused", StringComparison.Ordinal);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void BindPlanParameters(DbCommand cmd, QueryPlan plan, IReadOnlyList<object?>? paramValues)
         {
@@ -1142,7 +1187,10 @@ namespace nORM.Query
                 {
                     var count = Math.Min(compiledParams.Count, paramValues.Count);
                     for (int i = 0; i < count; i++)
+                    {
+                        if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                         cmd.AddOptimizedParam(compiledParams[i], paramValues[i] ?? DBNull.Value);
+                    }
                 }
             }
         }
@@ -1159,7 +1207,7 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
-                // LINQ-to-Objects Sum returns 0 for empty / all-null source — even for
+                // LINQ-to-Objects Sum returns 0 for empty / all-null source � even for
                 // nullable element types (`Enumerable.Sum(IEnumerable<decimal?>)` returns 0,
                 // not null). SQL `SUM(col)` returns NULL on the same input, so map NULL to
                 // zero-of-target so the materialized result matches LINQ semantics.
@@ -1202,7 +1250,7 @@ namespace nORM.Query
             return (TResult)Activator.CreateInstance(underlying)!;
         }
 
-        /// <summary>PERF: List&lt;object&gt; materialization path — avoids covariant copy.</summary>
+        /// <summary>PERF: List&lt;object&gt; materialization path � avoids covariant copy.</summary>
         private async Task<List<object>> ExecuteObjectListPlanAsync(QueryPlan plan, DbCommand cmd, Stopwatch? sw, CancellationToken ct)
         {
             var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
@@ -1214,7 +1262,7 @@ namespace nORM.Query
         /// <summary>
         /// Fully synchronous materialization wrapped in Task.FromResult.
         /// Eliminates async state machine overhead for providers without true async I/O (SQLite).
-        /// Saves ~50-100ns per Read() call ? ~1-4µs for typical result sets.
+        /// Saves ~50-100ns per Read() call ? ~1-4�s for typical result sets.
         /// </summary>
         private Task<TResult> ExecuteListPlanSyncWrapped<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw)
         {
@@ -1407,7 +1455,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
                             return false;
-                        whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
+                        whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                     }
                     // Support negated boolean member: u => !u.IsActive
                     else if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr
@@ -1416,7 +1464,7 @@ namespace nORM.Query
                     {
                         if (!map.ColumnsByName.TryGetValue(negBoolMember.Member.Name, out var boolCol))
                             return false;
-                        whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: false)}";
+                        whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: false)}";
                     }
                     else
                     {
@@ -1432,7 +1480,7 @@ namespace nORM.Query
                             return false;
                         if (me.Type == typeof(bool) && value is bool boolValue)
                         {
-                            whereClause = $" WHERE {_ctx.Provider.FormatBooleanPredicate(column.EscCol, boolValue)}";
+                            whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(column.EscCol, boolValue)}";
                         }
                         // Null value: emit IS NULL (SQL "col = NULL" is always UNKNOWN/false).
                         else if (value == null || value == DBNull.Value)
@@ -1442,7 +1490,7 @@ namespace nORM.Query
                         }
                         else
                         {
-                            var paramName = _ctx.Provider.ParamPrefix + "p0";
+                            var paramName = _ctx.RawProvider.ParamPrefix + "p0";
                             whereClause = $" WHERE {column.EscCol} = {paramName}";
                             parameters = new Dictionary<string, object>(1) { [paramName] = value };
                         }
@@ -1476,7 +1524,7 @@ namespace nORM.Query
                                                  && value is bool;
                     if (!isBoolLiteralPredicate && value != null && value != DBNull.Value)
                     {
-                        var paramName = _ctx.Provider.ParamPrefix + "p0";
+                        var paramName = _ctx.RawProvider.ParamPrefix + "p0";
                         parameters = new Dictionary<string, object>(1) { [paramName] = value };
                     }
                 }
@@ -1653,6 +1701,8 @@ namespace nORM.Query
                         if (plan.MethodName is "Min" or "Max" or "Average" &&
                             typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                             throw new InvalidOperationException("Sequence contains no elements");
+                        if (plan.MethodName == "Sum")
+                            return GetZeroOfTargetType<TResult>();
                         return default(TResult)!;
                     }
                     result = ConvertScalarResult<TResult>(scalarResult)!;
@@ -1720,26 +1770,25 @@ namespace nORM.Query
         /// <returns>The count of rows removed from the database.</returns>
         private async Task<int> ExecuteDeleteInternalAsync(Expression expression, CancellationToken ct)
         {
-            // Only allocate Stopwatch when logger is active
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException(
-                    "ExecuteDeleteAsync only supports queries against a single table. The current " +
-                    "expression touches multiple tables (typically via a Join) and SQL DELETE has no " +
-                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
-                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteDeleteAsync()` " +
-                    "or materialize the matching keys first and feed them through Contains: " +
-                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
-                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteDeleteAsync()`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+            string finalSql;
+            if (plan.Tables.Count != 1)
+            {
+                ValidateJoinedCudShape(plan.BulkCudShape);
+                finalSql = BuildJoinedCudWhereInSql("DELETE FROM " + mapping.EscTable, null, plan.Sql, mapping);
+            }
+            else
+            {
+                _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+            }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-            var finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
             cmd.CommandText = finalSql;
             BindPlanParameters(cmd, plan, paramValues);
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
@@ -1747,35 +1796,107 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             return affected;
         }
+
+        private static void ValidateJoinedCudShape(BulkCudQueryShape? shape)
+        {
+            if (shape == null)
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
+            if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasDistinct || shape.HasPaging)
+                throw new NormUnsupportedFeatureException(
+                    "ExecuteUpdate/Delete with a join does not support grouped, ordered, distinct, or paged queries.");
+        }
+
+        private string BuildJoinedCudWhereInSql(string prefix, string? setSql, string planSql, TableMapping mapping)
+        {
+            var fromIdx = planSql.IndexOf(" FROM ", StringComparison.Ordinal);
+            if (fromIdx < 0)
+                throw new InvalidOperationException("Cannot locate FROM clause in join SQL.");
+
+            if (mapping.KeyColumns.Length == 1)
+            {
+                var outerAlias = _ctx.RawProvider.Escape("T0");
+                var pk = mapping.KeyColumns[0].EscCol;
+                var subquery = "SELECT " + outerAlias + "." + pk + planSql[fromIdx..];
+                string whereIn;
+                if (_ctx.RawProvider.CudWhereInSubqueryNeedsDoubleWrap)
+                    whereIn = pk + " IN (SELECT " + pk + " FROM (" + subquery + ") AS __nm_cud)";
+                else
+                    whereIn = pk + " IN (" + subquery + ")";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
+
+            // Composite-PK path
+            var cudOuterAlias = _ctx.RawProvider.Escape("T0");
+            var pkCols = mapping.KeyColumns.Select(k => k.EscCol).ToArray();
+            var subquerySelect = string.Join(", ", pkCols.Select(pk => cudOuterAlias + "." + pk));
+            var subquerySql = "SELECT " + subquerySelect + planSql[fromIdx..];
+
+            if (!_ctx.RawProvider.SupportsRowTupleComparison)
+            {
+                // SQL Server: row-tuple IN is unsupported � use JOIN-based DELETE/UPDATE.
+                // DELETE __nm_tgt FROM Table AS __nm_tgt INNER JOIN (...) AS __nm_cud ON T.pk1 = cud.pk1 ...
+                const string tgtAlias = "__nm_tgt";
+                var joinOn = string.Join(" AND ", pkCols.Select(pk => tgtAlias + "." + pk + " = __nm_cud." + pk));
+                var cudSubquery = "(" + subquerySql + ") AS __nm_cud";
+                if (setSql == null)
+                    return "DELETE " + tgtAlias + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                        + " INNER JOIN " + cudSubquery + " ON " + joinOn;
+                else
+                    return "UPDATE " + tgtAlias + " SET " + setSql
+                        + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                        + " INNER JOIN " + cudSubquery + " ON " + joinOn;
+            }
+
+            // Row-tuple comparison: (pk1, pk2) IN (SELECT T0.pk1, T0.pk2 FROM ...)
+            var pkTuple = "(" + string.Join(", ", pkCols) + ")";
+            if (_ctx.RawProvider.CudWhereInSubqueryNeedsDoubleWrap)
+            {
+                var outerSelect = string.Join(", ", pkCols);
+                var whereIn = pkTuple + " IN (SELECT " + outerSelect + " FROM (" + subquerySql + ") AS __nm_cud)";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
+            else
+            {
+                var whereIn = pkTuple + " IN (" + subquerySql + ")";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
+        }
         private async Task<int> ExecuteUpdateInternalAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
-            // Only allocate Stopwatch when logger is active
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
-            if (plan.Tables.Count != 1)
-                throw new NormUnsupportedFeatureException(
-                    "ExecuteUpdateAsync only supports queries against a single table. The current " +
-                    "expression touches multiple tables (typically via a Join) and SQL UPDATE has no " +
-                    "portable cross-dialect multi-table form. Rewrite as a correlated WHERE: " +
-                    "`ctx.Query<Target>().Where(t => ctx.Query<Other>().Where(o => o.Fk == t.Id).Any()).ExecuteUpdateAsync(...)` " +
-                    "or materialize the matching keys first and feed them through Contains: " +
-                    "`var ids = await joined.Select(t => t.Id).ToListAsync();` then " +
-                    "`ctx.Query<Target>().Where(t => ids.Contains(t.Id)).ExecuteUpdateAsync(...)`.");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
-            _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-            var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
-            var (setClause, setParams) = _cudBuilder.BuildSetClause(mapping, set);
+            string finalSql;
+            Dictionary<string, object> setParams;
+            if (plan.Tables.Count != 1)
+            {
+                ValidateJoinedCudShape(plan.BulkCudShape);
+                var (setClauseJ, setParamsJ) = _cudBuilder.BuildSetClause(mapping, set);
+                setParams = setParamsJ;
+                finalSql = BuildJoinedCudWhereInSql("UPDATE " + mapping.EscTable, setClauseJ, plan.Sql, mapping);
+            }
+            else
+            {
+                _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
+                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                var (setClause, setParamsSingle) = _cudBuilder.BuildSetClause(mapping, set);
+                setParams = setParamsSingle;
+                finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
+            }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-            var finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
             cmd.CommandText = finalSql;
             BindPlanParameters(cmd, plan, paramValues);
             foreach (var p in setParams)
                 cmd.AddOptimizedParam(p.Key, p.Value);
-            // EnsureParameterDictionary returns a new Dictionary when compiled params exist,
-            // or the plan's own Parameters dict when there are none. Only copy when needed.
             var baseDict = EnsureParameterDictionary(plan, paramValues);
             var allParams = baseDict is Dictionary<string, object> mutableDict && !ReferenceEquals(baseDict, plan.Parameters)
                 ? mutableDict
@@ -1798,13 +1919,19 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
-            if (plan.Includes.Count > 0 || plan.GroupJoinInfo != null)
+            if (plan.Includes.Count > 0)
                 throw new NormUnsupportedFeatureException(
-                    "AsAsyncEnumerable does not support Include or GroupJoin. Eager-load paths " +
-                    "issue a dependent fetch after the principal materializer completes — incompatible " +
-                    "with row-by-row streaming. Use `await query.ToListAsync()` to materialize the " +
-                    "fully-loaded set in one round-trip, or remove the Include and reissue the " +
-                    "child query manually per principal if streaming is required.");
+                    "AsAsyncEnumerable does not support Include. Eager-load paths issue a dependent " +
+                    "fetch after the principal materializer completes � incompatible with row-by-row " +
+                    "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
+                    "in one round-trip, or remove the Include and reissue the child query manually " +
+                    "per principal if streaming is required.");
+            if (plan.GroupJoinInfo != null)
+            {
+                await foreach (var item in _executor.StreamGroupJoinAsync<T>(plan, cmd, ct).ConfigureAwait(false))
+                    yield return item;
+                yield break;
+            }
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>") &&
@@ -1843,7 +1970,9 @@ namespace nORM.Query
         {
             filtered = ApplyGlobalFilters(expression);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
-            var tenantHash = _ctx.Options.TenantProvider?.GetCurrentTenantId()?.GetHashCode() ?? 0;
+            var tenantHash = _ctx.Options.TenantProvider != null
+                ? _ctx.GetRequiredTenantId("query plan cache key").GetHashCode()
+                : 0;
             // Use cached mapping hash instead of recomputing on every query
             int mappingHash = _ctx.GetMappingHash();
 
@@ -1851,24 +1980,24 @@ namespace nORM.Query
             var fingerprint = ExpressionFingerprint
                 .ComputeForPlanCache(filtered)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
-                        _ctx.Provider.GetType().GetHashCode(), mappingHash)
+                        _ctx.RawProvider.GetType().GetHashCode(), mappingHash)
                 .Extend((int)_ctx.Options.ClientEvaluationPolicy);
 
-            // ExceptBy / IntersectBy / UnionBy capture an in-memory IEnumerable from
-            // the user's closure into a post-materialize transform. The plan cache
-            // keys by expression fingerprint, which doesn't differentiate captured
-            // collection identity / contents; reusing the cached plan would replay
-            // the prior call's collection. Bypass the cache for these methods so each
-            // invocation translates fresh against the live closure values. (Future
-            // work: model these like CompiledParameters so the captured collection
-            // becomes a per-call lookup instead of a plan-baked closure.)
-            bool bypassPlanCache = ExpressionContainsKeyedSetByOp(filtered);
-
-            if (!bypassPlanCache && _planCache.TryGet(fingerprint, out var cached))
+            if (_planCache.TryGet(fingerprint, out var cached))
             {
                 parameterValues = ExtractParameterValues(filtered, cached);
                 return cached;
             }
+
+            // ExceptBy / IntersectBy / UnionBy and local-sequence SequenceEqual capture
+            // an in-memory IEnumerable from the user's closure. The plan cache
+            // keys by expression fingerprint, which doesn't differentiate captured
+            // collection identity / contents; reusing the cached plan would replay
+            // the prior call's collection. Bypass the cache for these methods so each
+            // invocation translates fresh against the live closure values. Run this
+            // detector only after a cache miss so normal hot cached queries do not
+            // pay a full tree walk on every execution.
+            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered);
 
             var localFiltered = filtered;
             QueryPlan plan;
@@ -1909,23 +2038,21 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Walks the expression tree looking for ExceptBy / IntersectBy / UnionBy
-        /// method calls -- their second argument is a closure-captured in-memory
-        /// collection that needs fresh evaluation per invocation. Plans containing
-        /// these calls bypass the fingerprint-keyed plan cache to avoid replaying
-        /// a prior call's captured collection.
+        /// Walks the expression tree looking for methods whose captured local sequence
+        /// contents are embedded into generated SQL. Plans containing these calls bypass
+        /// the fingerprint-keyed plan cache to avoid replaying a prior call's collection.
         /// </summary>
-        private static bool ExpressionContainsKeyedSetByOp(Expression expression)
+        private static bool ExpressionContainsLocalSequenceOp(Expression expression)
         {
-            return KeyedSetByOpDetector.Has(expression);
+            return LocalSequenceOpDetector.Has(expression);
         }
 
-        private sealed class KeyedSetByOpDetector : ExpressionVisitor
+        private sealed class LocalSequenceOpDetector : ExpressionVisitor
         {
             private bool _found;
             public static bool Has(Expression e)
             {
-                var d = new KeyedSetByOpDetector();
+                var d = new LocalSequenceOpDetector();
                 d.Visit(e);
                 return d._found;
             }
@@ -1936,7 +2063,8 @@ namespace nORM.Query
                         || node.Method.DeclaringType == typeof(System.Linq.Enumerable))
                     && (node.Method.Name == "ExceptBy"
                         || node.Method.Name == "IntersectBy"
-                        || node.Method.Name == "UnionBy"))
+                        || node.Method.Name == "UnionBy"
+                        || node.Method.Name == "SequenceEqual"))
                 {
                     _found = true;
                     return node;
@@ -2031,6 +2159,24 @@ namespace nORM.Query
                 args[0] = filteredSource;
                 return mc.Update(mc.Object, args);
             }
+
+            if (expression is MethodCallExpression queryCall &&
+                queryCall.Method.DeclaringType == typeof(Queryable) &&
+                queryCall.Arguments.Count > 0 &&
+                typeof(IQueryable).IsAssignableFrom(queryCall.Arguments[0].Type))
+            {
+                var resultElementType = GetElementType(expression);
+                var sourceElementType = GetElementType(queryCall.Arguments[0]);
+
+                if (resultElementType != sourceElementType || !_ctx.IsMapped(resultElementType))
+                {
+                    var filteredSource = ApplyGlobalFilters(queryCall.Arguments[0]);
+                    var args = queryCall.Arguments.ToArray();
+                    args[0] = filteredSource;
+                    return queryCall.Update(queryCall.Object, args);
+                }
+            }
+
             var entityType = GetElementType(expression);
             if (_ctx.Options.GlobalFilters.Count > 0)
             {
@@ -2062,63 +2208,19 @@ namespace nORM.Query
             if (_ctx.Options.TenantProvider != null)
             {
                 var map = _ctx.GetMapping(entityType);
-                var tenantCol = map.TenantColumn;
-                if (tenantCol != null)
-                {
-                    var param = Expression.Parameter(entityType, "t");
-                    var prop = Expression.Property(param, tenantCol.Prop.Name);
-                    var tenantId = _ctx.Options.TenantProvider.GetCurrentTenantId();
-                    // Coerce the tenant ID to the mapped property type before building the expression
-                    // constant. If TenantProvider.GetCurrentTenantId() returns a boxed long but the
-                    // entity property is int (or any other cross-type mismatch), Expression.Constant
-                    // would throw ArgumentException before translation. Convert.ChangeType handles
-                    // common numeric widening/narrowing and string representations. If conversion is
-                    // genuinely impossible (e.g., string "abc" ? int), throw a deterministic
-                    // NormConfigurationException with an actionable message.
-                    var propType = tenantCol.Prop.PropertyType;
-                    object coercedTenantId;
-                    if (tenantId == null)
-                    {
-                        var isNullable = !propType.IsValueType || Nullable.GetUnderlyingType(propType) != null;
-                        if (!isNullable)
-                            throw new nORM.Core.NormConfigurationException(
-                                $"TenantProvider.GetCurrentTenantId() returned null but the tenant column " +
-                                $"'{tenantCol.PropName}' on entity '{entityType.Name}' has non-nullable type " +
-                                $"'{propType.FullName}'. Return a valid tenant ID or use a nullable column type.");
-                        coercedTenantId = null!;  // safe: propType is nullable reference or Nullable<T>
-                    }
-                    else if (propType.IsInstanceOfType(tenantId))
-                    {
-                        coercedTenantId = tenantId;
-                    }
-                    else
-                    {
-                        var underlyingType = Nullable.GetUnderlyingType(propType) ?? propType;
-                        try
-                        {
-                            coercedTenantId = Convert.ChangeType(tenantId, underlyingType,
-                                System.Globalization.CultureInfo.InvariantCulture);
-                        }
-                        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
-                        {
-                            throw new nORM.Core.NormConfigurationException(
-                                $"TenantProvider.GetCurrentTenantId() returned a value of type " +
-                                $"'{tenantId.GetType().FullName}' which cannot be converted to the " +
-                                $"tenant column property type '{propType.FullName}' " +
-                                $"(column: '{tenantCol.PropName}', entity: '{entityType.Name}'). " +
-                                $"Ensure TenantProvider returns a compatible type or update the entity mapping.", ex);
-                        }
-                    }
-                    var constant = Expression.Constant(coercedTenantId, propType);
-                    var body = Expression.Equal(prop, constant);
-                    var lambda = Expression.Lambda(body, param);
-                    expression = Expression.Call(
-                        typeof(Queryable),
-                        nameof(Queryable.Where),
-                        new[] { entityType },
-                        expression,
-                        Expression.Quote(lambda));
-                }
+                var tenantCol = _ctx.RequireTenantColumn(map, "query");
+                var param = Expression.Parameter(entityType, "t");
+                var prop = Expression.Property(param, tenantCol.Prop.Name);
+                var tenantId = _ctx.GetRequiredTenantId(map, "query");
+                var constant = Expression.Constant(tenantId, tenantCol.Prop.PropertyType);
+                var body = Expression.Equal(prop, constant);
+                var lambda = Expression.Lambda(body, param);
+                expression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Where),
+                    new[] { entityType },
+                    expression,
+                    Expression.Quote(lambda));
             }
             return expression;
         }

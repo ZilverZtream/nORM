@@ -1,0 +1,86 @@
+{
+  "Contract": "nORM-provider-mobility-v1",
+  "Strict": true,
+  "GeneratedUtc": "2026-05-28T16:14:48.9453804Z",
+  "ScanPath": null,
+  "ScanStatus": "NotRequested",
+  "Providers": [
+    {
+      "Provider": "sqlite",
+      "Status": "PASS",
+      "Summary": "tenant boundary, representative LINQ, bulk insert, compiled query, temporal AsOf(tag), and temporal history passed",
+      "Checks": [
+        "schema-bootstrap",
+        "strict-provider-mobility-mode",
+        "tenant-query-boundary",
+        "cross-tenant-update-delete-zero-rows",
+        "bulk-insert-visible-state",
+        "linq-where-select-dto-orderby-skip-take",
+        "include-as-split-query",
+        "groupby-aggregate",
+        "compiled-query",
+        "temporal-tag-asof-current-history",
+        "temporal-restore",
+        "temporal-tenant-isolation"
+      ]
+    },
+    {
+      "Provider": "sqlserver",
+      "Status": "PASS",
+      "Summary": "tenant boundary, representative LINQ, bulk insert, compiled query, temporal AsOf(tag), and temporal history passed",
+      "Checks": [
+        "schema-bootstrap",
+        "strict-provider-mobility-mode",
+        "tenant-query-boundary",
+        "cross-tenant-update-delete-zero-rows",
+        "bulk-insert-visible-state",
+        "linq-where-select-dto-orderby-skip-take",
+        "include-as-split-query",
+        "groupby-aggregate",
+        "compiled-query",
+        "temporal-tag-asof-current-history",
+        "temporal-restore",
+        "temporal-tenant-isolation"
+      ]
+    },
+    {
+      "Provider": "postgres",
+      "Status": "PASS",
+      "Summary": "tenant boundary, representative LINQ, bulk insert, compiled query, temporal AsOf(tag), and temporal history passed",
+      "Checks": [
+        "schema-bootstrap",
+        "strict-provider-mobility-mode",
+        "tenant-query-boundary",
+        "cross-tenant-update-delete-zero-rows",
+        "bulk-insert-visible-state",
+        "linq-where-select-dto-orderby-skip-take",
+        "include-as-split-query",
+        "groupby-aggregate",
+        "compiled-query",
+        "temporal-tag-asof-current-history",
+        "temporal-restore",
+        "temporal-tenant-isolation"
+      ]
+    },
+    {
+      "Provider": "mysql",
+      "Status": "PASS",
+      "Summary": "tenant boundary, representative LINQ, bulk insert, compiled query, temporal AsOf(tag), and temporal history passed",
+      "Checks": [
+        "schema-bootstrap",
+        "strict-provider-mobility-mode",
+        "tenant-query-boundary",
+        "cross-tenant-update-delete-zero-rows",
+        "bulk-insert-visible-state",
+        "linq-where-select-dto-orderby-skip-take",
+        "include-as-split-query",
+        "groupby-aggregate",
+        "compiled-query",
+        "temporal-tag-asof-current-history",
+        "temporal-restore",
+        "temporal-tenant-isolation"
+      ]
+    }
+  ],
+  "Findings": []
+}

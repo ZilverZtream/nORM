@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using nORM.Mapping;
@@ -258,10 +259,50 @@ namespace nORM.Query
 
             protected override Expression VisitBinary(BinaryExpression node)
             {
+                if (node.NodeType == ExpressionType.Coalesce
+                    && TryGetMemberColumnSql(node.Left, out var colSql)
+                    && node.Right is ConstantExpression constExpr)
+                {
+                    var literalSql = FormatLiteral(constExpr.Value);
+                    if (literalSql != null)
+                    {
+                        var fragment = $"COALESCE({colSql}, {literalSql})";
+                        if (_processedColumns.Add(fragment))
+                            _neededColumns.Add(fragment);
+                        return node;
+                    }
+                }
                 Visit(node.Left);
                 Visit(node.Right);
                 return node;
             }
+
+            private bool TryGetMemberColumnSql(Expression expr, out string colSql)
+            {
+                colSql = string.Empty;
+                if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ue)
+                    expr = ue.Operand;
+                if (expr is not MemberExpression mem || mem.Expression is not ParameterExpression param)
+                    return false;
+                var mapping = ResolveMapping(param.Type, out var alias);
+                if (mapping == null) return false;
+                if (!mapping.ColumnsByName.TryGetValue(mem.Member.Name, out var col)) return false;
+                colSql = $"{alias}.{col.EscCol}";
+                return true;
+            }
+
+            private static string? FormatLiteral(object? value) => value switch
+            {
+                null           => "NULL",
+                string s       => "'" + s.Replace("'", "''") + "'",
+                bool b         => b ? "1" : "0",
+                int or long or short or byte or sbyte or uint or ulong or ushort
+                               => Convert.ToString(value, CultureInfo.InvariantCulture),
+                double d       => d.ToString(CultureInfo.InvariantCulture),
+                float f        => f.ToString(CultureInfo.InvariantCulture),
+                decimal dec    => dec.ToString(CultureInfo.InvariantCulture),
+                _              => null
+            };
 
             protected override Expression VisitUnary(UnaryExpression node)
             {
@@ -350,7 +391,10 @@ namespace nORM.Query
     string innerKeySql,
     string? orderBy = null,
     bool distinct = false,
-    string? outerFromOverride = null)
+    string? outerFromOverride = null,
+    string? additionalOnConditions = null,
+    Func<Expression, string>? translateProjectionExpression = null,
+    Func<string, string>? escapeProjectionAlias = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -365,7 +409,19 @@ namespace nORM.Query
                 joinSql.Append("DISTINCT ");
             bool wroteAny = false;
 
-            if (projection?.Body is System.Linq.Expressions.NewExpression newExpr)
+            if (projection?.Body != null
+                && translateProjectionExpression != null
+                && escapeProjectionAlias != null
+                && TryAppendProjectionSelectList(
+                    joinSql,
+                    projection.Body,
+                    translateProjectionExpression,
+                    escapeProjectionAlias))
+            {
+                wroteAny = true;
+            }
+
+            if (!wroteAny && projection?.Body is System.Linq.Expressions.NewExpression newExpr)
             {
                 var needed = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                 if (needed.Count > 0)
@@ -413,8 +469,56 @@ namespace nORM.Query
             }
             joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
             joinSql.Append("ON ").Append(outerKeySql).Append(" = ").Append(innerKeySql);
+            if (!string.IsNullOrEmpty(additionalOnConditions))
+                joinSql.Append(" AND ").Append(additionalOnConditions);
             if (!string.IsNullOrEmpty(orderBy))
                 joinSql.Append(" ORDER BY ").Append(orderBy!);
+        }
+
+        private static bool TryAppendProjectionSelectList(
+            OptimizedSqlBuilder joinSql,
+            Expression projectionBody,
+            Func<Expression, string> translateProjectionExpression,
+            Func<string, string> escapeProjectionAlias)
+        {
+            if (projectionBody is MemberInitExpression memberInit)
+            {
+                var wroteAny = false;
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is not MemberAssignment assignment)
+                        continue;
+
+                    if (wroteAny)
+                        joinSql.Append(", ");
+                    joinSql.Append(translateProjectionExpression(assignment.Expression))
+                        .Append(" AS ")
+                        .Append(escapeProjectionAlias(assignment.Member.Name));
+                    wroteAny = true;
+                }
+
+                return wroteAny;
+            }
+
+            if (projectionBody is NewExpression newExpr)
+            {
+                if (newExpr.Arguments.Any(static arg => arg is ParameterExpression))
+                    return false;
+
+                for (int i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    if (i > 0)
+                        joinSql.Append(", ");
+                    var alias = newExpr.Members?[i].Name ?? $"Item{i + 1}";
+                    joinSql.Append(translateProjectionExpression(newExpr.Arguments[i]))
+                        .Append(" AS ")
+                        .Append(escapeProjectionAlias(alias));
+                }
+
+                return newExpr.Arguments.Count > 0;
+            }
+
+            return false;
         }
 
     }

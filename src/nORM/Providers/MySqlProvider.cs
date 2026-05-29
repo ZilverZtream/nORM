@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -29,6 +29,9 @@ namespace nORM.Providers
 
         internal override bool SupportsFastPathPreparedCommandCache => true;
 
+        // MySQL rejects self-referencing IN subqueries in DELETE/UPDATE — wrap in a derived table.
+        internal override bool CudWhereInSubqueryNeedsDoubleWrap => true;
+
         internal override bool SupportsCommandGeneratedKeyRetrieval => true;
 
         internal override bool PrefersSyncFastPathExecution => true;
@@ -36,6 +39,9 @@ namespace nORM.Providers
         internal override bool PrefersSyncQueryPlanExecution => true;
 
         internal override bool SupportsQueryPlanPreparedCommandCache => true;
+
+        /// <inheritdoc />
+        public override string ForceCaseSensitiveStringComparison(string sql) => $"BINARY {sql}";
 
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
@@ -232,7 +238,7 @@ namespace nORM.Providers
         /// <summary>
         /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
         /// MySQL <c>LAST_INSERT_ID()</c> only supports numeric <c>AUTO_INCREMENT</c> columns.
-        /// Non-numeric generated keys (Guid, string, â€¦) must be assigned by the application or a trigger
+        /// Non-numeric generated keys (Guid, string, …) must be assigned by the application or a trigger
         /// with <c>IsDbGenerated = false</c>.
         /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m)
@@ -279,7 +285,7 @@ namespace nORM.Providers
 
         /// <summary>
         /// MySQL treats <c>\</c> as a string-literal escape so <c>ESCAPE '\'</c> generates a syntax error.
-        /// Use <c>!</c> â€” it has no special meaning in MySQL string literals and is safe as a LIKE escape character.
+        /// Use <c>!</c> — it has no special meaning in MySQL string literals and is safe as a LIKE escape character.
         /// </summary>
         public override char LikeEscapeChar => '!';
 
@@ -347,7 +353,7 @@ namespace nORM.Providers
             => $"(TIME_TO_SEC({timeSpanColumnSql}) + MICROSECOND({timeSpanColumnSql}) / 1000000.0)";
 
         /// <summary>
-        /// MySQL has no native DATETIMEOFFSET â€” MySqlConnector stores DateTimeOffset
+        /// MySQL has no native DATETIMEOFFSET — MySqlConnector stores DateTimeOffset
         /// as DATETIME normalised to UTC. Adding the new offset's seconds shifts the
         /// rendered wall clock; the trailing offset suffix completes the canonical
         /// text the materialiser parses.
@@ -377,8 +383,17 @@ namespace nORM.Providers
             // to UTC. UNIX_TIMESTAMP() interprets its argument in the session timezone,
             // so it gives wrong results when the session TZ is not UTC.
             // TIMESTAMPDIFF(SECOND, epoch, col) does pure arithmetic on the stored
-            // value without any TZ conversion â€” correct because the value IS UTC.
+            // value without any TZ conversion — correct because the value IS UTC.
             => $"TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', {dtoSql})";
+
+        internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
+            => $"FLOOR(TIMESTAMPDIFF(MICROSECOND, '1970-01-01 00:00:00', {dtoSql}) / 1000)";
+
+        internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+            => $"TIMESTAMPDIFF(MICROSECOND, '1970-01-01 00:00:00', {dtoSql})";
+
+        internal override string GetDateTimeOffsetDifferenceSecondsSql(string leftSql, string rightSql)
+            => $"(CAST(({GetDateTimeOffsetUtcEpochMicrosecondsSql(leftSql)} - {GetDateTimeOffsetUtcEpochMicrosecondsSql(rightSql)}) AS DOUBLE) / 1000000.0)";
 
         /// <summary>
         /// MySQL DATE_ADD returns DATETIME; wrap with DATE() to cast back to a
@@ -402,13 +417,25 @@ namespace nORM.Providers
         public override string GetBoolCastSql(string innerSql)
             => $"(({innerSql}) <> 0)";
 
-        /// <summary>MySQL uses the REGEXP infix operator for regex match (synonym RLIKE).</summary>
+        /// <summary>
+        /// MySQL REGEXP/RLIKE obeys column collation and can become case-insensitive.
+        /// REGEXP_LIKE with explicit match_type preserves .NET Regex.IsMatch default
+        /// case-sensitive semantics across collations.
+        /// </summary>
         public override string GetRegexMatchSql(string inputSql, string patternLiteral)
-            => $"({inputSql} REGEXP {patternLiteral})";
+            => $"REGEXP_LIKE({inputSql}, {patternLiteral}, 'c')";
 
-        /// <summary>MySQL 8.0+ has REGEXP_REPLACE(input, pattern, replacement).</summary>
+        /// <summary>MySQL REGEXP_LIKE with match_type i preserves RegexOptions.IgnoreCase.</summary>
+        public override string GetRegexMatchIgnoreCaseSql(string inputSql, string patternLiteral)
+            => $"REGEXP_LIKE({inputSql}, {patternLiteral}, 'i')";
+
+        /// <summary>MySQL 8.0+ has REGEXP_REPLACE; match_type c preserves case-sensitive .NET defaults.</summary>
         public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
-            => $"REGEXP_REPLACE({inputSql}, {patternLiteral}, {replacementLiteral})";
+            => $"REGEXP_REPLACE({inputSql}, {patternLiteral}, {replacementLiteral}, 1, 0, 'c')";
+
+        /// <summary>MySQL REGEXP_REPLACE accepts match_type as the sixth argument.</summary>
+        public override string GetRegexReplaceIgnoreCaseSql(string inputSql, string patternLiteral, string replacementLiteral)
+            => $"REGEXP_REPLACE({inputSql}, {patternLiteral}, {replacementLiteral}, 1, 0, 'i')";
 
         /// <summary>MySQL DATE_ADD returns DATETIME; DATE() casts back to DATE for the materializer.</summary>
         public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
@@ -428,9 +455,13 @@ namespace nORM.Providers
                 ? $"SUBTIME({timeOnlySql}, {timeSpanColumnSql})"
                 : $"ADDTIME({timeOnlySql}, {timeSpanColumnSql})";
 
-        /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts â€” `CAST(x AS INT)` is a syntax error.</summary>
+        /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
+
+        /// <summary>MySQL requires SIGNED as the integer cast target and TRUNCATE for toward-zero semantics.</summary>
+        public override string GetTruncateToIntSql(string numericSql)
+            => $"CAST(TRUNCATE({numericSql}, 0) AS SIGNED)";
 
         /// <summary>MySQL supports INSERT IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
@@ -443,13 +474,15 @@ namespace nORM.Providers
             _parameterFactory.CreateParameter(name, value);
 
         /// <summary>
-        /// MySQL TIMESTAMPDIFF(SECOND) is integer seconds. Wrap in CAST to DOUBLE so the
-        /// subsequent division for TotalHours / TotalDays etc. stays fractional.
+        /// MySQL TIMESTAMPDIFF(MICROSECOND) preserves sub-second deltas while
+        /// avoiding TIMESTAMPDIFF(SECOND)'s integer truncation. Divide by
+        /// 1,000,000.0 so Total* projections and TimeSpan materialisation receive
+        /// fractional seconds.
         /// </summary>
         /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
         /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
-            => $"CAST(TIMESTAMPDIFF(SECOND, {startSql}, {endSql}) AS DOUBLE)";
+            => $"(CAST(TIMESTAMPDIFF(MICROSECOND, {startSql}, {endSql}) AS DOUBLE) / 1000000.0)";
 
         /// <summary>
         /// MySQL has no native date-from-parts; STR_TO_DATE on a zero-padded
@@ -506,12 +539,13 @@ namespace nORM.Providers
         public override string? TranslateMethodCall(System.Linq.Expressions.MethodCallExpression node, string[] args)
             => TryTranslateMathRoundWithMode(node, args,
                 awayFromZero: (x, digits) => digits == null ? $"ROUND({x})" : $"ROUND({x}, {digits})",
-                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})")
+                truncateTowardZero: (x, digits) => digits == null ? $"TRUNCATE({x}, 0)" : $"TRUNCATE({x}, {digits})",
+                integerCastType: "SIGNED")
             ?? TryTranslateIeee754Predicate(node, args)
             ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
-        /// MySQL's <c>CAST(x AS VARCHAR(N))</c> is a syntax error â€” its CAST
+        /// MySQL's <c>CAST(x AS VARCHAR(N))</c> is a syntax error — its CAST
         /// target type is <c>CHAR(N)</c>. Used by the canonical-text
         /// <see cref="DatabaseProvider.GetDateTimeOffsetFromPartsSql"/> emit.
         /// </summary>
@@ -721,6 +755,9 @@ namespace nORM.Providers
                 };
             }
 
+            if (declaringType == typeof(Guid) && name == nameof(Guid.NewGuid) && args.Length == 0)
+                return "UUID()";
+
             if (declaringType == typeof(Math))
             {
                 return name switch
@@ -884,7 +921,7 @@ ORDER BY ORDINAL_POSITION";
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet â€” return empty list.
+                // Table does not exist yet — return empty list.
             }
             return result;
         }
@@ -899,6 +936,34 @@ ORDER BY ORDINAL_POSITION";
                 return (null, tableName.Trim('`'));
             return (tableName[..dot].Trim('`'), tableName[(dot + 1)..].Trim('`'));
         }
+
+        /// <summary>
+        /// MySQL cannot use a TEXT column as a primary key without a prefix length.
+        /// Use bounded VARCHAR/DATETIME columns for temporal tags.
+        /// </summary>
+        public override string GetCreateTagsTableSql()
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $@"CREATE TABLE IF NOT EXISTS {table} ({tagCol} VARCHAR(450) NOT NULL, {tsCol} DATETIME(6) NOT NULL, PRIMARY KEY ({tagCol})) ENGINE=InnoDB
+-- DELIMITER
+ALTER TABLE {table} MODIFY COLUMN {tsCol} DATETIME(6) NOT NULL";
+        }
+
+        /// <summary>
+        /// Creates temporal tags using the MySQL server UTC clock so tag timestamps
+        /// are comparable to trigger-generated history windows.
+        /// </summary>
+        public override string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, UTC_TIMESTAMP(6))";
+        }
+
+        internal override bool UsesDatabaseClockForTemporalTags => true;
 
         /// <summary>
         /// Generates the SQL statement to create the temporal history table for an entity.
@@ -922,8 +987,8 @@ ORDER BY ORDINAL_POSITION";
             return $@"
 CREATE TABLE {historyTable} (
     `__VersionId` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `__ValidFrom` DATETIME NOT NULL,
-    `__ValidTo` DATETIME NOT NULL,
+    `__ValidFrom` DATETIME(6) NOT NULL,
+    `__ValidTo` DATETIME(6) NOT NULL,
     `__Operation` CHAR(1) NOT NULL,
     {columns}
 ) ENGINE=InnoDB;";
@@ -948,7 +1013,7 @@ CREATE TRIGGER {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
 FOR EACH ROW
 BEGIN
     INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(), '9999-12-31', 'I', {newColumns});
+    VALUES (UTC_TIMESTAMP(6), '9999-12-31', 'I', {newColumns});
 END;
 -- DELIMITER
 DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_au")};
@@ -956,9 +1021,9 @@ DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_au")};
 CREATE TRIGGER {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
 FOR EACH ROW
 BEGIN
-    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP() WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
+    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP(6) WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
     INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(), '9999-12-31', 'U', {newColumns});
+    VALUES (UTC_TIMESTAMP(6), '9999-12-31', 'U', {newColumns});
 END;
 -- DELIMITER
 DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ad")};
@@ -966,9 +1031,9 @@ DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ad")};
 CREATE TRIGGER {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
 FOR EACH ROW
 BEGIN
-    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP() WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
+    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP(6) WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
     INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(), UTC_TIMESTAMP(), 'D', {oldColumns});
+    VALUES (UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 'D', {oldColumns});
 END;";
         }
 
@@ -980,7 +1045,7 @@ END;";
         protected override void ValidateConnection(DbConnection connection)
         {
             base.ValidateConnection(connection);
-            if (_isDialectOnly) return; // foreign parameter factory â†’ dialect-only mode, foreign connection is intentional
+            if (_isDialectOnly) return; // foreign parameter factory ? dialect-only mode, foreign connection is intentional
             var name = connection.GetType().FullName;
             if (name != "MySqlConnector.MySqlConnection" && name != "MySql.Data.MySqlClient.MySqlConnection")
                 throw new NormConfigurationException("A MySqlConnection is required for MySqlProvider. Please install MySqlConnector or MySql.Data.");
@@ -1031,7 +1096,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken â€” a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -1053,7 +1118,7 @@ END;";
                     // Unwrap and rethrow the inner exception from reflection invoke.
                     // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     // NotSupportedException from a base DbTransaction.Save indicates the transaction type
-                    // does not support savepoints â€” map to NormUnsupportedFeatureException for a stable API.
+                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
                             $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
@@ -1075,7 +1140,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken â€” a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -1095,7 +1160,7 @@ END;";
                 {
                     // Unwrap and rethrow the inner exception from reflection invoke.
                     // NotSupportedException from a base DbTransaction.Rollback indicates the transaction type
-                    // does not support savepoints â€” map to NormUnsupportedFeatureException for a stable API.
+                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
                             $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
@@ -1118,7 +1183,7 @@ END;";
         /// <returns>Total number of rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -1128,18 +1193,18 @@ END;";
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
 
             var bulkCopyType = Type.GetType("MySqlConnector.MySqlBulkCopy, MySqlConnector");
-            var bulkCopyKey = GetBulkCopyCapabilityKey(ctx.Connection);
+            var bulkCopyKey = GetBulkCopyCapabilityKey(ctx.RawConnection);
             if (bulkCopyType != null &&
-                ctx.Connection.GetType().FullName == "MySqlConnector.MySqlConnection" &&
+                ctx.RawConnection.GetType().FullName == "MySqlConnector.MySqlConnection" &&
                 !_bulkCopyUnavailable.ContainsKey(bulkCopyKey))
             {
                 // Respect ambient CurrentTransaction; only create a new one if none is active.
                 bool ownedTx = ctx.CurrentTransaction == null;
                 DbTransaction transaction = ctx.CurrentTransaction
-                    ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                    ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.Connection, transaction)!;
+                    dynamic bulkCopy = Activator.CreateInstance(bulkCopyType, ctx.RawConnection, transaction)!;
                     bulkCopy.DestinationTableName = m.EscTable.Trim('`');
                     bulkCopy.BulkCopyTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
@@ -1241,7 +1306,7 @@ END;";
         /// <returns>Number of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
@@ -1274,14 +1339,17 @@ END;";
                 {
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk updates
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                        cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
+                    var tenantCol = ctx.Options.TenantProvider != null
+                        ? ctx.RequireTenantColumn(m, "MySQL bulk update")
+                        : null;
+                    if (tenantCol != null)
+                        cmd.AddParam($"{ParamPrefix}__tenant_bulk", ctx.GetRequiredTenantId(m, "MySQL bulk update"));
                     cmd.CommandText = BuildBulkUpdateSql(
                         m.EscTable,
                         tempTableName,
                         setClause,
                         joinClause,
-                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
+                        tenantCol?.EscCol);
                     updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }
@@ -1331,7 +1399,7 @@ END;";
         /// <returns>Total number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -1341,7 +1409,8 @@ END;";
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
-            var hasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+            var hasTenant = ctx.Options.TenantProvider != null;
+            var tenantColumn = hasTenant ? ctx.RequireTenantColumn(m, "MySQL bulk delete") : null;
             var paramsPerEntity = keyCols.Count + (hasTenant ? 1 : 0);
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);
             var maxBatchForProvider = MaxParameters / Math.Max(1, paramsPerEntity);
@@ -1383,11 +1452,11 @@ END;";
                 }
 
                 // X1: Add tenant predicate to prevent cross-tenant bulk deletes
-                if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                if (hasTenant)
                 {
                     var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                    cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
-                    whereClause += $" AND {m.TenantColumn.EscCol} = {tenantParam}";
+                    cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "MySQL bulk delete"));
+                    whereClause += $" AND {tenantColumn!.EscCol} = {tenantParam}";
                 }
                 cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
                 var batchSw = Stopwatch.StartNew();

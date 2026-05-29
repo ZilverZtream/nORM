@@ -334,4 +334,36 @@ public class LiveProviderGroupByParityTests
             finally { await TeardownAsync(ctx, kind); }
         }
     }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task GroupBy_raw_igrouping_groups_client_side_after_provider_fetch(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        using (var ctx = new DbContext(connection, provider))
+        {
+            await SetupAsync(ctx, kind);
+            try
+            {
+                var groups = (await ctx.Query<GbpRow>()
+                    .GroupBy(r => r.Cat)
+                    .ToListAsync())
+                    .OrderBy(g => g.Key)
+                    .ToArray();
+
+                Assert.Equal(3, groups.Length);
+                Assert.Equal("a", groups[0].Key); Assert.Equal(3, groups[0].Count());
+                Assert.Equal("b", groups[1].Key); Assert.Equal(2, groups[1].Count());
+                Assert.Equal("c", groups[2].Key); Assert.Single(groups[2]);
+            }
+            finally { await TeardownAsync(ctx, kind); }
+        }
+    }
 }

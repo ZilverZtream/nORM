@@ -11,12 +11,10 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the deterministic error message for <c>ExecuteUpdateAsync</c> /
-/// <c>ExecuteDeleteAsync</c> over a query that touches more than one table
-/// (typically via a Join). The pre-existing message was a single line —
-/// upgrade to surface the architectural reason and a concrete workaround
-/// (correlated subquery in WHERE / Contains over the join result) the same
-/// way the AsAsyncEnumerable + Include error did.
+/// ExecuteDeleteAsync / ExecuteUpdateAsync with join sources.
+/// Joined queries translate to portably-safe IN subqueries:
+///   DELETE FROM t WHERE pk IN (SELECT T0.pk FROM t T0 JOIN other T1 ON ...)
+///   UPDATE t SET ... WHERE pk IN (SELECT T0.pk FROM t T0 JOIN other T1 ON ...)
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqExecuteUpdateDeleteMultiTableTests : IAsyncLifetime
@@ -30,9 +28,9 @@ public class LinqExecuteUpdateDeleteMultiTableTests : IAsyncLifetime
         await _cn.OpenAsync();
         await using var cmd = _cn.CreateCommand();
         cmd.CommandText = """
-            CREATE TABLE EumLeft  (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE EumLeft  (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Active INTEGER NOT NULL DEFAULT 1);
             CREATE TABLE EumRight (Id INTEGER PRIMARY KEY, LeftId INTEGER NOT NULL, Flag INTEGER NOT NULL);
-            INSERT INTO EumLeft  VALUES (1,'a'),(2,'b');
+            INSERT INTO EumLeft  VALUES (1,'a',1),(2,'b',1),(3,'c',1);
             INSERT INTO EumRight VALUES (10, 1, 1),(20, 2, 0);
             """;
         await cmd.ExecuteNonQueryAsync();
@@ -46,17 +44,40 @@ public class LinqExecuteUpdateDeleteMultiTableTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExecuteDeleteAsync_over_joined_query_throws_with_actionable_message()
+    public async Task ExecuteDeleteAsync_over_joined_query_deletes_outer_rows()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await ((INormQueryable<EumLeft>)_ctx.Query<EumLeft>())
-                .Join(_ctx.Query<EumRight>(), l => l.Id, r => r.LeftId, (l, r) => l)
-                .ExecuteDeleteAsync();
-        });
-        // Must identify the constraint and point at the correlated-subquery workaround.
-        Assert.Contains("ExecuteDelete", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Contains",      ex.Message, StringComparison.OrdinalIgnoreCase);
+        // Delete EumLeft rows that have a corresponding EumRight (Id=1 and Id=2); row 3 has none.
+        await ((INormQueryable<EumLeft>)_ctx.Query<EumLeft>())
+            .Join(_ctx.Query<EumRight>(), l => l.Id, r => r.LeftId, (l, r) => l)
+            .ExecuteDeleteAsync();
+
+        var remaining = await _ctx.Query<EumLeft>().ToListAsync();
+        Assert.Single(remaining);
+        Assert.Equal("c", remaining[0].Name);
+    }
+
+    [Fact]
+    public async Task ExecuteUpdateAsync_over_joined_query_updates_outer_rows()
+    {
+        // Deactivate EumLeft rows that have a corresponding EumRight (Id=1 and Id=2).
+        await ((INormQueryable<EumLeft>)_ctx.Query<EumLeft>())
+            .Join(_ctx.Query<EumRight>(), l => l.Id, r => r.LeftId, (l, r) => l)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Active, false));
+
+        var rows = await _ctx.Query<EumLeft>().ToListAsync();
+        Assert.False(rows.First(r => r.Name == "a").Active);
+        Assert.False(rows.First(r => r.Name == "b").Active);
+        Assert.True(rows.First(r => r.Name == "c").Active);
+    }
+
+    [Fact]
+    public async Task ExecuteDeleteAsync_grouped_joined_query_throws_deterministically()
+    {
+        // GroupBy on a joined source is still unsupported — must fail clearly, not silently.
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
+            await _ctx.Query<EumLeft>().GroupBy(l => l.Name).SelectMany(g => g)
+                .ExecuteDeleteAsync());
+        Assert.Contains("ExecuteUpdate/Delete", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Table("EumLeft")]
@@ -64,6 +85,7 @@ public class LinqExecuteUpdateDeleteMultiTableTests : IAsyncLifetime
     {
         [Key] public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public bool Active { get; set; }
     }
 
     [Table("EumRight")]

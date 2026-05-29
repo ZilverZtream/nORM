@@ -304,7 +304,8 @@ namespace nORM.Internal
 
                 var args = BuildCompiledParameterValues(invEntry.ValueSources, value, paramNames);
 
-                // Inline pooled sync execution for providers without true async I/O (SQLite).
+                // Inline pooled sync execution for providers whose compiled-query hot path is
+                // faster synchronously.
                 // Bypasses the entire NormQueryProvider call chain (RetryPolicy, CacheProvider,
                 // EnsureConnectionAsync, IsScalar dispatch) by inlining command reuse + sync read.
                 // Pooled commands avoid per-call DbCommand/DbParameter allocation and SQL compilation.
@@ -313,10 +314,10 @@ namespace nORM.Internal
                 // Interceptors guard removed — the fast path now routes through
                 // ExecuteReaderWithInterception so interceptors are honoured.
                 if (cachedPlan != null &&
-                    ctx.Provider.PrefersSyncExecution &&
+                    ctx.RawProvider.PrefersSyncCompiledQueryExecution &&
                     ctx.Options.RetryPolicy == null &&
                     ctx.Options.CacheProvider == null &&
-                    ctx.Connection.State == ConnectionState.Open &&
+                    ctx.RawConnection.State == ConnectionState.Open &&
                     !cachedPlan.IsScalar)
                 {
                     // Q1 fix: dequeue a prepared command from the per-context pool, or create new
@@ -357,9 +358,10 @@ namespace nORM.Internal
                         {
                             var p = cmd.CreateParameter();
                             p.ParameterName = compiledParams2[i];
-                            p.Value = DBNull.Value;
+                            ParameterAssign.AssignValue(p, i < args.Length ? args[i] : DBNull.Value);
                             cmd.Parameters.Add(p);
                         }
+                        ApplyPreparedParameterSizeHints(cmd);
                         try { cmd.Prepare(); } catch (Exception) { /* Prepare is a performance optimization; failure is non-fatal */ }
                         state.FixedParamCount = fixedCount;
                     }
@@ -371,7 +373,10 @@ namespace nORM.Internal
                     var compiledCount = Math.Min(compiledParams.Count, args.Length);
                     var fixedParamCount = state.FixedParamCount;
                     for (int i = 0; i < compiledCount; i++)
+                    {
                         ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], args[i]);
+                        ApplyPreparedParameterSizeHint(cmd, cmd.Parameters[fixedParamCount + i]);
+                    }
 
                     var materializer = cachedPlan.SyncMaterializer;
                     var capacity = cachedPlan.SingleResult ? 1 : (cachedPlan.Take ?? 16);
@@ -409,7 +414,7 @@ namespace nORM.Internal
                     if (cachedPlan.PostReverse) Query.QueryExecutor.ReverseListInPlace(list);
                     if (cachedPlan.PostMaterializeTransform != null)
                     {
-                        var transformed = cachedPlan.PostMaterializeTransform(list);
+                        var transformed = cachedPlan.PostMaterializeTransform(ctx, list);
                         var rebuilt = new List<T>(transformed.Count);
                         foreach (var item in transformed) rebuilt.Add((T)item!);
                         list = rebuilt;
@@ -421,6 +426,25 @@ namespace nORM.Internal
                 return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<List<T>>(
                     cachedPlan!, args, invEntry.FixedParams, state, default);
             };
+        }
+
+        private static void ApplyPreparedParameterSizeHints(DbCommand cmd)
+        {
+            foreach (DbParameter parameter in cmd.Parameters)
+                ApplyPreparedParameterSizeHint(cmd, parameter);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static void ApplyPreparedParameterSizeHint(DbCommand cmd, DbParameter parameter)
+        {
+            var isSqlClient = cmd.GetType().FullName == "Microsoft.Data.SqlClient.SqlCommand";
+            if (isSqlClient &&
+                parameter.DbType is DbType.String or DbType.AnsiString or DbType.StringFixedLength or DbType.AnsiStringFixedLength)
+                parameter.Size = ParameterOptimizer.MaxInlineStringSize;
+            else if (parameter.DbType == DbType.Binary)
+                parameter.Size = -1;
+            else if (isSqlClient && parameter.Size == 0)
+                parameter.Size = 1;
         }
 
         private static CompiledParameterValueSource[] BuildCompiledParameterValueSources(
@@ -501,7 +525,9 @@ namespace nORM.Internal
 
         private static string BuildContextPlanKey(DbContext ctx)
         {
-            var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+            var tenantId = ctx.Options.TenantProvider != null
+                ? ctx.GetRequiredTenantId("compiled query cache key")
+                : null;
             // Use GetFilterKey() instead of f.ToString().
             // f.ToString() is shape-only — same string regardless of captured closure value.
             // ExpressionFingerprint alone also misses closure values: it hashes the closure
@@ -509,19 +535,18 @@ namespace nORM.Internal
             // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
             // closure-accessed field values so two lambdas with the same shape but different
             // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
-            // Tenant segment: "TENANT:NULL:" when provider is set but returns null,
-            // vs empty string when no provider — prevents cross-tenant plan sharing.
+            // Tenant segment is empty only when no provider is configured. A configured
+            // provider must return a non-null value; tenant mode fails closed before
+            // generating or reusing a compiled plan.
             // X1: Include the runtime type in the key so objects of different types
             // that produce the same ToString() (e.g. int 1 vs string "1") yield
             // distinct cache keys and cannot cross-pollinate compiled plans.
             var tenantSegment = ctx.Options.TenantProvider != null
-                ? (tenantId == null
-                    ? "TENANT:NULL:"
-                    : string.Concat("TENANT:", tenantId.GetType().FullName, ":", tenantId, ":"))
+                ? string.Concat("TENANT:", tenantId!.GetType().FullName, ":", tenantId, ":")
                 : "";
 
             return string.Concat(
-                ctx.Provider.GetType().FullName, "|",
+                ctx.RawProvider.GetType().FullName, "|",
                 ctx.GetMappingHash().ToString(), "|",
                 tenantSegment, "|",
                 ctx.Options.GlobalFilters.Count > 0
