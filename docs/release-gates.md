@@ -41,6 +41,19 @@ The gate sets `NORM_REQUIRE_LIVE_PARITY=any` when at least one live provider is 
 
 For a release candidate, run `full` with every supported live provider configured. For everyday regression work, run `quick` or `live` with the providers available on the machine.
 
+## Scaffolding Gate
+
+Use this focused local gate after scaffolding, CLI scaffold, or schema metadata
+changes:
+
+```powershell
+dotnet build nORM.sln -c Release --nologo
+dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter "Scaffolding|SchemaSignatureTests|DynamicTypeQueryTests|Scaffold_fail_on_warnings_returns_nonzero_after_writing_report|Scaffold_with_warnings_returns_zero_and_prints_warning_paths|Scaffold_sqlite_output_builds_as_consumer_project"
+```
+
+Live provider scaffolding parity is included in `eng\live-provider-gate.cmd live`
+and the RC gate through `LiveProviderScaffoldingParityTests`.
+
 ## RC3 Tenant/Temporal Sample Gate
 
 RC3 adds a product-proof sample gate around `samples/nORM.Sample.Store`. The
