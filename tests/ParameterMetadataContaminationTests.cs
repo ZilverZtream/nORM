@@ -131,7 +131,8 @@ public class ParameterMetadataContaminationTests
         p.Scale = 8;
 
         ParameterAssign.AssignValue(p, Guid.NewGuid());
-        Assert.Equal(DbType.Guid, p.DbType);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal(36, p.Size);
         Assert.Equal(0, p.Precision); // must NOT be 18 (stale decimal precision)
         Assert.Equal(0, p.Scale);     // must NOT be 8 (stale decimal scale)
     }
@@ -184,10 +185,10 @@ public class ParameterMetadataContaminationTests
 
             // 5. Guid — Precision and Scale must be reset to 0
             ParameterAssign.AssignValue(p, guid);
-            Assert.Equal(DbType.Guid, p.DbType);
+            Assert.Equal(DbType.String, p.DbType);
             Assert.Equal(0, p.Precision);
             Assert.Equal(0, p.Scale);
-            Assert.Equal(-1, p.Size);
+            Assert.Equal(36, p.Size);
         }
     }
 

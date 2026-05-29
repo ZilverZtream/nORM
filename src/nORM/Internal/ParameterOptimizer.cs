@@ -144,21 +144,18 @@ namespace nORM.Internal
                     if (lookupType.IsEnum)
                         lookupType = Enum.GetUnderlyingType(lookupType);
                 }
-                if (lookupType != null && _typeMap.TryGetValue(lookupType, out var dbType))
+                if (lookupType == typeof(Guid) && param is SqliteParameter)
                 {
-                    if (lookupType == typeof(Guid) && param is SqliteParameter)
-                    {
-                        param.DbType = DbType.String;
-                        param.Size = 36;
-                    }
-                    else
-                    {
-                        param.DbType = dbType;
-                        if (dbType == DbType.Decimal)
-                            ApplyProviderDecimalMetadata(param, null);
-                        else if (IsVariableLengthType(dbType))
-                            param.Size = GetTypedNullSize(dbType);
-                    }
+                    param.DbType = DbType.String;
+                    param.Size = 36;
+                }
+                else if (lookupType != null && _typeMap.TryGetValue(lookupType, out var dbType))
+                {
+                    param.DbType = dbType;
+                    if (dbType == DbType.Decimal)
+                        ApplyProviderDecimalMetadata(param, null);
+                    else if (IsVariableLengthType(dbType))
+                        param.Size = GetTypedNullSize(dbType);
                 }
                 else
                 {
@@ -234,10 +231,10 @@ namespace nORM.Internal
                 }
                 else if (valueType == typeof(Guid) && param is SqliteParameter)
                 {
-                    // SQLite has no native Guid type and nORM maps Guid columns to TEXT.
-                    // Binding DbType.Guid can compare as provider-specific binary/blob data
-                    // and silently miss TEXT-stored rows, including tenant predicates.
-                    param.Value = ((Guid)value).ToString("D");
+                    // SQLite stores nORM Guid columns as canonical TEXT. Bind the same
+                    // representation so tenant predicates and equality filters compare
+                    // against the stored value instead of provider-specific Guid/BLOB data.
+                    param.Value = ((Guid)value).ToString("D", System.Globalization.CultureInfo.InvariantCulture);
                     param.DbType = DbType.String;
                     param.Size = 36;
                 }

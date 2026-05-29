@@ -88,12 +88,13 @@ public class DBNullParameterMetadataTests
     }
 
     [Fact]
-    public void AddOptimizedParam_DBNullValue_WithKnownTypeGuid_SetsDbTypeGuid()
+    public void AddOptimizedParam_DBNullValue_WithKnownTypeGuid_SetsSqliteTextMetadata()
     {
         using var cmd = MakeCmd();
         cmd.AddOptimizedParam("@p", DBNull.Value, typeof(Guid));
         var p = cmd.Parameters[0];
-        Assert.Equal(DbType.Guid, p.DbType);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal(36, p.Size);
     }
 
     [Fact]

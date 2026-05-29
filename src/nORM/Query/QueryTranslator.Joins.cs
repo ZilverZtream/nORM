@@ -164,6 +164,133 @@ namespace nORM.Query
             }
         }
 
+        private void RewritePrebuiltJoinProjectionIfNeeded()
+        {
+            if (_projection == null
+                || _groupJoinInfo != null
+                || _isAggregate
+                || _sql.Length == 0)
+            {
+                return;
+            }
+
+            var sql = _sql.ToSqlString();
+            if (!sql.StartsWith("SELECT ", StringComparison.OrdinalIgnoreCase)
+                || !sql.Contains(" JOIN ", StringComparison.OrdinalIgnoreCase)
+                || sql.Contains(" UNION ", StringComparison.OrdinalIgnoreCase)
+                || sql.Contains(" INTERSECT ", StringComparison.OrdinalIgnoreCase)
+                || sql.Contains(" EXCEPT ", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!TryBuildJoinProjectionSelectList(_projection.Body, out var selectList))
+                return;
+
+            var fromIndex = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+            if (fromIndex <= "SELECT ".Length || string.IsNullOrWhiteSpace(selectList))
+                return;
+
+            var selectPrefix = sql.StartsWith("SELECT DISTINCT ", StringComparison.OrdinalIgnoreCase)
+                ? "SELECT DISTINCT "
+                : "SELECT ";
+
+            _sql.Clear();
+            _sql.Append(selectPrefix).Append(selectList).Append(sql.AsSpan(fromIndex));
+        }
+
+        private bool TryBuildJoinProjectionSelectList(Expression projectionBody, out string selectList)
+        {
+            using var builder = new OptimizedSqlBuilder(256);
+            selectList = string.Empty;
+
+            if (projectionBody is MemberInitExpression memberInit)
+            {
+                var wroteAny = false;
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is not MemberAssignment assignment)
+                        continue;
+
+                    if (ContainsWholeEntityParameter(assignment.Expression))
+                        return false;
+
+                    if (wroteAny)
+                        builder.Append(", ");
+
+                    builder.Append(TranslateJoinProjectionExpression(assignment.Expression))
+                        .Append(" AS ")
+                        .Append(_provider.Escape(assignment.Member.Name));
+                    wroteAny = true;
+                }
+
+                if (!wroteAny)
+                    return false;
+
+                selectList = builder.ToSqlString();
+                return true;
+            }
+
+            if (projectionBody is NewExpression newExpr)
+            {
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var argument = newExpr.Arguments[i];
+                    if (ContainsWholeEntityParameter(argument))
+                        return false;
+
+                    if (i > 0)
+                        builder.Append(", ");
+
+                    var alias = newExpr.Members?[i].Name ?? $"Item{i + 1}";
+                    builder.Append(TranslateJoinProjectionExpression(argument))
+                        .Append(" AS ")
+                        .Append(_provider.Escape(alias));
+                }
+
+                if (newExpr.Arguments.Count == 0)
+                    return false;
+
+                selectList = builder.ToSqlString();
+                return true;
+            }
+
+            if (ContainsWholeEntityParameter(projectionBody))
+                return false;
+
+            selectList = TranslateJoinProjectionExpression(projectionBody);
+            return !string.IsNullOrWhiteSpace(selectList);
+        }
+
+        private static bool ContainsWholeEntityParameter(Expression expression)
+        {
+            if (expression is ParameterExpression)
+                return true;
+
+            var visitor = new WholeEntityParameterVisitor();
+            visitor.Visit(expression);
+            return visitor.Found;
+        }
+
+        private sealed class WholeEntityParameterVisitor : ExpressionVisitor
+        {
+            public bool Found { get; private set; }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                Found = true;
+                return node;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (node.Expression is ParameterExpression)
+                    return node;
+
+                return base.VisitMember(node);
+            }
+        }
+
         private Expression HandleGroupJoin(MethodCallExpression node)
         {
             if (node.Arguments.Count < 5)
@@ -477,16 +604,20 @@ namespace nORM.Query
                         _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
                 }
 
-                // When an outer .Select() projection exists alongside a result selector, try to compose
-                // them: expand the outer projection through the result selector so the SELECT only
-                // fetches the columns that the final materializer actually needs (transparent id case).
+                // When an outer .Select() projection exists alongside a result selector,
+                // expand the final projection through the SelectMany result selector so the
+                // SELECT only fetches the columns that the final materializer actually needs.
+                // Register the transparent selector first; otherwise ExpandProjection cannot
+                // rewrite x.Blog.Name / x.Post.Title back to the two join parameters and the
+                // materializer reads the fallback all-column ordinal layout.
                 LambdaExpression? composedProjection = null;
                 if (resultSelector != null && _projection != null)
                 {
                     var savedProjection = _projection;
-                    _projection = resultSelector;
+                    var savedTransparent = _transparentIdentifier;
+                    _transparentIdentifier = ComposeTransparentIdentifierSelector(resultSelector);
                     var expanded = ExpandProjection(savedProjection);
-                    _projection = savedProjection;
+                    _transparentIdentifier = savedTransparent;
                     if (!ReferenceEquals(expanded, savedProjection))
                         composedProjection = expanded;
                 }
@@ -733,12 +864,26 @@ namespace nORM.Query
                     _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
             }
             using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
+            LambdaExpression? crossComposedProjection = null;
+            if (resultSelector != null && _projection != null)
+            {
+                var savedProjection = _projection;
+                var savedTransparent = _transparentIdentifier;
+                _transparentIdentifier = ComposeTransparentIdentifierSelector(resultSelector);
+                var expanded = ExpandProjection(savedProjection);
+                _transparentIdentifier = savedTransparent;
+                if (!ReferenceEquals(expanded, savedProjection))
+                    crossComposedProjection = expanded;
+            }
+
             // When an OUTER projection is already in flight (a later .Select() set _projection),
             // it expresses the FINAL row shape the caller wants and supersedes any transparent
             // identifier the SelectMany may have introduced via `(l, r) => new { l, r }`.
             // Otherwise fall back to the SelectMany's own result selector — which is the
             // common shape for `from l in L from r in R select new { l.X, r.Y }` (no later Select).
-            NewExpression? projectionNewExpr = (_projection?.Body as NewExpression) ?? (resultSelector?.Body as NewExpression);
+            NewExpression? projectionNewExpr = (crossComposedProjection?.Body as NewExpression)
+                ?? (_projection?.Body as NewExpression)
+                ?? (resultSelector?.Body as NewExpression);
             if (projectionNewExpr != null)
             {
                 var neededColumns = JoinBuilder.ExtractNeededColumns(projectionNewExpr, outerMapping, crossMapping, outerAlias, crossAlias);

@@ -160,13 +160,14 @@ namespace nORM.Query
                 if (p is Microsoft.Data.Sqlite.SqliteParameter)
                 {
                     p.DbType = System.Data.DbType.String;
-                    p.Value = ((Guid)v).ToString("D");
+                    p.Value = ((Guid)v).ToString("D", System.Globalization.CultureInfo.InvariantCulture);
                     p.Size = 36;
-                    return;
                 }
-
-                p.DbType = System.Data.DbType.Guid;
-                p.Value = v;
+                else
+                {
+                    p.DbType = System.Data.DbType.Guid;
+                    p.Value = v;
+                }
                 return;
             }
 

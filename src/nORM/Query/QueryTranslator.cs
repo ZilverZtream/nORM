@@ -478,11 +478,13 @@ namespace nORM.Query
                     && _t._having.Length == 0)
                 {
                     _t._groupBy.Clear();
-                    _t.InstallGroupingTransform(_t._streamingGroupByKeySelector);
+                    _t.InstallGroupingTransform(_t._streamingGroupByKeySelector, _t._groupByElementSelector);
                 }
 
                 if (_t._clauses.WindowFunctions.Count > 0 && _t._projection == null)
                     _t._projection = _t._clauses.WindowFunctions[^1].ResultSelector;
+
+                _t.RewritePrebuiltJoinProjectionIfNeeded();
 
                 var materializerType = _t._groupJoinInfo?.OuterType ?? _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
                 var topLevelMethodName = (_expression as MethodCallExpression)?.Method.Name;
@@ -2201,6 +2203,24 @@ namespace nORM.Query
             private readonly DbContext _ctx;
             public PostMaterializeQuerySourceReplacer(DbContext ctx) => _ctx = ctx;
 
+            protected override Expression VisitConstant(ConstantExpression node)
+            {
+                if (node.Value != null
+                    && typeof(IQueryable).IsAssignableFrom(node.Type)
+                    && node.Value.GetType().FullName?.StartsWith("nORM.Core.NormQueryable", StringComparison.Ordinal) == true)
+                {
+                    var entityType = node.Type.GetGenericArguments().FirstOrDefault()
+                        ?? node.Value.GetType().GetInterfaces()
+                            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>))
+                            ?.GetGenericArguments()[0];
+
+                    if (entityType != null)
+                        return BuildCurrentContextQueryable(entityType);
+                }
+
+                return base.VisitConstant(node);
+            }
+
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
                 if (node.Method.DeclaringType == typeof(NormQueryable)
@@ -2208,18 +2228,23 @@ namespace nORM.Query
                     && node.Method.IsGenericMethod)
                 {
                     var entityType = node.Method.GetGenericArguments()[0];
-                    var items = EnumerateQuery(_ctx, entityType).Cast<object>().ToArray();
-                    var list = CreateRuntimeList(entityType, items.Length);
-                    foreach (var item in items)
-                        list.Add(item);
-                    var queryable = typeof(Queryable).GetMethods()
-                        .First(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethod && m.GetParameters().Length == 1)
-                        .MakeGenericMethod(entityType)
-                        .Invoke(null, new object[] { list })!;
-                    return Expression.Constant(queryable, typeof(IQueryable<>).MakeGenericType(entityType));
+                    return BuildCurrentContextQueryable(entityType);
                 }
 
                 return base.VisitMethodCall(node);
+            }
+
+            private Expression BuildCurrentContextQueryable(Type entityType)
+            {
+                var items = EnumerateQuery(_ctx, entityType).Cast<object>().ToArray();
+                var list = CreateRuntimeList(entityType, items.Length);
+                foreach (var item in items)
+                    list.Add(item);
+                var queryable = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethod && m.GetParameters().Length == 1)
+                    .MakeGenericMethod(entityType)
+                    .Invoke(null, new object[] { list })!;
+                return Expression.Constant(queryable, typeof(IQueryable<>).MakeGenericType(entityType));
             }
         }
         private static System.Collections.IList CreateRuntimeList(Type elementType, int capacity)

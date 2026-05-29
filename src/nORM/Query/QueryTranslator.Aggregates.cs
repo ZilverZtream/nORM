@@ -1016,10 +1016,11 @@ namespace nORM.Query
         /// <see cref="_postMaterializeTransform"/> so the normal entity materializer handles
         /// row reading; the transform runs once after all rows are in memory.
         /// </summary>
-        private void InstallGroupingTransform(LambdaExpression keySelectorLambda)
+        private void InstallGroupingTransform(LambdaExpression keySelectorLambda, LambdaExpression? elementSelectorLambda = null)
         {
             var entityType = keySelectorLambda.Parameters[0].Type;
             var keyType = keySelectorLambda.Body.Type;
+            var elementType = elementSelectorLambda?.Body.Type ?? entityType;
 
             // Compile key selector: entity → boxed key (object?)
             var objParam = Expression.Parameter(typeof(object), "e");
@@ -1032,12 +1033,30 @@ namespace nORM.Query
             using var cts = new CancellationTokenSource(timeout);
             var keyFunc = ExpressionUtils.CompileWithFallback(keyFuncExpr, cts.Token);
 
+            Func<object, object?> elementFunc;
+            if (elementSelectorLambda != null)
+            {
+                var elementObjParam = Expression.Parameter(typeof(object), "e");
+                var castElementEntity = Expression.Convert(elementObjParam, entityType);
+                var reboundElement = new ParameterReplacer(elementSelectorLambda.Parameters[0], castElementEntity).Visit(elementSelectorLambda.Body)!;
+                var boxedElement = elementType.IsValueType ? (Expression)Expression.Convert(reboundElement, typeof(object)) : reboundElement;
+                var elementFuncExpr = Expression.Lambda<Func<object, object?>>(boxedElement, elementObjParam);
+                ExpressionUtils.ValidateExpression(elementFuncExpr);
+                var elementTimeout = ExpressionUtils.GetCompilationTimeout(elementFuncExpr);
+                using var elementCts = new CancellationTokenSource(elementTimeout);
+                elementFunc = ExpressionUtils.CompileWithFallback(elementFuncExpr, elementCts.Token);
+            }
+            else
+            {
+                elementFunc = static row => row;
+            }
+
             // Reflection pieces needed inside the transform closure
-            var groupingType = typeof(IGrouping<,>).MakeGenericType(keyType, entityType);
-            var concreteType = typeof(ClientGrouping<,>).MakeGenericType(keyType, entityType);
+            var groupingType = typeof(IGrouping<,>).MakeGenericType(keyType, elementType);
+            var concreteType = typeof(ClientGrouping<,>).MakeGenericType(keyType, elementType);
             var groupingCtor = concreteType.GetConstructor(
-                new[] { keyType, typeof(IEnumerable<>).MakeGenericType(entityType) })!;
-            var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!.MakeGenericMethod(entityType);
+                new[] { keyType, typeof(IEnumerable<>).MakeGenericType(elementType) })!;
+            var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!.MakeGenericMethod(elementType);
             var resultListType = typeof(List<>).MakeGenericType(groupingType);
 
             // Sentinel used as dictionary key when the actual group key is null,
@@ -1059,7 +1078,7 @@ namespace nORM.Query
                         buckets[dictKey] = bucket;
                         keyOrder.Add(key);   // actual key (may be null)
                     }
-                    bucket.Add(row!);
+                    bucket.Add(elementFunc(row!)!);
                 }
 
                 var result = (System.Collections.IList)Activator.CreateInstance(resultListType, keyOrder.Count)!;

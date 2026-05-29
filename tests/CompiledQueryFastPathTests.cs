@@ -399,16 +399,13 @@ public class CompiledQueryFastPathTests
     }
 
     /// <summary>
-    /// AssignValue must set DbType = Guid for a Guid value. Without a DbType hint, a raw
-    /// Guid stored via p.Value defaults to Object / String on some providers, causing
-    /// binding failures.
+    /// AssignValue must set DbType = Guid for native Guid providers. SQLite has a separate
+    /// canonical-text contract because nORM stores Guid columns as TEXT there.
     /// </summary>
     [Fact]
     public void AssignValue_Guid_SetsGuidDbType()
     {
-        using var cn = new SqliteConnection("Data Source=:memory:");
-        cn.Open();
-        var cmd = cn.CreateCommand();
+        using var cmd = new Microsoft.Data.SqlClient.SqlCommand();
         var p = cmd.CreateParameter();
 
         var g = Guid.NewGuid();
@@ -417,7 +414,6 @@ public class CompiledQueryFastPathTests
         Assert.Equal(DbType.Guid, p.DbType);
         Assert.Equal(g, p.Value);
     }
-
     /// <summary>
     /// A compiled query whose WHERE clause contains an enum constant (fixed parameter)
     /// must return correct results. AssignValue sets DbType = Int32 for enum-backed fixed params.
@@ -773,7 +769,7 @@ public class CompiledQueryFastPathTests
         var rows = await compiled(ctx, (Guid.NewGuid(), new DateOnly(2026, 5, 21), new TimeOnly(14, 30)));
 
         Assert.Empty(rows);
-        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.Guid);
+        Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.String && p.Value is string s && Guid.TryParse(s, out _) && s.Length == 36);
         // DateOnly now binds as canonical ISO `yyyy-MM-dd` text via DbType.String so
         // equality predicates round-trip against TEXT-stored dates.
         Assert.Contains(interceptor.CapturedParameters, p => p.DbType == DbType.String && p.Value is string s && s == "2026-05-21");

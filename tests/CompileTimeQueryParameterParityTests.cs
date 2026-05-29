@@ -424,8 +424,7 @@ public class CompileTimeQueryParameterParityTests
     [Fact]
     public void SG1_Guid_SetsDbTypeGuid()
     {
-        using var cn = OpenMemory();
-        using var cmd = cn.CreateCommand();
+        using var cmd = new SqlCommand();
 
         var guid = Guid.NewGuid();
         ParameterOptimizer.AddOptimizedParam(cmd, "@p0", guid);

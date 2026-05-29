@@ -7,6 +7,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Trait("Category", TestCategory.LiveProvider)]
+[Collection(LiveTemporalProviderCollection.Name)]
 public class TenantTemporalProviderSwapTests
 {
     [Theory]

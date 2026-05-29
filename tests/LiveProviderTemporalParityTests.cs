@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// Live-provider parity for the v1 temporal/versioning contract.
 /// </summary>
 [Trait("Category", TestCategory.LiveProvider)]
+[Collection(LiveTemporalProviderCollection.Name)]
 public class LiveProviderTemporalParityTests
 {
     private const string Table = "TlpLiveRow";

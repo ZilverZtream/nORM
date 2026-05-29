@@ -1626,21 +1626,33 @@ public class QueryTranslatorCoverageTests
     // ─── GroupBy with element selector ────────────────────────────────────
 
     [Fact]
-    public void GroupBy_WithElementSelector_GeneratesGroupBySql()
+    public async Task GroupBy_WithElementSelector_StreamsSelectedElementsClientSide()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var _cn = cn;
         CreateQtProductTable(cn);
         using var ctx = new DbContext(cn, new SqliteProvider());
+        InsertProduct(cn, "Apple", 10, 1, catId: 1);
+        InsertProduct(cn, "Apricot", 20, 2, catId: 1);
+        InsertProduct(cn, "Banana", 30, 3, catId: 2);
 
-        // GroupBy(keySelector, elementSelector) - groups by CategoryId, selects Name
         var q = ctx.Query<QtProduct>()
             .GroupBy(p => p.CategoryId, p => p.Name);
         var sql = TranslateSql(ctx, q);
-        Assert.Contains("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
-    }
+        Assert.DoesNotContain("GROUP BY", sql, StringComparison.OrdinalIgnoreCase);
 
+        var groups = (await q.ToListAsync())
+            .OrderBy(g => g.Key)
+            .Select(g => new { g.Key, Names = g.OrderBy(x => x).ToArray() })
+            .ToArray();
+
+        Assert.Equal(2, groups.Length);
+        Assert.Equal(1, groups[0].Key);
+        Assert.Equal(new[] { "Apple", "Apricot" }, groups[0].Names);
+        Assert.Equal(2, groups[1].Key);
+        Assert.Equal(new[] { "Banana" }, groups[1].Names);
+    }
     // ─── GroupBy streaming: plain GroupBy emits no GROUP BY SQL ──────────────
 
     [Fact]
