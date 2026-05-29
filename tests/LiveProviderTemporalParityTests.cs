@@ -131,6 +131,15 @@ public class LiveProviderTemporalParityTests
         return Convert.ToInt64(await cmd.ExecuteScalarAsync());
     }
 
+    private static async Task<string?> ReadPayloadRawAsync(DbContext ctx, int idValue)
+    {
+        await using var cmd = ctx.Connection.CreateCommand();
+        cmd.CommandText =
+            $"SELECT {ctx.Provider.Escape("Name")} FROM {ctx.Provider.Escape(Table)} WHERE {ctx.Provider.Escape("Id")} = {idValue}";
+        var result = await cmd.ExecuteScalarAsync();
+        return result is DBNull or null ? null : (string)result;
+    }
+
     private static async Task ExerciseHistoryTriggersAsync(DbConnection connection, DatabaseProvider provider)
     {
         var table = provider.Escape(Table);
@@ -188,6 +197,168 @@ public class LiveProviderTemporalParityTests
 
                 Assert.Equal(0, currentAsOfFuture);
                 Assert.Equal(3, await CountAsync(connection, provider, HistoryTable));
+            }
+            finally
+            {
+                await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Temporal_as_of_tag_returns_previous_state_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            var options = new DbContextOptions
+            {
+                OnModelCreating = mb => mb.Entity<TlpLiveRow>()
+            };
+            options.EnableTemporalVersioning();
+
+            using var ctx = new DbContext(connection, provider, options);
+            await SetupAsync(connection, provider, kind);
+            try
+            {
+                Assert.Equal(0, await ctx.Query<TlpLiveRow>().CountAsync());
+
+                ctx.Add(new TlpLiveRow { Id = 10, Name = "before" });
+                await ctx.SaveChangesAsync();
+
+                var tagName = "tlp-asof-" + Guid.NewGuid().ToString("N");
+                await ctx.CreateTagAsync(tagName);
+
+                // SQLite temporal trigger timestamps have second precision.
+                await Task.Delay(TimeSpan.FromMilliseconds(1100));
+
+                var current = await ctx.Query<TlpLiveRow>().SingleAsync(r => r.Id == 10);
+                current.Name = "after";
+                await ctx.SaveChangesAsync();
+
+                var historical = await ctx.Query<TlpLiveRow>()
+                    .AsOf(tagName)
+                    .SingleAsync(r => r.Id == 10);
+                var currentName = await ReadPayloadRawAsync(ctx, 10);
+
+                Assert.Equal("before", historical.Name);
+                Assert.Equal("after", currentName);
+            }
+            finally
+            {
+                await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Temporal_history_diff_restore_and_prune_work_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            var options = new DbContextOptions
+            {
+                OnModelCreating = mb => mb.Entity<TlpLiveRow>()
+            };
+            options.EnableTemporalVersioning();
+
+            using var ctx = new DbContext(connection, provider, options);
+            await SetupAsync(connection, provider, kind);
+            try
+            {
+                ctx.Add(new TlpLiveRow { Id = 20, Name = "alpha" });
+                await ctx.SaveChangesAsync();
+
+                var tagName = "tlp-restore-" + Guid.NewGuid().ToString("N");
+                await ctx.CreateTagAsync(tagName);
+                await Task.Delay(TimeSpan.FromMilliseconds(1100));
+
+                var current = await ctx.Query<TlpLiveRow>().SingleAsync(r => r.Id == 20);
+                current.Name = "beta";
+                await ctx.SaveChangesAsync();
+
+                var diff = await ctx.GetTemporalDiffAsync<TlpLiveRow>(20);
+                var entry = Assert.Single(diff);
+                Assert.Contains(entry.Changes, c => c.PropertyName == nameof(TlpLiveRow.Name) &&
+                                                    Equals(c.PreviousValue, "alpha") &&
+                                                    Equals(c.CurrentValue, "beta"));
+
+                var restored = await ctx.RestoreTemporalVersionAsync<TlpLiveRow>(20, tagName);
+                var restoredName = await ReadPayloadRawAsync(ctx, 20);
+                Assert.Equal(1, restored);
+                Assert.Equal("alpha", restoredName);
+
+                var beforePrune = await CountAsync(connection, provider, HistoryTable);
+                var pruned = await ctx.PruneTemporalHistoryAsync<TlpLiveRow>(DateTime.UtcNow.AddMinutes(1));
+                var afterPrune = await CountAsync(connection, provider, HistoryTable);
+
+                Assert.True(beforePrune > 0);
+                Assert.True(pruned > 0);
+                Assert.True(afterPrune < beforePrune);
+            }
+            finally
+            {
+                await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Temporal_tag_and_history_paths_participate_in_explicit_transaction_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            var options = new DbContextOptions
+            {
+                OnModelCreating = mb => mb.Entity<TlpLiveRow>()
+            };
+            options.EnableTemporalVersioning();
+
+            using var ctx = new DbContext(connection, provider, options);
+            await SetupAsync(connection, provider, kind);
+            try
+            {
+                Assert.Equal(0, await ctx.Query<TlpLiveRow>().CountAsync());
+
+                var tagName = "tlp-tx-" + Guid.NewGuid().ToString("N");
+                await using (var tx = await ctx.Database.BeginTransactionAsync())
+                {
+                    await ctx.CreateTagAsync(tagName);
+                    ctx.Add(new TlpLiveRow { Id = 30, Name = "inside-tx" });
+                    await ctx.SaveChangesAsync();
+
+                    var history = await ctx.GetTemporalHistoryAsync<TlpLiveRow>(30);
+                    Assert.Single(history);
+                    Assert.Equal("inside-tx", history[0].Entity.Name);
+
+                    await tx.RollbackAsync();
+                }
+
+                Assert.Equal(0, await CountTagAsync(connection, provider, tagName));
+                Assert.Equal(0, await ctx.Query<TlpLiveRow>().CountAsync());
             }
             finally
             {

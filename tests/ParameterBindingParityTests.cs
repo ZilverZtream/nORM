@@ -140,6 +140,26 @@ public class ParameterBindingParityTests
         Assert.Equal("2024-03-15", p.Value);
     }
 
+    [Fact]
+    public void P1_Guid_AddOptimizedParam_BindsCanonicalTextForSqlite()
+    {
+        // SQLite stores Guid columns as TEXT in nORM. Binding DbType.Guid can
+        // compare as provider-specific binary/blob data and miss TEXT rows,
+        // which is unacceptable for tenant predicates.
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+
+        var guid = Guid.Parse("eecf356e-4dc5-45bb-8b8a-4f895a9946e2");
+        ParameterOptimizer.AddOptimizedParam(cmd, "@tenant", guid);
+
+        Assert.Single(cmd.Parameters);
+        var p = cmd.Parameters[0];
+        Assert.Equal("@tenant", p.ParameterName);
+        Assert.Equal(DbType.String, p.DbType);
+        Assert.Equal("eecf356e-4dc5-45bb-8b8a-4f895a9946e2", p.Value);
+        Assert.Equal(36, p.Size);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  2. TimeOnly parameter binding round-trip
     // ─────────────────────────────────────────────────────────────────────────

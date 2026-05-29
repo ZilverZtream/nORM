@@ -1,0 +1,334 @@
+{
+  "Contract": "nORM-provider-mobility-v1",
+  "Strict": true,
+  "GeneratedUtc": "2026-05-28T18:09:47.3843822Z",
+  "ScanPath": null,
+  "ScanStatus": "NotRequested",
+  "ErrorCount": 0,
+  "WarningCount": 4,
+  "Providers": [
+    {
+      "Provider": "sqlite",
+      "Status": "PASS",
+      "Summary": "tenant boundary, representative LINQ, bulk insert, compiled query, temporal AsOf(tag), and temporal history passed",
+      "CapabilityProfile": [
+        {
+          "ProviderName": "SQLite",
+          "Feature": "BitwiseXorTranslation",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite bitwise XOR is translated as ((left | right) - (left \u0026 right)).",
+          "SuggestedFix": "Keep bitwise operator parity tests current for generated LINQ.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "BooleanPredicateTranslation",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite prefers bare boolean predicates for generated WHERE clauses.",
+          "SuggestedFix": "Keep boolean predicate translation in generated LINQ; avoid raw provider boolean fragments.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "BulkInsert",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Warning",
+          "Reason": "Provider-native bulk insert is not available; nORM must preserve generated bulk semantics through fallback SQL.",
+          "SuggestedFix": "Keep fallback bulk behavior covered by provider parity tests and avoid claiming native bulk for this target.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "CaseSensitiveStringComparison",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite applies provider-specific case-sensitive comparison wrapping (value COLLATE BINARY).",
+          "SuggestedFix": "Keep string equality and IN case-sensitivity parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "DateTimeComparisonNormalization",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite normalizes DateTime comparison with provider SQL: datetime(value).",
+          "SuggestedFix": "Keep mixed-offset DateTime comparison parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "DecimalComparisonNormalization",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Warning",
+          "Reason": "SQLite normalizes decimal comparison/sort/aggregate with provider SQL: CAST(value AS REAL).",
+          "SuggestedFix": "SQLite decimal normalization uses REAL for numeric semantics; keep precision caveats documented and tolerance tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "GeneratedKeyRetrieval",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite uses provider identity-returning SQL or follow-up identity retrieval where required.",
+          "SuggestedFix": "Keep single-insert generated-key parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "IdentifierEscaping",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite identifiers are escaped through the concrete nORM provider strategy (\u0022NormProbe\u0022).",
+          "SuggestedFix": "Keep generated SQL paths on nORM identifier escaping and avoid caller-authored delimited SQL.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "JsonTranslation",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "JSON translation is available through nORM provider SQL generation.",
+          "SuggestedFix": "Keep provider capability tests and live-provider parity evidence current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "LikeEscapeTranslation",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite LIKE wildcard escaping uses \u0027\\\u0027 and provider-owned REPLACE translation.",
+          "SuggestedFix": "Keep StartsWith/EndsWith/Contains LIKE escaping covered by provider parity tests.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "NativeTenantSessionContext",
+          "Support": "ProviderBound",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "Provider-native tenant session context is database-specific defense-in-depth infrastructure, not generated-path provider mobility.",
+          "SuggestedFix": "Use generated tenant predicates for provider mobility; keep native RLS/session context as explicit deployment evidence.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "NullSemantics",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite uses native null-safe equality syntax (a IS b).",
+          "SuggestedFix": "Keep equality/inequality null-semantics parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "OrderedStringAggregate",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Warning",
+          "Reason": "Provider lacks native ordered string aggregate support; nORM must preserve aggregate semantics through provider-specific rewrites or bounded fallback behavior.",
+          "SuggestedFix": "Keep string aggregate ordering caveats documented and covered by provider parity tests.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "PagingTranslation",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite uses LIMIT/OFFSET paging translation.",
+          "SuggestedFix": "Keep OrderBy/Skip/Take live-provider parity tests current for this target.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "ParameterBinding",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite parameters use the \u0027@\u0027 prefix and provider-owned DbParameter creation.",
+          "SuggestedFix": "Use generated nORM query/write APIs so parameter names and provider parameter objects stay owned by nORM.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "ParameterLimit",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Warning",
+          "Reason": "SQLite supports up to 999 parameters per command.",
+          "SuggestedFix": "Generated write/query paths must batch or split commands before reaching the provider parameter limit.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "ProviderNativeTemporalTables",
+          "Support": "ProviderBound",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "Provider-native temporal tables are database-specific infrastructure, not nORM-managed provider-neutral temporal history.",
+          "SuggestedFix": "Use nORM-managed temporal history for provider mobility; keep native temporal DDL as explicit provider evidence.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "RowTupleComparison",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "Provider supports native row-value tuple comparison for generated keyset/tuple predicates.",
+          "SuggestedFix": "Keep tuple comparison live parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "Savepoints",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "Transaction savepoints are available for nORM transaction wrappers.",
+          "SuggestedFix": "Keep provider capability tests and live-provider parity evidence current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "ServerVersion",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite server version 3.41.2 satisfies the minimum supported version 3.25.",
+          "SuggestedFix": "Keep startup validation enabled for each configured provider target.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "SqlStatementLengthLimit",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite limits individual SQL statements to 1000000 characters; generated SQL must split before reaching that bound.",
+          "SuggestedFix": "Keep generated SQL batching/splitting tests current for large IN lists, bulk operations, and migrations.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "StringConcatTranslation",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite string concatenation is translated as (left || right).",
+          "SuggestedFix": "Keep string concatenation and string interpolation query parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "TemporalClockSource",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite temporal tags and history triggers use the database clock for consistent AsOf windows.",
+          "SuggestedFix": "Keep temporal tag and AsOf live-provider parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "TemporalVersioning",
+          "Support": "Portable",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "nORM-managed temporal history is supported for this provider target.",
+          "SuggestedFix": "Keep provider capability tests and live-provider parity evidence current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": null
+        },
+        {
+          "ProviderName": "SQLite",
+          "Feature": "TimeSpanComparisonNormalization",
+          "Support": "Emulated",
+          "StrictRuntimeAllowed": true,
+          "CertificationSeverity": "Info",
+          "Reason": "SQLite normalizes TimeSpan comparison with provider SQL: (CASE WHEN substr(value, 1, 1) = \u0027-\u0027 AND (INSTR(substr(value, 2), \u0027.\u0027) \u003E 0 AND INSTR(substr(value, 2), \u0027.\u0027) \u003C INSTR(substr(value, 2), \u0027:\u0027)) THEN -1.0 * (CAST(substr(substr(value, 2), 1, INSTR(substr(value, 2), \u0027.\u0027) - 1) AS INTEGER) * 86400 \u002B (CAST(substr(substr(substr(value, 2), INSTR(substr(value, 2), \u0027.\u0027) \u002B 1), 1, 2) AS INTEGER) * 3600 \u002B CAST(substr(substr(substr(value, 2), INSTR(substr(value, 2), \u0027.\u0027) \u002B 1), 4, 2) AS INTEGER) * 60 \u002B CAST(substr(substr(substr(value, 2), INSTR(substr(value, 2), \u0027.\u0027) \u002B 1), 7, 2) AS INTEGER) \u002B CASE WHEN length(substr(substr(value, 2), INSTR(substr(value, 2), \u0027.\u0027) \u002B 1)) \u003E 9 THEN CAST(substr(substr(substr(value, 2), INSTR(substr(value, 2), \u0027.\u0027) \u002B 1), 10) AS REAL) / 10000000.0 ELSE 0 END)) WHEN substr(value, 1, 1) = \u0027-\u0027 THEN -1.0 * (CAST(substr(substr(value, 2), 1, 2) AS INTEGER) * 3600 \u002B CAST(substr(substr(value, 2), 4, 2) AS INTEGER) * 60 \u002B CAST(substr(substr(value, 2), 7, 2) AS INTEGER) \u002B CASE WHEN length(substr(value, 2)) \u003E 9 THEN CAST(substr(substr(value, 2), 10) AS REAL) / 10000000.0 ELSE 0 END) WHEN (INSTR(value, \u0027.\u0027) \u003E 0 AND INSTR(value, \u0027.\u0027) \u003C INSTR(value, \u0027:\u0027)) THEN (CAST(substr(value, 1, INSTR(value, \u0027.\u0027) - 1) AS INTEGER) * 86400 \u002B (CAST(substr(substr(value, INSTR(value, \u0027.\u0027) \u002B 1), 1, 2) AS INTEGER) * 3600 \u002B CAST(substr(substr(value, INSTR(value, \u0027.\u0027) \u002B 1), 4, 2) AS INTEGER) * 60 \u002B CAST(substr(substr(value, INSTR(value, \u0027.\u0027) \u002B 1), 7, 2) AS INTEGER) \u002B CASE WHEN length(substr(value, INSTR(value, \u0027.\u0027) \u002B 1)) \u003E 9 THEN CAST(substr(substr(value, INSTR(value, \u0027.\u0027) \u002B 1), 10) AS REAL) / 10000000.0 ELSE 0 END)) ELSE (CAST(substr(value, 1, 2) AS INTEGER) * 3600 \u002B CAST(substr(value, 4, 2) AS INTEGER) * 60 \u002B CAST(substr(value, 7, 2) AS INTEGER) \u002B CASE WHEN length(value) \u003E 9 THEN CAST(substr(value, 10) AS REAL) / 10000000.0 ELSE 0 END) END).",
+          "SuggestedFix": "Keep cross-column and mixed-magnitude TimeSpan comparison parity tests current.",
+          "MinimumServerVersion": "3.25",
+          "ActualServerVersion": "3.41.2"
+        }
+      ],
+      "Checks": [
+        "schema-bootstrap",
+        "strict-provider-mobility-mode",
+        "tenant-query-boundary",
+        "cross-tenant-update-delete-zero-rows",
+        "bulk-insert-visible-state",
+        "linq-where-select-dto-orderby-skip-take",
+        "include-as-split-query",
+        "groupby-aggregate",
+        "compiled-query",
+        "temporal-tag-asof-current-history",
+        "temporal-restore",
+        "temporal-tenant-isolation"
+      ]
+    }
+  ],
+  "Findings": [],
+  "Recommendations": [
+    {
+      "Kind": "provider-target-BulkInsert",
+      "Count": 1,
+      "Priority": "P2",
+      "SuggestedFix": "Keep fallback bulk behavior covered by provider parity tests and avoid claiming native bulk for this target."
+    },
+    {
+      "Kind": "provider-target-DecimalComparisonNormalization",
+      "Count": 1,
+      "Priority": "P2",
+      "SuggestedFix": "SQLite decimal normalization uses REAL for numeric semantics; keep precision caveats documented and tolerance tests current."
+    },
+    {
+      "Kind": "provider-target-OrderedStringAggregate",
+      "Count": 1,
+      "Priority": "P2",
+      "SuggestedFix": "Keep string aggregate ordering caveats documented and covered by provider parity tests."
+    },
+    {
+      "Kind": "provider-target-ParameterLimit",
+      "Count": 1,
+      "Priority": "P2",
+      "SuggestedFix": "Generated write/query paths must batch or split commands before reaching the provider parameter limit."
+    }
+  ]
+}

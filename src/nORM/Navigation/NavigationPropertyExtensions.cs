@@ -457,7 +457,7 @@ namespace nORM.Navigation
             await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = context.CreateCommand();
 
-            var paramName = context.Provider.ParamPrefix + "fk";
+            var paramName = context.RawProvider.ParamPrefix + "fk";
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
             cmd.CommandTimeout = ToSecondsClamped(context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText));
             cmd.AddParam(paramName, keyValue);
@@ -466,8 +466,8 @@ namespace nORM.Navigation
             using (var sb = new OptimizedSqlBuilder(cmd.CommandText.Length + 20))
             {
                 sb.Append(cmd.CommandText);
-                var limitParam = context.Provider.ParamPrefix + "p_limit";
-                context.Provider.ApplyPaging(sb, 1, null, limitParam, null);
+                var limitParam = context.RawProvider.ParamPrefix + "p_limit";
+                context.RawProvider.ApplyPaging(sb, 1, null, limitParam, null);
                 cmd.CommandText = sb.ToSqlString();
                 cmd.AddParam(limitParam, 1);
             }

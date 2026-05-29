@@ -21,9 +21,9 @@ namespace nORM.Tests;
 /// non-nullable value type (e.g. int) would crash with an unhandled ArgumentException
 /// inside Expression.Constant(null, typeof(int)).
 ///
-/// With the fix:
-/// - Null + non-nullable column → deterministic NormConfigurationException
-/// - Null + nullable column (int?, string) → query emits WHERE col IS NULL
+/// With the fix, tenant mode fails closed for null tenant IDs regardless of
+/// column nullability. A null tenant provider value is treated as
+/// misconfiguration, not as a request to query a shared null-tenant partition.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
 public class TenantNullHandlingTests
@@ -107,11 +107,10 @@ public class TenantNullHandlingTests
     }
 
     /// <summary>
-    /// Null tenant ID with a nullable int? column should succeed and emit WHERE TenantId IS NULL,
-    /// returning only rows where TenantId is NULL.
+    /// Null tenant ID with a nullable int? column must still fail closed.
     /// </summary>
     [Fact]
-    public async Task NullTenantId_NullableIntColumn_EmitsIsNullFilter()
+    public async Task NullTenantId_NullableIntColumn_ThrowsNormConfigurationException()
     {
         using var cn = CreateConnection();
         using (var cmd = cn.CreateCommand())
@@ -126,19 +125,18 @@ public class TenantNullHandlingTests
 
         using var ctx = CreateCtx(cn, new NullTenantProvider());
 
-        var results = ctx.Query<NullableIntTenantItem>().ToList();
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ctx.Query<NullableIntTenantItem>().ToList());
 
-        // Only the null-tenant row should be returned
-        Assert.Single(results);
-        Assert.Equal("NullRow", results[0].Name);
-        Assert.Null(results[0].TenantId);
+        Assert.Contains("null", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fails closed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// Null tenant ID with a nullable string column should succeed and emit WHERE TenantId IS NULL.
+    /// Null tenant ID with a nullable string column must still fail closed.
     /// </summary>
     [Fact]
-    public async Task NullTenantId_StringColumn_EmitsIsNullFilter()
+    public async Task NullTenantId_StringColumn_ThrowsNormConfigurationException()
     {
         using var cn = CreateConnection();
         using (var cmd = cn.CreateCommand())
@@ -152,11 +150,11 @@ public class TenantNullHandlingTests
 
         using var ctx = CreateCtx(cn, new NullTenantProvider());
 
-        var results = ctx.Query<StringTenantItem>().ToList();
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ctx.Query<StringTenantItem>().ToList());
 
-        Assert.Single(results);
-        Assert.Equal("NullRow", results[0].Name);
-        Assert.Null(results[0].TenantId);
+        Assert.Contains("null", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fails closed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -36,7 +36,7 @@ namespace nORM.Providers
             // Reuse caller's transaction when one is already open on this context.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction? transaction = ownedTx
-                ? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false)
+                ? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false)
                 : ctx.CurrentTransaction;
             try
             {

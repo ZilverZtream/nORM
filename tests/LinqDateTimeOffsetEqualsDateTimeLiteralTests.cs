@@ -38,7 +38,9 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
                 (1, '2026-05-25 12:30:45.123+00:00'),
                 (2, '2026-05-25 14:30:45.123+02:00'),
                 (3, '2026-05-25 12:30:45.987+00:00'),
-                (4, '2026-05-25 12:30:46.123+00:00');
+                (4, '2026-05-25 12:30:46.123+00:00'),
+                (5, '2026-05-25 12:30:45.123456+00:00'),
+                (6, '2026-05-25 12:30:45.123999+00:00');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider());
@@ -71,7 +73,33 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
             .Where(r => r.Dto != literal)
             .OrderBy(r => r.Id)
             .ToListAsync();
-        Assert.Equal(new[] { 3, 4 }, rows.Select(r => r.Id).ToArray());
+        Assert.Equal(new[] { 3, 4, 5, 6 }, rows.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task DateTimeOffset_column_equals_UTC_DateTime_literal_matches_microsecond_precision()
+    {
+        var literal = new DateTime(2026, 5, 25, 12, 30, 45, DateTimeKind.Utc).AddTicks(1234560);
+        var rows = await _ctx.Query<DeqRow>()
+            .Where(r => r.Dto == literal)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { 5 }, rows.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task DateTimeOffset_column_equals_unspecified_local_DateTime_literal_uses_literal_instant_offset()
+    {
+        var utcInstant = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
+        var localWall = TimeZoneInfo.ConvertTimeFromUtc(utcInstant, TimeZoneInfo.Local);
+        var literal = DateTime.SpecifyKind(localWall, DateTimeKind.Unspecified);
+
+        var rows = await _ctx.Query<DeqRow>()
+            .Where(r => r.Dto == literal)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).ToArray());
     }
 
     [Table("DeqRow")]

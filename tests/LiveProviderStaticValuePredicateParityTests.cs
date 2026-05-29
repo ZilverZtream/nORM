@@ -64,11 +64,18 @@ public sealed class LiveProviderStaticValuePredicateParityTests
                     .ToListAsync())
                     .Select(r => r.Id).ToArray();
 
+                var serverGuidPredicateIds = (await ctx.Query<StaticValueLiveRow>()
+                    .Where(r => Guid.NewGuid() != Guid.Empty)
+                    .OrderBy(r => r.Id)
+                    .ToListAsync())
+                    .Select(r => r.Id).ToArray();
+
                 Assert.Equal(new[] { 3 }, emptyGuidIds);
                 Assert.Equal(new[] { 1, 4 }, staticGuidIds);
                 Assert.Equal(new[] { 1, 3, 4 }, utcPastIds.OrderBy(i => i).ToArray());
                 Assert.Equal(new[] { 2 }, localFutureIds);
                 Assert.Equal(new[] { 1, 3, 4 }, todayPastIds.OrderBy(i => i).ToArray());
+                Assert.Equal(new[] { 1, 2, 3, 4 }, serverGuidPredicateIds);
             }
             finally
             {

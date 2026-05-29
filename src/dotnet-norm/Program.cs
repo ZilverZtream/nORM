@@ -199,6 +199,107 @@ database.Add(update);
 database.Add(drop);
 root.Add(database);
 
+var portability = new Command("portability", "Provider mobility certification and diagnostics");
+var portabilityCertify = new Command("certify", "Scan an application for provider-bound code that cannot pass strict provider mobility certification.");
+var portabilityScanPathOpt = new Option<string>("--scan-path") { Description = "Application source directory or file to scan.", Required = true };
+var portabilityReportOpt = new Option<string?>("--report") { Description = "Path to write the JSON certification report." };
+var portabilityHtmlOpt = new Option<string?>("--html") { Description = "Path to write an HTML certification dashboard." };
+var portabilityProfileOpt = new Option<string>("--profile") { Description = "Certification profile label, e.g. all-four, sqlite-postgres, sqlserver-postgres.", DefaultValueFactory = _ => "all-four" };
+var portabilityProvidersOpt = new Option<string?>("--providers") { Description = "Comma-separated provider target list for capability profiling, e.g. sqlite,postgres,mysql." };
+var portabilitySqliteConnectionOpt = new Option<string?>("--sqlite-connection") { Description = "Optional SQLite target connection string to open and validate for actual provider mobility evidence." };
+var portabilitySqlServerConnectionOpt = new Option<string?>("--sqlserver-connection") { Description = "Optional SQL Server target connection string to open and validate for actual provider mobility evidence." };
+var portabilityPostgresConnectionOpt = new Option<string?>("--postgres-connection") { Description = "Optional PostgreSQL target connection string to open and validate for actual provider mobility evidence." };
+var portabilityMySqlConnectionOpt = new Option<string?>("--mysql-connection") { Description = "Optional MySQL target connection string to open and validate for actual provider mobility evidence." };
+var portabilitySchemaSnapshotOpt = new Option<string?>("--schema-snapshot") { Description = "Optional nORM schema.snapshot.json to inspect for provider-mobile schema metadata." };
+var portabilityAssemblyOpt = new Option<string?>("--assembly") { Description = "Optional application assembly containing a design-time DbContext used to inspect provider-mobile schema metadata." };
+var portabilityAttributeOnlyOpt = new Option<bool>("--attribute-only") { Description = "When --assembly is used, build the schema from attributes only instead of requiring a design-time DbContext." };
+portabilityCertify.Add(portabilityScanPathOpt);
+portabilityCertify.Add(portabilityReportOpt);
+portabilityCertify.Add(portabilityHtmlOpt);
+portabilityCertify.Add(portabilityProfileOpt);
+portabilityCertify.Add(portabilityProvidersOpt);
+portabilityCertify.Add(portabilitySqliteConnectionOpt);
+portabilityCertify.Add(portabilitySqlServerConnectionOpt);
+portabilityCertify.Add(portabilityPostgresConnectionOpt);
+portabilityCertify.Add(portabilityMySqlConnectionOpt);
+portabilityCertify.Add(portabilitySchemaSnapshotOpt);
+portabilityCertify.Add(portabilityAssemblyOpt);
+portabilityCertify.Add(portabilityAttributeOnlyOpt);
+portabilityCertify.SetAction((ParseResult result) =>
+{
+    try
+    {
+        var schemaSnapshotPath = result.GetValue(portabilitySchemaSnapshotOpt);
+        var assemblyPath = result.GetValue(portabilityAssemblyOpt);
+        if (!string.IsNullOrWhiteSpace(schemaSnapshotPath) && !string.IsNullOrWhiteSpace(assemblyPath))
+        {
+            Console.Error.WriteLine("Use either --schema-snapshot or --assembly for schema inspection, not both.");
+            return 2;
+        }
+
+        SchemaSnapshot? schemaSnapshot = null;
+        if (!string.IsNullOrWhiteSpace(assemblyPath))
+        {
+            if (!File.Exists(assemblyPath))
+            {
+                Console.Error.WriteLine($"Assembly '{assemblyPath}' not found.");
+                return 2;
+            }
+
+            var assembly = LoadDesignTimeAssembly(assemblyPath);
+            schemaSnapshot = BuildMigrationSnapshot(assembly, result.GetValue(portabilityAttributeOnlyOpt));
+        }
+
+        var targetProviders = ParseProviderTargetList(result.GetValue(portabilityProvidersOpt));
+        var targetVersions = new Dictionary<string, Version?>(StringComparer.OrdinalIgnoreCase);
+        var targetFindings = new List<ProviderMobilityFinding>();
+        var connectionTargets = new (string Provider, string? ConnectionString)[]
+        {
+            ("sqlite", result.GetValue(portabilitySqliteConnectionOpt)),
+            ("sqlserver", result.GetValue(portabilitySqlServerConnectionOpt)),
+            ("postgres", result.GetValue(portabilityPostgresConnectionOpt)),
+            ("mysql", result.GetValue(portabilityMySqlConnectionOpt))
+        };
+        var explicitTargetProviders = targetProviders?.ToList();
+        foreach (var target in connectionTargets)
+        {
+            if (string.IsNullOrWhiteSpace(target.ConnectionString))
+                continue;
+
+            explicitTargetProviders ??= new List<string>();
+            if (!explicitTargetProviders.Contains(target.Provider, StringComparer.OrdinalIgnoreCase))
+                explicitTargetProviders.Add(target.Provider);
+            ProbeProviderTargetConnection(target.Provider, target.ConnectionString!, targetVersions, targetFindings);
+        }
+
+        var report = ProviderMobilityCertificationRunner.Run(new ProviderMobilityCertificationOptions
+        {
+            ScanPath = result.GetValue(portabilityScanPathOpt)!,
+            JsonReportPath = result.GetValue(portabilityReportOpt),
+            HtmlReportPath = result.GetValue(portabilityHtmlOpt),
+            Profile = result.GetValue(portabilityProfileOpt)!,
+            TargetProviders = explicitTargetProviders,
+            TargetProviderVersions = targetVersions,
+            TargetProviderFindings = targetFindings,
+            SchemaSnapshotPath = schemaSnapshotPath,
+            SchemaSnapshot = schemaSnapshot
+        });
+
+        Console.WriteLine($"Provider mobility certification {report.Status}: {report.ErrorCount} error(s), {report.WarningCount} warning(s), {report.ScannedFiles} file(s) scanned, {report.SchemaTables} schema table(s) inspected.");
+        if (!string.IsNullOrWhiteSpace(result.GetValue(portabilityReportOpt)))
+            Console.WriteLine($"JSON report written to {Path.GetFullPath(result.GetValue(portabilityReportOpt)!)}");
+        if (!string.IsNullOrWhiteSpace(result.GetValue(portabilityHtmlOpt)))
+            Console.WriteLine($"HTML report written to {Path.GetFullPath(result.GetValue(portabilityHtmlOpt)!)}");
+        return report.Status == "PASS" ? 0 : 1;
+    }
+    catch (Exception ex)
+    {
+        return Fail(ex);
+    }
+});
+portability.Add(portabilityCertify);
+root.Add(portability);
+
 // migrations add
 var migrations = new Command("migrations", "Migration management commands");
 var add = new Command("add", "Add a new migration based on model changes.\nExample:\n  norm migrations add InitialCreate --provider sqlserver --assembly App.dll");
@@ -493,6 +594,90 @@ static bool IsProtectedDatabaseName(string provider, string databaseName)
             || normalized.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
         _ => false
     };
+}
+
+static IReadOnlyList<string>? ParseProviderTargetList(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+        return null;
+
+    return value
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(static provider => NormalizeProviderTargetName(provider))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+static string NormalizeProviderTargetName(string providerName)
+    => providerName.Trim().ToLowerInvariant() switch
+    {
+        "mssql" => "sqlserver",
+        "postgresql" => "postgres",
+        "mariadb" => "mysql",
+        var normalized => normalized
+    };
+
+static void ProbeProviderTargetConnection(
+    string providerName,
+    string connectionString,
+    IDictionary<string, Version?> targetVersions,
+    ICollection<ProviderMobilityFinding> findings)
+{
+    try
+    {
+        var validated = ConnectionStringValidator.Validate(connectionString, providerName);
+        using var connection = CreateConnection(providerName, validated.ConnectionString);
+        connection.Open();
+        var provider = CreateProvider(providerName);
+        provider.InitializeConnection(connection);
+        ProbeProviderTargetFeatures(providerName, connection, findings);
+        targetVersions[providerName] = ProviderMobilityTranslator.ParseProviderVersion(connection.ServerVersion);
+    }
+    catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+    {
+        findings.Add(new ProviderMobilityFinding(
+            "provider-target",
+            0,
+            "provider-target-open",
+            "Error",
+            $"Provider target '{providerName}' could not be opened and validated: {RedactConnectionStrings(ex.Message)}",
+            "Fix the target connection string, driver, credentials, network access, or server version before claiming live provider mobility evidence."));
+    }
+}
+
+static void ProbeProviderTargetFeatures(
+    string providerName,
+    DbConnection connection,
+    ICollection<ProviderMobilityFinding> findings)
+{
+    var probes = providerName.ToLowerInvariant() switch
+    {
+        "sqlite" => new[] { ("JSON translation", "SELECT json_extract('{\"a\":1}', '$.a')") },
+        "sqlserver" => new[] { ("JSON translation", "SELECT JSON_VALUE(N'{\"a\":1}', '$.a')") },
+        "postgres" => new[] { ("JSON translation", "SELECT ('{\"a\":1}'::jsonb ->> 'a')") },
+        "mysql" => new[] { ("JSON translation", "SELECT JSON_EXTRACT('{\"a\":1}', '$.a')") },
+        _ => Array.Empty<(string Feature, string Sql)>()
+    };
+
+    foreach (var (feature, sql) in probes)
+    {
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            _ = command.ExecuteScalar();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            findings.Add(new ProviderMobilityFinding(
+                "provider-target",
+                0,
+                "provider-target-capability",
+                "Error",
+                $"Provider target '{providerName}' failed the {feature} probe: {RedactConnectionStrings(ex.Message)}",
+                "Enable the required database feature/extension or remove that provider target before claiming live provider mobility evidence."));
+        }
+    }
 }
 
 static int Fail(Exception ex, int exitCode = 1)

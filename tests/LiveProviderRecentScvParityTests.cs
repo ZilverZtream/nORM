@@ -132,11 +132,18 @@ public class LiveProviderRecentScvParityTests
                 // Row 3 is the same second but a different millisecond and must not match.
                 Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).ToArray());
 
+                var microsecondLiteral = new DateTime(2026, 5, 25, 12, 30, 45, DateTimeKind.Utc).AddTicks(1234560);
+                var microsecondRows = await ctx.Query<DtoParityRow>()
+                    .Where(r => r.Dto == microsecondLiteral)
+                    .OrderBy(r => r.Id)
+                    .ToListAsync();
+                Assert.Equal(new[] { 5 }, microsecondRows.Select(r => r.Id).ToArray());
+
                 var notRows = await ctx.Query<DtoParityRow>()
                     .Where(r => r.Dto != literal)
                     .OrderBy(r => r.Id)
                     .ToListAsync();
-                Assert.Equal(new[] { 3, 4 }, notRows.Select(r => r.Id).ToArray());
+                Assert.Equal(new[] { 3, 4, 5, 6 }, notRows.Select(r => r.Id).ToArray());
             }
             finally { await Teardown(ctx, DtoTable); }
         }
@@ -158,25 +165,33 @@ public class LiveProviderRecentScvParityTests
                 "(1,CAST('2026-05-25 12:30:45.123 +00:00' AS DATETIMEOFFSET))," +
                 "(2,CAST('2026-05-25 14:30:45.123 +02:00' AS DATETIMEOFFSET))," +
                 "(3,CAST('2026-05-25 12:30:45.987 +00:00' AS DATETIMEOFFSET))," +
-                "(4,CAST('2026-05-25 12:30:46.123 +00:00' AS DATETIMEOFFSET))",
+                "(4,CAST('2026-05-25 12:30:46.123 +00:00' AS DATETIMEOFFSET))," +
+                "(5,CAST('2026-05-25 12:30:45.123456 +00:00' AS DATETIMEOFFSET))," +
+                "(6,CAST('2026-05-25 12:30:45.123999 +00:00' AS DATETIMEOFFSET))",
             ProviderKind.Postgres =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
                 "(1,'2026-05-25 12:30:45.123+00'::timestamptz)," +
                 "(2,'2026-05-25 14:30:45.123+02'::timestamptz)," +
                 "(3,'2026-05-25 12:30:45.987+00'::timestamptz)," +
-                "(4,'2026-05-25 12:30:46.123+00'::timestamptz)",
+                "(4,'2026-05-25 12:30:46.123+00'::timestamptz)," +
+                "(5,'2026-05-25 12:30:45.123456+00'::timestamptz)," +
+                "(6,'2026-05-25 12:30:45.123999+00'::timestamptz)",
             ProviderKind.MySql =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
                 "(1,'2026-05-25 12:30:45.123000')," +
                 "(2,'2026-05-25 12:30:45.123000')," +
                 "(3,'2026-05-25 12:30:45.987000')," +
-                "(4,'2026-05-25 12:30:46.123000')",
+                "(4,'2026-05-25 12:30:46.123000')," +
+                "(5,'2026-05-25 12:30:45.123456')," +
+                "(6,'2026-05-25 12:30:45.123999')",
             ProviderKind.Sqlite =>
                 $"INSERT INTO {t} ({id},{dto}) VALUES " +
                 "(1,'2026-05-25 12:30:45.123+00:00')," +
                 "(2,'2026-05-25 14:30:45.123+02:00')," +
                 "(3,'2026-05-25 12:30:45.987+00:00')," +
-                "(4,'2026-05-25 12:30:46.123+00:00')",
+                "(4,'2026-05-25 12:30:46.123+00:00')," +
+                "(5,'2026-05-25 12:30:45.123456+00:00')," +
+                "(6,'2026-05-25 12:30:45.123999+00:00')",
             _ => throw new NotSupportedException()
         };
         await ExecuteAsync(ctx, insert);
@@ -220,7 +235,7 @@ public class LiveProviderRecentScvParityTests
                 Assert.Equal(TimeSpan.FromSeconds(15), rows[0].Diff);  // 12:30:45Z - 12:30:30Z
                 Assert.Equal(TimeSpan.Zero,            rows[1].Diff);  // 12:00:00Z - 12:00:00Z (different stored offsets)
                 Assert.Equal(TimeSpan.FromHours(-1),   rows[2].Diff);  // 12:00:00Z - 13:00:00Z
-                Assert.InRange((rows[3].Diff - TimeSpan.FromSeconds(1.25)).TotalMilliseconds, -1.0, 1.0);
+                Assert.InRange(rows[3].Diff.TotalMicroseconds, 455.5, 456.5);
             }
             finally { await Teardown(ctx, DsubTable); }
         }
@@ -243,26 +258,26 @@ public class LiveProviderRecentScvParityTests
                 "(1,CAST('2026-05-25 12:30:45 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 12:30:30 +00:00' AS DATETIMEOFFSET))," +
                 "(2,CAST('2026-05-25 14:00:00 +02:00' AS DATETIMEOFFSET),CAST('2026-05-25 11:00:00 -01:00' AS DATETIMEOFFSET))," +
                 "(3,CAST('2026-05-25 12:00:00 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 13:00:00 +00:00' AS DATETIMEOFFSET))," +
-                "(4,CAST('2026-05-25 12:00:01.500 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 12:00:00.250 +00:00' AS DATETIMEOFFSET))",
+                "(4,CAST('2026-05-25 12:30:45.123456 +00:00' AS DATETIMEOFFSET),CAST('2026-05-25 12:30:45.123000 +00:00' AS DATETIMEOFFSET))",
             ProviderKind.Postgres =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45+00'::timestamptz,'2026-05-25 12:30:30+00'::timestamptz)," +
                 "(2,'2026-05-25 14:00:00+02'::timestamptz,'2026-05-25 11:00:00-01'::timestamptz)," +
                 "(3,'2026-05-25 12:00:00+00'::timestamptz,'2026-05-25 13:00:00+00'::timestamptz)," +
-                "(4,'2026-05-25 12:00:01.500+00'::timestamptz,'2026-05-25 12:00:00.250+00'::timestamptz)",
+                "(4,'2026-05-25 12:30:45.123456+00'::timestamptz,'2026-05-25 12:30:45.123000+00'::timestamptz)",
             // MySQL stores as UTC DATETIME(6); both +02:00 and -01:00 rows become 12:00:00 UTC.
             ProviderKind.MySql =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45.000000','2026-05-25 12:30:30.000000')," +
                 "(2,'2026-05-25 12:00:00.000000','2026-05-25 12:00:00.000000')," +
                 "(3,'2026-05-25 12:00:00.000000','2026-05-25 13:00:00.000000')," +
-                "(4,'2026-05-25 12:00:01.500000','2026-05-25 12:00:00.250000')",
+                "(4,'2026-05-25 12:30:45.123456','2026-05-25 12:30:45.123000')",
             ProviderKind.Sqlite =>
                 $"INSERT INTO {t} ({id},{a},{b}) VALUES " +
                 "(1,'2026-05-25 12:30:45+00:00','2026-05-25 12:30:30+00:00')," +
                 "(2,'2026-05-25 14:00:00+02:00','2026-05-25 11:00:00-01:00')," +
                 "(3,'2026-05-25 12:00:00+00:00','2026-05-25 13:00:00+00:00')," +
-                "(4,'2026-05-25 12:00:01.500+00:00','2026-05-25 12:00:00.250+00:00')",
+                "(4,'2026-05-25 12:30:45.123456+00:00','2026-05-25 12:30:45.123000+00:00')",
             _ => throw new NotSupportedException()
         };
         await ExecuteAsync(ctx, insert);
@@ -404,7 +419,7 @@ public class LiveProviderRecentScvParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
-    public async Task DateTimeOffset_LocalDateTime_projection_returns_wall_clock_at_snapshot_local_offset(ProviderKind kind)
+    public async Task DateTimeOffset_LocalDateTime_projection_returns_per_instant_local_wall_clock(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
@@ -422,16 +437,12 @@ public class LiveProviderRecentScvParityTests
                     .ToListAsync())
                     .ToArray();
 
-                // LocalDateTime uses the local offset snapshotted at query-build time.
-                // Compute the expected value the same way nORM does so the assertion
-                // is TZ-agnostic (works whether the test machine is UTC, UTC+2, etc.).
-                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-                var utcBase = new DateTime(2026, 5, 25, 12, 0, 0, DateTimeKind.Utc);
-                var expected = utcBase.Add(localOffset);
-
-                var row = Assert.Single(rows);
-                // ⚠️ Second-resolution: allow ±1s for sub-second rounding.
-                Assert.InRange(row.Local, expected.AddSeconds(-1), expected.AddSeconds(1));
+                Assert.Equal(2, rows.Length);
+                var expected1 = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero).LocalDateTime;
+                var expected2 = new DateTimeOffset(2026, 7, 15, 12, 0, 0, TimeSpan.Zero).LocalDateTime;
+                // Second-resolution: allow +/-1s for provider formatting.
+                Assert.InRange(rows[0].Local, expected1.AddSeconds(-1), expected1.AddSeconds(1));
+                Assert.InRange(rows[1].Local, expected2.AddSeconds(-1), expected2.AddSeconds(1));
             }
             finally { await Teardown(ctx, LocalDtoTable); }
         }
@@ -449,13 +460,21 @@ public class LiveProviderRecentScvParityTests
         string insert = kind switch
         {
             ProviderKind.SqlServer =>
-                $"INSERT INTO {t} ({id},{dto}) VALUES (1,CAST('2026-05-25 12:00:00 +00:00' AS DATETIMEOFFSET))",
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,CAST('2026-01-15 12:00:00 +00:00' AS DATETIMEOFFSET))," +
+                "(2,CAST('2026-07-15 12:00:00 +00:00' AS DATETIMEOFFSET))",
             ProviderKind.Postgres =>
-                $"INSERT INTO {t} ({id},{dto}) VALUES (1,'2026-05-25 12:00:00+00'::timestamptz)",
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-01-15 12:00:00+00'::timestamptz)," +
+                "(2,'2026-07-15 12:00:00+00'::timestamptz)",
             ProviderKind.MySql =>
-                $"INSERT INTO {t} ({id},{dto}) VALUES (1,'2026-05-25 12:00:00.000000')",
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-01-15 12:00:00.000000')," +
+                "(2,'2026-07-15 12:00:00.000000')",
             ProviderKind.Sqlite =>
-                $"INSERT INTO {t} ({id},{dto}) VALUES (1,'2026-05-25 12:00:00+00:00')",
+                $"INSERT INTO {t} ({id},{dto}) VALUES " +
+                "(1,'2026-01-15 12:00:00+00:00')," +
+                "(2,'2026-07-15 12:00:00+00:00')",
             _ => throw new NotSupportedException()
         };
         await ExecuteAsync(ctx, insert);
@@ -477,7 +496,7 @@ public class LiveProviderRecentScvParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
-    public async Task DateTimeOffset_LocalDateTime_where_and_orderby_use_snapshot_local_offset(ProviderKind kind)
+    public async Task DateTimeOffset_LocalDateTime_where_and_orderby_use_per_instant_local_offset(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"Live provider {kind} not configured")) return;

@@ -172,7 +172,7 @@ namespace nORM.Query
 
         private static ExpressionFingerprint BuildUnsupportedListMissKey<T>(Expression expr, DbContext ctx) where T : class
             => ExpressionFingerprint.ComputeForPlanCache(expr)
-                .Extend(ctx.Provider.GetType().GetHashCode(), ctx.GetMappingHash(), typeof(T).GetHashCode(),
+                .Extend(ctx.RawProvider.GetType().GetHashCode(), ctx.GetMappingHash(), typeof(T).GetHashCode(),
                     expr.Type.GetHashCode(), ctx.Options.CommandInterceptors.Count);
 
         private static bool ShouldCacheUnsupportedListMiss(Expression expr)
@@ -459,7 +459,7 @@ namespace nORM.Query
         private static string BuildFilteredOrderedPageCacheKey<T>(ComplexQueryInfo info, DbContext ctx) where T : class
         {
             var key = new StringBuilder(typeof(T).FullName);
-            key.Append('|').Append(ctx.Provider.GetType().FullName).Append('|').Append(ctx.GetMappingHash());
+            key.Append('|').Append(ctx.RawProvider.GetType().FullName).Append('|').Append(ctx.GetMappingHash());
             foreach (var predicate in info.Predicates)
             {
                 key.Append('|').Append(predicate.Property).Append(':').Append((int)predicate.Operation);
@@ -493,9 +493,9 @@ namespace nORM.Query
                 }
                 else if (predicate.Operation == ExpressionType.Equal &&
                          predicate.Value is bool boolValue &&
-                         !ctx.Provider.ParameterizeFastPathBooleanPredicates)
+                         !ctx.RawProvider.ParameterizeFastPathBooleanPredicates)
                 {
-                    sql.Append(ctx.Provider.FormatBooleanPredicate(column.EscCol, boolValue));
+                    sql.Append(ctx.RawProvider.FormatBooleanPredicate(column.EscCol, boolValue));
                 }
                 else
                 {
@@ -507,14 +507,14 @@ namespace nORM.Query
                     // because SQLite's datetime() returns empty for the .9999999 fractional
                     // overflow. Other providers' override is identity (native DATETIME).
                     var colType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
-                    var paramName = ctx.Provider.ParamPrefix + "p" + paramIndex++;
+                    var paramName = ctx.RawProvider.ParamPrefix + "p" + paramIndex++;
                     string colSql = column.EscCol;
                     // Only wrap on ORDER-sensitive operators -- equality matches storage
                     // format directly (see ETSV comment).
                     bool isOrderCmp = predicate.Operation is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
                                        or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
                     if (isOrderCmp && (colType == typeof(DateTime) || colType == typeof(DateTimeOffset)))
-                        colSql = ctx.Provider.NormalizeDateTimeForCompare(colSql);
+                        colSql = ctx.RawProvider.NormalizeDateTimeForCompare(colSql);
                     sql.Append(colSql).Append(' ').Append(SqlOperator(predicate.Operation)).Append(' ').Append(paramName);
                 }
             }
@@ -528,7 +528,7 @@ namespace nORM.Query
                     sql.Append(" DESC");
             }
 
-            if (ctx.Provider.UsesFetchOffsetPaging)
+            if (ctx.RawProvider.UsesFetchOffsetPaging)
             {
                 if (info.SkipCount.HasValue || info.TakeCount.HasValue)
                 {
@@ -562,7 +562,7 @@ namespace nORM.Query
                 return ExecuteFilteredOrderedPageListSlowAsync<T>(ensureTask, ctx, sql, info, map, ct);
 
             var timeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            if (ctx.Provider.SupportsFastPathPreparedCommandCache &&
+            if (ctx.RawProvider.SupportsFastPathPreparedCommandCache &&
                 ctx.Options.CommandInterceptors.Count == 0 &&
                 ctx.CurrentTransaction == null)
             {
@@ -579,7 +579,7 @@ namespace nORM.Query
             cmd.CommandTimeout = timeout;
             BindFilteredOrderedPageParameters(cmd, ctx, info);
 
-            if (ctx.Provider.PrefersSyncFastPathExecution)
+            if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, ct, sync: true);
 
             return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, ct, sync: false);
@@ -614,7 +614,7 @@ namespace nORM.Query
 
                 var results = new List<T>(info.TakeCount ?? QueryExecutor.DefaultListCapacity);
                 var materializer = GetSyncMaterializer<T>(ctx);
-                if (ctx.Provider.PrefersSyncFastPathExecution)
+                if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 {
                     ct.ThrowIfCancellationRequested();
                     using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.SingleResult);
@@ -647,10 +647,10 @@ namespace nORM.Query
                     continue;
                 if (predicate.Operation == ExpressionType.Equal &&
                     predicate.Value is bool &&
-                    !ctx.Provider.ParameterizeFastPathBooleanPredicates)
+                    !ctx.RawProvider.ParameterizeFastPathBooleanPredicates)
                     continue;
 
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p" + paramIndex++, predicate.Value);
+                cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p" + paramIndex++, predicate.Value);
             }
         }
 
@@ -663,7 +663,7 @@ namespace nORM.Query
                     continue;
                 if (predicate.Operation == ExpressionType.Equal &&
                     predicate.Value is bool &&
-                    !ctx.Provider.ParameterizeFastPathBooleanPredicates)
+                    !ctx.RawProvider.ParameterizeFastPathBooleanPredicates)
                     continue;
 
                 ParameterAssign.AssignValue(cmd.Parameters[paramIndex++], predicate.Value);
@@ -734,7 +734,7 @@ namespace nORM.Query
             bool isBoolFalse = !isNull && info.Value is bool bv3 && !bv3;
             string whereKind = isNull ? "N" : isBoolTrue ? "BT" : isBoolFalse ? "BF" : "P";
             var cacheKey = (typeof(T).FullName!, info.Property, whereKind, takeCount,
-                            ctx.Provider.GetType().FullName!, ctx.GetMappingHash());
+                            ctx.RawProvider.GetType().FullName!, ctx.GetMappingHash());
 
             if (!_fullSqlCache.TryGetValue(cacheKey, out var sql))
             {
@@ -742,13 +742,13 @@ namespace nORM.Query
                 if (isNull)
                     sql += $" WHERE {column.EscCol} IS NULL";
                 else if (isBoolTrue)
-                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: true)}";
+                    sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: true)}";
                 else if (isBoolFalse)
-                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
+                    sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
                 else
-                    sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
+                    sql += $" WHERE {column.EscCol} = {ctx.RawProvider.ParamPrefix}p0";
                 if (takeCount.HasValue)
-                    sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
+                    sql = ApplyLimit(sql, takeCount.Value, ctx.RawProvider);
                 _fullSqlCache[cacheKey] = sql;
             }
 
@@ -761,10 +761,10 @@ namespace nORM.Query
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue && !isBoolFalse)
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+                cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
 
             // Sync materialization for providers without true async I/O
-            if (ctx.Provider.PrefersSyncFastPathExecution)
+            if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 return ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(cmd, ctx, takeCount, ct, sync: true);
 
             return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, ct);
@@ -781,7 +781,7 @@ namespace nORM.Query
             bool isBoolFalse = !isNull && info.Value is bool bv3 && !bv3;
             string whereKind = isNull ? "N" : isBoolTrue ? "BT" : isBoolFalse ? "BF" : "P";
             var cacheKey = (typeof(T).FullName!, info.Property, whereKind, takeCount,
-                            ctx.Provider.GetType().FullName!, ctx.GetMappingHash());
+                            ctx.RawProvider.GetType().FullName!, ctx.GetMappingHash());
 
             if (!_fullSqlCache.TryGetValue(cacheKey, out var sql))
             {
@@ -789,13 +789,13 @@ namespace nORM.Query
                 if (isNull)
                     sql += $" WHERE {column.EscCol} IS NULL";
                 else if (isBoolTrue)
-                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: true)}";
+                    sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: true)}";
                 else if (isBoolFalse)
-                    sql += $" WHERE {ctx.Provider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
+                    sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
                 else
-                    sql += $" WHERE {column.EscCol} = {ctx.Provider.ParamPrefix}p0";
+                    sql += $" WHERE {column.EscCol} = {ctx.RawProvider.ParamPrefix}p0";
                 if (takeCount.HasValue)
-                    sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
+                    sql = ApplyLimit(sql, takeCount.Value, ctx.RawProvider);
                 _fullSqlCache[cacheKey] = sql;
             }
 
@@ -804,7 +804,7 @@ namespace nORM.Query
                 return ExecuteSimpleWhereListSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, ct);
 
             var timeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            if (ctx.Provider.SupportsFastPathPreparedCommandCache &&
+            if (ctx.RawProvider.SupportsFastPathPreparedCommandCache &&
                 ctx.Options.CommandInterceptors.Count == 0 &&
                 ctx.CurrentTransaction == null)
             {
@@ -815,7 +815,7 @@ namespace nORM.Query
                     command =>
                     {
                         if (!isNull && !isBoolTrue && !isBoolFalse)
-                            command.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+                            command.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
                     });
                 return ExecuteSimpleWherePreparedListAsync<T>(prepared, ctx, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, ct);
             }
@@ -824,9 +824,9 @@ namespace nORM.Query
             cmd.CommandText = sql;
             cmd.CommandTimeout = timeout;
             if (!isNull && !isBoolTrue && !isBoolFalse)
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+                cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
 
-            if (ctx.Provider.PrefersSyncFastPathExecution)
+            if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, ct, sync: true);
 
             return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, ct, sync: false);
@@ -852,7 +852,7 @@ namespace nORM.Query
 
                 var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
                 var materializer = GetSyncMaterializer<T>(ctx);
-                if (ctx.Provider.PrefersSyncFastPathExecution)
+                if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 {
                     ct.ThrowIfCancellationRequested();
                     using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.SingleResult);
@@ -883,7 +883,7 @@ namespace nORM.Query
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue && !isBoolFalse)
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+                cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
@@ -956,7 +956,7 @@ namespace nORM.Query
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue && !isBoolFalse)
-                cmd.AddOptimizedParam(ctx.Provider.ParamPrefix + "p0", info.Value!);
+                cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
 
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
@@ -1014,7 +1014,7 @@ namespace nORM.Query
             string sql = GetSqlTemplate<T>(ctx);
             if (takeCount.HasValue)
             {
-                sql = ApplyLimit(sql, takeCount.Value, ctx.Provider);
+                sql = ApplyLimit(sql, takeCount.Value, ctx.RawProvider);
             }
             await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();

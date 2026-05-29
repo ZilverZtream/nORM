@@ -412,18 +412,18 @@ public class TemporalSchemaTests
     }
 
  //<summary>
- //MySQL history table DDL must use DATETIME for the period columns with NOT NULL constraint.
+//MySQL history table DDL must use microsecond DATETIME for the period columns with NOT NULL constraint.
  //</summary>
     [Fact]
-    public void MySql_TemporalHistoryTable_UsesDatetimePeriodColumns()
+    public void MySql_TemporalHistoryTable_UsesMicrosecondDatetimePeriodColumns()
     {
         var provider = new MySqlProvider(new SqliteParameterFactory());
         var mapping = GetMapping(new SqliteProvider());
 
         var ddl = provider.GenerateCreateHistoryTableSql(mapping);
 
-        Assert.Contains("`__ValidFrom` DATETIME NOT NULL", ddl);
-        Assert.Contains("`__ValidTo` DATETIME NOT NULL", ddl);
+        Assert.Contains("`__ValidFrom` DATETIME(6) NOT NULL", ddl);
+        Assert.Contains("`__ValidTo` DATETIME(6) NOT NULL", ddl);
     }
 
  //<summary>

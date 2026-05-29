@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -57,6 +57,8 @@ namespace nORM.Query
             // GroupBy(source, keySelector) or GroupBy(source, keySelector, resultSelector)
             var sourceQuery = node.Arguments[0];
             var keySelectorLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
+            LambdaExpression? elementSelectorLambda = null;
+            LambdaExpression? resultSelectorLambda = null;
 
             if (keySelectorLambda == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "GroupBy key selector must be a lambda expression"));
@@ -85,7 +87,54 @@ namespace nORM.Query
                 Visit(sourceQuery);
                 alias = EscapeAlias("T" + _joinCounter);
             }
+            if (sourceQuery is MethodCallExpression selectSource
+                && selectSource.Method.Name == nameof(Queryable.Select)
+                && StripQuotes(selectSource.Arguments[1]) is LambdaExpression sourceProjection
+                && IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == sourceProjection.Parameters[0].Type)
+            {
+                AppendPostMaterializeSelect(sourceProjection);
+            }
 
+            if (node.Arguments.Count == 3)
+            {
+                var third = StripQuotes(node.Arguments[2]) as LambdaExpression;
+                if (third?.Parameters.Count == 1)
+                    elementSelectorLambda = third;
+                else
+                    resultSelectorLambda = third;
+            }
+            else if (node.Arguments.Count > 3)
+            {
+                elementSelectorLambda = StripQuotes(node.Arguments[2]) as LambdaExpression;
+                resultSelectorLambda = StripQuotes(node.Arguments[3]) as LambdaExpression;
+            }
+
+            var sourceContainsGroupBy = SourceContainsGroupBy(sourceQuery);
+            if (IsPostMaterializeTailMode
+                && CurrentPostMaterializeElementType == keySelectorLambda.Parameters[0].Type)
+            {
+                AppendPostMaterializeGroupBy(keySelectorLambda, elementSelectorLambda);
+                return node;
+            }
+            if (sourceContainsGroupBy
+                && _projection != null
+                && keySelectorLambda.Parameters.Count == 1
+                && keySelectorLambda.Parameters[0].Type == _projection.Body.Type)
+            {
+                AppendPostMaterializeGroupBy(keySelectorLambda, elementSelectorLambda);
+                return node;
+            }
+            if (sourceContainsGroupBy && TryCreateProjectedTailSelector(keySelectorLambda, out var projectedTailSelector))
+            {
+                AppendPostMaterializeGroupBy(projectedTailSelector, elementSelectorLambda);
+                return node;
+            }
+
+            keySelectorLambda = ExpandProjection(keySelectorLambda);
+            if (elementSelectorLambda != null)
+                elementSelectorLambda = ExpandProjection(elementSelectorLambda);
+            _groupByElementSelector = elementSelectorLambda;
             var param = keySelectorLambda.Parameters[0];
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
@@ -155,19 +204,17 @@ namespace nORM.Query
             }
 
             // If there's a result selector, handle the projection
-            if (node.Arguments.Count > 2)
+            if (resultSelectorLambda != null)
             {
-                var resultSelector = StripQuotes(node.Arguments[2]) as LambdaExpression;
-                if (resultSelector != null)
-                {
-                    _projection = resultSelector;
+                var resultSelector = resultSelectorLambda;
+                _projection = resultSelector;
+                var sourceFromSql = ExtractSourceFromClause(_sql.ToString());
 
-                    // Clear the default select and let the projection handling rebuild it
-                    _sql.Clear();
+                // Clear the default select and let the projection handling rebuild it
+                _sql.Clear();
 
-                    // Analyze the result selector to build appropriate SELECT clause
-                    BuildGroupBySelectClause(resultSelector, groupBySql, alias);
-                }
+                // Analyze the result selector to build appropriate SELECT clause
+                BuildGroupBySelectClause(resultSelector, groupBySql, alias, sourceFromSql);
             }
             else
             {
@@ -180,7 +227,7 @@ namespace nORM.Query
 
             return node;
         }
-        private void BuildGroupBySelectClause(LambdaExpression resultSelector, string groupBySql, string alias)
+        private void BuildGroupBySelectClause(LambdaExpression resultSelector, string groupBySql, string alias, string? sourceFromSql)
         {
             var selectItems = _selectItemsPool.Get();
             try
@@ -215,13 +262,12 @@ namespace nORM.Query
                 else
                 {
                     var builder = (System.Text.StringBuilder?)null;
-                    if (resultSelector.Body is NewExpression newExpr)
+                    var projectionItems = GetGroupProjectionItems(resultSelector.Body);
+                    if (projectionItems != null)
                     {
-                        for (int i = 0; i < newExpr.Arguments.Count; i++)
+                        foreach (var (arg, memberName) in projectionItems)
                         {
-                            var arg = newExpr.Arguments[i];
-                            var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                            // g.Key inside a NewExpression projects the group key column.
+                            // g.Key inside a projection projects the group key column.
                             if (arg is MemberExpression keyMember && keyMember.Member.Name == "Key")
                             {
                                 if (_compositeKeyMemberSql.Count > 0)
@@ -278,6 +324,23 @@ namespace nORM.Query
                                 PooledStringBuilder.Return(builder);
                                 continue;
                             }
+                            // Grouping-key member access: `g.Key.A` from the 2-arg
+                            // GroupBy + Select rewrite, where `g` is the grouping
+                            // parameter and A is one of the original composite key
+                            // members.
+                            if (arg is MemberExpression groupingKeyAccess
+                                && groupingKeyAccess.Expression is MemberExpression groupingKey
+                                && groupingKey.Member.Name == "Key"
+                                && groupingKey.Expression is ParameterExpression maybeGroup
+                                && resultSelector.Parameters.Contains(maybeGroup)
+                                && _compositeKeyMemberSql.TryGetValue(groupingKeyAccess.Member.Name, out var groupingMemberSql))
+                            {
+                                builder = PooledStringBuilder.Rent();
+                                builder.Append(groupingMemberSql).Append(" AS ").Append(_provider.Escape(memberName));
+                                selectItems.Add(builder.ToString());
+                                PooledStringBuilder.Return(builder);
+                                continue;
+                            }
                             // Nested anonymous payload: e.g. `Stats = new { Total = g.Sum(...), Count = g.Count() }`.
                             // Emit one flat column per inner arg with a prefixed alias (`Stats__Total`,
                             // `Stats__Count`) so the materialiser can reconstruct the nested anon type
@@ -317,6 +380,18 @@ namespace nORM.Query
                                         selectItems.Add(b.ToString());
                                         PooledStringBuilder.Return(b);
                                     }
+                                    else if (subArg is MemberExpression subGroupingKeyAccess
+                                             && subGroupingKeyAccess.Expression is MemberExpression subGroupingKey
+                                             && subGroupingKey.Member.Name == "Key"
+                                             && subGroupingKey.Expression is ParameterExpression subMaybeGroup
+                                             && resultSelector.Parameters.Contains(subMaybeGroup)
+                                             && _compositeKeyMemberSql.TryGetValue(subGroupingKeyAccess.Member.Name, out var subGroupingMemberSql))
+                                    {
+                                        var b = PooledStringBuilder.Rent();
+                                        b.Append(subGroupingMemberSql).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b.ToString());
+                                        PooledStringBuilder.Return(b);
+                                    }
                                     else
                                     {
                                         if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
@@ -346,13 +421,32 @@ namespace nORM.Query
                                     PooledStringBuilder.Return(builder);
                                 }
                             }
+                            else if (arg is ParameterExpression groupCarry
+                                     && resultSelector.Parameters.Contains(groupCarry)
+                                     && IsGroupingSequenceType(groupCarry.Type))
+                            {
+                                // Query syntax can carry the grouping range variable
+                                // through a `let` continuation even when downstream
+                                // operators only consume the derived aggregate payload.
+                                // There is no SQL column that represents an IGrouping;
+                                // omit the continuation-only payload from the SELECT.
+                                continue;
+                            }
                             else
                             {
                                 if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                                     _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
                                 var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
-                                var sql = visitor.Translate(arg);
+                                string sql;
+                                try
+                                {
+                                    sql = visitor.Translate(arg);
+                                }
+                                catch (NormUnsupportedFeatureException ex)
+                                {
+                                    throw new NormUnsupportedFeatureException($"Grouped projection member '{memberName}' could not be translated from expression '{arg}'. {ex.Message}", ex);
+                                }
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(sql).Append(" AS ").Append(_provider.Escape(memberName));
                                 selectItems.Add(builder.ToString());
@@ -380,7 +474,10 @@ namespace nORM.Query
                 }
                 else
                 {
-                    _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
+                    if (!string.IsNullOrWhiteSpace(sourceFromSql))
+                        _sql.AppendFragment(sourceFromSql);
+                    else
+                        _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
                 }
             }
             finally
@@ -388,6 +485,40 @@ namespace nORM.Query
                 _selectItemsPool.Return(selectItems);
             }
         }
+
+        private static string? ExtractSourceFromClause(string sql)
+        {
+            if (string.IsNullOrWhiteSpace(sql))
+                return null;
+
+            var fromIndex = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+            return fromIndex >= 0 ? sql[fromIndex..] : null;
+        }
+
+        private static IReadOnlyList<(Expression Expression, string MemberName)>? GetGroupProjectionItems(Expression body)
+        {
+            if (body is NewExpression newExpr)
+            {
+                var items = new List<(Expression, string)>(newExpr.Arguments.Count);
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                    items.Add((newExpr.Arguments[i], newExpr.Members?[i]?.Name ?? $"Item{i + 1}"));
+                return items;
+            }
+
+            if (body is MemberInitExpression memberInit)
+            {
+                var items = new List<(Expression, string)>(memberInit.Bindings.Count);
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is MemberAssignment assignment)
+                        items.Add((assignment.Expression, assignment.Member.Name));
+                }
+                return items;
+            }
+
+            return null;
+        }
+
         /// <summary>
         /// Extracts the predicate lambda from an Enumerable / IGrouping aggregate call —
         /// the extension-method form `Enumerable.Method(source, predicate)` puts the lambda
@@ -627,6 +758,7 @@ namespace nORM.Query
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, errorMessage));
                 return null;
             }
+            selector = ExpandGroupElementSelector(selector);
 
             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
@@ -662,6 +794,21 @@ namespace nORM.Query
             var predSql = TranslateGroupPredicateBody(reboundFilter, alias);
             return $"{sqlAgg}(CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END)";
         }
+
+        private LambdaExpression ExpandGroupElementSelector(LambdaExpression selector)
+        {
+            if (_groupByElementSelector == null
+                || selector.Parameters.Count != 1
+                || selector.Parameters[0].Type != _groupByElementSelector.Body.Type)
+            {
+                return selector;
+            }
+
+            var body = new ParameterReplacer(selector.Parameters[0], _groupByElementSelector.Body).Visit(selector.Body)!;
+            body = new ProjectionMemberReplacer().Visit(body)!;
+            return Expression.Lambda(body, _groupByElementSelector.Parameters);
+        }
+
         private Expression HandleDirectAggregate(MethodCallExpression node)
         {
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
@@ -897,7 +1044,7 @@ namespace nORM.Query
             // since Dictionary<object,…> does not permit null keys.
             var nullSentinel = new object();
 
-            System.Collections.IList Transform(System.Collections.IList rows)
+            System.Collections.IList Transform(DbContext ctx, System.Collections.IList rows)
             {
                 // Preserve first-seen key order (LINQ GroupBy semantics)
                 var keyOrder = new List<object?>();
@@ -929,11 +1076,68 @@ namespace nORM.Query
             _postMaterializeTransform = Transform;
         }
 
+        private bool TryCreateProjectedTailSelector(LambdaExpression selector, out LambdaExpression projectedSelector)
+        {
+            projectedSelector = selector;
+            if (_projection == null || selector.Parameters.Count != 1)
+                return false;
+
+            var projectedType = _projection.Body.Type;
+            var projectedParam = Expression.Parameter(projectedType, "__projected");
+            var rewriter = new ProjectedTailSelectorRewriter(selector.Parameters[0], projectedParam, projectedType);
+            var body = rewriter.Visit(selector.Body)!;
+            if (!rewriter.Replaced)
+                return false;
+
+            projectedSelector = Expression.Lambda(body, projectedParam);
+            return true;
+        }
+
+        private static bool SourceContainsGroupBy(Expression source)
+        {
+            if (source is MethodCallExpression call)
+            {
+                if (call.Method.Name == nameof(Queryable.GroupBy))
+                    return true;
+                return call.Arguments.Count > 0 && SourceContainsGroupBy(call.Arguments[0]);
+            }
+
+            return false;
+        }
+
+        private sealed class ProjectedTailSelectorRewriter : ExpressionVisitor
+        {
+            private readonly ParameterExpression _source;
+            private readonly ParameterExpression _projected;
+            private readonly Type _projectedType;
+
+            public ProjectedTailSelectorRewriter(ParameterExpression source, ParameterExpression projected, Type projectedType)
+            {
+                _source = source;
+                _projected = projected;
+                _projectedType = projectedType;
+            }
+
+            public bool Replaced { get; private set; }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (node.Expression == _source && node.Type == _projectedType)
+                {
+                    Replaced = true;
+                    return _projected;
+                }
+
+                return base.VisitMember(node);
+            }
+        }
+
         private sealed class ProjectionMemberReplacer : ExpressionVisitor
         {
             protected override Expression VisitMember(MemberExpression node)
             {
-                if (node.Expression is NewExpression newExpr)
+                var visitedExpression = node.Expression == null ? null : Visit(node.Expression);
+                if (visitedExpression is NewExpression newExpr)
                 {
                     if (newExpr.Members != null)
                     {
@@ -954,7 +1158,7 @@ namespace nORM.Query
                         }
                     }
                 }
-                if (node.Expression is MemberInitExpression memberInit)
+                if (visitedExpression is MemberInitExpression memberInit)
                 {
                     foreach (var binding in memberInit.Bindings)
                     {
@@ -962,8 +1166,20 @@ namespace nORM.Query
                             return Visit(ma.Expression);
                     }
                 }
+                if (visitedExpression != node.Expression)
+                    return node.Update(visitedExpression);
+
                 return base.VisitMember(node);
             }
+        }
+
+        private static bool IsGroupingSequenceType(Type type)
+        {
+            if (!type.IsGenericType)
+                return false;
+
+            var def = type.GetGenericTypeDefinition();
+            return def == typeof(IGrouping<,>) || def == typeof(IEnumerable<>);
         }
     }
 

@@ -58,12 +58,25 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Query_Simple_nORM_Compiled", code);
         Assert.Contains("Query_Simple_RawAdo_Convenience", code);
         Assert.Contains("Query_Simple_RawAdo_Optimized", code);
+        Assert.Contains("Query_Simple_RawAdo_TypedNoBox", code);
         Assert.Contains("Query_Simple_RawAdo_PreparedOptimized", code);
+        Assert.Contains("Query_Simple_RawAdo_PreparedTypedNoBox", code);
         Assert.Contains("Query_Complex_EfCore_Compiled", code);
         Assert.Contains("Query_Complex_nORM_Compiled", code);
         Assert.Contains("Query_Complex_RawAdo_Convenience", code);
         Assert.Contains("Query_Complex_RawAdo_Optimized", code);
+        Assert.Contains("Query_Complex_RawAdo_TypedNoBox", code);
         Assert.Contains("Query_Complex_RawAdo_PreparedOptimized", code);
+        Assert.Contains("Query_Complex_RawAdo_PreparedTypedNoBox", code);
+        Assert.Contains("Query_Scale1k_nORM", code);
+        Assert.Contains("Query_Scale1k_Dapper", code);
+        Assert.Contains("Query_Scale1k_RawAdo_TypedNoBox", code);
+        Assert.Contains("Query_Scale10k_nORM", code);
+        Assert.Contains("Query_Scale10k_Dapper", code);
+        Assert.Contains("Query_Scale10k_RawAdo_TypedNoBox", code);
+        Assert.Contains("Query_ParallelThroughput_nORM", code);
+        Assert.Contains("Query_ParallelThroughput_Dapper", code);
+        Assert.Contains("Query_ParallelThroughput_RawAdo_TypedNoBox", code);
         Assert.DoesNotContain("Query_Simple_Dapper_Prepared", code);
         Assert.DoesNotContain("Query_Complex_Dapper_Prepared", code);
     }
@@ -75,17 +88,29 @@ public sealed class BenchmarkFairnessLockTests
 
         Assert.Contains("ReadUsersConvenienceAsync", code);
         Assert.Contains("ReadUsersOptimizedAsync", code);
+        Assert.Contains("ReadUsersTypedNoBoxAsync", code);
         Assert.Contains("ReadUserConvenience", code);
         Assert.Contains("ReadUserOptimized", code);
+        Assert.Contains("ReadUserTypedNoBox", code);
         Assert.Contains("reader[\"Id\"]", code);
         Assert.Contains("reader.GetInt32(0)", code);
         Assert.Contains("reader.GetString(1)", code);
+        Assert.Contains("reader.GetDateTime(3)", code);
+        Assert.Contains("reader.GetBoolean(4)", code);
         Assert.Contains("reader.GetDouble(8)", code);
-        Assert.Contains("[SimpleJob(RuntimeMoniker.Net80, warmupCount: 3, iterationCount: 10)]", code);
+        Assert.Contains("[SimpleJob(RuntimeMoniker.Net80, launchCount: 3, warmupCount: 3, iterationCount: 20)]", code);
+        Assert.Contains("ApplyBenchmarkConnectionSettingsAsync(Provider, _efContext.Database.GetDbConnection())", code);
+        Assert.Contains("OpenBenchmarkConnectionAsync(Provider, _connectionString)", code);
+        Assert.Contains("PRAGMA synchronous = NORMAL", code);
+        Assert.Contains("PRAGMA busy_timeout = 5000", code);
         AssertMethodContains(code, "Query_Simple_RawAdo_Optimized", "ReadUsersOptimizedAsync");
+        AssertMethodContains(code, "Query_Simple_RawAdo_TypedNoBox", "ReadUsersTypedNoBoxAsync");
         AssertMethodContains(code, "Query_Complex_RawAdo_Optimized", "ReadUsersOptimizedAsync");
+        AssertMethodContains(code, "Query_Complex_RawAdo_TypedNoBox", "ReadUsersTypedNoBoxAsync");
         AssertMethodContains(code, "Query_Simple_RawAdo_PreparedOptimized", "ReadUsersOptimizedAsync(_adoSimplePrepared!)");
+        AssertMethodContains(code, "Query_Simple_RawAdo_PreparedTypedNoBox", "ReadUsersTypedNoBoxAsync(_adoSimplePrepared!)");
         AssertMethodContains(code, "Query_Complex_RawAdo_PreparedOptimized", "ReadUsersOptimizedAsync(_adoComplexPrepared!)");
+        AssertMethodContains(code, "Query_Complex_RawAdo_PreparedTypedNoBox", "ReadUsersTypedNoBoxAsync(_adoComplexPrepared!)");
     }
 
     [Fact]
@@ -155,6 +180,14 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Tx + per row", governance);
         Assert.Contains("eng/benchmark-thresholds.json", governance);
         Assert.Contains("eng/check-benchmark-thresholds.ps1", governance);
+        Assert.Contains("TenantTemporalBenchmarks", governance);
+        Assert.Contains("RawAdo_TypedNoBox", governance);
+        Assert.Contains("Query_Scale10k_*", governance);
+        Assert.Contains("Query_ParallelThroughput_*", governance);
+        Assert.Contains("synchronous = NORMAL", governance);
+        Assert.Contains("launchCount: 3", governance);
+        Assert.Contains("FastNormBenchmarks", evidence);
+        Assert.Contains("cannot be used as public release evidence", evidence);
         Assert.Contains("--provider-matrix --provider", sliceRunner);
         Assert.Contains("-AllowMissingRules", sliceRunner);
         Assert.Contains("provider-slices", sliceRunner);
@@ -173,6 +206,10 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Count_nORM", thresholds);
         Assert.Contains("Insert_Single_nORM", thresholds);
         Assert.Contains("BulkInsert_Idiomatic_nORM", thresholds);
+        Assert.Contains("Query_Simple_RawAdo_TypedNoBox", thresholds);
+        Assert.Contains("Query_Simple_RawAdo_PreparedTypedNoBox", thresholds);
+        Assert.Contains("Query_Complex_RawAdo_TypedNoBox", thresholds);
+        Assert.Contains("Query_Complex_RawAdo_PreparedTypedNoBox", thresholds);
         Assert.Contains("Convert-MeanToNanoseconds", thresholdGate);
         Assert.Contains("Convert-AllocatedToBytes", thresholdGate);
         Assert.Contains("Format-InvariantNumber", thresholdGate);
@@ -180,6 +217,29 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Single(Regex.Matches(thresholdGate, "function Convert-MeanToNanoseconds"));
         Assert.Contains("if ($Mode -ne 'rc')", gate);
         Assert.Contains("$thresholdArgs.AllowMissingRules = $true", gate);
+    }
+
+    [Fact]
+    public void TenantTemporalBenchmarks_MeasureLikeForLikeTenantOverheadAndSplitTemporalWrites()
+    {
+        var code = ReadRepoFile("benchmarks/TenantTemporalBenchmarks.cs");
+
+        Assert.DoesNotContain("[InProcess]", code);
+        Assert.Contains("[SimpleJob(RuntimeMoniker.Net80, launchCount: 2, warmupCount: 3, iterationCount: 10)]", code);
+        Assert.Contains("Query_ManualTenantPredicate_CountActive", code);
+        Assert.Contains("Query_InjectedTenantPredicate_CountActive", code);
+        AssertMethodContains(code, "Query_ManualTenantPredicate_CountActive", ".Where(p => p.TenantId == 1)");
+        AssertMethodContains(code, "Query_InjectedTenantPredicate_CountActive", "shared.TenantContext.Query<TtbProduct>().CountAsync(p => p.IsActive)");
+        Assert.Contains("Insert_NoTemporal", code);
+        Assert.Contains("Insert_Temporal", code);
+        Assert.Contains("Update_NoTemporal", code);
+        Assert.Contains("Update_Temporal", code);
+        Assert.Contains("Delete_NoTemporal", code);
+        Assert.Contains("Delete_Temporal", code);
+        Assert.DoesNotContain("InsertUpdateDelete_NoTemporal", code);
+        Assert.DoesNotContain("InsertUpdateDelete_Temporal", code);
+        Assert.Contains("PRAGMA synchronous = NORMAL", code);
+        Assert.Contains("PRAGMA busy_timeout = 5000", code);
     }
 
     [Fact]

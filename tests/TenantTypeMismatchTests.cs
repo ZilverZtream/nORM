@@ -181,4 +181,22 @@ public class TenantTypeMismatchTests
         Assert.Contains("TenantProvider", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("int", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task TenantFilter_StringProviderAgainstGuidColumn_CoercesSuccessfully()
+    {
+        var tenantId = Guid.NewGuid();
+        var (cn, ctx) = CreateGuidTenantContext(new StringTenantProvider(tenantId.ToString("D")));
+        await using var _ = cn;
+
+        await using var cmd = cn.CreateCommand();
+        cmd.CommandText = "INSERT INTO TtmGuidItem (Id, Name, TenantId) VALUES (1, 'GuidRow', @tenant)";
+        cmd.Parameters.AddWithValue("@tenant", tenantId.ToString("D"));
+        await cmd.ExecuteNonQueryAsync();
+
+        var results = ctx.Query<GuidTenantItem>().ToList();
+        Assert.Single(results);
+        Assert.Equal("GuidRow", results[0].Name);
+        Assert.Equal(tenantId, results[0].TenantId);
+    }
 }

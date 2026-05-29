@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -13,6 +13,7 @@ using nORM.Internal;
 using nORM.Mapping;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
+using nORM.Configuration;
 
 #nullable enable
 
@@ -304,7 +305,7 @@ namespace nORM.Providers
         /// Builds SQL for <c>new DateTimeOffset(year, month, day, hour, minute, second, offset)</c>
         /// when at least one of the date/time parts is a column expression and the
         /// <paramref name="offset"/> is a compile-time constant. Producing canonical
-        /// ISO-8601 text (<c>yyyy-MM-ddTHH:mm:ssÂ±HH:MM</c>) lets the materialiser
+        /// ISO-8601 text (<c>yyyy-MM-ddTHH:mm:ss±HH:MM</c>) lets the materialiser
         /// route through <c>DateTimeOffset.Parse</c> uniformly across providers.
         ///
         /// Default implementation uses CASE-based zero-padding so it works on every
@@ -358,7 +359,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Renders a <see cref="TimeSpan"/> offset as the trailing <c>Â±HH:MM</c>
+        /// Renders a <see cref="TimeSpan"/> offset as the trailing <c>±HH:MM</c>
         /// suffix that <see cref="System.DateTimeOffset.Parse(string, System.IFormatProvider)"/>
         /// accepts.
         /// </summary>
@@ -374,7 +375,7 @@ namespace nORM.Providers
         /// Shared helper for non-SQLite providers' <c>TimeSpan.From*</c> static
         /// factories applied to a column expression (or any non-constant arg).
         /// Emits REAL seconds; the materializer's
-        /// <c>double â†’ TimeSpan.FromSeconds</c> path reconstructs the TimeSpan.
+        /// <c>double ? TimeSpan.FromSeconds</c> path reconstructs the TimeSpan.
         ///
         /// SQLite has its own override that emits canonical 'c' format TEXT
         /// because Microsoft.Data.Sqlite reads TimeSpan via TimeSpan.Parse;
@@ -495,6 +496,65 @@ namespace nORM.Providers
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
 
         /// <summary>
+        /// Gets whether this provider can use database-native temporal tables for
+        /// time-travel reads and provider-owned history storage.
+        /// </summary>
+        public virtual bool SupportsProviderNativeTemporalTables => false;
+
+        /// <summary>
+        /// Generates reviewable DDL that enables provider-native temporal storage
+        /// for an existing mapped table.
+        /// </summary>
+        /// <param name="mapping">Mapped entity table.</param>
+        public virtual string GenerateProviderNativeTemporalBootstrapSql(TableMapping mapping)
+            => throw new NormUnsupportedFeatureException(
+                $"{GetType().Name} does not support provider-native temporal tables.");
+
+        /// <summary>
+        /// Returns the provider-specific <c>FROM</c> source for an as-of read against
+        /// a provider-native temporal table.
+        /// </summary>
+        /// <param name="mapping">Mapped entity table.</param>
+        /// <param name="timestampParameterName">Bound timestamp parameter name.</param>
+        public virtual string GetProviderNativeTemporalAsOfFromClause(TableMapping mapping, string timestampParameterName)
+            => throw new NormUnsupportedFeatureException(
+                $"{GetType().Name} does not support provider-native temporal table as-of queries.");
+
+        /// <summary>
+        /// Gets whether this provider can store the current tenant ID in provider-native
+        /// session context for database-native RLS policies.
+        /// </summary>
+        public virtual bool SupportsNativeTenantSessionContext => false;
+
+        /// <summary>
+        /// Returns SQL that stores the current tenant ID in provider-native session context.
+        /// </summary>
+        /// <param name="sessionKey">Provider session key.</param>
+        /// <param name="tenantParameterName">Parameter name containing the current tenant ID.</param>
+        public virtual string GetSetNativeTenantSessionContextSql(string sessionKey, string tenantParameterName)
+            => throw new NormUnsupportedFeatureException(
+                $"{GetType().Name} does not support provider-native tenant session context.");
+
+        /// <summary>
+        /// Generates optional provider-native RLS policy DDL for a mapped tenant table.
+        /// Applications own executing and reviewing this DDL.
+        /// </summary>
+        /// <param name="mapping">Mapped entity table.</param>
+        /// <param name="sessionKey">Provider session key that contains the current tenant ID.</param>
+        public virtual string GenerateNativeTenantPolicySql(TableMapping mapping, string sessionKey)
+            => throw new NormUnsupportedFeatureException(
+                $"{GetType().Name} does not support provider-native tenant policy DDL generation.");
+
+        /// <summary>
+        /// Generates optional provider-native DDL that removes nORM's tenant RLS
+        /// policy objects for a mapped tenant table.
+        /// </summary>
+        /// <param name="mapping">Mapped entity table.</param>
+        public virtual string GenerateDropNativeTenantPolicySql(TableMapping mapping)
+            => throw new NormUnsupportedFeatureException(
+                $"{GetType().Name} does not support provider-native tenant policy DDL generation.");
+
+        /// <summary>
         /// Returns provider-specific SQL to create the temporal tags table if it does not exist.
         /// Default uses IF NOT EXISTS syntax with TEXT column types (SQLite/MySQL/Postgres).
         /// SQL Server overrides this to use OBJECT_ID check and NVARCHAR/DATETIME2 types.
@@ -509,7 +569,7 @@ namespace nORM.Providers
 
         /// <summary>
         /// Returns provider-specific SQL to probe for the existence of a history table.
-        /// Default uses SELECT 1 â€¦ LIMIT 1 (SQLite/MySQL/Postgres).
+        /// Default uses SELECT 1 … LIMIT 1 (SQLite/MySQL/Postgres).
         /// SQL Server overrides this to use SELECT TOP 1.
         /// </summary>
         /// <param name="escapedHistoryTable">The already-escaped history table name.</param>
@@ -561,6 +621,14 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Indicates whether <see cref="GetCreateTagSql"/> obtains the tag timestamp
+        /// from the database server clock instead of the caller-bound timestamp
+        /// parameter. Providers with trigger-managed temporal history should use the
+        /// same clock source for tags and history windows.
+        /// </summary>
+        internal virtual bool UsesDatabaseClockForTemporalTags => false;
+
+        /// <summary>
         /// Character used to escape wildcards in patterns passed to SQL <c>LIKE</c> clauses.
         /// Defaults to a backslash but can be overridden by providers with different
         /// escaping semantics.
@@ -606,7 +674,7 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
-        /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation â€”
+        /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation —
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native
         /// text type (NVARCHAR(MAX) on SQL Server, TEXT on SQLite/Postgres, CHAR on MySQL).
@@ -624,7 +692,7 @@ namespace nORM.Providers
         /// <summary>
         /// Returns SQL that XORs two integer expressions. SQL Server and MySQL accept the
         /// `^` operator; PostgreSQL uses `#`; SQLite has no XOR operator and falls back to
-        /// `(a | b) - (a &amp; b)` â€” algebraically equivalent on integers.
+        /// `(a | b) - (a &amp; b)` — algebraically equivalent on integers.
         /// </summary>
         public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
 
@@ -652,7 +720,7 @@ namespace nORM.Providers
         /// <summary>
         /// Wraps a SQL operand for numeric TimeSpan comparison. SQL Server / Postgres /
         /// MySQL store TimeSpan in native TIME / INTERVAL types whose comparison operators
-        /// already use numeric ordering â€” the default is identity. SQLite stores TimeSpan
+        /// already use numeric ordering — the default is identity. SQLite stores TimeSpan
         /// as canonical 'c' TEXT (<c>"d.hh:mm:ss.fffffff"</c>) and lex-compares, which
         /// silently mis-orders multi-day durations ("10.00:00:00" &lt; "9.23:59:59"
         /// lexicographically but 10 days &gt; 9 days 23 hours). SqliteProvider overrides
@@ -786,8 +854,8 @@ namespace nORM.Providers
 
         /// <summary>
         /// Ordered variant: STRING_AGG with an ORDER BY clause inside the aggregate.
-        /// SQL Server uses <c>WITHIN GROUP (ORDER BY â€¦)</c>; Postgres puts ORDER BY
-        /// inside the function; MySQL differs â€” those providers override.
+        /// SQL Server uses <c>WITHIN GROUP (ORDER BY …)</c>; Postgres puts ORDER BY
+        /// inside the function; MySQL differs — those providers override.
         /// </summary>
         public virtual string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
             => $"STRING_AGG({expr}, {sepLiteral}) WITHIN GROUP (ORDER BY {orderBySql})";
@@ -1022,10 +1090,13 @@ namespace nORM.Providers
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as the wall-clock DateTime at
-        /// <paramref name="localOffset"/> â€” i.e. the value of
-        /// <see cref="DateTimeOffset.LocalDateTime"/> with the local offset baked
-        /// in at query-build time. Result is the date+time portion only (no offset
-        /// suffix), readable as a <see cref="DateTime"/> by the materialiser.
+        /// <paramref name="localOffset"/> — i.e. the value of
+        /// <see cref="DateTimeOffset.LocalDateTime"/> for one concrete local
+        /// offset. Query translation composes this provider hook inside a
+        /// generated timezone-offset range CASE expression so each row uses the
+        /// correct per-instant local offset where nORM owns the full expression.
+        /// Result is the date+time portion only (no offset suffix), readable as
+        /// a <see cref="DateTime"/> by the materialiser.
         /// </summary>
         public virtual string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
             => throw new NormUnsupportedFeatureException(
@@ -1035,7 +1106,7 @@ namespace nORM.Providers
         /// SQL evaluating <paramref name="dtoSql"/> as the integer count of seconds
         /// since the Unix epoch (UTC). Kept as a provider extension point and as a
         /// fallback for custom providers; built-in DateTimeOffset equality and
-        /// subtraction use the millisecond hook below.
+        /// subtraction use the microsecond hook below.
         /// </summary>
         public virtual string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => throw new NormUnsupportedFeatureException(
@@ -1043,18 +1114,35 @@ namespace nORM.Providers
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as milliseconds since the Unix
-        /// epoch (UTC). Used internally for DateTimeOffset equality/subtraction
-        /// where second-resolution is too coarse but full .NET tick precision is
-        /// not portable across the built-in providers.
+        /// epoch (UTC). Used internally by timezone-range lowering where transition
+        /// boundaries do not need sub-millisecond precision.
         /// </summary>
         internal virtual string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
             => $"(({GetDateTimeOffsetUtcEpochSecondsSql(dtoSql)}) * 1000)";
 
         /// <summary>
+        /// SQL evaluating <paramref name="dtoSql"/> as microseconds since the Unix
+        /// epoch (UTC). Built-in DateTimeOffset equality and subtraction use this
+        /// as the common precision floor; 100ns .NET ticks are still not portable
+        /// across all providers.
+        /// </summary>
+        internal virtual string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+            => $"(({GetDateTimeOffsetUtcEpochMillisecondsSql(dtoSql)}) * 1000)";
+
+        /// <summary>
+        /// SQL evaluating the UTC-instant difference between two DateTimeOffset
+        /// expressions as fractional seconds. Providers may override to force
+        /// floating arithmetic where native decimal division would round away
+        /// microsecond precision.
+        /// </summary>
+        internal virtual string GetDateTimeOffsetDifferenceSecondsSql(string leftSql, string rightSql)
+            => $"(({GetDateTimeOffsetUtcEpochMicrosecondsSql(leftSql)} - {GetDateTimeOffsetUtcEpochMicrosecondsSql(rightSql)}) / 1000000.0)";
+
+        /// <summary>
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
-        /// MySQL requires <c>CAST(x AS SIGNED)</c> instead â€” override on the MySQL provider.
+        /// MySQL requires <c>CAST(x AS SIGNED)</c> instead — override on the MySQL provider.
         /// </summary>
         public virtual string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS {(asLong ? "BIGINT" : "INTEGER")})";
@@ -1284,11 +1372,11 @@ namespace nORM.Providers
             var actual = ParseServerVersion(versionText);
             if (actual == null)
                 throw new NormConfigurationException(
-                    $"{Capabilities.ProviderName} server version could not be determined during provider startup validation.");
+                    ProviderMobilityTranslator.BuildProviderVersionViolationMessage(Capabilities, null));
 
             if (actual < minimum)
                 throw new NormConfigurationException(
-                    $"{Capabilities.ProviderName} server version {actual} is not supported. Minimum supported version is {minimum}.");
+                    ProviderMobilityTranslator.BuildProviderVersionViolationMessage(Capabilities, actual));
         }
 
         /// <summary>
@@ -1372,7 +1460,7 @@ namespace nORM.Providers
         /// <returns>The total number of rows inserted across all batches.</returns>
         public virtual async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0)
@@ -1394,7 +1482,7 @@ namespace nORM.Providers
             var index = 0;
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 while (index < entityList.Count)
@@ -1456,9 +1544,9 @@ namespace nORM.Providers
         /// <returns>The number of rows affected by the batch.</returns>
         protected async Task<int> ExecuteInsertBatch<T>(DbContext ctx, TableMapping m, List<T> batch, CancellationToken ct, DbTransaction? transaction = null) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            // All columns are DB-generated â€” use DEFAULT VALUES per row (no batching possible).
+            // All columns are DB-generated — use DEFAULT VALUES per row (no batching possible).
             if (cols.Count == 0)
             {
                 var inserted = 0;
@@ -1505,7 +1593,7 @@ namespace nORM.Providers
         /// </summary>
         public virtual Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedUpdateAsync(ctx, m, e, ct);
             throw new NormUnsupportedFeatureException(
@@ -1519,7 +1607,7 @@ namespace nORM.Providers
         /// </summary>
         public virtual Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> e, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps)
                 return BatchedDeleteAsync(ctx, m, e, ct);
             throw new NormUnsupportedFeatureException(
@@ -1533,26 +1621,28 @@ namespace nORM.Providers
         /// </summary>
         protected async Task<int> BatchedUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var totalUpdated = 0;
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 foreach (var entity in entities)
                 {
                     await using var cmd = ctx.CreateCommand();
                     cmd.Transaction = transaction;
-                    var batchHasTenant = ctx.Options.TenantProvider != null && m.TenantColumn != null;
+                    var batchHasTenant = ctx.Options.TenantProvider != null;
+                    if (batchHasTenant)
+                        ctx.RequireTenantColumn(m, "bulk update fallback");
                     cmd.CommandText = BuildUpdate(m, batchHasTenant);
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp && !(batchHasTenant && ReferenceEquals(c, m.TenantColumn))))
                         cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
                     if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
                     // X1: bind tenant param to match the WHERE predicate added when batchHasTenant is true.
-                    if (batchHasTenant) cmd.AddParam(ParamPrefix + m.TenantColumn!.PropName, ctx.Options.TenantProvider!.GetCurrentTenantId());
+                    if (batchHasTenant) cmd.AddParam(ParamPrefix + m.TenantColumn!.PropName, ctx.GetRequiredTenantId(m, "bulk update fallback"));
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
                 // Use CancellationToken.None so a cancelled caller token after a successful commit
@@ -1576,7 +1666,7 @@ namespace nORM.Providers
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -1593,7 +1683,7 @@ namespace nORM.Providers
         /// </summary>
         protected async Task<int> BatchedDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
@@ -1616,7 +1706,7 @@ namespace nORM.Providers
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
             bool ownedTx = ctx.CurrentTransaction == null;
             DbTransaction transaction = ctx.CurrentTransaction
-                ?? await ctx.Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ?? await ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
             {
                 for (int i = 0; i < entityList.Count; i += batchSize)
@@ -1658,11 +1748,12 @@ namespace nORM.Providers
                         whereClause = string.Join(" OR ", orConditions);
                     }
 
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
+                    if (ctx.Options.TenantProvider != null)
                     {
+                        var tenantCol = ctx.RequireTenantColumn(m, "bulk delete fallback");
                         var tenantParam = $"{ParamPrefix}__tenant_bulk";
-                        cmd.AddParam(tenantParam, ctx.Options.TenantProvider.GetCurrentTenantId());
-                        whereClause = $"({whereClause}) AND {m.TenantColumn.EscCol} = {tenantParam}";
+                        cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "bulk delete fallback"));
+                        whereClause = $"({whereClause}) AND {tenantCol.EscCol} = {tenantParam}";
                     }
 
                     cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {whereClause}";
@@ -1691,7 +1782,7 @@ namespace nORM.Providers
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable â€” satisfies compiler
+                throw; // unreachable — satisfies compiler
             }
             finally
             {
@@ -1768,7 +1859,7 @@ namespace nORM.Providers
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
                 // X1: include tenant column in WHERE so direct UpdateAsync cannot cross-write rows
-                // belonging to other tenants â€” parity with the batched SaveChangesAsync path.
+                // belonging to other tenants — parity with the batched SaveChangesAsync path.
                 if (includeTenant && m.TenantColumn != null)
                     whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
@@ -1799,7 +1890,7 @@ namespace nORM.Providers
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
                 // X1: include tenant column in WHERE so direct DeleteAsync cannot cross-delete rows
-                // belonging to other tenants â€” parity with the batched SaveChangesAsync path.
+                // belonging to other tenants — parity with the batched SaveChangesAsync path.
                 if (includeTenant && m.TenantColumn != null)
                     whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);

@@ -233,7 +233,7 @@ namespace nORM.Query
                     // This path is strongly typed as List<object> for the projection
                     // materializer; rebuild rather than reassign so callers still get
                     // a List<object> rather than the transform's element-typed list.
-                    var transformed = plan.PostMaterializeTransform(list);
+                    var transformed = plan.PostMaterializeTransform(_ctx, list);
                     var rebuilt = new List<object>(transformed.Count);
                     foreach (var item in transformed) rebuilt.Add(item!);
                     list = rebuilt;
@@ -260,7 +260,9 @@ namespace nORM.Query
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
                 var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-                var list = CreateList(plan.ElementType, capacity);
+                var list = plan.PostMaterializeTransform != null
+                    ? (IList)new List<object>(capacity)
+                    : CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
@@ -344,7 +346,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
-                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
                 return list;
             }
             catch (Exception ex)
@@ -369,7 +371,9 @@ namespace nORM.Query
 
                 // List capacity pre-sizing: SingleResult=1, Take=Take value, else DefaultListCapacity heuristic.
                 var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-                var list = CreateList(plan.ElementType, capacity);
+                var list = plan.PostMaterializeTransform != null
+                    ? (IList)new List<object>(capacity)
+                    : CreateList(plan.ElementType, capacity);
 
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
@@ -442,7 +446,7 @@ namespace nORM.Query
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
-                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(list);
+                if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
                 return list;
             }
             catch (Exception ex)
@@ -457,7 +461,9 @@ namespace nORM.Query
         public IList MaterializePooled(QueryPlan plan, DbCommand command)
         {
             var capacity = plan.SingleResult ? 1 : ClampTakeCapacity(plan.Take);
-            var list = CreateList(plan.ElementType, capacity);
+            var list = plan.PostMaterializeTransform != null
+                ? (IList)new List<object>(capacity)
+                : CreateList(plan.ElementType, capacity);
 
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
@@ -545,8 +551,15 @@ namespace nORM.Query
                 var outerColumnCount = outerMap.Columns.Length;
                 var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
                 if (innerKeyOffset < 0)
+                {
+                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
+                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
+                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
+                }
+                if (innerKeyOffset < 0)
                     throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
+                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
@@ -801,8 +814,15 @@ namespace nORM.Query
                 var outerColumnCount = outerMap.Columns.Length;
                 var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
                 if (innerKeyOffset < 0)
+                {
+                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
+                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
+                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
+                }
+                if (innerKeyOffset < 0)
                     throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
+                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
+                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
                 var innerKeyIndex = outerColumnCount + innerKeyOffset;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
@@ -874,6 +894,10 @@ namespace nORM.Query
                     var result = info.ResultSelector(currentOuter, list.Cast<object>());
                     resultList.Add(result);
                 }
+
+                reader.Dispose();
+                if (plan.PostMaterializeTransform != null)
+                    return plan.PostMaterializeTransform(_ctx, resultList);
 
                 return resultList;
             }, "MaterializeGroupJoin", new Dictionary<string, object> { ["Sql"] = RedactSqlForLogging(cmd.CommandText) });
@@ -949,7 +973,7 @@ namespace nORM.Query
 
                 // Phase 2: Fetch children in batches (to handle SQL parameter limits).
                 // Uses provider's MaxParameters minus DependentQueryParameterReserve for overhead.
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -997,7 +1021,7 @@ namespace nORM.Query
                     continue;
                 }
 
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.Provider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -1034,7 +1058,7 @@ namespace nORM.Query
             for (int i = 0; i < parentIds.Count; i++)
             {
                 if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
                 sql.Append(paramName);
                 cmd.AddParam(paramName, parentIds[i]);
             }
@@ -1044,11 +1068,12 @@ namespace nORM.Query
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
             // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            if (_ctx.Options.TenantProvider != null)
             {
-                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
+                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
 
             cmd.CommandText = sql.ToString();
@@ -1103,7 +1128,7 @@ namespace nORM.Query
             for (int i = 0; i < parentIds.Count; i++)
             {
                 if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.Provider.ParamPrefix}p{i}";
+                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
                 sql.Append(paramName);
                 cmd.AddParam(paramName, parentIds[i]);
             }
@@ -1113,11 +1138,12 @@ namespace nORM.Query
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
             // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null && depQuery.TargetMapping.TenantColumn != null)
+            if (_ctx.Options.TenantProvider != null)
             {
-                var tenantParam = $"{_ctx.Provider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {depQuery.TargetMapping.TenantColumn.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.Options.TenantProvider.GetCurrentTenantId());
+                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
+                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
+                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
 
             cmd.CommandText = sql.ToString();

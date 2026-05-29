@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.ObjectPool;
 using System.Text;
 using nORM.Core;
+using nORM.Configuration;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
@@ -113,7 +114,7 @@ namespace nORM.Query
         // Records the SelectMany result selector that builds a transparent identifier
         // (e.g. `(l, r) => new { l, r }`). Used by ExpandProjection to inline `t.l` /
         // `t.r` references in downstream Where / Select lambdas back to the join's
-        // outer / inner parameters â€” separate from _projection so the outer Select's
+        // outer / inner parameters — separate from _projection so the outer Select's
         // materializer projection isn't clobbered by the TI lambda.
         private LambdaExpression? _transparentIdentifier;
         private Func<object, object>? _clientProjection;
@@ -143,9 +144,11 @@ namespace nORM.Query
         // GroupJoin's result selector lambda preserved so downstream Where/OrderBy can
         // expand `r.Member` references back to the underlying outer/group expressions.
         // _projection isn't used for GroupJoin (it has 2 params and the materializer
-        // uses _groupJoinInfo.ResultSelector â€” a compiled Func â€” instead), so we need
+        // uses _groupJoinInfo.ResultSelector — a compiled Func — instead), so we need
         // a separate channel for ExpandProjection.
         private LambdaExpression? _groupJoinResultSelector;
+        private LambdaExpression? _groupJoinExpansionSelector;
+        private LambdaExpression? _groupByElementSelector;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;
@@ -155,12 +158,12 @@ namespace nORM.Query
         // applying Take/Skip. The materializer reverses the final list so the caller
         // sees rows in the original ORDER BY direction.
         internal bool _postReverseResult;
-        // Set by DistinctByTranslator to a closure that takes the materialized list
-        // and returns a deduplicated list (one entry per key, source order preserved).
-        // v1 implementation runs in memory after the row scan; the QueryPlan field
-        // makes the contract pluggable so a future ROW_NUMBER subquery emit can
-        // replace it server-side without breaking callers.
-        internal System.Func<System.Collections.IList, System.Collections.IList>? _postMaterializeTransform;
+        // Post-materialize transform hook for explicitly in-memory terminal adapters.
+        // Keyed set operators now emit provider SQL and should not use this field.
+        internal System.Func<DbContext, System.Collections.IList, System.Collections.IList>? _postMaterializeTransform;
+        private System.Func<DbContext, System.Collections.IList, System.Collections.IList>? _postMaterializeOrderPrefixTransform;
+        private List<(System.Func<object, object> KeyReader, bool Ascending)>? _postMaterializeOrderings;
+        private Type? _postMaterializeElementType;
         // Stored by HandleGroupBy when a 2-arg GroupBy with no downstream result selector
         // is detected. Generate() inspects this after visiting the full expression tree: if
         // no projection was set (streaming case), _groupBy is cleared and a client-side
@@ -193,7 +196,7 @@ namespace nORM.Query
         // SingleOrDefault / Last / LastOrDefault / ElementAt / ElementAtOrDefault) rather
         // than by a user-facing Take()/Skip(). Used by the post-Take/Skip silent-wrongness
         // pin family (bca0523 / 47acc83 / 54c16ae / 4fcd795 / c2cce55 / 3427495 / 3716e13 /
-        // f0ccf06 / b4f5ae4) to AVOID false-positives on `q.OrderBy(k).First()` â€”
+        // f0ccf06 / b4f5ae4) to AVOID false-positives on `q.OrderBy(k).First()` —
         // ordering BEFORE a terminal LIMIT is correct, and only ordering AFTER a USER
         // Take/Skip is the silent-wrongness shape the pins guard.
         private bool _takeSetByTerminal { get => _clauses.TakeSetByTerminal; set => _clauses.TakeSetByTerminal = value; }
@@ -203,7 +206,7 @@ namespace nORM.Query
         // EXCEPT arm. SQLite stores decimal as TEXT and the set-op dedup compares
         // strings, so '10.5' and '10.50' register as distinct rows. Coercing both
         // arms with CAST(col AS REAL) makes the dedup numeric. Same precision
-        // tradeoff as the rest of the decimal-cluster â€” see SCV.CoerceDecimalProjectionsToReal.
+        // tradeoff as the rest of the decimal-cluster — see SCV.CoerceDecimalProjectionsToReal.
         internal bool _coerceDecimalProjectionsToReal;
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
@@ -231,7 +234,7 @@ namespace nORM.Query
             int recursionDepth = 0)
         {
             _ctx = ctx;
-            _provider = ctx.Provider;
+            _provider = ctx.RawProvider;
             _mapping = mapping;
             _rootType = mapping.Type;
             _params = parameters;
@@ -270,7 +273,7 @@ namespace nORM.Query
                 SqlBuilder? oldClauses = Interlocked.Exchange(ref _clauses, null!);
                 oldClauses?.Dispose();
                 _ctx = ctx;
-                _provider = ctx.Provider;
+                _provider = ctx.RawProvider;
                 _mapping = null!;
                 _rootType = null;
                 _parameterManager.Reset();
@@ -288,6 +291,8 @@ namespace nORM.Query
                 _correlatedParams = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
                 _groupJoinInfo = null;
                 _groupJoinResultSelector = null;
+                _groupJoinExpansionSelector = null;
+                _groupByElementSelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _singleResult = false;
@@ -334,6 +339,8 @@ namespace nORM.Query
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
                 _groupJoinResultSelector = null;
+                _groupJoinExpansionSelector = null;
+                _groupByElementSelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _contextStack.Clear();
@@ -436,7 +443,7 @@ namespace nORM.Query
                         var discAttr = _t._rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
                         if (discAttr != null)
                         {
-                            var paramName = _t._ctx.Provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
+                            var paramName = _t._ctx.RawProvider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
                             // Use direct params assignment (not _compiledParams) - discriminator is a fixed constant,
                             // not a closure capture. Adding to _compiledParams causes it to be overridden with DBNull
                             // when ParameterValueExtractor extracts lambda parameter placeholders.
@@ -458,7 +465,7 @@ namespace nORM.Query
                 _t.Visit(_expression);
 
                 // Streaming GroupBy: GroupBy(source, key) with no downstream projection,
-                // no aggregate terminal (Count/Sum/â€¦), and no HAVING filter means the
+                // no aggregate terminal (Count/Sum/…), and no HAVING filter means the
                 // caller wants IGrouping<K, V> elements. Discard the SQL GROUP BY (which
                 // the entity materializer can't handle) and install a client-side grouping
                 // transform that groups the plain entity rows in memory.
@@ -477,7 +484,7 @@ namespace nORM.Query
                 if (_t._clauses.WindowFunctions.Count > 0 && _t._projection == null)
                     _t._projection = _t._clauses.WindowFunctions[^1].ResultSelector;
 
-                var materializerType = _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
+                var materializerType = _t._groupJoinInfo?.OuterType ?? _t._projection?.Body.Type ?? _t._rootType ?? _t._mapping.Type;
                 var topLevelMethodName = (_expression as MethodCallExpression)?.Method.Name;
                 if (_t._isAggregate && _t._groupBy.Count == 0 && topLevelMethodName is "Count" or "LongCount")
                 {
@@ -497,7 +504,7 @@ namespace nORM.Query
                 Func<DbDataReader, object> syncMaterializer;
                 Func<DbDataReader, CancellationToken, Task<object>> materializer;
 
-                if (_t._projection != null)
+                if (_t._projection != null && _t._groupJoinInfo == null)
                 {
                     syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection);
                     materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection);
@@ -513,7 +520,7 @@ namespace nORM.Query
                 {
                     var aggMethod = (_expression as MethodCallExpression)?.Method;
                     var aggMethodName = aggMethod?.Name ?? string.Empty;
-                    // Count/LongCount always return non-null integer â€” keep the fast path.
+                    // Count/LongCount always return non-null integer — keep the fast path.
                     if (aggMethodName is "Count" or "LongCount")
                     {
                         syncMaterializer = static (DbDataReader r) =>
@@ -648,15 +655,22 @@ namespace nORM.Query
                         alias ??= _t.EscapeAlias("T0");
                         var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
                         _t.AddLiteralParameter(timeParamName, _t._asOfTimestamp.Value);
-                        var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
-                        var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
-                        var t1 = _t.EscapeAlias("T1");
-                        var temporalQuery = $@"
+                        if (_t._ctx.Options.TemporalStorageMode == TemporalStorageMode.ProviderNative)
+                        {
+                            fromClause = _t._provider.GetProviderNativeTemporalAsOfFromClause(_t._mapping, timeParamName);
+                        }
+                        else
+                        {
+                            var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
+                            var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
+                            var t1 = _t.EscapeAlias("T1");
+                            var temporalQuery = $@"
 (
     SELECT {cols} FROM {historyTable} {t1}
     WHERE {timeParamName} >= {t1}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t1}.{_t._provider.Escape("__ValidTo")}
 )";
-                        fromClause = temporalQuery;
+                            fromClause = temporalQuery;
+                        }
                     }
                     if (_t._isAggregate && _t._groupBy.Count == 0)
                     {
@@ -664,7 +678,7 @@ namespace nORM.Query
                         try
                         {
                             // DISTINCT over a projected shape (e.g. `Select(anon).Distinct().Count()`)
-                            // must count rows of the distinct set â€” wrap as `SELECT COUNT(*) FROM
+                            // must count rows of the distinct set — wrap as `SELECT COUNT(*) FROM
                             // (SELECT DISTINCT <proj> FROM ...) AS T0`. Plain `SELECT COUNT(*) FROM
                             // table` would return the full row count and ignore the distinct.
                             if (_t._isDistinct && _t._projection != null)
@@ -761,12 +775,12 @@ namespace nORM.Query
                     _t._sql.AppendFragment(" HAVING ").Append(_t._having.ToSqlString());
                 if (_t._orderBy.Count > 0)
                     _t._sql.AppendFragment(" ORDER BY ").Append(PooledStringBuilder.JoinOrderBy(_t._orderBy));
-                _t._ctx.Provider.ApplyPaging(_t._sql, _t._take, _t._skip, _t._takeParam, _t._skipParam);
+                _t._ctx.RawProvider.ApplyPaging(_t._sql, _t._take, _t._skip, _t._takeParam, _t._skipParam);
                 var singleResult = _t._singleResult || _t._methodName is "First" or "FirstOrDefault" or "Single" or "SingleOrDefault"
                     or "ElementAt" or "ElementAtOrDefault" or "Last" or "LastOrDefault" || isScalar;
                 // When the projection was split for client-side evaluation, the FINAL row shape
                 // is the original projection's body type, not the server-side intermediate.
-                var elementType = _t._groupJoinInfo?.ResultType ?? _t._clientProjectionResultType ?? materializerType;
+                var elementType = _t._postMaterializeElementType ?? _t._groupJoinInfo?.ResultType ?? _t._clientProjectionResultType ?? materializerType;
                 var bulkCudShape = new BulkCudQueryShape(
                     _t._where.Length > 0 ? " WHERE " + _t._where.ToSqlString() : string.Empty,
                     _t._groupBy.Count > 0,
@@ -909,7 +923,7 @@ namespace nORM.Query
                         var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
-                        // AddLiteralParameter â€” see HandleAggregateExpression / OrderByTranslator.
+                        // AddLiteralParameter — see HandleAggregateExpression / OrderByTranslator.
                         foreach (var kvp in visitor.GetParameters())
                             AddLiteralParameter(kvp.Key, kvp.Value);
                         FastExpressionVisitorPool.Return(visitor);
@@ -936,7 +950,7 @@ namespace nORM.Query
                 var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
-                // AddLiteralParameter â€” window-function value selectors with COALESCE / literal
+                // AddLiteralParameter — window-function value selectors with COALESCE / literal
                 // fallbacks must merge constants the same way as the rest of the family.
                 foreach (var kvp in visitor.GetParameters())
                     AddLiteralParameter(kvp.Key, kvp.Value);
@@ -953,7 +967,7 @@ namespace nORM.Query
                     var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
-                    // AddLiteralParameter â€” see the value-selector branch above.
+                    // AddLiteralParameter — see the value-selector branch above.
                     foreach (var kv in visitor2.GetParameters())
                         AddLiteralParameter(kv.Key, kv.Value);
                     FastExpressionVisitorPool.Return(visitor2);
@@ -1109,9 +1123,9 @@ namespace nORM.Query
                 return translator.Translate(this, node);
             }
             // Reject unsupported Queryable / Enumerable method calls on a nORM query with a
-            // stable nORM exception. Without this guard, methods like DefaultIfEmpty, OfType,
-            // Cast, TakeWhile, SkipWhile, and SequenceEqual either silently pass through
-            // (returning wrong results) or leak provider-specific exceptions on execution.
+            // stable nORM exception. Without this guard, methods like SequenceEqual or
+            // unsupported Cast/OfType variants either silently pass through (returning
+            // wrong results) or leak provider-specific exceptions on execution.
             var declaring = node.Method.DeclaringType;
             if (declaring == typeof(System.Linq.Queryable) || declaring == typeof(System.Linq.Enumerable))
             {
@@ -1146,8 +1160,8 @@ namespace nORM.Query
             // applies WHERE before LIMIT, so a flat rewrite `Where(Take(N, q), pred)`
             // would filter the full table first and the windowing semantics would
             // be lost. Detect the shape, translate the windowed source AS-IS, and
-            // wrap it as a derived table inside the EXISTS â€” `EXISTS(SELECT 1 FROM
-            // (windowedSource) AS t WHERE pred LIMIT 1)` â€” so the predicate runs
+            // wrap it as a derived table inside the EXISTS — `EXISTS(SELECT 1 FROM
+            // (windowedSource) AS t WHERE pred LIMIT 1)` — so the predicate runs
             // against the windowed rowset.
             bool sourceWindowed = node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All) or nameof(Queryable.Contains)
                 && SourceHasTakeOrSkip(source);
@@ -1156,8 +1170,8 @@ namespace nORM.Query
                 LambdaExpression? windowedPred = null;
                 var windowedSource = source;
                 // Predicate-bearing forms come in two shapes depending on the call site:
-                //   (a) 2-arg `Queryable.Any(source, pred)` â€” predicate at node.Arguments[1].
-                //   (b) 1-arg `Queryable.Any(Where(source, pred))` â€” async-extensions
+                //   (a) 2-arg `Queryable.Any(source, pred)` — predicate at node.Arguments[1].
+                //   (b) 1-arg `Queryable.Any(Where(source, pred))` — async-extensions
                 //       pre-inject a Where wrapper. Peel it off so we translate the
                 //       inner windowed source as a derived table.
                 if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1
@@ -1173,7 +1187,7 @@ namespace nORM.Query
                 }
                 else if (node.Method.Name == nameof(Queryable.Contains) && node.Arguments.Count == 2)
                 {
-                    // Contains over a projected source â€” `Select(Take(...), p => p.V).Contains(value)` â€”
+                    // Contains over a projected source — `Select(Take(...), p => p.V).Contains(value)` —
                     // peels the Select so we apply the predicate against the underlying entity in
                     // the derived table, where the column references resolve naturally.
                     if (source is MethodCallExpression projSel
@@ -1264,7 +1278,7 @@ namespace nORM.Query
             {
                 subSqlBuilder.Append(subPlan.Sql);
             }
-            _ctx.Provider.ApplyPaging(subSqlBuilder, 1, null, null, null);
+            _ctx.RawProvider.ApplyPaging(subSqlBuilder, 1, null, null, null);
             switch (node.Method.Name)
             {
                 case nameof(Queryable.Any):
@@ -1303,7 +1317,7 @@ namespace nORM.Query
                     return true;
                 case MemberExpression me:
                     // Static member access (DateTime.UtcNow, MyClass.StaticField). me.Expression
-                    // is null in this case â€” read directly from the type.
+                    // is null in this case — read directly from the type.
                     if (me.Expression == null)
                     {
                         value = me.Member switch
@@ -1350,7 +1364,7 @@ namespace nORM.Query
 
         private void AdvanceParameterIndexPast(string parameterName)
         {
-            var generatedPrefix = _ctx.Provider.ParamPrefix + "p";
+            var generatedPrefix = _ctx.RawProvider.ParamPrefix + "p";
             if (!parameterName.StartsWith(generatedPrefix, StringComparison.Ordinal))
                 return;
 
@@ -1374,7 +1388,7 @@ namespace nORM.Query
 
         /// <summary>
         /// Stores a parameter value without flagging it as compiled. Use when copying inline
-        /// constants from a sub-visitor â€” the sub-visitor's closure-capture path already
+        /// constants from a sub-visitor — the sub-visitor's closure-capture path already
         /// registers compiled entries in the shared list, so blindly re-flagging literals
         /// causes BindPlanParameters to skip them at execution time.
         /// </summary>
@@ -1391,6 +1405,7 @@ namespace nORM.Query
                 _isAggregate,
                 _methodName,
                 _groupJoinInfo,
+                _groupJoinExpansionSelector,
                 _joinCounter,
                 _singleResult,
                 _noTracking,
@@ -1411,6 +1426,7 @@ namespace nORM.Query
             _isAggregate = snapshot.IsAggregate;
             _methodName = snapshot.MethodName;
             _groupJoinInfo = snapshot.GroupJoinInfo;
+            _groupJoinExpansionSelector = snapshot.GroupJoinExpansionSelector;
             _joinCounter = snapshot.JoinCounter;
             _singleResult = snapshot.SingleResult;
             _noTracking = snapshot.NoTracking;
@@ -1437,6 +1453,7 @@ namespace nORM.Query
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
                 _groupJoinResultSelector = null;
+                _groupJoinExpansionSelector = null;
                 _joinCounter = joinStart;
                 _singleResult = false;
                 _noTracking = false;
@@ -1471,6 +1488,7 @@ namespace nORM.Query
                 bool isAggregate,
                 string methodName,
                 GroupJoinInfo? groupJoinInfo,
+                LambdaExpression? groupJoinExpansionSelector,
                 int joinCounter,
                 bool singleResult,
                 bool noTracking,
@@ -1489,6 +1507,7 @@ namespace nORM.Query
                 IsAggregate = isAggregate;
                 MethodName = methodName;
                 GroupJoinInfo = groupJoinInfo;
+                GroupJoinExpansionSelector = groupJoinExpansionSelector;
                 JoinCounter = joinCounter;
                 SingleResult = singleResult;
                 NoTracking = noTracking;
@@ -1507,6 +1526,7 @@ namespace nORM.Query
             public bool IsAggregate { get; }
             public string MethodName { get; }
             public GroupJoinInfo? GroupJoinInfo { get; }
+            public LambdaExpression? GroupJoinExpansionSelector { get; }
             public int JoinCounter { get; }
             public bool SingleResult { get; }
             public bool NoTracking { get; }
@@ -1539,7 +1559,7 @@ namespace nORM.Query
             {
                 if (!_paramMap.TryGetValue(parameter, out parameterName!))
                 {
-                    parameterName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                    parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                     AddParameter(parameterName, DBNull.Value);
                     _paramMap[parameter] = parameterName;
                 }
@@ -1548,7 +1568,7 @@ namespace nORM.Query
 
             if (expression is MemberExpression member && HasUncorrelatedParameterRoot(member))
             {
-                parameterName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 AddParameter(parameterName, DBNull.Value);
                 return true;
             }
@@ -1579,7 +1599,7 @@ namespace nORM.Query
             }
             if (node.Value != null)
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                var paramName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 AddParameter(paramName, node.Value);
                 _sql.Append(paramName);
             }
@@ -1594,7 +1614,7 @@ namespace nORM.Query
                 _sql.Append(existing);
                 return node;
             }
-            var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+            var paramName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
             AddParameter(paramName, DBNull.Value);
             _paramMap[node] = paramName;
             _sql.Append(paramName);
@@ -1667,7 +1687,7 @@ namespace nORM.Query
             }
             if (TryGetConstantValue(node, out var value))
             {
-                var paramName = _ctx.Provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                var paramName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
                 AddParameter(paramName, value ?? DBNull.Value);
                 _sql.Append(paramName);
                 return node;
@@ -1699,9 +1719,51 @@ namespace nORM.Query
             }
             return e;
         }
-        private LambdaExpression ExpandProjection(LambdaExpression lambda)
+        private LambdaExpression ComposeGroupJoinExpansionSelector(LambdaExpression resultSelector)
         {
-            // Prefer the transparent-identifier lambda when present â€” that's the one that
+            if (_groupJoinExpansionSelector != null
+                && resultSelector.Parameters.Count >= 1
+                && resultSelector.Parameters[0].Type == _groupJoinExpansionSelector.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], _groupJoinExpansionSelector.Body).Visit(resultSelector.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body)!;
+                var parameters = _groupJoinExpansionSelector.Parameters
+                    .Concat(resultSelector.Parameters.Skip(1))
+                    .ToArray();
+                return Expression.Lambda(body, parameters);
+            }
+
+            return resultSelector;
+        }
+        private LambdaExpression ComposeTransparentIdentifierSelector(LambdaExpression resultSelector)
+        {
+            var previous = _transparentIdentifier ?? _projection;
+            if (previous != null
+                && resultSelector.Parameters.Count >= 1
+                && resultSelector.Parameters[0].Type == previous.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], previous.Body).Visit(resultSelector.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body)!;
+                var parameters = previous.Parameters
+                    .Concat(resultSelector.Parameters.Skip(1))
+                    .ToArray();
+                return Expression.Lambda(body, parameters);
+            }
+
+            return resultSelector;
+        }
+
+        private void RegisterTransparentIdentifierTail(LambdaExpression selector, TableMapping mapping, string alias)
+        {
+            if (selector.Parameters.Count == 0)
+                return;
+
+            var tail = selector.Parameters[^1];
+            if (!_correlatedParams.ContainsKey(tail))
+                _correlatedParams[tail] = (mapping, alias);
+        }        private LambdaExpression ExpandProjection(LambdaExpression lambda)
+        {
+            // Prefer the transparent-identifier lambda when present — that's the one that
             // unpacks `t.l` / `t.r` back into the join's outer/inner parameters. Fall back
             // to a normal _projection inline for non-join shapes.
             if (_transparentIdentifier != null &&
@@ -1721,9 +1783,17 @@ namespace nORM.Query
                 return Expression.Lambda(body, _projection.Parameters);
             }
             // GroupJoin's result selector isn't stored in _projection (materialiser
-            // limitation â€” see HandleGroupJoin), but downstream Where/OrderBy still
+            // limitation — see HandleGroupJoin), but downstream Where/OrderBy still
             // need to expand `r.Member` back to the outer/group expressions inside
             // the selector. Fall through to it here when no regular projection is set.
+            if (_groupJoinExpansionSelector != null &&
+                lambda.Parameters.Count == 1 &&
+                lambda.Parameters[0].Type == _groupJoinExpansionSelector.Body.Type)
+            {
+                var body = new nORM.Internal.ParameterReplacer(lambda.Parameters[0], _groupJoinExpansionSelector.Body).Visit(lambda.Body)!;
+                body = new ProjectionMemberReplacer().Visit(body);
+                return Expression.Lambda(body, _groupJoinExpansionSelector.Parameters);
+            }
             if (_groupJoinResultSelector != null &&
                 lambda.Parameters.Count == 1 &&
                 lambda.Parameters[0].Type == _groupJoinResultSelector.Body.Type)
@@ -1733,6 +1803,437 @@ namespace nORM.Query
                 return Expression.Lambda(body, _groupJoinResultSelector.Parameters);
             }
             return lambda;
+        }
+        private bool IsPostMaterializeTailMode => _groupJoinInfo != null || _postMaterializeElementType != null;
+
+        private Type? CurrentPostMaterializeElementType => _postMaterializeElementType ?? _groupJoinInfo?.ResultType;
+
+        private void AppendPostMaterializeTransform(System.Func<DbContext, System.Collections.IList, System.Collections.IList> transform, Type resultElementType)
+        {
+            var previous = _postMaterializeTransform;
+            _postMaterializeTransform = previous == null
+                ? transform
+                : (ctx, rows) => transform(ctx, previous(ctx, rows));
+            _postMaterializeElementType = resultElementType;
+        }
+
+
+        private void AppendPostMaterializeInnerJoin(Expression innerQuery, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector)
+        {
+            var outerType = CurrentPostMaterializeElementType ?? _projection?.Body.Type ?? _mapping.Type;
+            if (outerType == null || outerKeySelector.Parameters.Count != 1 || outerKeySelector.Parameters[0].Type != outerType)
+                return;
+
+            var innerElementType = GetElementType(innerQuery);
+            var outerItem = Expression.Parameter(typeof(object), "outer");
+            var outerKeyBody = new nORM.Internal.ParameterReplacer(outerKeySelector.Parameters[0], Expression.Convert(outerItem, outerType)).Visit(outerKeySelector.Body)!;
+            var outerKeyReader = Expression.Lambda<System.Func<object, object>>(Expression.Convert(outerKeyBody, typeof(object)), outerItem).Compile();
+
+            var innerItem = Expression.Parameter(typeof(object), "inner");
+            var innerKeyBody = new nORM.Internal.ParameterReplacer(innerKeySelector.Parameters[0], Expression.Convert(innerItem, innerElementType)).Visit(innerKeySelector.Body)!;
+            var innerKeyReader = Expression.Lambda<System.Func<object, object>>(Expression.Convert(innerKeyBody, typeof(object)), innerItem).Compile();
+
+            var outerArg = Expression.Parameter(typeof(object), "outerArg");
+            var innerArg = Expression.Parameter(typeof(object), "innerArg");
+            var resultBody = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], Expression.Convert(outerArg, outerType)).Visit(resultSelector.Body)!;
+            resultBody = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[1], Expression.Convert(innerArg, innerElementType)).Visit(resultBody)!;
+            var projector = Expression.Lambda<System.Func<object, object, object>>(Expression.Convert(resultBody, typeof(object)), outerArg, innerArg).Compile();
+            var resultType = resultSelector.Body.Type;
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var resolvedInnerQuery = new PostMaterializeQuerySourceReplacer(ctx).Visit(innerQuery)!;
+                var innerEnumerable = Expression.Lambda<System.Func<System.Collections.IEnumerable>>(
+                    Expression.Convert(resolvedInnerQuery, typeof(System.Collections.IEnumerable))).Compile();
+                var inners = innerEnumerable().Cast<object>().ToArray();
+                var output = CreateRuntimeList(resultType, rows.Count);
+                foreach (var outer in rows.Cast<object>())
+                {
+                    var outerKey = outerKeyReader(outer);
+                    foreach (var inner in inners)
+                    {
+                        if (object.Equals(outerKey, innerKeyReader(inner)))
+                            output.Add(projector(outer, inner));
+                    }
+                }
+                return output;
+            }, resultType);
+        }
+        private void AppendPostMaterializeGroupJoin(Expression innerQuery, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector)
+        {
+            var outerType = CurrentPostMaterializeElementType;
+            if (outerType == null || outerKeySelector.Parameters.Count != 1 || outerKeySelector.Parameters[0].Type != outerType)
+                return;
+
+            var innerElementType = GetElementType(innerQuery);
+            var outerItem = Expression.Parameter(typeof(object), "outer");
+            var outerKeyBody = new nORM.Internal.ParameterReplacer(outerKeySelector.Parameters[0], Expression.Convert(outerItem, outerType)).Visit(outerKeySelector.Body)!;
+            var outerKeyReader = Expression.Lambda<System.Func<object, object>>(Expression.Convert(outerKeyBody, typeof(object)), outerItem).Compile();
+
+            var innerItem = Expression.Parameter(typeof(object), "inner");
+            var innerKeyBody = new nORM.Internal.ParameterReplacer(innerKeySelector.Parameters[0], Expression.Convert(innerItem, innerElementType)).Visit(innerKeySelector.Body)!;
+            var innerKeyReader = Expression.Lambda<System.Func<object, object>>(Expression.Convert(innerKeyBody, typeof(object)), innerItem).Compile();
+
+            var outerArg = Expression.Parameter(typeof(object), "outerArg");
+            var groupArg = Expression.Parameter(typeof(object), "groupArg");
+            var resultBody = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], Expression.Convert(outerArg, outerType)).Visit(resultSelector.Body)!;
+            resultBody = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[1], Expression.Convert(groupArg, resultSelector.Parameters[1].Type)).Visit(resultBody)!;
+            var projector = Expression.Lambda<System.Func<object, object, object>>(Expression.Convert(resultBody, typeof(object)), outerArg, groupArg).Compile();
+            var resultType = resultSelector.Body.Type;
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var resolvedInnerQuery = new PostMaterializeQuerySourceReplacer(ctx).Visit(innerQuery)!;
+                var innerEnumerable = Expression.Lambda<System.Func<System.Collections.IEnumerable>>(
+                    Expression.Convert(resolvedInnerQuery, typeof(System.Collections.IEnumerable))).Compile();
+                var inners = innerEnumerable().Cast<object>().ToArray();
+                var output = CreateRuntimeList(resultType, rows.Count);
+                foreach (var outer in rows.Cast<object>())
+                {
+                    var outerKey = outerKeyReader(outer);
+                    var matches = CreateRuntimeList(innerElementType, 0);
+                    foreach (var inner in inners)
+                    {
+                        if (object.Equals(outerKey, innerKeyReader(inner)))
+                            matches.Add(inner);
+                    }
+                    output.Add(projector(outer, matches));
+                }
+                return output;
+            }, resultType);
+        }
+        private void AppendPostMaterializeGroupBy(LambdaExpression keySelector, LambdaExpression? elementSelector = null)
+        {
+            var inputType = CurrentPostMaterializeElementType ?? keySelector.Parameters[0].Type;
+            var keyType = keySelector.Body.Type;
+            var elementType = elementSelector?.Body.Type ?? inputType;
+            var objParam = Expression.Parameter(typeof(object), "row");
+            var castRow = Expression.Convert(objParam, inputType);
+            var keyBody = new ParameterReplacer(keySelector.Parameters[0], castRow).Visit(keySelector.Body)!;
+            var boxedKey = keyType.IsValueType ? (Expression)Expression.Convert(keyBody, typeof(object)) : keyBody;
+            var keyFunc = Expression.Lambda<Func<object, object?>>(boxedKey, objParam).Compile();
+
+            Func<object, object?> elementFunc;
+            if (elementSelector != null)
+            {
+                var elementBody = new ParameterReplacer(elementSelector.Parameters[0], castRow).Visit(elementSelector.Body)!;
+                var boxedElement = elementType.IsValueType ? (Expression)Expression.Convert(elementBody, typeof(object)) : elementBody;
+                elementFunc = Expression.Lambda<Func<object, object?>>(boxedElement, objParam).Compile();
+            }
+            else
+            {
+                elementFunc = static row => row;
+            }
+
+            var groupingType = typeof(IGrouping<,>).MakeGenericType(keyType, elementType);
+            var concreteType = typeof(ClientGrouping<,>).MakeGenericType(keyType, elementType);
+            var groupingCtor = concreteType.GetConstructor(new[] { keyType, typeof(IEnumerable<>).MakeGenericType(elementType) })!;
+            var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!.MakeGenericMethod(elementType);
+            var resultListType = typeof(List<>).MakeGenericType(groupingType);
+            var nullSentinel = new object();
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var keyOrder = new List<object?>();
+                var buckets = new Dictionary<object, List<object>>(EqualityComparer<object>.Default);
+                foreach (var row in rows)
+                {
+                    var key = row == null ? null : keyFunc(row);
+                    var dictKey = (object?)key ?? nullSentinel;
+                    if (!buckets.TryGetValue(dictKey, out var bucket))
+                    {
+                        bucket = new List<object>();
+                        buckets[dictKey] = bucket;
+                        keyOrder.Add(key);
+                    }
+                    bucket.Add(elementFunc(row!)!);
+                }
+
+                var result = (System.Collections.IList)Activator.CreateInstance(resultListType, keyOrder.Count)!;
+                foreach (var keyObj in keyOrder)
+                {
+                    var dictKey = (object?)keyObj ?? nullSentinel;
+                    var items = castMethod.Invoke(null, new object?[] { buckets[dictKey] })!;
+                    var grouping = groupingCtor.Invoke(new object?[] { keyObj, items })!;
+                    result.Add(grouping);
+                }
+                return result;
+            }, groupingType);
+        }
+
+        private void AppendPostMaterializeSelectMany(LambdaExpression collectionSelector, LambdaExpression? resultSelector)
+        {
+            var inputType = CurrentPostMaterializeElementType ?? collectionSelector.Parameters[0].Type;
+            var collectionType = GetSequenceElementType(collectionSelector.Body.Type);
+            var resultType = resultSelector?.Body.Type ?? collectionType;
+            var objParam = Expression.Parameter(typeof(object), "row");
+            var castRow = Expression.Convert(objParam, inputType);
+            var collectionBody = new ParameterReplacer(collectionSelector.Parameters[0], castRow).Visit(collectionSelector.Body)!;
+            var boxedCollection = Expression.Convert(collectionBody, typeof(System.Collections.IEnumerable));
+            var collectionFunc = Expression.Lambda<Func<object, System.Collections.IEnumerable?>>(boxedCollection, objParam).Compile();
+
+            Func<object, object?, object?> resultFunc;
+            if (resultSelector != null)
+            {
+                var outerObj = Expression.Parameter(typeof(object), "outer");
+                var innerObj = Expression.Parameter(typeof(object), "inner");
+                var outerCast = Expression.Convert(outerObj, inputType);
+                var innerCast = collectionType.IsValueType ? (Expression)Expression.Convert(innerObj, collectionType) : Expression.TypeAs(innerObj, collectionType);
+                var body = new ParameterReplacer(resultSelector.Parameters[0], outerCast).Visit(resultSelector.Body)!;
+                body = new ParameterReplacer(resultSelector.Parameters[1], innerCast).Visit(body)!;
+                var boxed = resultType.IsValueType ? (Expression)Expression.Convert(body, typeof(object)) : body;
+                resultFunc = Expression.Lambda<Func<object, object?, object?>>(boxed, outerObj, innerObj).Compile();
+            }
+            else
+            {
+                resultFunc = static (_, inner) => inner;
+            }
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var listType = typeof(List<>).MakeGenericType(resultType);
+                var result = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                foreach (var row in rows)
+                {
+                    var values = collectionFunc(row!);
+                    if (values == null)
+                        continue;
+                    foreach (var value in values)
+                        result.Add(resultFunc(row!, value));
+                }
+                return result;
+            }, resultType);
+        }
+
+        private static Type GetSequenceElementType(Type type)
+        {
+            if (type.IsArray)
+                return type.GetElementType()!;
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                return type.GetGenericArguments()[0];
+            var iface = type.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+            return iface?.GetGenericArguments()[0] ?? typeof(object);
+        }
+        private void AppendPostMaterializeSelect(LambdaExpression selector)
+        {
+            var inputType = CurrentPostMaterializeElementType;
+            if (inputType == null || selector.Parameters.Count != 1 || selector.Parameters[0].Type != inputType)
+                return;
+
+            var resultType = selector.Body.Type;
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var item = Expression.Parameter(typeof(object), "item");
+                var clientBody = new PostMaterializeQuerySourceReplacer(ctx).Visit(selector.Body)!;
+                var body = new nORM.Internal.ParameterReplacer(selector.Parameters[0], Expression.Convert(item, inputType)).Visit(clientBody)!;
+                var projector = Expression.Lambda<System.Func<object, object>>(Expression.Convert(body, typeof(object)), item).Compile();
+                var output = CreateRuntimeList(resultType, rows.Count);
+                var seen = new HashSet<object>();
+                foreach (var row in rows)
+                {
+                    HydratePostMaterializeObject(ctx, row, seen);
+                    output.Add(projector(row!));
+                }
+                return output;
+            }, resultType);
+        }
+        private void AppendPostMaterializeOrder(LambdaExpression keySelector, bool ascending, bool thenBy = false)
+        {
+            var inputType = CurrentPostMaterializeElementType;
+            if (inputType == null || keySelector.Parameters.Count != 1 || keySelector.Parameters[0].Type != inputType)
+                return;
+
+            var item = Expression.Parameter(typeof(object), "item");
+            var body = new nORM.Internal.ParameterReplacer(keySelector.Parameters[0], Expression.Convert(item, inputType)).Visit(keySelector.Body)!;
+            var keyReader = Expression.Lambda<System.Func<object, object>>(Expression.Convert(body, typeof(object)), item).Compile();
+
+            if (!thenBy || _postMaterializeOrderings == null)
+            {
+                _postMaterializeOrderPrefixTransform = _postMaterializeTransform;
+                _postMaterializeOrderings = new List<(System.Func<object, object> KeyReader, bool Ascending)>(4);
+            }
+            _postMaterializeOrderings.Add((keyReader, ascending));
+
+            System.Collections.IList ApplyOrdering(System.Collections.IList rows)
+            {
+                IOrderedEnumerable<object>? ordered = null;
+                foreach (var ordering in _postMaterializeOrderings!)
+                {
+                    ordered = ordered == null
+                        ? ordering.Ascending
+                            ? rows.Cast<object>().OrderBy(ordering.KeyReader)
+                            : rows.Cast<object>().OrderByDescending(ordering.KeyReader)
+                        : ordering.Ascending
+                            ? ordered.ThenBy(ordering.KeyReader)
+                            : ordered.ThenByDescending(ordering.KeyReader);
+                }
+
+                var orderedRows = (ordered ?? rows.Cast<object>().OrderBy(static x => 0)).ToArray();
+                var output = CreateRuntimeList(inputType, orderedRows.Length);
+                foreach (var row in orderedRows)
+                    output.Add(row);
+                return output;
+            }
+
+            var prefix = _postMaterializeOrderPrefixTransform;
+            _postMaterializeTransform = prefix == null
+                ? (ctx, rows) => ApplyOrdering(rows)
+                : (ctx, rows) => ApplyOrdering(prefix(ctx, rows));
+            _postMaterializeElementType = inputType;
+        }
+
+        private void AppendPostMaterializeTake(int count)
+        {
+            var inputType = CurrentPostMaterializeElementType;
+            if (inputType == null)
+                return;
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var take = Math.Min(Math.Max(count, 0), rows.Count);
+                var output = CreateRuntimeList(inputType, take);
+                for (var i = 0; i < take; i++)
+                    output.Add(rows[i]);
+                return output;
+            }, inputType);
+        }
+
+        private static void HydratePostMaterializeObject(DbContext ctx, object? value, HashSet<object> seen)
+        {
+            if (value == null || value is string || !value.GetType().IsClass)
+                return;
+            if (!seen.Add(value))
+                return;
+
+            var type = value.GetType();
+            if (ctx.IsMapped(type))
+            {
+                var map = ctx.GetMapping(type);
+                foreach (var relation in map.Relations.Values)
+                {
+                    var current = relation.NavProp.GetValue(value) as System.Collections.IList;
+                    if (current == null || current.Count == 0)
+                    {
+                        var pk = relation.PrincipalKey.Getter(value);
+                        var loaded = CreateRuntimeList(relation.DependentType, 0);
+                        foreach (var child in EnumerateQuery(ctx, relation.DependentType))
+                        {
+                            var fk = relation.ForeignKey.Getter(child);
+                            if (object.Equals(pk, fk))
+                                loaded.Add(child);
+                        }
+                        relation.NavProp.SetValue(value, loaded);
+                        current = loaded;
+                    }
+                    foreach (var child in current)
+                        HydratePostMaterializeObject(ctx, child, seen);
+                }
+
+                foreach (var prop in type.GetProperties().Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0))
+                {
+                    var navType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                    if (navType == typeof(string) || !navType.IsClass || !ctx.IsMapped(navType) || typeof(System.Collections.IEnumerable).IsAssignableFrom(navType))
+                        continue;
+                    if (prop.GetValue(value) != null)
+                        continue;
+
+                    var relatedMap = ctx.GetMapping(navType);
+                    var fkProp = type.GetProperty(prop.Name + "Id") ?? type.GetProperty(navType.Name + "Id");
+                    if (fkProp != null && relatedMap.KeyColumns.Length == 1)
+                    {
+                        var fk = fkProp.GetValue(value);
+                        foreach (var related in EnumerateQuery(ctx, navType))
+                        {
+                            if (object.Equals(fk, relatedMap.KeyColumns[0].Getter(related)))
+                            {
+                                prop.SetValue(value, related);
+                                HydratePostMaterializeObject(ctx, related, seen);
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+
+                    var principalName = type.Name;
+                    if (principalName.Length > 3 && principalName.StartsWith("Crr", StringComparison.Ordinal))
+                        principalName = principalName.Substring(3);
+                    var inverseFk = relatedMap.Columns.FirstOrDefault(c => string.Equals(c.PropName, principalName + "Id", StringComparison.OrdinalIgnoreCase));
+                    if (inverseFk != null && map.KeyColumns.Length == 1)
+                    {
+                        var pk = map.KeyColumns[0].Getter(value);
+                        foreach (var related in EnumerateQuery(ctx, navType))
+                        {
+                            if (object.Equals(pk, inverseFk.Getter(related)))
+                            {
+                                prop.SetValue(value, related);
+                                HydratePostMaterializeObject(ctx, related, seen);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (var prop in type.GetProperties().Where(p => p.CanRead && p.GetIndexParameters().Length == 0))
+                {
+                    var propValue = prop.GetValue(value);
+                    if (propValue is System.Collections.IEnumerable en && propValue is not string)
+                    {
+                        foreach (var item in en)
+                            HydratePostMaterializeObject(ctx, item, seen);
+                    }
+                    else
+                    {
+                        HydratePostMaterializeObject(ctx, propValue, seen);
+                    }
+                }
+            }
+        }
+
+        private static System.Collections.IEnumerable EnumerateQuery(DbContext ctx, Type entityType)
+        {
+            var queryMethod = typeof(NormQueryable).GetMethod(nameof(NormQueryable.Query))!.MakeGenericMethod(entityType);
+            return (System.Collections.IEnumerable)queryMethod.Invoke(null, new object[] { ctx })!;
+        }
+        private sealed class PostMaterializeQuerySourceReplacer : ExpressionVisitor
+        {
+            private readonly DbContext _ctx;
+            public PostMaterializeQuerySourceReplacer(DbContext ctx) => _ctx = ctx;
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.DeclaringType == typeof(NormQueryable)
+                    && node.Method.Name == nameof(NormQueryable.Query)
+                    && node.Method.IsGenericMethod)
+                {
+                    var entityType = node.Method.GetGenericArguments()[0];
+                    var items = EnumerateQuery(_ctx, entityType).Cast<object>().ToArray();
+                    var list = CreateRuntimeList(entityType, items.Length);
+                    foreach (var item in items)
+                        list.Add(item);
+                    var queryable = typeof(Queryable).GetMethods()
+                        .First(m => m.Name == nameof(Queryable.AsQueryable) && m.IsGenericMethod && m.GetParameters().Length == 1)
+                        .MakeGenericMethod(entityType)
+                        .Invoke(null, new object[] { list })!;
+                    return Expression.Constant(queryable, typeof(IQueryable<>).MakeGenericType(entityType));
+                }
+
+                return base.VisitMethodCall(node);
+            }
+        }
+        private static System.Collections.IList CreateRuntimeList(Type elementType, int capacity)
+        {
+            return (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType), capacity)!;
+        }
+        private bool ProjectionContainsMember(string memberName)
+        {
+            return _projection?.Body switch
+            {
+                NewExpression ne when ne.Members != null => ne.Members.Any(m => m.Name == memberName),
+                MemberInitExpression mi => mi.Bindings.OfType<MemberAssignment>().Any(b => b.Member.Name == memberName),
+                _ => false
+            };
         }
         private static Expression UnwrapQueryExpression(Expression expression) =>
             expression is MethodCallExpression mc &&

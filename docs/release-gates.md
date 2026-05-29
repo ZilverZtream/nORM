@@ -41,6 +41,112 @@ The gate sets `NORM_REQUIRE_LIVE_PARITY=any` when at least one live provider is 
 
 For a release candidate, run `full` with every supported live provider configured. For everyday regression work, run `quick` or `live` with the providers available on the machine.
 
+## RC3 Tenant/Temporal Sample Gate
+
+RC3 adds a product-proof sample gate around `samples/nORM.Sample.Store`. The
+sample is an ASP.NET Core web app with a browser frontend, tenant login,
+authenticated APIs, bulk operations, representative LINQ, and nORM-managed
+temporal history. The same focused gate also covers native tenant session/RLS
+DDL tests, explicit RLS apply/drop tests, and explicit SQL Server
+provider-native temporal mode/bootstrap tests.
+
+Use the fast local path while iterating:
+
+```powershell
+dotnet build nORM.sln -c Release --nologo
+dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter "Tenant|Temporal|Sample|ProviderSwap|ProviderMobilityStrict"
+dotnet run --project samples/nORM.Sample.Store -c Release --no-build -- verify-providers
+```
+
+Use the strict provider mobility gate for release evidence:
+
+```powershell
+dotnet run --project samples/nORM.Sample.Store -c Release --no-build -- certify-provider-swap --report ../../artifacts/provider-swap/sample-store.json
+```
+
+Unlike `verify-providers`, `certify-provider-swap` fails when a requested
+provider is missing or fails. The JSON report is the provider-swap artifact for
+the sample app. The certification scenario runs with
+`DbContextOptions.UseStrictProviderMobility()` so provider-bound escape hatches
+cannot pass as provider-mobile evidence. The report records `ScanStatus` as
+`NotRequested`, `Pass`, or `Fail` so an empty findings list is not ambiguous.
+
+For existing applications, add `--scan-path <app-source>` to include
+provider-bound usage findings in the JSON artifact. Strict certification fails
+when the scan finds raw SQL APIs, stored procedure APIs, direct connection
+access, raw transaction/command handles, command interceptors, direct provider
+access, dynamic table queries, custom `[SqlFunction]` SQL fragments,
+`[CompileTimeQuery]` raw SQL, provider-native tenant/temporal configuration, or
+silent client-eval opt-ins, because those must be rewritten, emulated, or
+reviewed before the application can be called provider-mobile. Explicit
+`ClientEvaluationPolicy.Warn` projection tails are warning-level inventory:
+they are only admissible after server filters, ordering and paging have run.
+Provider package and connection bootstrapping is warning-level inventory when
+it stays in the composition root.
+
+Runtime strict failures and static certification findings must stay aligned
+through `ProviderMobilityTranslator`; the support classes, severity, reason,
+and suggested-fix contract are documented in
+[`provider-mobility-translation-layer.md`](provider-mobility-translation-layer.md).
+
+For application-level portability evidence outside the sample app, run the
+reusable CLI certification command and include schema inspection:
+
+```powershell
+norm portability certify --scan-path src/MyApp --assembly bin/Release/net8.0/MyApp.dll --report artifacts/provider-mobility.json --html artifacts/provider-mobility.html
+```
+
+`--assembly` builds the schema snapshot from the design-time nORM context.
+`--schema-snapshot Migrations/schema.snapshot.json` can be used when only the
+saved migration snapshot is available. The schema check rejects unsupported CLR
+column types, provider-specific default SQL, invalid FK metadata, and
+non-integral identity columns before the app can be called provider-mobile.
+Use `--providers` to narrow the provider target capability profile recorded in
+the report; otherwise `all-four` records SQLite, SQL Server, PostgreSQL, and
+MySQL target decisions. Add target connection options such as
+`--sqlite-connection` or `--postgres-connection` when the release artifact must
+prove actual server versions instead of descriptor-only capability floors. A
+descriptor-only report must leave `ActualServerVersion` empty; it must not reuse
+the minimum supported version as fake live evidence.
+Live target certification also executes a minimal provider JSON expression on
+each supplied target so the report proves required JSON functionality is present,
+not only that the server version looks high enough.
+The provider target section must include both coarse capabilities and concrete
+translation-strategy rows: paging, identifier escaping, parameter binding,
+boolean predicates, null semantics, LIKE escaping, string concatenation,
+DateTime/decimal/TimeSpan normalization, temporal clock source, generated-key
+retrieval, bitwise XOR, case-sensitive string comparison, regex translation,
+temporal construction/arithmetic, row-tuple comparison, ordered string
+aggregation, and SQL statement length limits. Warning-level
+target rows do not fail the gate, but they must appear in the recommendation
+section so reviewers can distinguish native behavior from nORM-owned emulation.
+
+Tenant or temporal implementation changes also require the focused overhead
+benchmark:
+
+```powershell
+dotnet run --project benchmarks/nORM.Benchmarks.csproj -c Release -- --filter "*TenantTemporalBenchmarks*"
+```
+
+Current local RC3 overhead evidence: tenant count query measured 58.81 us
+versus 54.25 us without tenant filtering (1.10x), and temporal
+insert/update/delete measured 3.32 ms versus 1.48 ms without temporal triggers.
+Write allocations stayed effectively flat at 8.86 KB versus 8.87 KB.
+
+For RC evidence, run the live provider gate with SQL Server, PostgreSQL, and
+MySQL configured. `TenantTemporalProviderSwapTests` executes the same sample
+scenario on SQLite and every configured live provider.
+
+Current RC3 local evidence with SQL Server, PostgreSQL, and MySQL configured:
+`eng\live-provider-gate.cmd live` passed 1381/1381, and
+`dotnet run --project samples/nORM.Sample.Store -c Release --no-build --
+verify-providers` passed SQLite, SQL Server, PostgreSQL, and MySQL.
+The sample certification report records error/warning totals and recommended
+fix rows in addition to per-provider checks. Provider FAIL results, and SKIP
+results under strict certification, contribute error-level report evidence.
+SQLite sample verification runs against an isolated in-memory database so
+parallel certification probes cannot collide on a shared local file.
+
 ## v1.0 Release Candidate Gate
 
 Use `eng\v1-release-gate.ps1` for v1.0 release-candidate validation. It extends

@@ -19,6 +19,14 @@ namespace nORM.Internal
 
         private static SemaphoreSlim CreateGate(DbConnection _) => new(1, 1);
 
+        private static System.Collections.Generic.IList<IDbCommandInterceptor> GetCommandInterceptors(DbContext ctx)
+        {
+            var interceptors = ctx.Options.CommandInterceptors;
+            if (interceptors.Count > 0 && ctx.IsStrictProviderMobility)
+                ctx.ThrowIfStrictProviderMobilityEscapeHatch("command interceptors");
+            return interceptors;
+        }
+
         internal static SemaphoreSlim? GetSerializedConnectionGate(DbCommand command, DbContext ctx)
         {
             var connection = command.Connection;
@@ -26,7 +34,7 @@ namespace nORM.Internal
         }
 
         internal static SemaphoreSlim? GetSerializedConnectionGate(DbConnection connection, DbContext ctx)
-            => ctx.Provider.PrefersSyncExecution
+            => ctx.RawProvider.PrefersSyncExecution
                 ? s_serializedConnectionGates.GetValue(connection, CreateGate)
                 : null;
 
@@ -40,7 +48,7 @@ namespace nORM.Internal
         /// <returns>The number of rows affected.</returns>
         public static Task<int> ExecuteNonQueryWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
@@ -133,7 +141,7 @@ namespace nORM.Internal
         /// <returns>The number of rows affected.</returns>
         public static int ExecuteNonQueryWithInterception(this DbCommand command, DbContext ctx)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
@@ -211,7 +219,7 @@ namespace nORM.Internal
         /// <returns>The scalar result returned by the command.</returns>
         public static Task<object?> ExecuteScalarWithInterceptionAsync(this DbCommand command, DbContext ctx, CancellationToken ct)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
@@ -330,7 +338,7 @@ namespace nORM.Internal
         {
             try
             {
-                var interceptors = ctx.Options.CommandInterceptors;
+                var interceptors = GetCommandInterceptors(ctx);
                 if (interceptors.Count == 0)
                 {
                     gate.Wait();
@@ -391,7 +399,7 @@ namespace nORM.Internal
 
         private static object? ExecuteScalarWithInterceptionCore(DbCommand command, DbContext ctx)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             if (interceptors.Count == 0)
             {
                 return command.ExecuteScalar();
@@ -437,7 +445,7 @@ namespace nORM.Internal
         /// <returns>The resulting <see cref="DbDataReader"/>.</returns>
         public static Task<DbDataReader> ExecuteReaderWithInterceptionAsync(this DbCommand command, DbContext ctx, CommandBehavior behavior, CancellationToken ct)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {
@@ -522,7 +530,7 @@ namespace nORM.Internal
 
         private static DbDataReader ExecuteReaderWithInterceptionCore(DbCommand command, DbContext ctx, CommandBehavior behavior, bool disposeCommandWithReader)
         {
-            var interceptors = ctx.Options.CommandInterceptors;
+            var interceptors = GetCommandInterceptors(ctx);
             var gate = GetSerializedConnectionGate(command, ctx);
             if (interceptors.Count == 0)
             {

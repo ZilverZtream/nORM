@@ -14,7 +14,7 @@ namespace nORM.Tests;
 /// Pins <c>dtoColA - dtoColB</c> in projection. Result is a TimeSpan
 /// equal to the difference between the two UTC instants — independent
 /// of the offsets each column was stored in. The SQL must lower to a
-/// UTC epoch-millisecond difference (using the same normalization that powers
+/// UTC epoch-microsecond difference (using the same normalization that powers
 /// DateTimeOffset == DateTime equality) and the materialiser must reconstruct a
 /// TimeSpan from the fractional seconds value.
 /// </summary>
@@ -37,7 +37,8 @@ public class LinqDateTimeOffsetColumnSubtractionTests : IAsyncLifetime
             INSERT INTO DsubRow VALUES
                 (1, '2026-05-25 12:30:45+00:00', '2026-05-25 12:30:30+00:00'),
                 (2, '2026-05-25 14:00:00+02:00', '2026-05-25 11:00:00-01:00'),
-                (3, '2026-05-25 12:00:00+00:00', '2026-05-25 13:00:00+00:00');
+                (3, '2026-05-25 12:00:00+00:00', '2026-05-25 13:00:00+00:00'),
+                (4, '2026-05-25 12:30:45.123456+00:00', '2026-05-25 12:30:45.123000+00:00');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider());
@@ -63,6 +64,7 @@ public class LinqDateTimeOffsetColumnSubtractionTests : IAsyncLifetime
         Assert.Equal(TimeSpan.FromSeconds(15), rows[0].Diff);
         Assert.Equal(TimeSpan.Zero,             rows[1].Diff);
         Assert.Equal(TimeSpan.FromHours(-1),    rows[2].Diff);
+        Assert.InRange(rows[3].Diff.TotalMicroseconds, 455.5, 456.5);
     }
 
     [Table("DsubRow")]
