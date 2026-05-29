@@ -13,6 +13,9 @@ must be reviewed and edited like handwritten model code.
 ## Supported
 
 - Table discovery for SQL Server, PostgreSQL, MySQL, and SQLite.
+- Schema-qualified table names are preserved for SQL Server, PostgreSQL, and
+  SQLite attached databases. MySQL scaffolding uses the current database for
+  discovery but does not emit the database/catalog name as a model schema.
 - Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity, and
   simple `[Required]`/`[MaxLength]` annotations when provider metadata exposes
   them.

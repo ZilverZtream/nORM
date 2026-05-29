@@ -43,6 +43,15 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_bounds_schema_preservation_by_provider()
+    {
+        var doc = ReadDoc();
+        Assert.Contains("Schema-qualified table names are preserved for SQL Server, PostgreSQL, and", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL scaffolding uses the current database for", doc, StringComparison.Ordinal);
+        Assert.Contains("does not emit the database/catalog name as a model schema", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_separates_supported_from_not_yet_stable_scope()
     {
         var doc = ReadDoc();

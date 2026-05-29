@@ -301,7 +301,7 @@ namespace nORM.Scaffolding
             {
                 return await QueryTablesAsync(
                     connection,
-                    "SELECT table_schema AS TABLE_SCHEMA, table_name AS TABLE_NAME FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema = DATABASE() ORDER BY table_name").ConfigureAwait(false);
+                    "SELECT NULL AS TABLE_SCHEMA, table_name AS TABLE_NAME FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema = DATABASE() ORDER BY table_name").ConfigureAwait(false);
             }
 
             return await GetSchemaTablesAsync(connection).ConfigureAwait(false);
@@ -459,7 +459,7 @@ namespace nORM.Scaffolding
             {
                 return await QueryIndexesAsync(connection, """
                     SELECT
-                        s.table_schema AS TableSchema,
+                        NULL AS TableSchema,
                         s.table_name AS TableName,
                         s.column_name AS ColumnName,
                         s.index_name AS IndexName,
@@ -614,10 +614,10 @@ namespace nORM.Scaffolding
             {
                 return await QueryForeignKeysAsync(connection, """
                     SELECT
-                        kcu.table_schema AS DependentSchema,
+                        NULL AS DependentSchema,
                         kcu.table_name AS DependentTable,
                         kcu.column_name AS DependentColumn,
-                        kcu.referenced_table_schema AS PrincipalSchema,
+                        NULL AS PrincipalSchema,
                         kcu.referenced_table_name AS PrincipalTable,
                         kcu.referenced_column_name AS PrincipalColumn,
                         kcu.constraint_name AS ConstraintName,
@@ -753,15 +753,15 @@ namespace nORM.Scaffolding
             if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
             {
                 await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
+                    SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE() AND column_default IS NOT NULL
                     UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression
+                    SELECT NULL, table_name, column_name, 'Computed', generation_expression
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE() AND generation_expression IS NOT NULL AND generation_expression <> ''
                     UNION ALL
-                    SELECT trigger_schema, event_object_table, trigger_name, 'Trigger', 'MySQL trigger'
+                    SELECT NULL, event_object_table, trigger_name, 'Trigger', 'MySQL trigger'
                     FROM information_schema.triggers
                     WHERE trigger_schema = DATABASE()
                     """).ConfigureAwait(false);
