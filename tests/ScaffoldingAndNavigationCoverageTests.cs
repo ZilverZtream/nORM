@@ -1261,6 +1261,46 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSelfReferencingPureJoinTable_GeneratesUniqueInverseCollections()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Person (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE PersonFriend (
+                PersonId INTEGER NOT NULL,
+                FriendId INTEGER NOT NULL,
+                PRIMARY KEY (PersonId, FriendId),
+                CONSTRAINT FK_PersonFriend_Person FOREIGN KEY (PersonId) REFERENCES Person(Id),
+                CONSTRAINT FK_PersonFriend_Friend FOREIGN KEY (FriendId) REFERENCES Person(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SelfJoinCtx");
+
+            var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
+
+            Assert.False(File.Exists(Path.Combine(dir, "PersonFriend.cs")));
+            Assert.Contains("public List<Person> Persons { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> Persons2 { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.Persons)", contextCode);
+            Assert.Contains(".WithMany(p => p.Persons2)", contextCode);
+            Assert.Contains(".UsingTable(\"PersonFriend\", \"PersonId\", \"FriendId\");", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

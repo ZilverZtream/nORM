@@ -1519,6 +1519,7 @@ namespace nORM.Scaffolding
         {
             return foreignKeys
                 .OrderBy(fk => PrincipalNamePosition(joinTableName, fk.PrincipalTable))
+                .ThenBy(fk => PrincipalNamePosition(joinTableName, TrimIdSuffix(fk.DependentColumn)))
                 .ThenBy(fk => fk.DependentColumn, StringComparer.Ordinal)
                 .ToArray();
         }
