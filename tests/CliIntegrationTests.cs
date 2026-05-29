@@ -137,6 +137,65 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_sqlite_output_builds_as_consumer_project()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_compile_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_compile_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    PRAGMA foreign_keys=ON;
+                    CREATE TABLE Author (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL
+                    );
+                    CREATE TABLE Book (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Author_Id INTEGER NOT NULL,
+                        Title TEXT NOT NULL,
+                        CONSTRAINT FK_Book_Author FOREIGN KEY (Author_Id) REFERENCES Author(Id)
+                    );
+                    CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var scaffold = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            File.WriteAllText(Path.Combine(output, "CliScaffolded.csproj"), $$"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+                  </ItemGroup>
+                </Project>
+                """, Encoding.UTF8);
+
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Migrations_add_generates_compilable_literals_for_special_sql_text()
     {
         var root = FindRepositoryRoot();

@@ -15,6 +15,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Navigation;
 using nORM.Providers;
@@ -448,8 +449,8 @@ public class DatabaseScaffolderPrivateMethodTests
     public void ScaffoldContext_UsesReadablePluralizedQueryPropertyNames()
     {
         var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Category", "Class" });
-        Assert.Contains("INormQueryable<Category> Categories", code);
-        Assert.Contains("INormQueryable<Class> Classes", code);
+        Assert.Contains("IQueryable<Category> Categories", code);
+        Assert.Contains("IQueryable<Class> Classes", code);
     }
 
     [Fact]
@@ -517,6 +518,41 @@ public class DatabaseScaffolderPrivateMethodTests
         var provider = new SqliteProvider();
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             DatabaseScaffolder.ScaffoldAsync(cn, provider, Path.GetTempPath(), null!));
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_InvalidNamespace_ThrowsNormConfigurationException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var provider = new SqliteProvider();
+
+        await Assert.ThrowsAsync<NormConfigurationException>(() =>
+            DatabaseScaffolder.ScaffoldAsync(cn, provider, Path.GetTempPath(), "1.Bad Namespace"));
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_UnsafeContextName_WritesEscapedContextFile()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE Widget (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "1 Bad/Ctx");
+
+            var contextFile = Path.Combine(dir, "_1_Bad_Ctx.cs");
+            Assert.True(File.Exists(contextFile));
+            var contextCode = File.ReadAllText(contextFile);
+            Assert.Contains("public class _1_Bad_Ctx : DbContext", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]
@@ -919,8 +955,8 @@ public class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("public string FirstName { get; set; } = default!;", firstEntityCode);
             Assert.Contains("public string FirstName2 { get; set; } = default!;", firstEntityCode);
-            Assert.Contains("public INormQueryable<SalesOrder> SalesOrders", contextCode);
-            Assert.Contains("public INormQueryable<SalesOrder2> SalesOrder2s", contextCode);
+            Assert.Contains("public IQueryable<SalesOrder> SalesOrders", contextCode);
+            Assert.Contains("public IQueryable<SalesOrder2> SalesOrder2s", contextCode);
         }
         finally
         {
@@ -954,7 +990,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.True(File.Exists(Path.Combine(dir, "KeepMe.cs")));
             Assert.False(File.Exists(Path.Combine(dir, "SkipMe.cs")));
             var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredCtx.cs"));
-            Assert.Contains("INormQueryable<KeepMe> KeepMes", contextCode);
+            Assert.Contains("IQueryable<KeepMe> KeepMes", contextCode);
             Assert.DoesNotContain("SkipMes", contextCode);
         }
         finally

@@ -20,12 +20,16 @@ must be reviewed and edited like handwritten model code.
 - Non-null reference properties are initialized with `default!` so generated
   nullable-enabled code compiles cleanly before the application adds its own
   constructors or required-member style.
-- `DbContext` generation with `INormQueryable<T>` properties.
+- `DbContext` generation with `IQueryable<T>` properties backed by nORM's
+  query provider.
 - Provider-specific identifier escaping for the zero-row schema query.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when
   different database identifiers normalize to the same C# identifier.
+- The requested namespace is validated before files are written, and the
+  generated context file name follows the escaped context class name rather
+  than the raw CLI/API input.
 - Single-column foreign key relationship generation when provider metadata
   exposes the constraint. Generated entities include reference/collection
   navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires
