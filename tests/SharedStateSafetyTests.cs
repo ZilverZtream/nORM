@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Enterprise;
+using nORM.Internal;
 using nORM.Providers;
 using Xunit;
 
@@ -649,6 +652,92 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    public void DbContextOptions_Clone_CopiesConfigurationWithoutSharingCollections()
+    {
+        var commandInterceptor = new CloneCommandInterceptor();
+        var saveInterceptor = new CloneSaveChangesInterceptor();
+        var cache = new NormMemoryCacheProvider(() => "tenant-a");
+        var original = new DbContextOptions
+        {
+            BulkBatchSize = 123,
+            MaxGroupJoinSize = 456,
+            MaxRecursionDepth = 42,
+            Logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+            RetryPolicy = new RetryPolicy { MaxRetries = 5, BaseDelay = TimeSpan.FromMilliseconds(25) },
+            TenantProvider = new CloneTenantProvider("tenant-a"),
+            TenantColumnName = "TenantKey",
+            NativeTenantSessionKey = "app.tenant",
+            OnModelCreating = mb => mb.Entity<SsProduct>(),
+            UseBatchedBulkOps = true,
+            UsePreciseChangeTracking = true,
+            EagerChangeTracking = false,
+            DefaultTrackingBehavior = QueryTrackingBehavior.NoTracking,
+            ClientEvaluationPolicy = ClientEvaluationPolicy.Warn,
+            CacheProvider = cache,
+            CacheExpiration = TimeSpan.FromSeconds(22),
+            AmbientTransactionPolicy = AmbientTransactionEnlistmentPolicy.BestEffort,
+            RequireMatchedRowOccSemantics = false
+        };
+        original.TimeoutConfiguration.BaseTimeout = TimeSpan.FromSeconds(11);
+        original.TimeoutConfiguration.SimpleQueryTimeout = TimeSpan.FromSeconds(12);
+        original.TimeoutConfiguration.ComplexQueryTimeout = TimeSpan.FromSeconds(13);
+        original.TimeoutConfiguration.BulkOperationTimeout = TimeSpan.FromSeconds(14);
+        original.TimeoutConfiguration.TransactionTimeout = TimeSpan.FromSeconds(15);
+        original.TimeoutConfiguration.TimeoutMultiplierPerComplexity = 2.5;
+        original.TimeoutConfiguration.EnableAdaptiveTimeouts = false;
+        original.CommandInterceptors.Add(commandInterceptor);
+        original.SaveChangesInterceptors.Add(saveInterceptor);
+        original.AddGlobalFilter<SsProduct>(p => p.Stock > 0);
+
+        var clone = original.Clone();
+
+        Assert.NotSame(original, clone);
+        Assert.Equal(123, clone.BulkBatchSize);
+        Assert.Equal(456, clone.MaxGroupJoinSize);
+        Assert.Equal(42, clone.MaxRecursionDepth);
+        Assert.NotSame(original.TimeoutConfiguration, clone.TimeoutConfiguration);
+        Assert.Equal(TimeSpan.FromSeconds(11), clone.TimeoutConfiguration.BaseTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(12), clone.TimeoutConfiguration.SimpleQueryTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(13), clone.TimeoutConfiguration.ComplexQueryTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(14), clone.TimeoutConfiguration.BulkOperationTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(15), clone.TimeoutConfiguration.TransactionTimeout);
+        Assert.Equal(2.5, clone.TimeoutConfiguration.TimeoutMultiplierPerComplexity);
+        Assert.False(clone.TimeoutConfiguration.EnableAdaptiveTimeouts);
+        Assert.Same(original.Logger, clone.Logger);
+        Assert.NotSame(original.RetryPolicy, clone.RetryPolicy);
+        Assert.Equal(5, clone.RetryPolicy!.MaxRetries);
+        Assert.Equal(TimeSpan.FromMilliseconds(25), clone.RetryPolicy.BaseDelay);
+        Assert.Same(original.RetryPolicy.ShouldRetry, clone.RetryPolicy.ShouldRetry);
+        Assert.Same(original.TenantProvider, clone.TenantProvider);
+        Assert.Equal("TenantKey", clone.TenantColumnName);
+        Assert.Equal("app.tenant", clone.NativeTenantSessionKey);
+        Assert.Same(original.OnModelCreating, clone.OnModelCreating);
+        Assert.True(clone.UseBatchedBulkOps);
+        Assert.True(clone.UsePreciseChangeTracking);
+        Assert.False(clone.EagerChangeTracking);
+        Assert.Equal(QueryTrackingBehavior.NoTracking, clone.DefaultTrackingBehavior);
+        Assert.Equal(ClientEvaluationPolicy.Warn, clone.ClientEvaluationPolicy);
+        Assert.Same(cache, clone.CacheProvider);
+        Assert.Equal(TimeSpan.FromSeconds(22), clone.CacheExpiration);
+        Assert.Equal(AmbientTransactionEnlistmentPolicy.BestEffort, clone.AmbientTransactionPolicy);
+        Assert.False(clone.RequireMatchedRowOccSemantics);
+        Assert.Equal(original.CommandInterceptors, clone.CommandInterceptors);
+        Assert.Equal(original.SaveChangesInterceptors, clone.SaveChangesInterceptors);
+        Assert.NotSame(original.CommandInterceptors, clone.CommandInterceptors);
+        Assert.NotSame(original.SaveChangesInterceptors, clone.SaveChangesInterceptors);
+        Assert.Single(clone.GlobalFilters[typeof(SsProduct)]);
+
+        clone.CommandInterceptors.Clear();
+        clone.SaveChangesInterceptors.Clear();
+        clone.AddGlobalFilter<SsProduct>(p => p.Name != "");
+
+        Assert.Single(original.CommandInterceptors);
+        Assert.Single(original.SaveChangesInterceptors);
+        Assert.Single(original.GlobalFilters[typeof(SsProduct)]);
+        Assert.Equal(2, clone.GlobalFilters[typeof(SsProduct)].Count);
+    }
+
+    [Fact]
     public async Task SaveChanges_ContextA_DoesNotRunDetectChanges_ForContextB()
     {
         var (cn1, ctx1) = CreateProductCtx();
@@ -967,5 +1056,47 @@ public class SharedStateSafetyTests
             await ctx2.SaveChangesAsync();
             Assert.True(p2.Id > 0);
         }
+    }
+
+    private sealed class CloneTenantProvider : ITenantProvider
+    {
+        private readonly object _tenantId;
+
+        public CloneTenantProvider(object tenantId) => _tenantId = tenantId;
+
+        public object GetCurrentTenantId() => _tenantId;
+    }
+
+    private sealed class CloneSaveChangesInterceptor : ISaveChangesInterceptor
+    {
+        public Task SavingChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task SavedChangesAsync(DbContext context, IReadOnlyList<EntityEntry> entries, int result, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    private sealed class CloneCommandInterceptor : IDbCommandInterceptor
+    {
+        public Task<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
+            => Task.FromResult(InterceptionResult<int>.Continue());
+
+        public Task NonQueryExecutedAsync(DbCommand command, DbContext context, int result, TimeSpan duration, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task<InterceptionResult<object?>> ScalarExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
+            => Task.FromResult(InterceptionResult<object?>.Continue());
+
+        public Task ScalarExecutedAsync(DbCommand command, DbContext context, object? result, TimeSpan duration, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, DbContext context, CancellationToken cancellationToken)
+            => Task.FromResult(InterceptionResult<DbDataReader>.Continue());
+
+        public Task ReaderExecutedAsync(DbCommand command, DbContext context, DbDataReader reader, TimeSpan duration, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task CommandFailedAsync(DbCommand command, DbContext context, Exception exception, CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 }

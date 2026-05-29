@@ -131,6 +131,7 @@ M:nORM.Configuration.ConverterConfiguration.ToString():System.String
 M:nORM.Configuration.DbContextOptions.#ctor()
 M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}}):nORM.Configuration.DbContextOptions
 M:nORM.Configuration.DbContextOptions.AddGlobalFilter``1(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,`0,System.Boolean}}):nORM.Configuration.DbContextOptions
+M:nORM.Configuration.DbContextOptions.Clone():nORM.Configuration.DbContextOptions
 M:nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(System.String):nORM.Configuration.DbContextOptions
 M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning():nORM.Configuration.DbContextOptions
 M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode):nORM.Configuration.DbContextOptions

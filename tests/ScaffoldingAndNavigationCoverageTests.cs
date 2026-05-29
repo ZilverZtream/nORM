@@ -597,6 +597,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(".WithOne(d => d.Author)", contextCode);
             Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
             Assert.Contains("configure?.Invoke(mb);", contextCode);
+            Assert.Contains("var configuredOptions = options?.Clone() ?? new DbContextOptions();", contextCode);
+            Assert.DoesNotContain("options.OnModelCreating =", contextCode);
         }
         finally
         {

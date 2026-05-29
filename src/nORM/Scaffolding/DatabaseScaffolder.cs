@@ -830,9 +830,9 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
                     sb.AppendLine("    {");
-                    sb.AppendLine("        options ??= new DbContextOptions();");
-                    sb.AppendLine("        var configure = options.OnModelCreating;");
-                    sb.AppendLine("        options.OnModelCreating = mb =>");
+                    sb.AppendLine("        var configuredOptions = options?.Clone() ?? new DbContextOptions();");
+                    sb.AppendLine("        var configure = configuredOptions.OnModelCreating;");
+                    sb.AppendLine("        configuredOptions.OnModelCreating = mb =>");
                     sb.AppendLine("        {");
                     sb.AppendLine("            configure?.Invoke(mb);");
                     foreach (var relationship in relationships.OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal).ThenBy(r => r.DependentEntityName, StringComparer.Ordinal))
@@ -849,7 +849,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey});");
                     }
                     sb.AppendLine("        };");
-                    sb.AppendLine("        return options;");
+                    sb.AppendLine("        return configuredOptions;");
                     sb.AppendLine("    }");
                 }
 

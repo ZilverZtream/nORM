@@ -359,6 +359,68 @@ namespace nORM.Configuration
         public TimeSpan CacheExpiration { get; set; } = DefaultCacheExpiration;
 
         /// <summary>
+        /// Creates an independent options instance with the same configuration values.
+        /// Collection-backed settings are copied so generated contexts and other
+        /// composition layers can extend callbacks without mutating the caller-owned
+        /// options object.
+        /// </summary>
+        /// <returns>A cloned <see cref="DbContextOptions"/> instance.</returns>
+        public DbContextOptions Clone()
+        {
+            var clone = new DbContextOptions
+            {
+                _bulkBatchSize = _bulkBatchSize,
+                _temporalVersioningEnabled = _temporalVersioningEnabled,
+                _temporalStorageMode = _temporalStorageMode,
+                _nativeTenantSecurityMode = _nativeTenantSecurityMode,
+                _clientEvaluationPolicy = _clientEvaluationPolicy,
+                _providerMobilityMode = _providerMobilityMode,
+                _maxGroupJoinSize = _maxGroupJoinSize,
+                _maxRecursionDepth = _maxRecursionDepth,
+                TimeoutConfiguration = new AdaptiveTimeoutManager.TimeoutConfiguration
+                {
+                    BaseTimeout = TimeoutConfiguration.BaseTimeout,
+                    SimpleQueryTimeout = TimeoutConfiguration.SimpleQueryTimeout,
+                    ComplexQueryTimeout = TimeoutConfiguration.ComplexQueryTimeout,
+                    BulkOperationTimeout = TimeoutConfiguration.BulkOperationTimeout,
+                    TransactionTimeout = TimeoutConfiguration.TransactionTimeout,
+                    TimeoutMultiplierPerComplexity = TimeoutConfiguration.TimeoutMultiplierPerComplexity,
+                    EnableAdaptiveTimeouts = TimeoutConfiguration.EnableAdaptiveTimeouts
+                },
+                Logger = Logger,
+                RetryPolicy = RetryPolicy is null
+                    ? null
+                    : new RetryPolicy
+                    {
+                        MaxRetries = RetryPolicy.MaxRetries,
+                        BaseDelay = RetryPolicy.BaseDelay,
+                        ShouldRetry = RetryPolicy.ShouldRetry
+                    },
+                TenantProvider = TenantProvider,
+                TenantColumnName = TenantColumnName,
+                NativeTenantSessionKey = NativeTenantSessionKey,
+                OnModelCreating = OnModelCreating,
+                UseBatchedBulkOps = UseBatchedBulkOps,
+                UsePreciseChangeTracking = UsePreciseChangeTracking,
+                EagerChangeTracking = EagerChangeTracking,
+                DefaultTrackingBehavior = DefaultTrackingBehavior,
+                CacheProvider = CacheProvider,
+                CacheExpiration = CacheExpiration,
+                AmbientTransactionPolicy = AmbientTransactionPolicy,
+                RequireMatchedRowOccSemantics = RequireMatchedRowOccSemantics
+            };
+
+            foreach (var interceptor in CommandInterceptors)
+                clone.CommandInterceptors.Add(interceptor);
+            foreach (var interceptor in SaveChangesInterceptors)
+                clone.SaveChangesInterceptors.Add(interceptor);
+            foreach (var (entityType, filters) in _globalFilters)
+                clone._globalFilters[entityType] = new List<LambdaExpression>(filters);
+
+            return clone;
+        }
+
+        /// <summary>
         /// Enables the built-in in-memory cache for query results using
         /// <see cref="NormMemoryCacheProvider"/>. The cache is scoped by tenant when a
         /// <see cref="ITenantProvider"/> is available.
