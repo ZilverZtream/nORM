@@ -682,6 +682,7 @@ public class DatabaseScaffolderPrivateMethodTests
         var total = Assert.Single(mapping.Columns, c => c.PropName == nameof(SanComputedGenerated.Total));
         Assert.True(total.IsDbGenerated);
         Assert.DoesNotContain(mapping.InsertColumns, c => c.PropName == nameof(SanComputedGenerated.Total));
+        Assert.DoesNotContain(mapping.UpdateColumns, c => c.PropName == nameof(SanComputedGenerated.Total));
     }
 
     [Fact]
@@ -695,6 +696,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.True(rowVersion.IsTimestamp);
         Assert.True(rowVersion.IsDbGenerated);
         Assert.DoesNotContain(mapping.InsertColumns, c => c.PropName == nameof(SanRowVersionGenerated.RowVersion));
+        Assert.DoesNotContain(mapping.UpdateColumns, c => c.PropName == nameof(SanRowVersionGenerated.RowVersion));
     }
 
     [Fact]

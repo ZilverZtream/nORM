@@ -180,7 +180,7 @@ namespace nORM.Mapping
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
-            UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+            UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation
             int fp = 0;
