@@ -66,6 +66,10 @@ navigation generation, payload join-table modeling, owned-type inference,
 inheritance inference, view entity generation, and provider-specific schema
 semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
+When warnings are present, the CLI prints a compact summary with stable
+diagnostic codes and categories, for example `SCF100=1` and
+`schema-feature=1`, so CI logs can route scaffold follow-up without parsing the
+markdown report.
 
 ## Provider Mobility Certification
 

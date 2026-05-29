@@ -60,12 +60,22 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
             FailOnWarnings = result.GetValue(failOnWarningsOpt)
         };
-        await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
+        }
+        catch (NormConfigurationException ex) when (ScaffoldWarningsExist(output))
+        {
+            PrintScaffoldWarningSummary(output);
+            return Fail(ex);
+        }
+
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");
         if (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
             || File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")))
         {
             Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
+            PrintScaffoldWarningSummary(output);
         }
 
         return 0;
@@ -711,6 +721,74 @@ static int Fail(Exception ex, int exitCode = 1)
     Console.Error.WriteLine($"Error: {RedactConnectionStrings(ex.Message)}");
     return exitCode;
 }
+
+static bool ScaffoldWarningsExist(string outputDirectory)
+    => File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"))
+       || File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"));
+
+static void PrintScaffoldWarningSummary(string outputDirectory)
+{
+    var jsonPath = Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json");
+    if (!File.Exists(jsonPath))
+        return;
+
+    try
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var root = document.RootElement;
+        var sections = new[]
+        {
+            "compositeForeignKeys",
+            "possibleManyToManyJoinTables",
+            "providerOwnedSchemaFeatures",
+            "skippedDatabaseObjects"
+        };
+        var codeCounts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var categoryCounts = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var total = 0;
+        var nonEmptySections = 0;
+
+        foreach (var section in sections)
+        {
+            if (!root.TryGetProperty(section, out var items) || items.ValueKind != JsonValueKind.Array)
+                continue;
+
+            var sectionCount = 0;
+            foreach (var item in items.EnumerateArray())
+            {
+                total++;
+                sectionCount++;
+                IncrementDiagnosticCount(codeCounts, ReadScaffoldDiagnosticProperty(item, "code", "unknown"));
+                IncrementDiagnosticCount(categoryCounts, ReadScaffoldDiagnosticProperty(item, "category", "uncategorized"));
+            }
+
+            if (sectionCount > 0)
+                nonEmptySections++;
+        }
+
+        if (total == 0)
+            return;
+
+        Console.WriteLine($"Scaffolding warning summary: {total} warning(s) across {nonEmptySections} section(s).");
+        Console.WriteLine("Codes: " + string.Join(", ", codeCounts.Select(pair => $"{pair.Key}={pair.Value}")));
+        Console.WriteLine("Categories: " + string.Join(", ", categoryCounts.Select(pair => $"{pair.Key}={pair.Value}")));
+    }
+    catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+    {
+        Console.WriteLine($"Scaffolding warning summary unavailable: {RedactConnectionStrings(ex.Message)}");
+    }
+}
+
+static void IncrementDiagnosticCount(IDictionary<string, int> counts, string key)
+{
+    counts.TryGetValue(key, out var current);
+    counts[key] = current + 1;
+}
+
+static string ReadScaffoldDiagnosticProperty(JsonElement item, string propertyName, string fallback)
+    => item.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+        ? property.GetString() ?? fallback
+        : fallback;
 
 /// <summary>
 /// Replaces any recognizable connection string segments containing sensitive key=value pairs

@@ -137,6 +137,9 @@ public class CliIntegrationTests
 
             Assert.NotEqual(0, result.ExitCode);
             Assert.Contains("Scaffolding produced warnings", result.Stderr + result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("SCF100=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("schema-feature=1", result.Stdout, StringComparison.Ordinal);
             var warningFile = Path.Combine(output, "nORM.ScaffoldWarnings.md");
             Assert.True(File.Exists(warningFile));
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
@@ -179,6 +182,9 @@ public class CliIntegrationTests
             Assert.Contains("Scaffolding completed", result.Stdout, StringComparison.Ordinal);
             Assert.Contains("nORM.ScaffoldWarnings.md", result.Stdout, StringComparison.Ordinal);
             Assert.Contains("nORM.ScaffoldWarnings.json", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("SCF100=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("schema-feature=1", result.Stdout, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
         }
