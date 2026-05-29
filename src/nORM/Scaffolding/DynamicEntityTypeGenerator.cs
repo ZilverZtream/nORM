@@ -236,8 +236,9 @@ namespace nORM.Scaffolding
         /// <summary>
         /// Computes a stable hash string that represents the schema of the specified table.
         /// The signature is derived from ordered column names, their CLR types, primary-key status,
-        /// and nullability. Including this in the dynamic-type cache key ensures that schema changes
-        /// (added columns, changed types) produce a new cache entry rather than returning a stale type.
+        /// nullability, identity, and length metadata. Including this in the dynamic-type cache key ensures
+        /// that schema changes (added columns, changed types, generated attributes) produce a new cache entry
+        /// rather than returning a stale type.
         /// Uses SHA-256 truncated to <see cref="SchemaSignatureTruncationBytes"/> bytes (32-char hex)
         /// for negligible collision probability.
         /// </summary>
@@ -257,10 +258,10 @@ namespace nORM.Scaffolding
             {
                 var (schemaName, bareTable) = SplitSchema(tableName);
                 var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-                // Include database nullability and primary-key status in descriptor so different nullability/key
-                // configs produce different signatures.
+                // Include every metadata field that changes the emitted CLR surface. Omitting one can return
+                // a stale dynamic type after a schema change even though the generated C# would differ.
                 var descriptor = string.Join(",", columns.Select(c =>
-                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(c.AllowsNull ? "N" : "NN")}"));
+                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(c.AllowsNull ? "N" : "NN")}:{(c.IsAuto ? "AI" : "NA")}:{c.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}"));
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
                 return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
             }

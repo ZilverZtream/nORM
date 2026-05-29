@@ -154,6 +154,46 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void DifferentPrimaryKey_DifferentSignature()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE T5b (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = "CREATE TABLE T5b (Id INTEGER NOT NULL, Name TEXT NOT NULL)";
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var sig1 = gen.ComputeSchemaSignature(cn, "T5b");
+        var sig2 = gen.ComputeSchemaSignature(cn2, "T5b");
+
+        Assert.NotEqual(sig1, sig2);
+    }
+
+    [Fact]
+    public void DifferentIdentityMetadata_DifferentSignature_WhenProviderReportsIt()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE T5c (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = "CREATE TABLE T5c (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)";
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var sig1 = gen.ComputeSchemaSignature(cn, "T5c");
+        var sig2 = gen.ComputeSchemaSignature(cn2, "T5c");
+
+        Assert.NotEqual(sig1, sig2);
+    }
+
+    [Fact]
     public void GenerateEntityType_WithIdentifierCollisions_GeneratesUniqueProperties()
     {
         using var cn = OpenMemory();
