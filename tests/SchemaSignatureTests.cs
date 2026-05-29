@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Core;
 using nORM.Scaffolding;
 using Xunit;
 
@@ -277,6 +278,25 @@ public class SchemaSignatureTests
         Assert.Null(table.Schema);
         Assert.Contains(type.GetProperties(), p => p.Name == "Message");
         Assert.Equal(32, signature.Length);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithLiteralAndSchemaQualifiedDottedCollision_Throws()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE "aux.orders" (Id INTEGER PRIMARY KEY, Message TEXT NOT NULL);
+            CREATE TABLE "aux"."orders" (Id INTEGER PRIMARY KEY, Message TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var ex = Assert.Throws<NormConfigurationException>(() => Gen().GenerateEntityType(cn, "aux.orders"));
+
+        Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("literal table name", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("schema-qualified", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -30,6 +30,8 @@ must be reviewed and edited like handwritten model code.
   single database object names, so names containing dots (for example
   `audit.events` or `value.part`) are not silently reinterpreted as
   schema-qualified identifiers unless a schema is supplied separately.
+- Dynamic table generation also rejects ambiguous dotted names when the same
+  input could mean either a literal table name or a schema-qualified table.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when

@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using nORM.Core;
 
 namespace nORM.Scaffolding
 {
@@ -337,21 +338,41 @@ namespace nORM.Scaffolding
         {
             if (tableName.Contains('.', StringComparison.Ordinal))
             {
-                try
+                var exactFound = TryGetTableSchema(connection, null, tableName, out var exactColumns);
+                var (schemaName, bareTable) = SplitSchema(tableName);
+                var schemaFound = TryGetTableSchema(connection, schemaName, bareTable, out var schemaColumns);
+
+                if (exactFound && schemaFound)
                 {
-                    var exactColumns = GetTableSchema(connection, null, tableName).ToList();
+                    throw new NormConfigurationException(
+                        $"Dynamic scaffolding table name '{tableName}' is ambiguous: it matches both a literal table name and a schema-qualified table. " +
+                        "Use a typed model or remove the naming collision before using Query(string).");
+                }
+
+                if (exactFound)
                     return (null, tableName, exactColumns);
-                }
-                catch (DbException)
-                {
-                    // Dotted names are ambiguous: first try a literal table name such as
-                    // "audit.events"; if that object does not exist, resolve as schema.table.
-                }
+
+                if (schemaFound)
+                    return (schemaName, bareTable, schemaColumns);
             }
 
-            var (schemaName, bareTable) = SplitSchema(tableName);
-            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-            return (schemaName, bareTable, columns);
+            var (fallbackSchemaName, fallbackBareTable) = SplitSchema(tableName);
+            var columns = GetTableSchema(connection, fallbackSchemaName, fallbackBareTable).ToList();
+            return (fallbackSchemaName, fallbackBareTable, columns);
+        }
+
+        private static bool TryGetTableSchema(DbConnection connection, string? schemaName, string tableName, out List<ColumnInfo> columns)
+        {
+            try
+            {
+                columns = GetTableSchema(connection, schemaName, tableName).ToList();
+                return true;
+            }
+            catch (DbException)
+            {
+                columns = new List<ColumnInfo>();
+                return false;
+            }
         }
 
         private static string EscapeQualified(DbConnection connection, string? schema, string table)
