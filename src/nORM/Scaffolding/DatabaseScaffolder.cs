@@ -1087,7 +1087,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Skipped Database Objects");
                     sb.AppendLine();
-                    sb.AppendLine("Views are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
+                    sb.AppendLine("Views, routines, and sequences are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Name | Detail |");
                     sb.AppendLine("| --- | --- | --- |");
