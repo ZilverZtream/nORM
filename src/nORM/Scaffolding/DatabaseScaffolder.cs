@@ -79,6 +79,7 @@ namespace nORM.Scaffolding
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
+                var unsupportedFeatures = await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false);
                 var relationships = BuildRelationships(foreignKeys, entityByTable, columnPropertiesByTable);
 
                 foreach (var table in tables)
@@ -100,7 +101,7 @@ namespace nORM.Scaffolding
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships);
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode, options).ConfigureAwait(false);
-                var diagnostics = ScaffoldDiagnostics(foreignKeys);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
             }
@@ -635,7 +636,135 @@ namespace nORM.Scaffolding
             return foreignKeys;
         }
 
-        private static string ScaffoldDiagnostics(IReadOnlyList<ScaffoldForeignKey> foreignKeys)
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var features = new List<ScaffoldUnsupportedFeature>();
+            var providerName = provider.GetType().Name;
+
+            if (provider is SqliteProvider)
+            {
+                foreach (var table in tables)
+                {
+                    await using var cmd = connection.CreateCommand();
+                    cmd.CommandText = $"PRAGMA table_xinfo({provider.Escape(table.Name)})";
+                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var name = Convert.ToString(reader["name"]) ?? string.Empty;
+                        var defaultValue = Convert.ToString(reader["dflt_value"]);
+                        var hidden = Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture);
+                        if (!string.IsNullOrWhiteSpace(defaultValue))
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Default", name, defaultValue));
+                        if (hidden is 2 or 3)
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Computed", name, "SQLite generated column"));
+                    }
+                }
+
+                await using var triggerCmd = connection.CreateCommand();
+                triggerCmd.CommandText = "SELECT tbl_name AS TableName, name AS TriggerName FROM sqlite_master WHERE type = 'trigger'";
+                await using var triggerReader = await triggerCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await triggerReader.ReadAsync().ConfigureAwait(false))
+                {
+                    var tableName = Convert.ToString(triggerReader["TableName"]);
+                    var triggerName = Convert.ToString(triggerReader["TriggerName"]);
+                    var tableKey = TableKey(null, tableName ?? string.Empty);
+                    if (!string.IsNullOrWhiteSpace(tableName) && tableKeys.Contains(tableKey))
+                        features.Add(new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger"));
+                }
+
+                return features;
+            }
+
+            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
+                    SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ObjectName, 'Default' AS Kind, dc.definition AS Detail
+                    FROM sys.default_constraints dc
+                    INNER JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+                    INNER JOIN sys.tables t ON t.object_id = dc.parent_object_id
+                    WHERE t.is_ms_shipped = 0
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Computed', cc.definition
+                    FROM sys.computed_columns cc
+                    INNER JOIN sys.columns c ON c.object_id = cc.object_id AND c.column_id = cc.column_id
+                    INNER JOIN sys.tables t ON t.object_id = cc.object_id
+                    WHERE t.is_ms_shipped = 0
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
+                    FROM sys.triggers tr
+                    INNER JOIN sys.tables t ON t.object_id = tr.parent_id
+                    WHERE t.is_ms_shipped = 0
+                    """).ConfigureAwait(false);
+                return features;
+            }
+
+            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND column_default IS NOT NULL
+                    UNION ALL
+                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND is_generated <> 'NEVER'
+                    UNION ALL
+                    SELECT event_object_schema, event_object_table, trigger_name, 'Trigger', 'PostgreSQL trigger'
+                    FROM information_schema.triggers
+                    WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
+                    """).ConfigureAwait(false);
+                return features;
+            }
+
+            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE() AND column_default IS NOT NULL
+                    UNION ALL
+                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE() AND generation_expression IS NOT NULL AND generation_expression <> ''
+                    UNION ALL
+                    SELECT trigger_schema, event_object_table, trigger_name, 'Trigger', 'MySQL trigger'
+                    FROM information_schema.triggers
+                    WHERE trigger_schema = DATABASE()
+                    """).ConfigureAwait(false);
+            }
+
+            return features;
+        }
+
+        private static async Task AddUnsupportedFeaturesAsync(
+            DbConnection connection,
+            List<ScaffoldUnsupportedFeature> features,
+            HashSet<string> tableKeys,
+            string sql)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
+                if (!tableKeys.Contains(tableKey))
+                    continue;
+                features.Add(new ScaffoldUnsupportedFeature(
+                    tableKey,
+                    Convert.ToString(reader["Kind"]) ?? string.Empty,
+                    Convert.ToString(reader["ObjectName"]) ?? string.Empty,
+                    Convert.ToString(reader["Detail"]) ?? string.Empty));
+            }
+        }
+
+        private static string ScaffoldDiagnostics(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures)
         {
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
@@ -645,7 +774,7 @@ namespace nORM.Scaffolding
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
                 .ToArray();
 
-            if (compositeForeignKeys.Length == 0)
+            if (compositeForeignKeys.Length == 0 && unsupportedFeatures.Count == 0)
                 return string.Empty;
 
             var sb = _stringBuilderPool.Get();
@@ -670,6 +799,24 @@ namespace nORM.Scaffolding
                     var dependent = TableKey(first.DependentSchema, first.DependentTable);
                     var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
                     sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                }
+
+                if (unsupportedFeatures.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("## Provider-Owned Schema Features");
+                    sb.AppendLine();
+                    sb.AppendLine("Defaults, computed/generated columns, and triggers are discovered for review, but are not emitted as provider-neutral nORM model code.");
+                    sb.AppendLine();
+                    sb.AppendLine("| Kind | Table | Object | Detail |");
+                    sb.AppendLine("| --- | --- | --- | --- |");
+                    foreach (var feature in unsupportedFeatures
+                        .OrderBy(f => f.TableKey, StringComparer.Ordinal)
+                        .ThenBy(f => f.Kind, StringComparer.Ordinal)
+                        .ThenBy(f => f.Name, StringComparer.Ordinal))
+                    {
+                        sb.AppendLine($"| {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} |");
+                    }
                 }
 
                 return sb.ToString();
@@ -1204,5 +1351,11 @@ namespace nORM.Scaffolding
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
             string CollectionNavigationName);
+
+        private readonly record struct ScaffoldUnsupportedFeature(
+            string TableKey,
+            string Kind,
+            string Name,
+            string Detail);
     }
 }

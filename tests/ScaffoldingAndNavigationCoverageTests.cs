@@ -723,6 +723,42 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithProviderOwnedSchemaFeatures_EmitsDiagnostics()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE FeatureOwned (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL DEFAULT 'new',
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL
+            );
+            CREATE TRIGGER TR_FeatureOwned_Audit AFTER INSERT ON FeatureOwned BEGIN SELECT 1; END;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FeatureOwnedCtx");
+
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            Assert.Contains("Provider-Owned Schema Features", warnings);
+            Assert.Contains("Default", warnings);
+            Assert.Contains("Name", warnings);
+            Assert.Contains("Computed", warnings);
+            Assert.Contains("NameLength", warnings);
+            Assert.Contains("Trigger", warnings);
+            Assert.Contains("TR_FeatureOwned_Audit", warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

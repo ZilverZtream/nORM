@@ -41,7 +41,8 @@ must be reviewed and edited like handwritten model code.
 - Deterministic `nORM.ScaffoldWarnings.md` diagnostics for discovered database
   features that are not converted into runnable model code. Composite foreign
   keys are listed there instead of being silently ignored or converted into
-  fake single-column navigations.
+  fake single-column navigations; defaults, computed/generated columns, and
+  triggers are inventoried for review.
 
 ## Evidence
 
@@ -49,7 +50,7 @@ must be reviewed and edited like handwritten model code.
   duplicate generated-name handling, table filtering, overwrite protection,
   nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
-  multiple indexes, plus composite-FK diagnostics.
+  multiple indexes, plus composite-FK and provider-owned schema diagnostics.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
   duplicate generated property handling.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
@@ -63,7 +64,9 @@ must be reviewed and edited like handwritten model code.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
 - Owned types, many-to-many join-table modeling, and inheritance inference.
 - Provider-specific computed columns, default constraints, triggers, and
-  temporal tables.
+  temporal tables. Defaults, computed/generated columns, and triggers are
+  discovered and reported in scaffold diagnostics, but not converted into
+  provider-neutral model code.
 
 ## v1 Guidance
 
