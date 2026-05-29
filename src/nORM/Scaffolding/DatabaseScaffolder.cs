@@ -35,12 +35,36 @@ namespace nORM.Scaffolding
         /// <param name="namespaceName">Namespace for the generated classes.</param>
         /// <param name="contextName">Name of the generated DbContext.</param>
         public static async Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, string contextName = "AppDbContext")
+            => await ScaffoldAsync(connection, provider, outputDirectory, namespaceName, contextName, options: null).ConfigureAwait(false);
+
+        /// <summary>
+        /// Generates entity classes and a DbContext based on the current database schema.
+        /// </summary>
+        /// <param name="connection">Open database connection.</param>
+        /// <param name="provider">Database provider implementation.</param>
+        /// <param name="outputDirectory">Directory to write generated files into.</param>
+        /// <param name="namespaceName">Namespace for the generated classes.</param>
+        /// <param name="options">Scaffolding options.</param>
+        public static Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, ScaffoldOptions options)
+            => ScaffoldAsync(connection, provider, outputDirectory, namespaceName, "AppDbContext", options);
+
+        /// <summary>
+        /// Generates entity classes and a DbContext based on the current database schema.
+        /// </summary>
+        /// <param name="connection">Open database connection.</param>
+        /// <param name="provider">Database provider implementation.</param>
+        /// <param name="outputDirectory">Directory to write generated files into.</param>
+        /// <param name="namespaceName">Namespace for the generated classes.</param>
+        /// <param name="contextName">Name of the generated DbContext.</param>
+        /// <param name="options">Scaffolding options.</param>
+        public static async Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, string contextName, ScaffoldOptions? options)
         {
             if (connection is null) throw new ArgumentNullException(nameof(connection));
             if (provider is null) throw new ArgumentNullException(nameof(provider));
             if (outputDirectory is null) throw new ArgumentNullException(nameof(outputDirectory));
             if (namespaceName is null) throw new ArgumentNullException(nameof(namespaceName));
             if (string.IsNullOrWhiteSpace(contextName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(contextName));
+            options ??= new ScaffoldOptions();
 
             var connectionWasOpen = connection.State == ConnectionState.Open;
             if (!connectionWasOpen)
@@ -49,7 +73,7 @@ namespace nORM.Scaffolding
             try
             {
                 Directory.CreateDirectory(outputDirectory);
-                var tables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
+                var tables = FilterTables(await GetTablesAsync(connection, provider).ConfigureAwait(false), options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
@@ -69,11 +93,11 @@ namespace nORM.Scaffolding
                     var collections = relationships.Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
                     var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, references, collections).ConfigureAwait(false);
-                    await File.WriteAllTextAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode).ConfigureAwait(false);
+                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships);
-                await File.WriteAllTextAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode).ConfigureAwait(false);
+                await WriteGeneratedFileAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode, options).ConfigureAwait(false);
             }
             finally
             {
@@ -225,6 +249,53 @@ namespace nORM.Scaffolding
             }
 
             return await GetSchemaTablesAsync(connection).ConfigureAwait(false);
+        }
+
+        private static IReadOnlyList<ScaffoldTable> FilterTables(IReadOnlyList<ScaffoldTable> tables, ScaffoldOptions options)
+        {
+            if (options.Tables.Count == 0)
+                return tables;
+
+            var requested = options.Tables
+                .Where(table => !string.IsNullOrWhiteSpace(table))
+                .Select(table => table.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (requested.Length == 0)
+                return tables;
+
+            var selected = tables
+                .Where(table => requested.Any(request => MatchesTableFilter(table, request)))
+                .ToArray();
+
+            var missing = requested
+                .Where(request => !tables.Any(table => MatchesTableFilter(table, request)))
+                .ToArray();
+
+            if (missing.Length > 0)
+            {
+                throw new NormConfigurationException(
+                    "Scaffolding table filter did not match discovered table(s): " +
+                    string.Join(", ", missing));
+            }
+
+            return selected;
+        }
+
+        private static bool MatchesTableFilter(ScaffoldTable table, string requested)
+            => string.Equals(table.Name, requested, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(TableKey(table.Schema, table.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static async Task WriteGeneratedFileAsync(string path, string content, ScaffoldOptions options)
+        {
+            if (!options.OverwriteFiles && File.Exists(path))
+            {
+                throw new NormConfigurationException(
+                    $"Scaffolding output file already exists: '{path}'. Enable overwrite or choose an empty output directory.");
+            }
+
+            await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
         }
 
         private static async Task<IReadOnlyList<ScaffoldForeignKey>> GetForeignKeysAsync(

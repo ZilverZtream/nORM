@@ -31,11 +31,15 @@ var providerOpt = new Option<string>("--provider") { Description = "Database pro
 var outputOpt = new Option<string>("--output") { Description = "Output directory for generated code", DefaultValueFactory = _ => "." };
 var nsOpt = new Option<string>("--namespace") { Description = "Namespace for generated classes", DefaultValueFactory = _ => "Scaffolded" };
 var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
+var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names." };
+var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
 scaffold.Add(connOpt);
 scaffold.Add(providerOpt);
 scaffold.Add(outputOpt);
 scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
+scaffold.Add(tablesOpt);
+scaffold.Add(noOverwriteOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
     try
@@ -48,7 +52,12 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         using var connection = CreateConnection(prov, validated.ConnectionString);
         await connection.OpenAsync();
         var provider = CreateProvider(prov);
-        await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx);
+        var options = new ScaffoldOptions
+        {
+            Tables = ParseCsvList(result.GetValue(tablesOpt)),
+            OverwriteFiles = !result.GetValue(noOverwriteOpt)
+        };
+        await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");
         return 0;
     }
@@ -548,6 +557,14 @@ static DatabaseProvider CreateProvider(string provider) =>
         "mysql" => new MySqlProvider(),
         _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
     };
+
+static IReadOnlyCollection<string> ParseCsvList(string? value)
+    => string.IsNullOrWhiteSpace(value)
+        ? Array.Empty<string>()
+        : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
 static bool IsSystemSchema(string provider, string? schemaName)
 {

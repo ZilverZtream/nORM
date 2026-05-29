@@ -675,6 +675,100 @@ public class DatabaseScaffolderPrivateMethodTests
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithTableFilter_GeneratesOnlyRequestedTables()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE KeepMe (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE SkipMe (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "FilteredCtx",
+                new ScaffoldOptions { Tables = new[] { "KeepMe" } });
+
+            Assert.True(File.Exists(Path.Combine(dir, "KeepMe.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "SkipMe.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredCtx.cs"));
+            Assert.Contains("INormQueryable<KeepMe> KeepMes", contextCode);
+            Assert.DoesNotContain("SkipMes", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE Existing (Id INTEGER PRIMARY KEY)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "FilteredCtx",
+                    new ScaffoldOptions { Tables = new[] { "Missing" } }));
+            Assert.Contains("Missing", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNoOverwrite_RefusesExistingFiles()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE ExistingFile (Id INTEGER PRIMARY KEY)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "ExistingFile.cs"), "// owned");
+
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "NoOverwriteCtx",
+                    new ScaffoldOptions { OverwriteFiles = false }));
+            Assert.Contains("already exists", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
 }
 
 // ── NavigationContext tests ───────────────────────────────────────────────────

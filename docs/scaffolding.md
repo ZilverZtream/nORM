@@ -29,6 +29,10 @@ must be reviewed and edited like handwritten model code.
   exposes the constraint. Generated entities include reference/collection
   navigations and the generated `DbContext` wires them through
   `OnModelCreating` while preserving caller-supplied model configuration.
+- Optional table filtering through `ScaffoldOptions.Tables` and CLI
+  `--tables`.
+- Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
+  CLI `--no-overwrite`.
 
 ## Not Yet Stable
 
@@ -45,9 +49,16 @@ Use scaffolding to bootstrap a model, then edit the generated files into the
 model you want to own. For production applications, commit the generated code
 and review diffs like handwritten model code.
 
-The `dotnet-norm scaffold` command shares the v1 contract above. It uses the same
-`DatabaseScaffolder` implementation as the runtime API; both surfaces support the same
-"Supported" scope and have the same out-of-scope items.
+The `dotnet-norm scaffold` command shares the v1 contract above. It uses the
+same `DatabaseScaffolder` implementation as the runtime API; both surfaces
+support the same "Supported" scope and have the same out-of-scope items.
+
+Examples:
+
+```bash
+norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
+norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite
+```
 
 Do not use scaffolding as evidence for provider mobility by itself. Provider
 mobility is proven by generated nORM query/write paths, strict certification,

@@ -933,10 +933,13 @@ M:nORM.Query.OptimizedSqlBuilder.ToString(System.Int32,System.Int32):System.Stri
 M:nORM.Query.OptimizedSqlBuilder.TruncateTo(System.Int32):System.Void
 M:nORM.Query.SqlFunctionAttribute.#ctor(System.String)
 M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String):System.Threading.Tasks.Task
+M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String,nORM.Scaffolding.ScaffoldOptions):System.Threading.Tasks.Task
+M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,nORM.Scaffolding.ScaffoldOptions):System.Threading.Tasks.Task
 M:nORM.Scaffolding.DynamicEntityTypeGenerator.#ctor()
 M:nORM.Scaffolding.DynamicEntityTypeGenerator.ComputeSchemaSignature(System.Data.Common.DbConnection,System.String):System.String
 M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityType(System.Data.Common.DbConnection,System.String):System.Type
 M:nORM.Scaffolding.DynamicEntityTypeGenerator.GenerateEntityTypeAsync(System.Data.Common.DbConnection,System.String):System.Threading.Tasks.Task{System.Type}
+M:nORM.Scaffolding.ScaffoldOptions.#ctor()
 M:nORM.SourceGeneration.CompileTimeQueryAttribute.#ctor(System.String)
 M:nORM.SourceGeneration.CompiledMaterializerStore.Add(System.Type,System.Func{System.Data.Common.DbDataReader,System.Object}):System.Void
 M:nORM.SourceGeneration.CompiledMaterializerStore.AddPermanent``1(System.String,System.Func{System.Data.Common.DbDataReader,`0}):System.Void
@@ -1270,6 +1273,8 @@ P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandTy
 P:nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
+P:nORM.Scaffolding.ScaffoldOptions.OverwriteFiles:System.Boolean
+P:nORM.Scaffolding.ScaffoldOptions.Tables:System.Collections.Generic.IReadOnlyCollection{System.String}
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String
 P:nORM.SourceGeneration.CompiledMaterializerStore.Count:System.Int32
 P:nORM.SourceGeneration.CompiledMaterializerStore.Evictions:System.Int64
@@ -1413,6 +1418,7 @@ T:nORM.Query.OptimizedSqlBuilder
 T:nORM.Query.SqlFunctionAttribute
 T:nORM.Scaffolding.DatabaseScaffolder
 T:nORM.Scaffolding.DynamicEntityTypeGenerator
+T:nORM.Scaffolding.ScaffoldOptions
 T:nORM.SourceGeneration.CompileTimeQueryAttribute
 T:nORM.SourceGeneration.CompiledMaterializerStore
 T:nORM.SourceGeneration.GenerateMaterializerAttribute
