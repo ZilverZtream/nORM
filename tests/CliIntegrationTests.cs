@@ -137,6 +137,46 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_with_warnings_returns_zero_and_prints_warning_paths()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_warn_ok_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_warn_ok_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE WarningRow (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Status TEXT NOT NULL DEFAULT 'new'
+                    );
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx",
+                root);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Scaffolding completed", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("nORM.ScaffoldWarnings.md", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("nORM.ScaffoldWarnings.json", result.Stdout, StringComparison.Ordinal);
+            Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
+            Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Scaffold_sqlite_output_builds_as_consumer_project()
     {
         var root = FindRepositoryRoot();

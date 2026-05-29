@@ -62,6 +62,12 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         };
         await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");
+        if (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
+            || File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")))
+        {
+            Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
+        }
+
         return 0;
     }
     catch (Exception ex)
