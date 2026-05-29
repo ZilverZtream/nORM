@@ -324,6 +324,19 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("@var", InvokeEscapeCSharpIdentifier("var"));
     }
 
+    [Fact]
+    public void EscapeCSharpIdentifier_AlreadyEscapedIdentifier_ReturnsUnchanged()
+    {
+        Assert.Equal("@class", InvokeEscapeCSharpIdentifier("@class"));
+        Assert.Equal("@record", InvokeEscapeCSharpIdentifier("@record"));
+    }
+
+    [Fact]
+    public void EscapeCSharpIdentifier_InvalidVerbatimIdentifier_IsSanitized()
+    {
+        Assert.Equal("_bad_name", InvokeEscapeCSharpIdentifier("@bad-name"));
+    }
+
     // ── GetTypeName ─────────────────────────────────────────────────────────
 
     [Fact]
