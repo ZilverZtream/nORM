@@ -591,6 +591,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "BookStoreContext.cs"));
 
             Assert.Contains("public List<Book> Books { get; set; } = new();", authorCode);
+            Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
             Assert.Contains("public Author? Author { get; set; }", bookCode);
             Assert.Contains(".HasMany(p => p.Books)", contextCode);
             Assert.Contains(".WithOne(d => d.Author)", contextCode);

@@ -46,6 +46,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldContext.cs"));
 
                 Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", authorCode);
+                Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
                 Assert.Contains("public ScaffoldLiveAuthor? ScaffoldLiveAuthor { get; set; }", bookCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);

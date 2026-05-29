@@ -199,6 +199,7 @@ namespace nORM.Scaffolding
 
                 foreach (var reference in references ?? Array.Empty<ScaffoldRelationship>())
                 {
+                    sb.AppendLine($"    [ForeignKey(nameof({EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(reference.PrincipalEntityName)}? {EscapeCSharpIdentifier(reference.ReferenceNavigationName)} {{ get; set; }}");
                     sb.AppendLine();
                 }

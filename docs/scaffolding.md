@@ -28,8 +28,9 @@ must be reviewed and edited like handwritten model code.
   different database identifiers normalize to the same C# identifier.
 - Single-column foreign key relationship generation when provider metadata
   exposes the constraint. Generated entities include reference/collection
-  navigations and the generated `DbContext` wires them through
-  `OnModelCreating` while preserving caller-supplied model configuration.
+  navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires
+  them through `OnModelCreating` while preserving caller-supplied model
+  configuration.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
