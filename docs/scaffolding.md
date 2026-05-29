@@ -56,7 +56,9 @@ must be reviewed and edited like handwritten model code.
   that are not converted into runnable model code. Composite foreign keys are
   listed there instead of being silently ignored or converted into fake
   single-column navigations; defaults, computed/generated columns, and triggers
-  are inventoried for review; likely many-to-many join tables are flagged when
+  are inventoried for review; SQL Server provider-native temporal tables are
+  reported as provider-owned schema; views are discovered and reported as
+  skipped database objects; likely many-to-many join tables are flagged when
   they are scaffolded as normal entities.
 
 ## Evidence
@@ -82,10 +84,10 @@ must be reviewed and edited like handwritten model code.
 - Payload join-table modeling and many-to-many joins whose foreign keys do not
   target single-column primary keys. These are discovered and reported in
   scaffold diagnostics rather than converted into unsafe fluent mappings.
-- Provider-specific computed columns, default constraints, triggers, and
-  temporal tables. Defaults, computed/generated columns, and triggers are
-  discovered and reported in scaffold diagnostics, but not converted into
-  provider-neutral model code.
+- Provider-specific computed columns, default constraints, triggers, views, and
+  temporal tables. Defaults, computed/generated columns, triggers, SQL Server
+  provider-native temporal tables, and views are discovered and reported in
+  scaffold diagnostics, but not converted into provider-neutral model code.
 
 ## v1 Guidance
 

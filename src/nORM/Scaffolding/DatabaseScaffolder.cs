@@ -80,6 +80,7 @@ namespace nORM.Scaffolding
             {
                 Directory.CreateDirectory(outputDirectory);
                 var tables = FilterTables(await GetTablesAsync(connection, provider).ConfigureAwait(false), options);
+                var skippedObjects = FilterSkippedObjects(await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false), options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
@@ -117,11 +118,11 @@ namespace nORM.Scaffolding
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships, manyToManyJoins);
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode, options).ConfigureAwait(false);
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, manyToManyJoinTableKeys);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
-                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, manyToManyJoinTableKeys), options).ConfigureAwait(false);
+                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys), options).ConfigureAwait(false);
                     if (options.FailOnWarnings)
                         throw new NormConfigurationException(
                             "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
@@ -307,6 +308,71 @@ namespace nORM.Scaffolding
             return await GetSchemaTablesAsync(connection).ConfigureAwait(false);
         }
 
+        private static async Task<IReadOnlyList<ScaffoldSkippedObject>> GetSkippedObjectsAsync(DbConnection connection, DatabaseProvider provider)
+        {
+            var providerName = provider.GetType().Name;
+            if (provider is SqliteProvider)
+            {
+                return await QuerySkippedObjectsAsync(
+                    connection,
+                    "SELECT NULL AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail FROM sqlite_master WHERE type = 'view' ORDER BY name").ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QuerySkippedObjectsAsync(connection, """
+                    SELECT SCHEMA_NAME(v.schema_id) AS ObjectSchema, v.name AS ObjectName, 'View' AS Kind, 'SQL Server view' AS Detail
+                    FROM sys.views v
+                    WHERE v.is_ms_shipped = 0
+                    ORDER BY SCHEMA_NAME(v.schema_id), v.name
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QuerySkippedObjectsAsync(connection, """
+                    SELECT table_schema AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'PostgreSQL view' AS Detail
+                    FROM information_schema.views
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY table_schema, table_name
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QuerySkippedObjectsAsync(connection, """
+                    SELECT NULL AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'MySQL view' AS Detail
+                    FROM information_schema.views
+                    WHERE table_schema = DATABASE()
+                    ORDER BY table_name
+                    """).ConfigureAwait(false);
+            }
+
+            return Array.Empty<ScaffoldSkippedObject>();
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldSkippedObject>> QuerySkippedObjectsAsync(DbConnection connection, string sql)
+        {
+            var objects = new List<ScaffoldSkippedObject>();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var objectName = Convert.ToString(reader["ObjectName"]);
+                if (string.IsNullOrWhiteSpace(objectName))
+                    continue;
+
+                objects.Add(new ScaffoldSkippedObject(
+                    NullIfWhiteSpace(Convert.ToString(reader["ObjectSchema"])),
+                    objectName,
+                    Convert.ToString(reader["Kind"]) ?? string.Empty,
+                    Convert.ToString(reader["Detail"]) ?? string.Empty));
+            }
+
+            return objects;
+        }
+
         private static IReadOnlyList<ScaffoldTable> FilterTables(IReadOnlyList<ScaffoldTable> tables, ScaffoldOptions options)
         {
             if (options.Tables.Count == 0)
@@ -342,6 +408,29 @@ namespace nORM.Scaffolding
         private static bool MatchesTableFilter(ScaffoldTable table, string requested)
             => string.Equals(table.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(table.Schema, table.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(IReadOnlyList<ScaffoldSkippedObject> skippedObjects, ScaffoldOptions options)
+        {
+            if (options.Tables.Count == 0)
+                return skippedObjects;
+
+            var requested = options.Tables
+                .Where(table => !string.IsNullOrWhiteSpace(table))
+                .Select(table => table.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (requested.Length == 0)
+                return skippedObjects;
+
+            return skippedObjects
+                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(obj, request)))
+                .ToArray();
+        }
+
+        private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObject obj, string requested)
+            => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
 
         private static async Task WriteGeneratedFileAsync(string path, string content, ScaffoldOptions options)
         {
@@ -728,6 +817,11 @@ namespace nORM.Scaffolding
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
                     WHERE t.is_ms_shipped = 0
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, t.name, 'TemporalTable',
+                        CASE t.temporal_type WHEN 1 THEN 'SQL Server temporal history table' ELSE 'SQL Server system-versioned temporal table' END
+                    FROM sys.tables t
+                    WHERE t.is_ms_shipped = 0 AND t.temporal_type <> 0
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -795,6 +889,7 @@ namespace nORM.Scaffolding
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -818,7 +913,7 @@ namespace nORM.Scaffolding
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .ToArray();
 
-            if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0)
+            if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0 && skippedObjects.Count == 0)
                 return string.Empty;
 
             var sb = _stringBuilderPool.Get();
@@ -867,7 +962,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, and triggers are discovered for review, but are not emitted as provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, triggers, and provider-native temporal tables are discovered for review, but are not emitted as provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Table | Object | Detail |");
                     sb.AppendLine("| --- | --- | --- | --- |");
@@ -877,6 +972,23 @@ namespace nORM.Scaffolding
                         .ThenBy(f => f.Name, StringComparer.Ordinal))
                     {
                         sb.AppendLine($"| {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} |");
+                    }
+                }
+
+                if (skippedObjects.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("## Skipped Database Objects");
+                    sb.AppendLine();
+                    sb.AppendLine("Views are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
+                    sb.AppendLine();
+                    sb.AppendLine("| Kind | Name | Detail |");
+                    sb.AppendLine("| --- | --- | --- |");
+                    foreach (var obj in skippedObjects
+                        .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
+                        .ThenBy(o => o.Kind, StringComparer.Ordinal))
+                    {
+                        sb.AppendLine($"| {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} |");
                     }
                 }
 
@@ -898,6 +1010,7 @@ namespace nORM.Scaffolding
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -954,13 +1067,25 @@ namespace nORM.Scaffolding
                 })
                 .ToArray();
 
+            var skippedDatabaseObjects = skippedObjects
+                .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
+                .ThenBy(o => o.Kind, StringComparer.Ordinal)
+                .Select(o => new
+                {
+                    kind = o.Kind,
+                    name = TableKey(o.Schema, o.Name),
+                    detail = o.Detail
+                })
+                .ToArray();
+
             return JsonSerializer.Serialize(
                 new
                 {
                     version = 1,
                     compositeForeignKeys,
                     possibleManyToManyJoinTables = possibleJoinTables,
-                    providerOwnedSchemaFeatures
+                    providerOwnedSchemaFeatures,
+                    skippedDatabaseObjects
                 },
                 new JsonSerializerOptions { WriteIndented = true });
         }
@@ -1633,6 +1758,12 @@ namespace nORM.Scaffolding
         };
 
         private readonly record struct ScaffoldTable(string Name, string? Schema);
+
+        private readonly record struct ScaffoldSkippedObject(
+            string? Schema,
+            string Name,
+            string Kind,
+            string Detail);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

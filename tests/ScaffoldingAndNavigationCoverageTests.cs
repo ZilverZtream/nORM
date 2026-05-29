@@ -869,6 +869,7 @@ public class DatabaseScaffolderPrivateMethodTests
                 NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL
             );
             CREATE TRIGGER TR_FeatureOwned_Audit AFTER INSERT ON FeatureOwned BEGIN SELECT 1; END;
+            CREATE VIEW FeatureOwnedView AS SELECT Id, Name FROM FeatureOwned;
             """;
         cmd.ExecuteNonQuery();
 
@@ -887,10 +888,14 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("NameLength", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
+            Assert.Contains("Skipped Database Objects", warnings);
+            Assert.Contains("FeatureOwnedView", warnings);
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("name").GetString() == "Name");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
+            var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
+            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
         }
         finally
         {

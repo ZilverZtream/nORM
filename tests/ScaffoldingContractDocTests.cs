@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace nORM.Tests;
@@ -18,6 +19,15 @@ public class ScaffoldingContractDocTests
         var asmDir = Path.GetDirectoryName(typeof(ScaffoldingContractDocTests).Assembly.Location)!;
         var repoRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", "..", ".."));
         var path = Path.Combine(repoRoot, "docs", "scaffolding.md");
+        Assert.True(File.Exists(path));
+        return File.ReadAllText(path);
+    }
+
+    private static string ReadRepoFile(params string[] pathParts)
+    {
+        var asmDir = Path.GetDirectoryName(typeof(ScaffoldingContractDocTests).Assembly.Location)!;
+        var repoRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", "..", ".."));
+        var path = Path.Combine(new[] { repoRoot }.Concat(pathParts).ToArray());
         Assert.True(File.Exists(path));
         return File.ReadAllText(path);
     }
@@ -57,6 +67,17 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         Assert.Contains("Supported", doc, StringComparison.Ordinal);
         Assert.Contains("Not Yet Stable", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_and_source_pin_provider_owned_temporal_and_view_diagnostics()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
+        Assert.Contains("views are discovered and reported as", doc, StringComparison.Ordinal);
+        Assert.Contains("temporal_type <> 0", source, StringComparison.Ordinal);
+        Assert.Contains("skippedDatabaseObjects", source, StringComparison.Ordinal);
     }
 
     [Fact]
