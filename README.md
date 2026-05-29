@@ -283,7 +283,9 @@ temporal tables, tables without primary keys, SQLite virtual tables and shadow
 tables, skipped views, routines, sequences, synonyms, materialized views, and
 events are reported in `nORM.ScaffoldWarnings.md` and
 `nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
-model code.
+model code. The JSON report includes stable diagnostic codes, categories,
+section counts, and suggested actions so CI can route scaffold follow-up without
+parsing prose.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
 Composite FK navigation generation, payload join-table modeling, owned-type

@@ -48,7 +48,7 @@ changes:
 
 ```powershell
 dotnet build nORM.sln -c Release --nologo
-dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter "Scaffolding|SchemaSignatureTests|DynamicTypeQueryTests|RelationshipConfigurationTests|UpdateNoMutableColumnsTests|PublicApiSnapshotTests|PublicApiClassificationTests|Scaffold_fail_on_warnings_returns_nonzero_after_writing_report|Scaffold_with_warnings_returns_zero_and_prints_warning_paths|Scaffold_sqlite_output_builds_as_consumer_project"
+dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter "Scaffolding|SchemaSignatureTests|DynamicTypeQueryTests|RelationshipConfigurationTests|UpdateNoMutableColumnsTests|PublicApiSnapshotTests|PublicApiClassificationTests|Scaffold_fail_on_warnings_returns_nonzero_after_writing_report|Scaffold_with_warnings_returns_zero_and_prints_warning_paths|Scaffold_sqlite_output_builds_as_consumer_project|Scaffold_help_describes_bounded_contract_and_warning_reports"
 ```
 
 Live provider scaffolding parity is included in `eng\live-provider-gate.cmd live`
