@@ -1,17 +1,25 @@
 # nORM
 
-nORM is an evidence-gated, provider-mobile ORM for .NET.
+nORM is a provider-mobile ORM for .NET with broad SQL-backed LINQ, strict tenant
+boundaries, provider-neutral temporal history, and benchmark-gated performance.
 
-It is built around a specific goal: keep application data access on generated
-nORM APIs so the same model and LINQ surface can move across SQLite, SQL
-Server, PostgreSQL, and MySQL with equivalent behavior, provider-specific SQL
-translation, explicit tenant boundaries, provider-neutral temporal history, and
-benchmark-governed performance.
+Use one nORM data layer across SQLite, SQL Server, PostgreSQL, and MySQL. nORM
+translates supported generated LINQ, write, bulk, tenant, transaction-wrapper,
+and temporal operations for each provider, emulates safe provider differences,
+and fails before execution when it cannot preserve the same application-facing
+semantics.
 
-nORM is not marketed as a complete EF Core replacement, a complete LINQ
-implementation, or "always faster than raw ADO.NET". Claims in this repository
-are intentionally bounded by docs, tests, live-provider gates, sample evidence,
-and BenchmarkDotNet artifacts.
+That makes the intended workflow straightforward:
+
+- build a PoC on SQLite;
+- develop against SQL Server or SQLEXPRESS;
+- certify the same generated nORM surface against PostgreSQL or MySQL;
+- keep raw SQL, stored procedures, and provider-native features explicit when
+  an application really needs them.
+
+The repository backs public claims with support matrices, live-provider tests,
+the sample store app, certification reports, release gates, and BenchmarkDotNet
+artifacts.
 
 ## Product Pillars
 
