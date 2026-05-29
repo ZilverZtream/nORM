@@ -194,7 +194,8 @@ public class CliIntegrationTests
                     CREATE TABLE Author (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Name TEXT NOT NULL,
-                        "bad""col\name<&>" TEXT NOT NULL
+                        "bad""col\name<&>
+                    line" TEXT NOT NULL
                     );
                     CREATE TABLE Book (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,7 +226,9 @@ public class CliIntegrationTests
                         CONSTRAINT FK_Shipment_ShippingAddress FOREIGN KEY (ShippingAddressId) REFERENCES Address(Id)
                     );
                     CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
-                    CREATE INDEX "IX_Author_Bad""Col" ON Author("bad""col\name<&>");
+                    CREATE INDEX "IX_Author_Bad""Col
+                    Line" ON Author("bad""col\name<&>
+                    line");
                     """;
                 cmd.ExecuteNonQuery();
             }

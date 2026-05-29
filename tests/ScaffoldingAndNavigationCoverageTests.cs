@@ -1328,9 +1328,12 @@ public class DatabaseScaffolderPrivateMethodTests
         cmd.CommandText = """
             CREATE TABLE "Quoted""Back\Table" (
                 "Id" INTEGER PRIMARY KEY,
-                "bad""col\name<&>" TEXT NOT NULL
+                "bad""col\name<&>
+            line" TEXT NOT NULL
             );
-            CREATE INDEX "IX""Back\Name" ON "Quoted""Back\Table" ("bad""col\name<&>");
+            CREATE INDEX "IX""Back\Name
+            Line" ON "Quoted""Back\Table" ("bad""col\name<&>
+            line");
             """;
         cmd.ExecuteNonQuery();
 
@@ -1341,9 +1344,10 @@ public class DatabaseScaffolderPrivateMethodTests
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "QuotedBackTable.cs"));
             Assert.Contains("[Table(\"Quoted\\\"Back\\\\Table\")]", entityCode);
-            Assert.Contains("[Column(\"bad\\\"col\\\\name<&>\")]", entityCode);
-            Assert.Contains("[Index(\"IX\\\"Back\\\\Name\")]", entityCode);
-            Assert.Contains("Maps to column bad\"col\\name&lt;&amp;&gt;", entityCode);
+            Assert.Contains("[Column(\"bad\\\"col\\\\name<&>\\nline\")]", entityCode);
+            Assert.Contains("[Index(\"IX\\\"Back\\\\Name\\nLine\")]", entityCode);
+            Assert.Contains("Maps to column bad\"col\\name&lt;&amp;&gt;\\nline", entityCode);
+            Assert.DoesNotContain("\nline\" TEXT", entityCode, StringComparison.Ordinal);
         }
         finally
         {

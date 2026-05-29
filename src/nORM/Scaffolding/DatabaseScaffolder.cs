@@ -1260,16 +1260,26 @@ namespace nORM.Scaffolding
         }
 
         private static string EscapeMarkdown(string value)
-            => value.Replace("\\", "\\\\").Replace("|", "\\|");
+            => value
+                .Replace("\\", "\\\\")
+                .Replace("|", "\\|")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
 
         private static string EscapeStringLiteral(string value)
-            => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            => value
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
 
         private static string EscapeXmlDocumentation(string value)
             => value
                 .Replace("&", "&amp;")
                 .Replace("<", "&lt;")
-                .Replace(">", "&gt;");
+                .Replace(">", "&gt;")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
         {
