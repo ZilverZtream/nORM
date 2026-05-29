@@ -1078,6 +1078,13 @@ namespace nORM.Scaffolding
                       AND c.collation_name IS NOT NULL
                       AND c.collation_name <> CONVERT(sysname, DATABASEPROPERTYEX(DB_NAME(), 'Collation'))
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'ProviderSpecificColumnType', ty.name
+                    FROM sys.columns c
+                    INNER JOIN sys.tables t ON t.object_id = c.object_id
+                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                    WHERE t.is_ms_shipped = 0
+                      AND (ty.is_user_defined = 1 OR ty.name IN ('geography', 'geometry', 'hierarchyid', 'sql_variant', 'xml'))
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1136,6 +1143,15 @@ namespace nORM.Scaffolding
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND collation_name IS NOT NULL
                     UNION ALL
+                    SELECT table_schema, table_name, column_name, 'ProviderSpecificColumnType',
+                        CASE WHEN udt_name IS NULL OR udt_name = '' THEN data_type ELSE data_type || ' (' || udt_name || ')' END
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                      AND (
+                          data_type IN ('ARRAY', 'USER-DEFINED', 'json', 'jsonb', 'xml')
+                          OR udt_name IN ('json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8', 'tsvector', 'tsquery')
+                      )
+                    UNION ALL
                     SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
@@ -1191,6 +1207,24 @@ namespace nORM.Scaffolding
                     WHERE c.table_schema = DATABASE()
                       AND c.collation_name IS NOT NULL
                       AND c.collation_name <> s.default_collation_name
+                    UNION ALL
+                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType', data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND data_type IN (
+                          'json',
+                          'geometry',
+                          'point',
+                          'linestring',
+                          'polygon',
+                          'multipoint',
+                          'multilinestring',
+                          'multipolygon',
+                          'geometrycollection',
+                          'enum',
+                          'set',
+                          'year'
+                      )
                     """).ConfigureAwait(false);
             }
 
@@ -1413,6 +1447,7 @@ namespace nORM.Scaffolding
                 "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
                 "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
+                "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",

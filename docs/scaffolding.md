@@ -75,7 +75,8 @@ must be reviewed and edited like handwritten model code.
   that are not converted into runnable model code. Composite foreign keys are
   listed there instead of being silently ignored or converted into fake
   single-column navigations; defaults, computed/generated columns, check
-  constraints, provider-specific collations, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
+  constraints, provider-specific collations, provider-specific column types,
+  and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
   schema; views, routines, and sequences are discovered and reported as skipped
   database objects; likely many-to-many join tables are flagged when they are
   scaffolded as normal entities.
@@ -114,8 +115,9 @@ must be reviewed and edited like handwritten model code.
   target single-column primary keys. These are discovered and reported in
   scaffold diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
-  collations, triggers, views, temporal tables, and keyless tables. Defaults,
-  computed/generated columns, check constraints, collations, triggers, SQL Server
+  collations, column types, triggers, views, temporal tables, and keyless
+  tables. Defaults, computed/generated columns, check constraints, collations,
+  provider-specific column types, triggers, SQL Server
   provider-native temporal tables, keyless tables, views, routines, and
   sequences are discovered and reported in scaffold diagnostics, but not
   converted into complete provider-neutral model code.
