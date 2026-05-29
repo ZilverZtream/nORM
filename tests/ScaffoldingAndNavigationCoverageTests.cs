@@ -57,6 +57,25 @@ public class SanSchemaWidget
     public string Name { get; set; } = string.Empty;
 }
 
+[Table("SchemaParent", Schema = "aux")]
+[Xunit.Trait("Category", "Fast")]
+public class SanSchemaParent
+{
+    [Key]
+    public int Id { get; set; }
+    public List<SanSchemaChild> Children { get; set; } = new();
+}
+
+[Table("SchemaChild", Schema = "aux")]
+[Xunit.Trait("Category", "Fast")]
+public class SanSchemaChild
+{
+    [Key]
+    public int Id { get; set; }
+    public int ParentId { get; set; }
+    public int Amount { get; set; }
+}
+
 [Table("SAN_TIParent")]
 [Xunit.Trait("Category", "Fast")]
 public class SanTIParent
@@ -586,6 +605,45 @@ public class DatabaseScaffolderPrivateMethodTests
         var rows = await ctx.Query<SanSchemaWidget>().ToListAsync();
         var row = Assert.Single(rows);
         Assert.Equal("schema-ok", row.Name);
+    }
+
+    [Fact]
+    public async Task TableAttributeSchema_IsUsedInNavigationProjectionSubqueries()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                ATTACH DATABASE ':memory:' AS aux;
+                CREATE TABLE "aux"."SchemaParent" (Id INTEGER PRIMARY KEY);
+                CREATE TABLE "aux"."SchemaChild" (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Amount INTEGER NOT NULL);
+                INSERT INTO "aux"."SchemaParent" (Id) VALUES (1);
+                INSERT INTO "aux"."SchemaChild" (Id, ParentId, Amount) VALUES (10, 1, 7), (11, 1, 5);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<SanSchemaParent>()
+                .HasMany<SanSchemaChild>(p => p.Children)
+                .WithOne()
+                .HasForeignKey(c => c.ParentId, p => p.Id)
+        });
+
+        var rows = await ctx.Query<SanSchemaParent>()
+            .Select(p => new
+            {
+                p.Id,
+                ChildCount = p.Children.Count(),
+                Total = p.Children.Sum(c => c.Amount)
+            })
+            .ToListAsync();
+
+        var row = Assert.Single(rows);
+        Assert.Equal(2, row.ChildCount);
+        Assert.Equal(12, row.Total);
     }
 
     [Fact]

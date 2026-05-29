@@ -1171,8 +1171,7 @@ namespace nORM.Query
             // doesn't have a TableMappingProvider, build the SQL identifiers manually from
             // attributes — match the same convention TableMapping uses (table name from
             // [Table] attribute or type name; columns from property names escaped by provider).
-            var depTable = depType.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.TableAttribute), inherit: false)
-                .Cast<System.ComponentModel.DataAnnotations.Schema.TableAttribute>().FirstOrDefault()?.Name ?? depType.Name;
+            var depTable = GetTableName(depType);
             var depAlias = _provider.Escape("__nav");
             var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
             var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
@@ -1351,8 +1350,7 @@ namespace nORM.Query
             // a per-row selector. Selector is a member access on the dependent element
             // (e.g. `c => c.Amount`); resolve it to the column name via attribute lookup.
             var depType = relation.DependentType;
-            var depTable = depType.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.TableAttribute), inherit: false)
-                .Cast<System.ComponentModel.DataAnnotations.Schema.TableAttribute>().FirstOrDefault()?.Name ?? depType.Name;
+            var depTable = GetTableName(depType);
             var depAlias = _provider.Escape("__nav");
             var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
             var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
@@ -2063,6 +2061,21 @@ namespace nORM.Query
                 }
             }
             return false;
+        }
+
+        private static string GetTableName(Type type)
+        {
+            var tableAttribute = type
+                .GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.TableAttribute), inherit: false)
+                .Cast<System.ComponentModel.DataAnnotations.Schema.TableAttribute>()
+                .FirstOrDefault();
+
+            if (tableAttribute is null)
+                return type.Name;
+
+            return string.IsNullOrWhiteSpace(tableAttribute.Schema)
+                ? tableAttribute.Name
+                : tableAttribute.Schema + "." + tableAttribute.Name;
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
