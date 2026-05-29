@@ -1,12 +1,12 @@
 # Scaffolding Contract
 
-Scaffolding ships as a preview v1 tooling surface with the scope below. The
+Scaffolding ships as a bounded v1 tooling surface with the scope below. The
 public entry points (`nORM.Scaffolding.DatabaseScaffolder`,
 `nORM.Scaffolding.DynamicEntityTypeGenerator`, and the `dotnet-norm scaffold`
-command) are API-snapshotted so callers can experiment without churn, but the
-generated model is intentionally a bootstrap artifact, not a database-first completeness claim.
+command) are API-snapshotted, but the generated model is intentionally a
+bootstrap artifact, not a database-first completeness claim.
 
-The "Supported" section is the v1 preview contract; everything in "Not Yet
+The "Supported" section is the v1 scaffolding contract; everything in "Not Yet
 Stable" is explicitly out of scope for v1.0 and tracked for v1.x. Generated code
 must be reviewed and edited like handwritten model code.
 

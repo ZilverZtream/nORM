@@ -23,11 +23,11 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
-    public void Doc_describes_preview_v1_contract()
+    public void Doc_describes_bounded_v1_contract()
     {
         var doc = ReadDoc();
         Assert.Contains("Scaffolding Contract", doc, StringComparison.Ordinal);
-        Assert.Contains("preview v1", doc, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("bounded v1", doc, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not a database-first completeness claim", doc, StringComparison.OrdinalIgnoreCase);
     }
 

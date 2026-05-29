@@ -16,7 +16,7 @@ The list is enforced by `NamespacePolicyContractTests`.
 | `nORM.Execution` | Stable user API | `AdaptiveTimeoutManager` and operational primitives |
 | `nORM.Navigation` | Stable user API | Lazy-loading proxy / navigation primitives |
 | `nORM.SourceGeneration` | Stable user API (compile-time integration) | `CompiledMaterializerStore`, `[GenerateMaterializer]`, `[CompileTimeQuery]` |
-| `nORM.Scaffolding` | Stable preview | `DatabaseScaffolder`, `DynamicEntityTypeGenerator` (preview; see `docs/scaffolding.md`) |
+| `nORM.Scaffolding` | Stable tooling | `DatabaseScaffolder`, `DynamicEntityTypeGenerator`, `ScaffoldOptions` (bounded v1 scaffolding contract; see `docs/scaffolding.md`) |
 | `nORM.Enterprise` | Stable provider API | Enterprise integration extension points; opt-in |
 | `nORM.Internal` | **Deprecated namespace, tracked for v1.x relocation** | Existing public types here remain reachable for compatibility. New types must NOT be added; existing entries (e.g., `ConcurrentLruCache<T, TValue>`, `ParameterOptimizer`) are scheduled for relocation to `nORM.Caching` / `nORM.Diagnostics` in a v1.x release with type forwarders. |
 | `Microsoft.Extensions.Logging` | Stable user API (extension methods) | Hosts `DbContextLoggingExtensions` (and any future `Microsoft.Extensions.*` extensions) per the standard convention of registering extension methods under the namespace of the type they extend. |

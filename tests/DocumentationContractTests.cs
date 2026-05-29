@@ -188,14 +188,14 @@ public class DocumentationContractTests
     }
 
     [Fact]
-    public void Readme_links_to_scaffolding_preview_contract()
+    public void Readme_links_to_scaffolding_contract()
     {
         var root = FindRepositoryRoot();
         var readme = File.ReadAllText(Path.Combine(root, "README.md"));
         var contract = File.ReadAllText(Path.Combine(root, "docs", "scaffolding.md"));
 
         Assert.Contains("docs/scaffolding.md", readme, StringComparison.Ordinal);
-        Assert.Contains("preview", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("bounded v1", readme, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
         Assert.Contains("MySQL", contract, StringComparison.Ordinal);

@@ -258,13 +258,16 @@ checks, and cache invalidation are part of the v1 contract. See
 // Query any table without defining entity classes
 var users = await context.Query("Users").ToListAsync();
 
-// Preview: scaffold tables and columns from an existing database
+// Scaffold tables, columns, and supported single-column relationships
 await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.Entities");
 ```
 
-Scaffolding is preview in v1: table and column reverse engineering is supported,
-but relationship/index generation remains explicit post-processing. See
-[Scaffolding Preview Contract](docs/scaffolding.md).
+Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
+identifier cleanup, table filtering, overwrite protection, nullable-safe output,
+and single-column FK navigation generation are supported. Composite FK, index,
+owned-type, inheritance, and provider-specific computed/default/trigger
+inference remain explicit post-processing. See
+[Scaffolding Contract](docs/scaffolding.md).
 
 ### Modern SQL Features
 
