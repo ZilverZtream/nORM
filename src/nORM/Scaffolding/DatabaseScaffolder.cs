@@ -1085,6 +1085,14 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND (ty.is_user_defined = 1 OR ty.name IN ('geography', 'geometry', 'hierarchyid', 'sql_variant', 'xml'))
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'PrecisionScale',
+                        ty.name + '(' + CONVERT(varchar(10), c.precision) + ',' + CONVERT(varchar(10), c.scale) + ')'
+                    FROM sys.columns c
+                    INNER JOIN sys.tables t ON t.object_id = c.object_id
+                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                    WHERE t.is_ms_shipped = 0
+                      AND ty.name IN ('decimal', 'numeric')
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1151,6 +1159,14 @@ namespace nORM.Scaffolding
                           data_type IN ('ARRAY', 'USER-DEFINED', 'json', 'jsonb', 'xml')
                           OR udt_name IN ('json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8', 'tsvector', 'tsquery')
                       )
+                    UNION ALL
+                    SELECT table_schema, table_name, column_name, 'PrecisionScale',
+                        'numeric(' || numeric_precision || ',' || numeric_scale || ')'
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                      AND data_type = 'numeric'
+                      AND numeric_precision IS NOT NULL
+                      AND numeric_scale IS NOT NULL
                     UNION ALL
                     SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
                     FROM pg_index ix
@@ -1225,6 +1241,14 @@ namespace nORM.Scaffolding
                           'set',
                           'year'
                       )
+                    UNION ALL
+                    SELECT NULL, table_name, column_name, 'PrecisionScale',
+                        CONCAT(data_type, '(', numeric_precision, ',', numeric_scale, ')')
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND data_type IN ('decimal', 'numeric')
+                      AND numeric_precision IS NOT NULL
+                      AND numeric_scale IS NOT NULL
                     """).ConfigureAwait(false);
             }
 
@@ -1448,6 +1472,7 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
+                "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",

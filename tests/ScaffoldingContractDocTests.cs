@@ -82,11 +82,13 @@ public class ScaffoldingContractDocTests
         Assert.Contains("tables without primary keys", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific column types", doc, StringComparison.Ordinal);
+        Assert.Contains("decimal precision/scale", doc, StringComparison.Ordinal);
         Assert.Contains("temporal_type <> 0", source, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", source, StringComparison.Ordinal);
         Assert.Contains("MissingPrimaryKey", source, StringComparison.Ordinal);
         Assert.Contains("Collation", source, StringComparison.Ordinal);
         Assert.Contains("ProviderSpecificColumnType", source, StringComparison.Ordinal);
+        Assert.Contains("PrecisionScale", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
     }
