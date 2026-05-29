@@ -119,6 +119,56 @@ public class DynamicTypeQueryTests
     }
 
     [Fact]
+    public void QueryString_WithLiteralDottedTableName_MaterializesRowsFromOriginalTable()
+    {
+        var dbName = $"dynamic_query_dotted_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE "audit.events" (Id INTEGER PRIMARY KEY, Message TEXT);
+                INSERT INTO "audit.events" (Id, Message) VALUES (1, 'created');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var rows = ctx.Query("audit.events").Cast<object>().ToList();
+
+        var row = Assert.Single(rows);
+        Assert.Equal("created", row.GetType().GetProperty("Message")!.GetValue(row));
+    }
+
+    [Fact]
+    public void QueryString_WithLiteralDottedColumnName_MaterializesRowsFromOriginalColumn()
+    {
+        var dbName = $"dynamic_query_dotted_column_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE Metrics (Id INTEGER PRIMARY KEY, "value.part" TEXT);
+                INSERT INTO Metrics (Id, "value.part") VALUES (1, 'ok');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var rows = ctx.Query("Metrics").Cast<object>().ToList();
+
+        var row = Assert.Single(rows);
+        Assert.Equal("ok", row.GetType().GetProperty("ValuePart")!.GetValue(row));
+    }
+
+    [Fact]
     public void GateC_SameConnectionStringDifferentOrder_MapsToSameCacheEntry()
     {
         // Gate C: "Server=A;Database=B" and "DATABASE=B;SERVER=A" must normalize to the same

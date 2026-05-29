@@ -68,7 +68,7 @@ namespace nORM.Mapping
             var fluentColName = fluentConfig?.ColumnNames.TryGetValue(info.Property, out var name) == true ? name : null;
             var colName = fluentColName ?? info.ColumnName ?? PropName;
             Name = colName;
-            EscCol = p.Escape(colName);
+            EscCol = IdentifierEscaping.EscapeSingle(p, colName);
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == info.Property) ?? false) || info.IsKey;
             IsTimestamp = info.IsTimestamp;

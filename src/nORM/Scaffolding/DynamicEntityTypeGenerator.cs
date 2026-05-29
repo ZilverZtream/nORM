@@ -76,11 +76,9 @@ namespace nORM.Scaffolding
 
             try
             {
-                var (schemaName, bareTable) = SplitSchema(tableName);
+                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
                 // Materialize columns eagerly so the reader is closed before type building begins.
-                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-
-                return BuildDynamicType(tableName, columns);
+                return BuildDynamicType(schemaName, bareTable, columns);
             }
             finally
             {
@@ -110,11 +108,9 @@ namespace nORM.Scaffolding
 
             try
             {
-                var (schemaName, bareTable) = SplitSchema(tableName);
+                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
                 // Materialize columns eagerly so the reader is closed before type building begins.
-                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-
-                return BuildDynamicType(tableName, columns);
+                return BuildDynamicType(schemaName, bareTable, columns);
             }
             finally
             {
@@ -128,11 +124,11 @@ namespace nORM.Scaffolding
         /// Each invocation generates a uniquely-named type to prevent conflicts when the same table
         /// is regenerated after a schema change.
         /// </summary>
-        private static Type BuildDynamicType(string tableName, IReadOnlyList<ColumnInfo> columns)
+        private static Type BuildDynamicType(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns)
         {
             lock (_moduleBuilderLock)
             {
-                var className = EscapeCSharpIdentifier(ToPascalCase(GetUnqualifiedName(tableName)));
+                var className = EscapeCSharpIdentifier(ToPascalCase(tableName));
 
                 // Generate unique type name to avoid conflicts when same table is regenerated
                 var typeId = Interlocked.Increment(ref _typeCounter);
@@ -149,17 +145,16 @@ namespace nORM.Scaffolding
                     MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
 
                 var tableAttrCtor = typeof(TableAttribute).GetConstructor(new[] { typeof(string) })!;
-                var (schemaName, bareTableName) = SplitSchema(tableName);
                 if (schemaName is null)
                 {
-                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(tableAttrCtor, new object[] { bareTableName }));
+                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(tableAttrCtor, new object[] { tableName }));
                 }
                 else
                 {
                     var schemaProperty = typeof(TableAttribute).GetProperty(nameof(TableAttribute.Schema))!;
                     typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(
                         tableAttrCtor,
-                        new object[] { bareTableName },
+                        new object[] { tableName },
                         new[] { schemaProperty },
                         new object[] { schemaName }));
                 }
@@ -256,8 +251,7 @@ namespace nORM.Scaffolding
                 connection.Open();
             try
             {
-                var (schemaName, bareTable) = SplitSchema(tableName);
-                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+                var (_, _, columns) = ResolveTableSchema(connection, tableName);
                 // Include every metadata field that changes the emitted CLR surface. Omitting one can return
                 // a stale dynamic type after a schema change even though the generated C# would differ.
                 var descriptor = BuildSchemaDescriptor(columns);
@@ -339,6 +333,27 @@ namespace nORM.Scaffolding
             return (null, identifier);
         }
 
+        private static (string? schema, string table, List<ColumnInfo> columns) ResolveTableSchema(DbConnection connection, string tableName)
+        {
+            if (tableName.Contains('.', StringComparison.Ordinal))
+            {
+                try
+                {
+                    var exactColumns = GetTableSchema(connection, null, tableName).ToList();
+                    return (null, tableName, exactColumns);
+                }
+                catch (DbException)
+                {
+                    // Dotted names are ambiguous: first try a literal table name such as
+                    // "audit.events"; if that object does not exist, resolve as schema.table.
+                }
+            }
+
+            var (schemaName, bareTable) = SplitSchema(tableName);
+            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+            return (schemaName, bareTable, columns);
+        }
+
         private static string EscapeQualified(DbConnection connection, string? schema, string table)
         {
             return string.IsNullOrEmpty(schema)
@@ -362,12 +377,6 @@ namespace nORM.Scaffolding
                 var n when n.Contains("mysql") => $"`{identifier.Replace("`", "``")}`",
                 _ => $"\"{identifier.Replace("\"", "\"\"")}\""
             };
-        }
-
-        private static string GetUnqualifiedName(string identifier)
-        {
-            var idx = identifier.LastIndexOf('.');
-            return idx >= 0 ? identifier[(idx + 1)..] : identifier;
         }
 
         /// <summary>

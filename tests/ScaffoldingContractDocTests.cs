@@ -127,6 +127,18 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_and_source_pin_literal_dotted_identifier_scaffolding()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Mapping", "IdentifierEscaping.cs");
+
+        Assert.Contains("Literal table and column identifiers", doc, StringComparison.Ordinal);
+        Assert.Contains("not silently reinterpreted as", doc, StringComparison.Ordinal);
+        Assert.Contains("EscapeSingle", source, StringComparison.Ordinal);
+        Assert.Contains("EscapeTable", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_names_the_public_scaffolder_types()
     {
         var doc = ReadDoc();

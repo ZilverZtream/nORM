@@ -111,7 +111,9 @@ namespace nORM.Mapping
             {
                 var tableAttr = t.GetCustomAttribute<TableAttribute>();
                 var tableName = fluentConfig?.TableName ?? GetTableName(t, tableAttr);
-                EscTable = p.Escape(tableName);
+                EscTable = fluentConfig?.TableName is null && tableAttr is not null
+                    ? IdentifierEscaping.EscapeTable(p, tableAttr.Name, tableAttr.Schema)
+                    : p.Escape(tableName);
                 TableName = tableName;
             }
 

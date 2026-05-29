@@ -26,6 +26,10 @@ must be reviewed and edited like handwritten model code.
 - `DbContext` generation with `IQueryable<T>` properties backed by nORM's
   query provider.
 - Provider-specific identifier escaping for the zero-row schema query.
+- Literal table and column identifiers discovered from metadata are escaped as
+  single database object names, so names containing dots (for example
+  `audit.events` or `value.part`) are not silently reinterpreted as
+  schema-qualified identifiers unless a schema is supplied separately.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when
@@ -82,8 +86,12 @@ must be reviewed and edited like handwritten model code.
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
-  duplicate generated property handling, quoted identifier preservation, and
-  connection ownership for sync/async dynamic scaffolding calls.
+  duplicate generated property handling, quoted and dotted literal identifier
+  preservation, and connection ownership for sync/async dynamic scaffolding
+  calls.
+- `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
+  when runtime-generated table or column mappings contain literal dotted
+  identifiers.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, composite-FK diagnostic shape, provider-owned/default and
   keyless-table diagnostics, and skipped-view table-filter failures against

@@ -256,6 +256,30 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void GenerateEntityType_WithLiteralDottedTableName_DoesNotTreatDotAsSchema()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "dynamic.audit" (
+                Id INTEGER PRIMARY KEY,
+                Message TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var gen = Gen();
+        var type = gen.GenerateEntityType(cn, "dynamic.audit");
+        var table = Assert.Single(type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+        var signature = gen.ComputeSchemaSignature(cn, "dynamic.audit");
+
+        Assert.Equal("dynamic.audit", table.Name);
+        Assert.Null(table.Schema);
+        Assert.Contains(type.GetProperties(), p => p.Name == "Message");
+        Assert.Equal(32, signature.Length);
+    }
+
+    [Fact]
     public void DynamicScaffolding_ClosedConnection_IsClosedAfterSynchronousUse()
     {
         var dbFile = CreateFileDatabase("LifecycleSync");
