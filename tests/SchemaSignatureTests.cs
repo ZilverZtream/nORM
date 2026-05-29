@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
@@ -137,5 +138,27 @@ public class SchemaSignatureTests
 
         Assert.Contains("FirstName", propertyNames);
         Assert.Contains("FirstName2", propertyNames);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithQuotedIdentifierCharacters_PreservesOriginalNames()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "dynamic""quote" (
+                Id INTEGER PRIMARY KEY,
+                "quoted""column" TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "dynamic\"quote");
+        var table = Assert.Single(type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+        var quotedColumn = Assert.Single(type.GetProperties(), p => p.Name == "QuotedColumn");
+        var column = Assert.Single(quotedColumn.GetCustomAttributes(typeof(ColumnAttribute), inherit: false).Cast<ColumnAttribute>());
+
+        Assert.Equal("dynamic\"quote", table.Name);
+        Assert.Equal("quoted\"column", column.Name);
     }
 }

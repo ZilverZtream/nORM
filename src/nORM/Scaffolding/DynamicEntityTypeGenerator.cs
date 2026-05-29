@@ -297,19 +297,19 @@ namespace nORM.Scaffolding
 
         /// <summary>
         /// Wraps a raw SQL identifier in the appropriate quoting characters for the provider.
-        /// Strips the quoting character from within the value to prevent SQL injection via
-        /// crafted table or schema names.
+        /// Escapes embedded quoting characters so legitimate identifiers are preserved
+        /// without allowing crafted table or schema names to break out of the quote.
         /// </summary>
         private static string EscapeIdentifier(DbConnection connection, string identifier)
         {
             var name = connection.GetType().Name.ToLowerInvariant();
             return name switch
             {
-                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "")}]",
-                var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "")}\"",
-                var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "")}\"",
-                var n when n.Contains("mysql") => $"`{identifier.Replace("`", "")}`",
-                _ => identifier
+                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "]]")}]",
+                var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "\"\"")}\"",
+                var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "\"\"")}\"",
+                var n when n.Contains("mysql") => $"`{identifier.Replace("`", "``")}`",
+                _ => $"\"{identifier.Replace("\"", "\"\"")}\""
             };
         }
 
