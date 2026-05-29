@@ -303,6 +303,7 @@ namespace nORM.Scaffolding
                 yield break;
             var existingPropertyNames = CreateReservedMemberNameSet();
             var sqliteComputedColumns = GetSqliteComputedColumns(connection, schemaName, tableName);
+            var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
@@ -316,7 +317,8 @@ namespace nORM.Scaffolding
                 var propertyType = GetPropertyType(clrType, allowNull);
 
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                var isAuto = schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+                var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
+                    || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
                     || sqliteComputedColumns.Contains(colName);
 
@@ -355,6 +357,104 @@ namespace nORM.Scaffolding
                 var name = Convert.ToString(reader["name"]);
                 if (!string.IsNullOrWhiteSpace(name))
                     result.Add(name);
+            }
+
+            return result;
+        }
+
+        private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
+        {
+            var connectionName = connection.GetType().Name;
+
+            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
+                using var cmd = connection.CreateCommand();
+                var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                    ? string.Empty
+                    : EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    rows.Add((
+                        Convert.ToString(reader["name"]) ?? string.Empty,
+                        Convert.ToString(reader["type"]) ?? string.Empty,
+                        ReaderHasColumn(reader, "pk")
+                            ? Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture)
+                            : 0));
+                }
+
+                var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
+                if (primaryKeyColumns.Length == 1
+                    && primaryKeyColumns[0].Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryKeyColumns[0].Name };
+                }
+
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT c.name AS ColumnName
+                    FROM sys.identity_columns ic
+                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
+                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                    WHERE t.name = @tableName
+                      AND (@schemaName IS NULL OR s.name = @schemaName)
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_name = @tableName
+                      AND (@schemaName IS NULL OR table_schema = @schemaName)
+                      AND (
+                          is_identity = 'YES'
+                          OR column_default LIKE 'nextval(%'
+                      )
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = @tableName
+                      AND LOWER(extra) LIKE '%auto_increment%'
+                    """, schemaName, tableName);
+            }
+
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlySet<string> QueryColumnNameSet(DbConnection connection, string sql, string? schemaName, string tableName)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (!string.IsNullOrWhiteSpace(columnName))
+                    result.Add(columnName);
             }
 
             return result;

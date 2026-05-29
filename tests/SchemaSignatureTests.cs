@@ -233,7 +233,7 @@ public class SchemaSignatureTests
     }
 
     [Fact]
-    public void DifferentIdentityMetadata_DifferentSignature_WhenProviderReportsIt()
+    public void IntegerPrimaryKey_MetadataAffectsSignatureAndDynamicAttributes()
     {
         using var cn = OpenMemory();
         using var cmd = cn.CreateCommand();
@@ -242,14 +242,21 @@ public class SchemaSignatureTests
 
         using var cn2 = OpenMemory();
         using var cmd2 = cn2.CreateCommand();
-        cmd2.CommandText = "CREATE TABLE T5c (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)";
+        cmd2.CommandText = "CREATE TABLE T5c (Id INTEGER NOT NULL, Name TEXT NOT NULL)";
         cmd2.ExecuteNonQuery();
 
         var gen = Gen();
         var sig1 = gen.ComputeSchemaSignature(cn, "T5c");
         var sig2 = gen.ComputeSchemaSignature(cn2, "T5c");
+        var type = gen.GenerateEntityType(cn, "T5c");
+        var generated = type.GetProperty("Id")!
+            .GetCustomAttributes(typeof(DatabaseGeneratedAttribute), inherit: false)
+            .Cast<DatabaseGeneratedAttribute>()
+            .SingleOrDefault();
 
         Assert.NotEqual(sig1, sig2);
+        Assert.NotNull(generated);
+        Assert.Equal(DatabaseGeneratedOption.Identity, generated.DatabaseGeneratedOption);
     }
 
     [Fact]
