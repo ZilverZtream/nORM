@@ -494,6 +494,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private static void AssertScaffoldOutputBuilds(string outputDirectory)
     {
         var root = FindRepositoryRoot();
+        var normAssembly = Path.Combine(root, "src", "bin", "Release", "net8.0", "nORM.dll");
+        Assert.True(File.Exists(normAssembly), $"Expected built nORM assembly at {normAssembly}. Run dotnet build nORM.sln -c Release first.");
         File.WriteAllText(Path.Combine(outputDirectory, "LiveScaffolded.csproj"), $$"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -502,7 +504,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 <ImplicitUsings>enable</ImplicitUsings>
               </PropertyGroup>
               <ItemGroup>
-                <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+                <Reference Include="nORM">
+                  <HintPath>{{normAssembly}}</HintPath>
+                </Reference>
               </ItemGroup>
             </Project>
             """, Encoding.UTF8);

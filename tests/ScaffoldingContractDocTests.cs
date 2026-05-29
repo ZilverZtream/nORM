@@ -102,6 +102,31 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_and_source_pin_provider_specific_index_diagnostics()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+
+        Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
+        Assert.Contains("expression", doc, StringComparison.Ordinal);
+        Assert.Contains("included-column", doc, StringComparison.Ordinal);
+        Assert.Contains("PartialIndex", source, StringComparison.Ordinal);
+        Assert.Contains("ExpressionIndex", source, StringComparison.Ordinal);
+        Assert.Contains("IncludedColumnIndex", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_pins_inverse_many_to_many_scaffolding()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+
+        Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
+        Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
+        Assert.Contains(".WithMany(p => p.", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_names_the_public_scaffolder_types()
     {
         var doc = ReadDoc();
