@@ -396,7 +396,7 @@ namespace nORM.Scaffolding
                         att.attname AS ColumnName,
                         idx.relname AS IndexName,
                         ix.indisunique AS IsUnique,
-                        cardinality(ix.indkey) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY ix.indexrelid) AS ColumnCount
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
