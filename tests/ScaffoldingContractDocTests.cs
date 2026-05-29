@@ -78,6 +78,9 @@ public class ScaffoldingContractDocTests
         Assert.Contains("views", doc, StringComparison.Ordinal);
         Assert.Contains("routines", doc, StringComparison.Ordinal);
         Assert.Contains("sequences", doc, StringComparison.Ordinal);
+        Assert.Contains("synonyms", doc, StringComparison.Ordinal);
+        Assert.Contains("materialized views", doc, StringComparison.Ordinal);
+        Assert.Contains("events", doc, StringComparison.Ordinal);
         Assert.Contains("skipped", doc, StringComparison.Ordinal);
         Assert.Contains("tables without primary keys", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
@@ -97,6 +100,9 @@ public class ScaffoldingContractDocTests
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
+        Assert.Contains("'Synonym'", source, StringComparison.Ordinal);
+        Assert.Contains("'MaterializedView'", source, StringComparison.Ordinal);
+        Assert.Contains("'Event'", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -375,6 +375,9 @@ namespace nORM.Scaffolding
                     UNION ALL
                     SELECT SCHEMA_NAME(s.schema_id), s.name, 'Sequence', 'SQL Server sequence'
                     FROM sys.sequences s
+                    UNION ALL
+                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Synonym', 'SQL Server synonym'
+                    FROM sys.synonyms s
                     ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
@@ -389,6 +392,10 @@ namespace nORM.Scaffolding
                     SELECT sequence_schema, sequence_name, 'Sequence', 'PostgreSQL sequence'
                     FROM information_schema.sequences
                     WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT schemaname, matviewname, 'MaterializedView', 'PostgreSQL materialized view'
+                    FROM pg_matviews
+                    WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
                     SELECT routine_schema, routine_name, 'Routine', 'PostgreSQL routine'
                     FROM information_schema.routines
@@ -407,6 +414,10 @@ namespace nORM.Scaffolding
                     SELECT NULL, routine_name, 'Routine', CONCAT('MySQL ', routine_type)
                     FROM information_schema.routines
                     WHERE routine_schema = DATABASE()
+                    UNION ALL
+                    SELECT NULL, event_name, 'Event', 'MySQL event'
+                    FROM information_schema.events
+                    WHERE event_schema = DATABASE()
                     ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
@@ -1646,6 +1657,9 @@ namespace nORM.Scaffolding
                 "View" => "Map a supported table-backed model or hand-write a read-only query surface for the view; v1 scaffolding emits base-table entities only.",
                 "Routine" => "Keep routine calls behind explicit raw SQL/stored-procedure code and document the provider-bound contract.",
                 "Sequence" => "Configure generated-key behavior explicitly or keep sequence DDL in provider migrations.",
+                "Synonym" => "Resolve the synonym to a supported base table or keep it behind provider-bound integration code.",
+                "MaterializedView" => "Map a supported base table or hand-write a provider-bound refresh/query path for the materialized view.",
+                "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
                 _ => "Keep this database object in provider migrations or hand-written integration code."
             };
 
