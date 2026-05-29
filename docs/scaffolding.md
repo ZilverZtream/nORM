@@ -73,6 +73,9 @@ must be reviewed and edited like handwritten model code.
   single-column/composite index generation and columns that participate in
   multiple indexes, plus composite-FK, many-to-many candidate, and
   provider-owned schema diagnostics.
+- `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
+  proves `dotnet-norm scaffold` output builds in a consumer project, including
+  quoted/backslash/XML-sensitive table and column identifiers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted identifier preservation, and
   connection ownership for sync/async dynamic scaffolding calls.

@@ -193,7 +193,8 @@ public class CliIntegrationTests
                     PRAGMA foreign_keys=ON;
                     CREATE TABLE Author (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Name TEXT NOT NULL
+                        Name TEXT NOT NULL,
+                        "bad""col\name<&>" TEXT NOT NULL
                     );
                     CREATE TABLE Book (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,6 +214,7 @@ public class CliIntegrationTests
                         CONSTRAINT FK_BookLabel_Label FOREIGN KEY (LabelId) REFERENCES Label(Id)
                     );
                     CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
+                    CREATE INDEX "IX_Author_Bad""Col" ON Author("bad""col\name<&>");
                     """;
                 cmd.ExecuteNonQuery();
             }
