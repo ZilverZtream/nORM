@@ -59,6 +59,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, AuthorTable + ".cs"));
                 var bookCode = await File.ReadAllTextAsync(Path.Combine(dir, BookTable + ".cs"));
+                var labelCode = await File.ReadAllTextAsync(Path.Combine(dir, LabelTable + ".cs"));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldContext.cs"));
 
                 Assert.False(File.Exists(Path.Combine(dir, BookLabelTable + ".cs")));
@@ -68,10 +69,12 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Author_Title\", Order = 1)]", bookCode);
                 Assert.Contains("public ScaffoldLiveAuthor? ScaffoldLiveAuthor { get; set; }", bookCode);
                 Assert.Contains("public List<ScaffoldLiveLabel> ScaffoldLiveLabels { get; set; } = new();", bookCode);
+                Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", labelCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);
                 Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
                 Assert.Contains(".HasMany<ScaffoldLiveLabel>(p => p.ScaffoldLiveLabels)", contextCode);
+                Assert.Contains(".WithMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains($".UsingTable(\"", contextCode);
                 Assert.Contains(BookLabelTable, contextCode);
                 Assert.Contains("\"BookId\", \"LabelId\");", contextCode);

@@ -112,7 +112,7 @@ namespace nORM.Scaffolding
 
                     var references = relationships.Where(r => string.Equals(r.DependentTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     var collections = relationships.Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
-                    var manyToManyCollections = manyToManyJoins.Where(r => string.Equals(r.LeftTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var manyToManyCollections = BuildManyToManyNavigations(manyToManyJoins, tableKey);
                     var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
                     var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections).ConfigureAwait(false);
@@ -166,7 +166,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex>? indexes = null,
             IReadOnlyList<ScaffoldRelationship>? references = null,
             IReadOnlyList<ScaffoldRelationship>? collections = null,
-            IReadOnlyList<ScaffoldManyToManyJoin>? manyToManyCollections = null)
+            IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -261,9 +261,9 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                 }
 
-                foreach (var collection in manyToManyCollections ?? Array.Empty<ScaffoldManyToManyJoin>())
+                foreach (var collection in manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
                 {
-                    sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.RightEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
+                    sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.TargetEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
                     sb.AppendLine();
                 }
 
@@ -1466,7 +1466,14 @@ namespace nORM.Scaffolding
                     existingCollectionNames[leftTableKey] = existingNames;
                 }
 
-                var collectionName = MakeUnique(Pluralize(rightEntity), existingNames);
+                var leftCollectionName = MakeUnique(Pluralize(rightEntity), existingNames);
+                if (!existingCollectionNames.TryGetValue(rightTableKey, out var existingInverseNames))
+                {
+                    existingInverseNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    existingCollectionNames[rightTableKey] = existingInverseNames;
+                }
+
+                var rightCollectionName = MakeUnique(Pluralize(leftEntity), existingInverseNames);
                 joins.Add(new ScaffoldManyToManyJoin(
                     joinTableKey,
                     leftTableKey,
@@ -1476,10 +1483,36 @@ namespace nORM.Scaffolding
                     rightEntity,
                     left.DependentColumn,
                     right.DependentColumn,
-                    collectionName));
+                    leftCollectionName,
+                    rightCollectionName));
             }
 
             return joins;
+        }
+
+        private static IReadOnlyList<ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
+            IReadOnlyList<ScaffoldManyToManyJoin> joins,
+            string tableKey)
+        {
+            var navigations = new List<ScaffoldManyToManyNavigation>();
+            foreach (var join in joins)
+            {
+                if (string.Equals(join.LeftTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    navigations.Add(new ScaffoldManyToManyNavigation(
+                        join.RightEntityName,
+                        join.LeftCollectionNavigationName));
+                }
+
+                if (string.Equals(join.RightTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    navigations.Add(new ScaffoldManyToManyNavigation(
+                        join.LeftEntityName,
+                        join.RightCollectionNavigationName));
+                }
+            }
+
+            return navigations;
         }
 
         private static ScaffoldForeignKey[] OrderManyToManyForeignKeys(string joinTableName, ScaffoldForeignKey[] foreignKeys)
@@ -1768,13 +1801,14 @@ namespace nORM.Scaffolding
                     {
                         var left = EscapeCSharpIdentifier(join.LeftEntityName);
                         var right = EscapeCSharpIdentifier(join.RightEntityName);
-                        var collection = EscapeCSharpIdentifier(join.CollectionNavigationName);
+                        var collection = EscapeCSharpIdentifier(join.LeftCollectionNavigationName);
+                        var inverseCollection = EscapeCSharpIdentifier(join.RightCollectionNavigationName);
                         var joinTable = EscapeStringLiteral(join.JoinTableName);
                         var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
                         var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
                         sb.AppendLine($"            mb.Entity<{left}>()");
                         sb.AppendLine($"                .HasMany<{right}>(p => p.{collection})");
-                        sb.AppendLine("                .WithMany()");
+                        sb.AppendLine($"                .WithMany(p => p.{inverseCollection})");
                         sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
                     }
                     sb.AppendLine("        };");
@@ -2132,6 +2166,11 @@ namespace nORM.Scaffolding
             string RightEntityName,
             string LeftForeignKeyColumn,
             string RightForeignKeyColumn,
+            string LeftCollectionNavigationName,
+            string RightCollectionNavigationName);
+
+        private readonly record struct ScaffoldManyToManyNavigation(
+            string TargetEntityName,
             string CollectionNavigationName);
 
         private readonly record struct ScaffoldUnsupportedFeature(

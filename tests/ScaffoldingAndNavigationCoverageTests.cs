@@ -1160,10 +1160,12 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "JoinCtx.cs"));
             Assert.Contains("public List<Book> Books { get; set; } = new();", authorCode);
+            Assert.Contains("public List<Author> Authors { get; set; } = new();", bookCode);
             Assert.Contains(".HasMany<Book>(p => p.Books)", contextCode);
-            Assert.Contains(".WithMany()", contextCode);
+            Assert.Contains(".WithMany(p => p.Authors)", contextCode);
             Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorId\", \"BookId\");", contextCode);
         }
         finally
@@ -1247,8 +1249,9 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "JoinCtx.cs"));
 
             Assert.Contains("public List<Course> Courses { get; set; } = new();", studentCode);
-            Assert.DoesNotContain("public List<Student>", courseCode);
+            Assert.Contains("public List<Student> Students { get; set; } = new();", courseCode);
             Assert.Contains(".HasMany<Course>(p => p.Courses)", contextCode);
+            Assert.Contains(".WithMany(p => p.Students)", contextCode);
             Assert.Contains(".UsingTable(\"StudentCourse\", \"StudentId\", \"CourseId\");", contextCode);
         }
         finally

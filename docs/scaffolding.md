@@ -45,8 +45,10 @@ must be reviewed and edited like handwritten model code.
   diagnostics rather than emitted as portable `[Index]` attributes.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   single-column foreign keys, no payload columns, and both references targeting
-  single-column primary keys. The join table is emitted as fluent
-  `HasMany().WithMany().UsingTable(...)` configuration instead of a join entity.
+  single-column primary keys. Both entity sides receive collection navigations,
+  and the join table is emitted as fluent
+  `HasMany().WithMany(inverse).UsingTable(...)` configuration instead of a join
+  entity.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`; null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an
