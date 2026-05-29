@@ -52,6 +52,13 @@ public class SchemaSnapshotTests
         public int TenantId { get; set; }
     }
 
+    [Table("SnapshotSchemaEntity", Schema = "tenant")]
+    private class SnapshotSchemaEntity
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
  // Helper: build a single-type snapshot using the assembly of the test type
     private static SchemaSnapshot BuildFor(params System.Type[] types)
     {
@@ -60,7 +67,12 @@ public class SchemaSnapshotTests
         foreach (var type in types)
         {
             var tableAttr = type.GetCustomAttribute<TableAttribute>();
-            var table = new TableSchema { Name = tableAttr?.Name ?? type.Name };
+            var tableName = tableAttr is null
+                ? type.Name
+                : string.IsNullOrWhiteSpace(tableAttr.Schema)
+                    ? tableAttr.Name
+                    : tableAttr.Schema + "." + tableAttr.Name;
+            var table = new TableSchema { Name = tableName };
 
  // Collect PK names
             var pkNames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
@@ -167,6 +179,16 @@ public class SchemaSnapshotTests
         var added = Assert.Single(diff.AddedIndexes, x => x.IndexName == "IX_SnapshotComposite_Tenant_Code");
         Assert.True(added.IsUnique);
         Assert.Equal(new[] { "TenantId", "Code" }, added.ColumnNames);
+    }
+
+    [Fact]
+    public void TableAttributeSchema_IncludedInSnapshotTableName()
+    {
+        var snapshot = BuildFor(typeof(SnapshotSchemaEntity));
+        var table = Assert.Single(snapshot.Tables);
+
+        Assert.Equal("tenant.SnapshotSchemaEntity", table.Name);
+        Assert.Contains(table.Columns, c => c.Name == "Id" && c.IndexName == "PK_tenant.SnapshotSchemaEntity");
     }
 
     [Fact]

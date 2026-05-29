@@ -163,7 +163,7 @@ namespace nORM.Migration
 
                 var table = new TableSchema
                 {
-                    Name = tableAttr?.Name ?? type.Name
+                    Name = GetTableName(type, tableAttr)
                 };
 
                 // Collect PK property names for the type using [Key] or convention.
@@ -465,6 +465,16 @@ namespace nORM.Migration
 
             // All other reference types (class, interface) are navigation properties
             return false;
+        }
+
+        private static string GetTableName(Type type, TableAttribute? tableAttribute)
+        {
+            if (tableAttribute is null)
+                return type.Name;
+
+            return string.IsNullOrWhiteSpace(tableAttribute.Schema)
+                ? tableAttribute.Name
+                : tableAttribute.Schema + "." + tableAttribute.Name;
         }
 
         /// <summary>
@@ -839,5 +849,6 @@ namespace nORM.Migration
             }
             return map;
         }
+
     }
 }
