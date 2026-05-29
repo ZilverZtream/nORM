@@ -1172,6 +1172,9 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("TenantOrderLine", warnings);
             Assert.Contains("TenantOrder", warnings);
             var compositeForeignKeys = warningJson.RootElement.GetProperty("compositeForeignKeys");
+            Assert.Equal("SCF001", compositeForeignKeys[0].GetProperty("code").GetString());
+            Assert.Equal("Warning", compositeForeignKeys[0].GetProperty("severity").GetString());
+            Assert.Equal("relationship", compositeForeignKeys[0].GetProperty("category").GetString());
             Assert.Equal("TenantOrderLine", compositeForeignKeys[0].GetProperty("dependentTable").GetString());
             Assert.Equal("TenantOrder", compositeForeignKeys[0].GetProperty("principalTable").GetString());
             Assert.Equal("TenantId", compositeForeignKeys[0].GetProperty("dependentColumns")[0].GetString());
@@ -1228,9 +1231,14 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Collation" && item.GetProperty("name").GetString() == "FeatureOwned");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint" && item.GetProperty("name").GetString() == "FeatureOwned");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("code").GetString() == "SCF100" && item.GetProperty("category").GetString() == "schema-feature");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("code").GetString() == "SCF110" && item.GetProperty("category").GetString() == "database-object");
+            Assert.All(providerOwned.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
+            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("code").GetString() == "SCF200" && item.GetProperty("category").GetString() == "query-object");
+            Assert.All(skippedObjects.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(skippedObjects.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
         }
         finally
@@ -1628,6 +1636,9 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Author", warnings);
             Assert.Contains("Book", warnings);
             var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            Assert.Equal("SCF002", joinTables[0].GetProperty("code").GetString());
+            Assert.Equal("Warning", joinTables[0].GetProperty("severity").GetString());
+            Assert.Equal("many-to-many", joinTables[0].GetProperty("category").GetString());
             Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Author");
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Book");

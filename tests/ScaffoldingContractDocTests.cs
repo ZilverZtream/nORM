@@ -126,8 +126,15 @@ public class ScaffoldingContractDocTests
         Assert.Contains("possibleManyToManyJoinTables", doc, StringComparison.Ordinal);
         Assert.Contains("providerOwnedSchemaFeatures", doc, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", doc, StringComparison.Ordinal);
+        Assert.Contains("code", doc, StringComparison.Ordinal);
+        Assert.Contains("severity", doc, StringComparison.Ordinal);
+        Assert.Contains("category", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
-        Assert.Contains("suggestedAction", ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"), StringComparison.Ordinal);
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        Assert.Contains("code =", source, StringComparison.Ordinal);
+        Assert.Contains("severity =", source, StringComparison.Ordinal);
+        Assert.Contains("category =", source, StringComparison.Ordinal);
+        Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
     }
 
     [Fact]

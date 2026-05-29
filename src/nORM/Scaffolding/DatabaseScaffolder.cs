@@ -1607,15 +1607,15 @@ namespace nORM.Scaffolding
                     sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
-                    sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- | --- |");
+                    sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
                     foreach (var group in compositeForeignKeys)
                     {
                         var rows = group.ToArray();
                         var first = rows[0];
                         var dependent = TableKey(first.DependentSchema, first.DependentTable);
                         var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
-                        sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} | {EscapeMarkdown(SuggestedActionForCompositeForeignKey())} |");
+                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForCompositeForeignKey()} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForCompositeForeignKey()} | {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} | {EscapeMarkdown(SuggestedActionForCompositeForeignKey())} |");
                     }
                 }
 
@@ -1626,10 +1626,10 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("These tables have two single-column foreign key constraints. They are scaffolded as normal entities; review them if you want nORM fluent many-to-many mapping instead.");
                     sb.AppendLine();
-                    sb.AppendLine("| Table | Principal Tables | Constraints | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- |");
+                    sb.AppendLine("| Code | Severity | Category | Table | Principal Tables | Constraints | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
                     foreach (var table in possibleJoinTables)
-                        sb.AppendLine($"| {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} | {EscapeMarkdown(SuggestedActionForPossibleJoinTable())} |");
+                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForPossibleJoinTable()} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForPossibleJoinTable()} | {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} | {EscapeMarkdown(SuggestedActionForPossibleJoinTable())} |");
                 }
 
                 if (unsupportedFeatures.Count > 0)
@@ -1639,14 +1639,14 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
-                    sb.AppendLine("| Kind | Table | Object | Detail | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- |");
+                    sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
                     foreach (var feature in unsupportedFeatures
                         .OrderBy(f => f.TableKey, StringComparer.Ordinal)
                         .ThenBy(f => f.Kind, StringComparer.Ordinal)
                         .ThenBy(f => f.Name, StringComparer.Ordinal))
                     {
-                        sb.AppendLine($"| {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} | {EscapeMarkdown(SuggestedActionForUnsupportedFeature(feature.Kind))} |");
+                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForUnsupportedFeature(feature.Kind)} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForUnsupportedFeature(feature.Kind)} | {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} | {EscapeMarkdown(SuggestedActionForUnsupportedFeature(feature.Kind))} |");
                     }
                 }
 
@@ -1657,13 +1657,13 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("Views, routines, and sequences are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
                     sb.AppendLine();
-                    sb.AppendLine("| Kind | Name | Detail | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- |");
+                    sb.AppendLine("| Code | Severity | Category | Kind | Name | Detail | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
                     foreach (var obj in skippedObjects
                         .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
                         .ThenBy(o => o.Kind, StringComparer.Ordinal))
                     {
-                        sb.AppendLine($"| {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} | {EscapeMarkdown(SuggestedActionForSkippedObject(obj.Kind))} |");
+                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForSkippedObject(obj.Kind)} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForSkippedObject(obj.Kind)} | {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} | {EscapeMarkdown(SuggestedActionForSkippedObject(obj.Kind))} |");
                     }
                 }
 
@@ -1714,6 +1714,78 @@ namespace nORM.Scaffolding
 
         private static string SuggestedActionForPossibleJoinTable()
             => "If this is a pure join table, replace the scaffolded entity with an explicit UsingTable mapping; keep it as an entity if it carries payload or domain behavior.";
+
+        private static string ScaffoldDiagnosticSeverity()
+            => "Warning";
+
+        private static string ScaffoldDiagnosticCodeForCompositeForeignKey()
+            => "SCF001";
+
+        private static string ScaffoldDiagnosticCategoryForCompositeForeignKey()
+            => "relationship";
+
+        private static string ScaffoldDiagnosticCodeForPossibleJoinTable()
+            => "SCF002";
+
+        private static string ScaffoldDiagnosticCategoryForPossibleJoinTable()
+            => "many-to-many";
+
+        private static string ScaffoldDiagnosticCodeForUnsupportedFeature(string kind)
+            => kind switch
+            {
+                "Default" => "SCF100",
+                "Computed" => "SCF101",
+                "CheckConstraint" => "SCF102",
+                "Collation" => "SCF103",
+                "ProviderSpecificColumnType" => "SCF104",
+                "PrecisionScale" => "SCF105",
+                "ReferentialAction" => "SCF106",
+                "RelationshipPrincipalKey" => "SCF107",
+                "RowVersion" => "SCF108",
+                "IdentityStrategy" => "SCF109",
+                "Trigger" => "SCF110",
+                "PartialIndex" => "SCF111",
+                "ExpressionIndex" => "SCF112",
+                "IncludedColumnIndex" => "SCF113",
+                "DescendingIndex" => "SCF114",
+                "TemporalTable" => "SCF115",
+                "MissingPrimaryKey" => "SCF116",
+                _ => "SCF199"
+            };
+
+        private static string ScaffoldDiagnosticCategoryForUnsupportedFeature(string kind)
+            => kind switch
+            {
+                "ReferentialAction" or "RelationshipPrincipalKey" => "relationship",
+                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" => "index",
+                "Trigger" or "TemporalTable" => "database-object",
+                "MissingPrimaryKey" => "table-shape",
+                _ => "schema-feature"
+            };
+
+        private static string ScaffoldDiagnosticCodeForSkippedObject(string kind)
+            => kind switch
+            {
+                "View" => "SCF200",
+                "Routine" => "SCF201",
+                "Sequence" => "SCF202",
+                "Synonym" => "SCF203",
+                "MaterializedView" => "SCF204",
+                "Event" => "SCF205",
+                "VirtualTable" => "SCF206",
+                "VirtualTableShadow" => "SCF207",
+                _ => "SCF299"
+            };
+
+        private static string ScaffoldDiagnosticCategoryForSkippedObject(string kind)
+            => kind switch
+            {
+                "View" or "MaterializedView" => "query-object",
+                "Routine" or "Event" => "routine",
+                "Sequence" => "key-generation",
+                "VirtualTable" or "VirtualTableShadow" => "virtual-table",
+                _ => "database-object"
+            };
 
         private static string SuggestedActionForUnsupportedFeature(string kind)
             => kind switch
@@ -1770,6 +1842,9 @@ namespace nORM.Scaffolding
                     var first = rows[0];
                     return new
                     {
+                        code = ScaffoldDiagnosticCodeForCompositeForeignKey(),
+                        severity = ScaffoldDiagnosticSeverity(),
+                        category = ScaffoldDiagnosticCategoryForCompositeForeignKey(),
                         constraint = first.ConstraintName,
                         dependentTable = TableKey(first.DependentSchema, first.DependentTable),
                         dependentColumns = rows.Select(r => r.DependentColumn).ToArray(),
@@ -1794,6 +1869,9 @@ namespace nORM.Scaffolding
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .Select(g => new
                 {
+                    code = ScaffoldDiagnosticCodeForPossibleJoinTable(),
+                    severity = ScaffoldDiagnosticSeverity(),
+                    category = ScaffoldDiagnosticCategoryForPossibleJoinTable(),
                     table = g.TableKey,
                     principalTables = g.PrincipalTables,
                     constraints = g.ConstraintNames,
@@ -1807,6 +1885,9 @@ namespace nORM.Scaffolding
                 .ThenBy(f => f.Name, StringComparer.Ordinal)
                 .Select(f => new
                 {
+                    code = ScaffoldDiagnosticCodeForUnsupportedFeature(f.Kind),
+                    severity = ScaffoldDiagnosticSeverity(),
+                    category = ScaffoldDiagnosticCategoryForUnsupportedFeature(f.Kind),
                     kind = f.Kind,
                     table = f.TableKey,
                     name = f.Name,
@@ -1820,6 +1901,9 @@ namespace nORM.Scaffolding
                 .ThenBy(o => o.Kind, StringComparer.Ordinal)
                 .Select(o => new
                 {
+                    code = ScaffoldDiagnosticCodeForSkippedObject(o.Kind),
+                    severity = ScaffoldDiagnosticSeverity(),
+                    category = ScaffoldDiagnosticCategoryForSkippedObject(o.Kind),
                     kind = o.Kind,
                     name = TableKey(o.Schema, o.Name),
                     detail = o.Detail,

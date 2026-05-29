@@ -205,6 +205,18 @@ explicit model configuration, keep provider-owned DDL in migrations, replace a
 pure join entity with `UsingTable`, add a primary key, or hand-write a
 provider-bound routine/view path.
 
+Each row also includes stable diagnostic metadata:
+
+- `code`: machine-readable scaffold diagnostic code such as `SCF001`,
+  `SCF100`, or `SCF200`.
+- `severity`: currently `Warning` for every report row emitted by v1
+  scaffolding.
+- `category`: a coarse bucket such as `relationship`, `schema-feature`,
+  `index`, `database-object`, `query-object`, or `virtual-table`.
+
+Use `code` and `category` for CI baselines, owner routing, and remediation
+dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
+
 The report is additive: new fields may be added in later versions, but v1 tools
 should tolerate unknown fields and should not treat an empty diagnostics file as
 provider-mobility evidence.
