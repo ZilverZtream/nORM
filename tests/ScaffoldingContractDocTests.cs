@@ -122,6 +122,9 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         Assert.Contains("Warning Report Shape", doc, StringComparison.Ordinal);
         Assert.Contains("nORM.ScaffoldWarnings.json", doc, StringComparison.Ordinal);
+        Assert.Contains("summary", doc, StringComparison.Ordinal);
+        Assert.Contains("totalWarnings", doc, StringComparison.Ordinal);
+        Assert.Contains("sectionCounts", doc, StringComparison.Ordinal);
         Assert.Contains("compositeForeignKeys", doc, StringComparison.Ordinal);
         Assert.Contains("possibleManyToManyJoinTables", doc, StringComparison.Ordinal);
         Assert.Contains("providerOwnedSchemaFeatures", doc, StringComparison.Ordinal);
@@ -134,6 +137,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("code =", source, StringComparison.Ordinal);
         Assert.Contains("severity =", source, StringComparison.Ordinal);
         Assert.Contains("category =", source, StringComparison.Ordinal);
+        Assert.Contains("totalWarnings =", source, StringComparison.Ordinal);
+        Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
     }
 

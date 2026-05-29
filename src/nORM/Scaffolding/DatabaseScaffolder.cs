@@ -1911,10 +1911,44 @@ namespace nORM.Scaffolding
                 })
                 .ToArray();
 
+            var diagnosticCodes = compositeForeignKeys
+                .Select(item => item.code)
+                .Concat(possibleJoinTables.Select(item => item.code))
+                .Concat(providerOwnedSchemaFeatures.Select(item => item.code))
+                .Concat(skippedDatabaseObjects.Select(item => item.code))
+                .GroupBy(code => code, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+            var diagnosticCategories = compositeForeignKeys
+                .Select(item => item.category)
+                .Concat(possibleJoinTables.Select(item => item.category))
+                .Concat(providerOwnedSchemaFeatures.Select(item => item.category))
+                .Concat(skippedDatabaseObjects.Select(item => item.category))
+                .GroupBy(category => category, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
             return JsonSerializer.Serialize(
                 new
                 {
                     version = 1,
+                    summary = new
+                    {
+                        totalWarnings = compositeForeignKeys.Length
+                            + possibleJoinTables.Length
+                            + providerOwnedSchemaFeatures.Length
+                            + skippedDatabaseObjects.Length,
+                        sectionCounts = new
+                        {
+                            compositeForeignKeys = compositeForeignKeys.Length,
+                            possibleManyToManyJoinTables = possibleJoinTables.Length,
+                            providerOwnedSchemaFeatures = providerOwnedSchemaFeatures.Length,
+                            skippedDatabaseObjects = skippedDatabaseObjects.Length
+                        },
+                        codes = diagnosticCodes,
+                        categories = diagnosticCategories
+                    },
                     compositeForeignKeys,
                     possibleManyToManyJoinTables = possibleJoinTables,
                     providerOwnedSchemaFeatures,

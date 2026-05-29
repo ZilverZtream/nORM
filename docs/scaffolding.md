@@ -194,10 +194,15 @@ When diagnostics exist, scaffolding writes both `nORM.ScaffoldWarnings.md` and
 these top-level fields:
 
 - `version`
+- `summary`
 - `compositeForeignKeys`
 - `possibleManyToManyJoinTables`
 - `providerOwnedSchemaFeatures`
 - `skippedDatabaseObjects`
+
+The `summary` field contains `totalWarnings`, `sectionCounts`, `codes`, and
+`categories` so CI can enforce budgets or route remediation without walking
+every report section.
 
 Each warning row includes a `suggestedAction` value. The action is intentionally
 specific enough for CI/reporting tools to show the next manual step: add
