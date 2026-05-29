@@ -411,6 +411,22 @@ public class DatabaseScaffolderPrivateMethodTests
 
     // ── GetUnqualifiedName ──────────────────────────────────────────────────
 
+    [Theory]
+    [InlineData(typeof(sbyte), "sbyte")]
+    [InlineData(typeof(uint), "uint")]
+    [InlineData(typeof(ulong), "ulong")]
+    [InlineData(typeof(ushort), "ushort")]
+    [InlineData(typeof(char), "char")]
+    [InlineData(typeof(DateOnly), "DateOnly")]
+    [InlineData(typeof(DateTimeOffset), "DateTimeOffset")]
+    [InlineData(typeof(TimeOnly), "TimeOnly")]
+    [InlineData(typeof(TimeSpan), "TimeSpan")]
+    public void GetTypeName_CommonScalarTypes_ReturnsStableCSharpName(Type type, string expected)
+    {
+        Assert.Equal(expected, InvokeGetTypeName(type, false));
+        Assert.Equal(expected + "?", InvokeGetTypeName(type, true));
+    }
+
     [Fact]
     public void GetUnqualifiedName_SchemaQualified_ReturnsTablePart()
     {
