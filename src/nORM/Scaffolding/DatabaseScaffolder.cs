@@ -1654,7 +1654,7 @@ namespace nORM.Scaffolding
                 cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
                 await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
                 var schema = reader.GetSchemaTable()!;
-                var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var existingNames = CreateReservedMemberNameSet();
                 var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (DataRow row in schema.Rows)
                 {
@@ -1674,7 +1674,12 @@ namespace nORM.Scaffolding
         {
             var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var (tableKey, columns) in columnPropertiesByTable)
-                result[tableKey] = new HashSet<string>(columns.Values, StringComparer.OrdinalIgnoreCase);
+            {
+                var names = CreateReservedMemberNameSet();
+                foreach (var column in columns.Values)
+                    names.Add(column);
+                result[tableKey] = names;
+            }
 
             return result;
         }
@@ -1685,12 +1690,18 @@ namespace nORM.Scaffolding
         {
             if (!memberNamesByTable.TryGetValue(tableKey, out var names))
             {
-                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                names = CreateReservedMemberNameSet();
                 memberNamesByTable[tableKey] = names;
             }
 
             return names;
         }
+
+        private static HashSet<string> CreateReservedMemberNameSet()
+            => typeof(object)
+                .GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .Select(member => member.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetPrimaryKeyColumnNamesAsync(
             DbConnection connection,

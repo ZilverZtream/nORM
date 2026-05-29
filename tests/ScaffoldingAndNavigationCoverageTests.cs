@@ -1542,6 +1542,40 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithObjectMemberColumnNames_GeneratesUniquePropertyNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE ObjectMembers (
+                Id INTEGER PRIMARY KEY,
+                ToString TEXT NOT NULL,
+                Equals TEXT NOT NULL,
+                GetHashCode TEXT NOT NULL,
+                GetType TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ObjectMemberCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "ObjectMembers.cs"));
+            Assert.Contains("public string ToString2 { get; set; } = default!;", entityCode);
+            Assert.Contains("public string Equals2 { get; set; } = default!;", entityCode);
+            Assert.Contains("public string GetHashCode2 { get; set; } = default!;", entityCode);
+            Assert.Contains("public string GetType2 { get; set; } = default!;", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithTableFilter_GeneratesOnlyRequestedTables()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

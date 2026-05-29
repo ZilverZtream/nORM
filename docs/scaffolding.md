@@ -35,7 +35,9 @@ must be reviewed and edited like handwritten model code.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when
-  different database identifiers normalize to the same C# identifier.
+  different database identifiers normalize to the same C# identifier. Property
+  and navigation names also avoid inherited `object` member names such as
+  `ToString`, `Equals`, `GetHashCode`, and `GetType`.
 - The requested namespace is validated before files are written, and the
   generated context file name follows the escaped context class name rather
   than the raw CLI/API input. If that context name collides with an entity
