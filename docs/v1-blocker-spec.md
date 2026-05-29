@@ -674,6 +674,10 @@ Resolution note:
   cascade/non-cascade delete preservation, pure many-to-many join mappings
   including schema-qualified join tables, index metadata, warning reports, and
   `--fail-on-warnings`.
+- Warning reports are structured evidence, not prose dumps: JSON rows include
+  stable diagnostic codes, severity, category, suggested actions, section
+  counts, and code/category summaries; stale warning reports are removed or
+  rejected deterministically when a later scaffold has no diagnostics.
 - Unsupported or non-entity database shapes are reported instead of silently
   modeled: composite FKs, payload join tables, alternate-key/keyless-principal
   relationships, provider defaults/computed expressions/check constraints/
