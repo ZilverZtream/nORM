@@ -121,7 +121,7 @@ namespace nORM.Mapping
             var fluentColName = fluentConfig?.ColumnNames.TryGetValue(pi, out var name) == true ? name : null;
             var colName = fluentColName ?? pi.GetCustomAttribute<ColumnAttribute>()?.Name ?? PropName;
             Name = colName;
-            EscCol = p.Escape(colName);
+            EscCol = IdentifierEscaping.EscapeSingle(p, colName);
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
@@ -168,7 +168,7 @@ namespace nORM.Mapping
             PropName = name;
             var colName = columnName ?? name;
             Name = colName;
-            EscCol = p.Escape(colName);
+            EscCol = IdentifierEscaping.EscapeSingle(p, colName);
             IsKey = false;
             IsTimestamp = false;
             IsDbGenerated = false;

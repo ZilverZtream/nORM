@@ -1,6 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using nORM.Providers;
 using Xunit;
 using System.Linq;
+using Microsoft.Data.Sqlite;
+using nORM.Core;
 
 namespace nORM.Tests;
 
@@ -129,10 +133,41 @@ public class IdentifierEscapingTests
         Assert.Equal("\"dbo\".\"my\"\"table\"", provider.Escape("dbo.my\"table"));
     }
 
+    [Fact]
+    public void MappingMetadata_LiteralDottedTableAndColumnNames_AreEscapedAsSingleIdentifiers()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE "audit.events" (Id INTEGER PRIMARY KEY, "value.part" TEXT NOT NULL);
+                INSERT INTO "audit.events" (Id, "value.part") VALUES (1, 'mapped');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(connection, new SqliteProvider());
+
+        var row = ctx.Query<DottedIdentifierEntity>().Single();
+
+        Assert.Equal("mapped", row.Value);
+    }
+
  //<summary>
  //Creates a PostgresProvider without needing a real Npgsql connection.
  //We use a SqliteParameterFactory as a stand-in since we only test Escape().
  //</summary>
     private static PostgresProvider CreatePostgresProvider()
         => new PostgresProvider(new SqliteParameterFactory());
+
+    [Table("audit.events")]
+    private sealed class DottedIdentifierEntity
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Column("value.part")]
+        public string Value { get; set; } = string.Empty;
+    }
 }
