@@ -44,6 +44,11 @@ PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL uses the current database for discovery without emitting
 the database/catalog name as a model schema.
 
+`--tables` accepts bare table names and schema-qualified names. Literal dotted
+table names are supported, but if a literal dotted table name collides with the
+same text as a schema-qualified table, scaffolding fails with an actionable
+error because the v1 filter syntax cannot disambiguate those objects safely.
+
 It is a bounded bootstrap tool, not a database-first completeness claim.
 Unsupported composite foreign keys, payload join tables, provider-specific
 defaults/computed columns/triggers, SQL Server provider-native temporal tables,
