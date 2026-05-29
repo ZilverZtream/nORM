@@ -745,6 +745,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             Assert.Contains("Provider-Owned Schema Features", warnings);
+            Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.Contains("Default", warnings);
             Assert.Contains("Name", warnings);
             Assert.Contains("Computed", warnings);

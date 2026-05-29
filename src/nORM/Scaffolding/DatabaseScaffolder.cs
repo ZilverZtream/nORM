@@ -802,21 +802,25 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine("The scaffolder detected database features that were not converted into runnable nORM model code.");
                 sb.AppendLine("Review these items before using the generated model for migrations or navigation queries.");
-                sb.AppendLine();
-                sb.AppendLine("## Composite Foreign Keys");
-                sb.AppendLine();
-                sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
-                sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
-                sb.AppendLine();
-                sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns |");
-                sb.AppendLine("| --- | --- | --- | --- | --- |");
-                foreach (var group in compositeForeignKeys)
+
+                if (compositeForeignKeys.Length > 0)
                 {
-                    var rows = group.ToArray();
-                    var first = rows[0];
-                    var dependent = TableKey(first.DependentSchema, first.DependentTable);
-                    var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
-                    sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                    sb.AppendLine();
+                    sb.AppendLine("## Composite Foreign Keys");
+                    sb.AppendLine();
+                    sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
+                    sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
+                    sb.AppendLine();
+                    sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- |");
+                    foreach (var group in compositeForeignKeys)
+                    {
+                        var rows = group.ToArray();
+                        var first = rows[0];
+                        var dependent = TableKey(first.DependentSchema, first.DependentTable);
+                        var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
+                        sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                    }
                 }
 
                 if (possibleJoinTables.Length > 0)
