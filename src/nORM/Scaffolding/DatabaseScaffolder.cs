@@ -971,6 +971,15 @@ namespace nORM.Scaffolding
                             table.Name,
                             "SQLite CHECK constraint"));
                     }
+
+                    if (ContainsCollation(createSql))
+                    {
+                        features.Add(new ScaffoldUnsupportedFeature(
+                            TableKey(table.Schema, table.Name),
+                            "Collation",
+                            table.Name,
+                            "SQLite COLLATE clause"));
+                    }
                 }
 
                 foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
@@ -1062,6 +1071,13 @@ namespace nORM.Scaffolding
                     INNER JOIN sys.tables t ON t.object_id = cc.parent_object_id
                     WHERE t.is_ms_shipped = 0
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Collation', c.collation_name
+                    FROM sys.columns c
+                    INNER JOIN sys.tables t ON t.object_id = c.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND c.collation_name IS NOT NULL
+                      AND c.collation_name <> CONVERT(sysname, DATABASEPROPERTYEX(DB_NAME(), 'Collation'))
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1116,6 +1132,10 @@ namespace nORM.Scaffolding
                     FROM information_schema.table_constraints
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND constraint_type = 'CHECK'
                     UNION ALL
+                    SELECT table_schema, table_name, column_name, 'Collation', collation_name
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND collation_name IS NOT NULL
+                    UNION ALL
                     SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
@@ -1164,6 +1184,13 @@ namespace nORM.Scaffolding
                     SELECT NULL, table_name, constraint_name, 'CheckConstraint', 'MySQL CHECK constraint'
                     FROM information_schema.table_constraints
                     WHERE table_schema = DATABASE() AND constraint_type = 'CHECK'
+                    UNION ALL
+                    SELECT NULL, c.table_name, c.column_name, 'Collation', c.collation_name
+                    FROM information_schema.columns c
+                    INNER JOIN information_schema.schemata s ON s.schema_name = c.table_schema
+                    WHERE c.table_schema = DATABASE()
+                      AND c.collation_name IS NOT NULL
+                      AND c.collation_name <> s.default_collation_name
                     """).ConfigureAwait(false);
             }
 
@@ -1216,6 +1243,13 @@ namespace nORM.Scaffolding
                && System.Text.RegularExpressions.Regex.IsMatch(
                    createTableSql,
                    @"\bCHECK\s*\(",
+                   System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        private static bool ContainsCollation(string? createTableSql)
+            => !string.IsNullOrWhiteSpace(createTableSql)
+               && System.Text.RegularExpressions.Regex.IsMatch(
+                   createTableSql,
+                   @"\bCOLLATE\s+(?:""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)",
                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         private static string ScaffoldDiagnostics(
@@ -1378,6 +1412,7 @@ namespace nORM.Scaffolding
                 "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
                 "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
                 "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
+                "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",

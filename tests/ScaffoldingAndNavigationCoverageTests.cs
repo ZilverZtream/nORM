@@ -1090,7 +1090,7 @@ public class DatabaseScaffolderPrivateMethodTests
         cmd.CommandText = """
             CREATE TABLE FeatureOwned (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT NOT NULL DEFAULT 'new',
+                Name TEXT COLLATE NOCASE NOT NULL DEFAULT 'new',
                 NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL,
                 CONSTRAINT CK_FeatureOwned_Name CHECK (length(Name) > 0)
             );
@@ -1112,6 +1112,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Name", warnings);
             Assert.Contains("Computed", warnings);
             Assert.Contains("NameLength", warnings);
+            Assert.Contains("Collation", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
             Assert.Contains("CheckConstraint", warnings);
@@ -1120,6 +1121,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("name").GetString() == "Name");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Collation" && item.GetProperty("name").GetString() == "FeatureOwned");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint" && item.GetProperty("name").GetString() == "FeatureOwned");
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
