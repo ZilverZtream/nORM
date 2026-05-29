@@ -316,7 +316,21 @@ namespace nORM.Scaffolding
                 {
                     tables.AddRange(await QueryTablesAsync(
                         connection,
-                        $"SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, name AS TABLE_NAME FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND UPPER(sql) NOT LIKE 'CREATE VIRTUAL TABLE%' ORDER BY name").ConfigureAwait(false));
+                        $"""
+                        SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, m.name AS TABLE_NAME
+                        FROM {provider.Escape(schema)}.sqlite_master m
+                        WHERE m.type = 'table'
+                          AND m.name NOT LIKE 'sqlite_%'
+                          AND UPPER(COALESCE(m.sql, '')) NOT LIKE 'CREATE VIRTUAL TABLE%'
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM {provider.Escape(schema)}.sqlite_master vt
+                              WHERE vt.type = 'table'
+                                AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
+                                AND m.name LIKE vt.name || '_%'
+                          )
+                        ORDER BY m.name
+                        """).ConfigureAwait(false));
                 }
 
                 return tables;
@@ -364,6 +378,19 @@ namespace nORM.Scaffolding
                         SELECT {SqliteSchemaResult(schema)}, name, 'VirtualTable', 'SQLite virtual table'
                         FROM {provider.Escape(schema)}.sqlite_master
                         WHERE type = 'table' AND UPPER(sql) LIKE 'CREATE VIRTUAL TABLE%'
+                        UNION ALL
+                        SELECT {SqliteSchemaResult(schema)}, m.name, 'VirtualTableShadow', 'SQLite virtual table shadow table'
+                        FROM {provider.Escape(schema)}.sqlite_master m
+                        WHERE m.type = 'table'
+                          AND m.name NOT LIKE 'sqlite_%'
+                          AND UPPER(COALESCE(m.sql, '')) NOT LIKE 'CREATE VIRTUAL TABLE%'
+                          AND EXISTS (
+                              SELECT 1
+                              FROM {provider.Escape(schema)}.sqlite_master vt
+                              WHERE vt.type = 'table'
+                                AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
+                                AND m.name LIKE vt.name || '_%'
+                          )
                         ORDER BY ObjectName
                         """).ConfigureAwait(false));
                 }
@@ -1670,6 +1697,7 @@ namespace nORM.Scaffolding
                 "MaterializedView" => "Map a supported base table or hand-write a provider-bound refresh/query path for the materialized view.",
                 "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
                 "VirtualTable" => "Keep the virtual table behind provider-bound query/index code; v1 scaffolding emits normal base-table models only.",
+                "VirtualTableShadow" => "Do not map SQLite virtual-table shadow storage as domain entities; keep it provider-owned with the virtual table.",
                 _ => "Keep this database object in provider migrations or hand-written integration code."
             };
 

@@ -1261,6 +1261,7 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "VirtualCtx");
 
             Assert.False(File.Exists(Path.Combine(dir, "SearchDocs.cs")));
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileName(path).Contains("SearchDocs", StringComparison.OrdinalIgnoreCase));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("VirtualTable", warnings);
@@ -1269,6 +1270,9 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(skippedObjects.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "VirtualTable" &&
                 item.GetProperty("name").GetString() == "SearchDocs");
+            Assert.Contains(skippedObjects.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
+                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal));
         }
         finally
         {
