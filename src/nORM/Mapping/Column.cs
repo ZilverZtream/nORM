@@ -125,7 +125,7 @@ namespace nORM.Mapping
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
-            IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity;
+            IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed;
             IsNullable = prefix != null || DetermineIsNullable(pi);
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
             if (ForeignKeyPrincipalTypeName == null && !IsKey)

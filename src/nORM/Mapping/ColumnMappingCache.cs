@@ -128,7 +128,7 @@ namespace nORM.Mapping
                         IsKey = attributes.OfType<KeyAttribute>().Any(),
                         IsTimestamp = attributes.OfType<TimestampAttribute>().Any(),
                         IsDbGenerated = attributes.OfType<DatabaseGeneratedAttribute>()
-                            .Any(attr => attr.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity),
+                            .Any(attr => attr.DatabaseGeneratedOption is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed),
                         ColumnName = attributes.OfType<ColumnAttribute>().FirstOrDefault()?.Name,
                         ForeignKeyName = attributes.OfType<ForeignKeyAttribute>().FirstOrDefault()?.Name,
                         Getter = CreateOptimizedGetter(prop),

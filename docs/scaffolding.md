@@ -17,8 +17,10 @@ must be reviewed and edited like handwritten model code.
   SQLite attached databases. MySQL scaffolding uses the current database for
   discovery but does not emit the database/catalog name as a model schema.
 - Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity, and
-  simple `[Required]`/`[MaxLength]` annotations when provider metadata exposes
-  them.
+  computed/generated-column, and simple `[Required]`/`[MaxLength]` annotations
+  when provider metadata exposes them. Computed/generated columns are marked
+  with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
+  insert columns, but their provider expressions remain provider-owned DDL.
 - Nullable reference/value type generation from database nullability metadata.
 - Non-null reference properties are initialized with `default!` so generated
   nullable-enabled code compiles cleanly before the application adds its own

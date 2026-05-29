@@ -57,6 +57,16 @@ public class SanSchemaWidget
     public string Name { get; set; } = string.Empty;
 }
 
+[Table("SAN_ComputedGenerated")]
+public class SanComputedGenerated
+{
+    [Key]
+    public int Id { get; set; }
+
+    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+    public int Total { get; set; }
+}
+
 [Table("SchemaParent", Schema = "aux")]
 [Xunit.Trait("Category", "Fast")]
 public class SanSchemaParent
@@ -652,6 +662,18 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void DatabaseGeneratedComputed_IsTreatedAsDatabaseGeneratedColumn()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var mapping = ctx.GetMapping(typeof(SanComputedGenerated));
+        var total = Assert.Single(mapping.Columns, c => c.PropName == nameof(SanComputedGenerated.Total));
+        Assert.True(total.IsDbGenerated);
+        Assert.DoesNotContain(mapping.InsertColumns, c => c.PropName == nameof(SanComputedGenerated.Total));
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_SqliteAttachedDatabase_PreservesSchemaAndDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1158,8 +1180,10 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FeatureOwnedCtx");
 
+            var entityCode = File.ReadAllText(Path.Combine(dir, "FeatureOwned.cs"));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode);
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.Contains("Default", warnings);

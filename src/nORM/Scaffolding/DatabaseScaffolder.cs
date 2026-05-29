@@ -96,6 +96,7 @@ namespace nORM.Scaffolding
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
+                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed");
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
@@ -121,7 +122,8 @@ namespace nORM.Scaffolding
                     var manyToManyCollections = BuildManyToManyNavigations(manyToManyJoins, tableKey);
                     var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections).ConfigureAwait(false);
+                    computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns).ConfigureAwait(false);
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
@@ -160,6 +162,7 @@ namespace nORM.Scaffolding
         /// <param name="references">Reference navigations from this entity to principal entities.</param>
         /// <param name="collections">Collection navigations from this entity to dependent entities.</param>
         /// <param name="manyToManyCollections">Many-to-many collection navigations from this entity through pure join tables.</param>
+        /// <param name="computedColumns">Column names known to be database-computed/generated.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -172,7 +175,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex>? indexes = null,
             IReadOnlyList<ScaffoldRelationship>? references = null,
             IReadOnlyList<ScaffoldRelationship>? collections = null,
-            IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null)
+            IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null,
+            IReadOnlySet<string>? computedColumns = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -216,6 +220,7 @@ namespace nORM.Scaffolding
 
                     var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                     var isAuto = row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+                    var isComputed = computedColumns?.Contains(colName) == true;
 
                     // String length if available
                     int? maxLength = null;
@@ -232,6 +237,8 @@ namespace nORM.Scaffolding
                         sb.AppendLine("    [Key]");
                     if (isAuto)
                         sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+                    else if (isComputed)
+                        sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
                     if (maxLength.HasValue)
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
                     if (!clrType.IsValueType && !allowNull)
@@ -1928,6 +1935,34 @@ namespace nORM.Scaffolding
             }
 
             return result;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
+            IEnumerable<ScaffoldUnsupportedFeature> features,
+            string kind)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, kind, StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name))
+                {
+                    continue;
+                }
+
+                if (!result.TryGetValue(feature.TableKey, out var names))
+                {
+                    names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    result[feature.TableKey] = names;
+                }
+
+                names.Add(feature.Name);
+            }
+
+            return result.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlySet<string>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
         }
 
         private static HashSet<string> GetOrCreateMemberNames(
