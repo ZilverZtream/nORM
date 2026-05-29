@@ -12,7 +12,8 @@ namespace nORM.Scaffolding
         /// <summary>
         /// Gets the optional table filter. Entries may be bare table names or
         /// schema-qualified names such as <c>dbo.Customer</c>. When empty, all
-        /// discovered user tables are scaffolded.
+        /// discovered user tables are scaffolded. Null or blank filters are
+        /// treated as empty.
         /// </summary>
         public IReadOnlyCollection<string> Tables { get; init; } = Array.Empty<string>();
 

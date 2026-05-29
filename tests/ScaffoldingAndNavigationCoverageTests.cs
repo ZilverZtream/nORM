@@ -1302,6 +1302,45 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithNullOrBlankTableFilter_TreatsFilterAsEmpty()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE FilterNullSafe (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var nullDir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        var blankDir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                nullDir,
+                "TestNs",
+                "NullFilterCtx",
+                new ScaffoldOptions { Tables = null! });
+
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                blankDir,
+                "TestNs",
+                "BlankFilterCtx",
+                new ScaffoldOptions { Tables = new[] { " ", "" } });
+
+            Assert.True(File.Exists(Path.Combine(nullDir, "FilterNullSafe.cs")));
+            Assert.True(File.Exists(Path.Combine(blankDir, "FilterNullSafe.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(nullDir)) Directory.Delete(nullDir, recursive: true);
+            if (Directory.Exists(blankDir)) Directory.Delete(blankDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

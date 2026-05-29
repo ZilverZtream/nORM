@@ -46,7 +46,8 @@ must be reviewed and edited like handwritten model code.
   single-column primary keys. The join table is emitted as fluent
   `HasMany().WithMany().UsingTable(...)` configuration instead of a join entity.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
-  `--tables`.
+  `--tables`; null or blank API filters are treated as empty rather than
+  producing raw runtime exceptions.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI

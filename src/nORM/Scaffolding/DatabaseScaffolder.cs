@@ -446,15 +446,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
             ScaffoldOptions options)
         {
-            if (options.Tables.Count == 0)
-                return tables;
-
-            var requested = options.Tables
-                .Where(table => !string.IsNullOrWhiteSpace(table))
-                .Select(table => table.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
+            var requested = GetRequestedTableFilters(options);
             if (requested.Length == 0)
                 return tables;
 
@@ -496,15 +488,7 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(IReadOnlyList<ScaffoldSkippedObject> skippedObjects, ScaffoldOptions options)
         {
-            if (options.Tables.Count == 0)
-                return skippedObjects;
-
-            var requested = options.Tables
-                .Where(table => !string.IsNullOrWhiteSpace(table))
-                .Select(table => table.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
+            var requested = GetRequestedTableFilters(options);
             if (requested.Length == 0)
                 return skippedObjects;
 
@@ -516,6 +500,18 @@ namespace nORM.Scaffolding
         private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObject obj, string requested)
             => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static string[] GetRequestedTableFilters(ScaffoldOptions options)
+        {
+            if (options.Tables is null)
+                return Array.Empty<string>();
+
+            return options.Tables
+                .Where(table => !string.IsNullOrWhiteSpace(table))
+                .Select(table => table.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
 
         private static async Task WriteGeneratedFileAsync(string path, string content, ScaffoldOptions options)
         {
