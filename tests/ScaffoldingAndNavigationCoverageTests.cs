@@ -1442,6 +1442,36 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithLiteralDottedIdentifiers_GeneratesSingleIdentifierMappings()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "audit.events" (
+                Id INTEGER PRIMARY KEY,
+                "value.part" TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DottedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "AuditEvents.cs"));
+            Assert.Contains("[Table(\"audit.events\")]", entityCode);
+            Assert.Contains("[Column(\"value.part\")]", entityCode);
+            Assert.Contains("public string ValuePart { get; set; } = default!;", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithIdentifierCollisions_GeneratesUniqueNames()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

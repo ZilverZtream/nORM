@@ -15,6 +15,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.ObjectPool;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using nORM.Mapping;
 
 namespace nORM.Scaffolding
 {
@@ -440,7 +441,7 @@ namespace nORM.Scaffolding
             var prefix = string.IsNullOrWhiteSpace(schema)
                 ? string.Empty
                 : provider.Escape(schema!) + ".";
-            return $"PRAGMA {prefix}{pragmaName}({provider.Escape(argument)})";
+            return $"PRAGMA {prefix}{pragmaName}({IdentifierEscaping.EscapeSingle(provider, argument)})";
         }
 
         private static IReadOnlyList<ScaffoldTable> FilterTables(
@@ -1951,7 +1952,9 @@ namespace nORM.Scaffolding
         /// Escapes schema and table identifiers using the given provider's rules.
         /// </summary>
         private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
-            => string.IsNullOrEmpty(schema) ? provider.Escape(table) : $"{provider.Escape(schema!)}.{provider.Escape(table)}";
+            => string.IsNullOrEmpty(schema)
+                ? IdentifierEscaping.EscapeSingle(provider, table)
+                : $"{provider.Escape(schema!)}.{IdentifierEscaping.EscapeSingle(provider, table)}";
 
         /// <summary>
         /// Escapes an identifier so it is valid in generated C# code. Reserved keywords are
