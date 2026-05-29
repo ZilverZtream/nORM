@@ -652,6 +652,7 @@ public class DatabaseScaffolderPrivateMethodTests
                 OrderNo TEXT NOT NULL
             );
             CREATE UNIQUE INDEX IX_IndexedOrder_Tenant_OrderNo ON IndexedOrder(TenantId, OrderNo);
+            CREATE INDEX IX_IndexedOrder_Tenant ON IndexedOrder(TenantId);
             """;
         cmd.ExecuteNonQuery();
 
@@ -661,6 +662,7 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeIndexCtx");
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedOrder.cs"));
+            Assert.Contains("[Index(\"IX_IndexedOrder_Tenant\")]", entityCode);
             Assert.Contains("[Index(\"IX_IndexedOrder_Tenant_OrderNo\", IsUnique = true, Order = 0)]", entityCode);
             Assert.Contains("[Index(\"IX_IndexedOrder_Tenant_OrderNo\", IsUnique = true, Order = 1)]", entityCode);
         }

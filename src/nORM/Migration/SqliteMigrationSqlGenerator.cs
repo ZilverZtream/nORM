@@ -101,11 +101,11 @@ namespace nORM.Migration
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
-                foreach (var idxGroup in table.Columns
-                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
-                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
-                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
+                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+                {
+                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                }
 
                 down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
             }
@@ -177,11 +177,11 @@ namespace nORM.Migration
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
-                foreach (var idxGroup in table.Columns
-                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
-                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
-                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
+                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+                {
+                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                }
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
@@ -339,11 +339,14 @@ namespace nORM.Migration
             stmts.Add($"DROP TABLE {Esc(table.Name)}");
             stmts.Add($"ALTER TABLE {tempName} RENAME TO {Esc(table.Name)}");
 
-            // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
-            foreach (var idxGroup in cols
-                .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
-                .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
-                stmts.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
+            var recreatedTable = new TableSchema { Name = table.Name };
+            foreach (var col in cols)
+                recreatedTable.Columns.Add(col);
+            foreach (var index in SchemaDiffer.GetExplicitIndexes(recreatedTable))
+            {
+                var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+            }
         }
 
         // M1/X1: Allowlist for FK referential action tokens. Free-form strings are not safe

@@ -47,6 +47,7 @@ public class SchemaSnapshotTests
         [Key] public int Id { get; set; }
         [Index("IX_SnapshotComposite_Tenant_Code", IsUnique = true, Order = 1)]
         public string Code { get; set; } = string.Empty;
+        [Index("IX_SnapshotComposite_Tenant", Order = 0)]
         [Index("IX_SnapshotComposite_Tenant_Code", IsUnique = true, Order = 0)]
         public int TenantId { get; set; }
     }
@@ -140,6 +141,11 @@ public class SchemaSnapshotTests
     {
         var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotCompositeIndexedEntity).Assembly);
         var table = snapshot.Tables.Single(t => t.Name == "SnapshotCompositeIndexedEntity");
+        var tenant = table.Columns.Single(c => c.Name == "TenantId");
+        Assert.False(tenant.IsUnique);
+        Assert.Equal(2, tenant.Indexes.Count);
+        Assert.Contains(tenant.Indexes, i => i.Name == "IX_SnapshotComposite_Tenant");
+        Assert.Contains(tenant.Indexes, i => i.Name == "IX_SnapshotComposite_Tenant_Code" && i.IsUnique && i.Order == 0);
         var oldSnapshot = new SchemaSnapshot
         {
             Tables =

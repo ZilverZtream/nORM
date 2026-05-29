@@ -31,8 +31,9 @@ must be reviewed and edited like handwritten model code.
   navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires
   them through `OnModelCreating` while preserving caller-supplied model
   configuration.
-- Single-column and composite non-primary-key index generation through nORM's
-  `[Index]` metadata.
+- Single-column, composite, and multi-membership non-primary-key index
+  generation through nORM's `[Index]` metadata, including unique composite
+  indexes without converting them into per-column uniqueness.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
@@ -43,7 +44,8 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` covers identifier normalization,
   duplicate generated-name handling, table filtering, overwrite protection,
   nullable initialization, SQLite FK navigation generation, and SQLite
-  single-column/composite index generation.
+  single-column/composite index generation and columns that participate in
+  multiple indexes.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
   duplicate generated property handling.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship

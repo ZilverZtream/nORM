@@ -117,11 +117,11 @@ namespace nORM.Migration
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
-                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
-                foreach (var idxGroup in table.Columns
-                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
-                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
-                    up.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
+                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+                {
+                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                }
             }
 
             // UP-6: Add columns to existing tables.
@@ -194,11 +194,11 @@ namespace nORM.Migration
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
-                // B: group columns by IndexName and emit ONE CREATE INDEX per unique name.
-                foreach (var idxGroup in table.Columns
-                    .Where(c => c.IndexName != null && !c.IsPrimaryKey && !c.IsUnique)
-                    .GroupBy(c => c.IndexName!, StringComparer.OrdinalIgnoreCase))
-                    down.Add($"CREATE INDEX {Esc(idxGroup.Key)} ON {Esc(table.Name)} ({string.Join(", ", idxGroup.Select(c => Esc(c.Name)))})");
+                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+                {
+                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                }
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.

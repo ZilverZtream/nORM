@@ -99,10 +99,25 @@ namespace nORM.Migration
         public string? IndexName { get; set; }
         /// <summary>Zero-based order of this column within a named composite index.</summary>
         public int? IndexOrder { get; set; }
+        /// <summary>Named indexes this column participates in.</summary>
+        public List<ColumnIndexSchema> Indexes { get; } = new();
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
         public bool IsIdentity { get; set; }
+    }
+
+    /// <summary>
+    /// Describes one index membership for a column.
+    /// </summary>
+    public class ColumnIndexSchema
+    {
+        /// <summary>Database index name.</summary>
+        public string Name { get; set; } = string.Empty;
+        /// <summary>True when the named index enforces uniqueness.</summary>
+        public bool IsUnique { get; set; }
+        /// <summary>Zero-based order of this column within the named index.</summary>
+        public int? Order { get; set; }
     }
 
     /// <summary>
@@ -174,7 +189,16 @@ namespace nORM.Migration
                     }
                 }
 
-                foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var indexAttributesByProperty = properties.ToDictionary(
+                    static prop => prop,
+                    static prop => prop.GetCustomAttributes<IndexAttribute>().ToArray());
+                var indexColumnCounts = indexAttributesByProperty.Values
+                    .SelectMany(static attrs => attrs.Select(static attr => attr.Name))
+                    .GroupBy(static name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+                foreach (var prop in properties)
                 {
                     // A property must be readable to be a column.
                     if (!prop.CanRead)
@@ -204,7 +228,12 @@ namespace nORM.Migration
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var renameAttr = prop.GetCustomAttribute<RenameColumnAttr>();
-                    var indexAttr = prop.GetCustomAttribute<IndexAttribute>();
+                    var indexAttrs = indexAttributesByProperty[prop];
+                    var firstIndexAttr = indexAttrs.FirstOrDefault();
+                    var hasSingleColumnUniqueIndex = indexAttrs.Any(attr =>
+                        attr.IsUnique &&
+                        indexColumnCounts.TryGetValue(attr.Name, out var count) &&
+                        count == 1);
                     var column = new ColumnSchema
                     {
                         Name = colAttr?.Name ?? prop.Name,
@@ -217,9 +246,9 @@ namespace nORM.Migration
                         // IsUnique is only set for single-column PKs; composite PKs must NOT
                         // emit per-column UNIQUE constraints.
                         IsPrimaryKey = isPk,
-                        IsUnique = (isPk && pkNames.Count == 1) || indexAttr?.IsUnique == true,
-                        IndexName = isPk ? "PK_" + table.Name : indexAttr?.Name,
-                        IndexOrder = indexAttr is null ? null : indexAttr.Order,
+                        IsUnique = (isPk && pkNames.Count == 1) || hasSingleColumnUniqueIndex,
+                        IndexName = isPk ? "PK_" + table.Name : firstIndexAttr?.Name,
+                        IndexOrder = firstIndexAttr is null ? null : firstIndexAttr.Order,
                         // Treat both Identity and Computed as server-managed columns for snapshot
                         // purposes: both are excluded from INSERT/UPDATE, and both require the
                         // migration generator to omit a NOT NULL constraint without a DEFAULT.
@@ -228,6 +257,15 @@ namespace nORM.Migration
                         // [RenameColumn("OldName")] signals the differ that this is a rename, not drop+add.
                         PreviousName = renameAttr?.OldName,
                     };
+                    foreach (var indexAttr in indexAttrs)
+                    {
+                        column.Indexes.Add(new ColumnIndexSchema
+                        {
+                            Name = indexAttr.Name,
+                            IsUnique = indexAttr.IsUnique,
+                            Order = indexAttr.Order
+                        });
+                    }
                     table.Columns.Add(column);
                 }
 
@@ -739,6 +777,13 @@ namespace nORM.Migration
             a.PrincipalColumns.Zip(b.PrincipalColumns, (x, y) =>
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
+        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames)> GetExplicitIndexes(TableSchema table)
+            => BuildIndexMap(table)
+                .Where(static index => !index.Key.StartsWith("__PK__", StringComparison.Ordinal) &&
+                                       !index.Key.StartsWith("__UQ__", StringComparison.Ordinal))
+                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames))
+                .ToArray();
+
         /// <summary>
         /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
         /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
@@ -749,9 +794,23 @@ namespace nORM.Migration
             var sequence = 0;
             foreach (var col in table.Columns)
             {
+                if (col.Indexes.Count > 0)
+                {
+                    foreach (var index in col.Indexes)
+                    {
+                        if (string.IsNullOrWhiteSpace(index.Name))
+                            continue;
+                        if (!intermediate.TryGetValue(index.Name, out var explicitEntry))
+                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name)>());
+                        explicitEntry.IsUnique = explicitEntry.IsUnique || index.IsUnique;
+                        explicitEntry.Columns.Add((index.Order, sequence++, col.Name));
+                        intermediate[index.Name] = explicitEntry;
+                    }
+                }
+
                 // Include columns that have an explicit IndexName, or are unique/PK (implicit constraint).
                 // This ensures that changes to IsPrimaryKey or IsUnique flow through AddedIndexes/DroppedIndexes.
-                string? indexKey = col.IndexName;
+                string? indexKey = col.Indexes.Count > 0 ? null : col.IndexName;
                 if (indexKey == null)
                 {
                     if (col.IsPrimaryKey)

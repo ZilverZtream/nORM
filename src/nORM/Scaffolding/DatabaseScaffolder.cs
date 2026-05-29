@@ -197,12 +197,16 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
                     if (!clrType.IsValueType && !allowNull)
                         sb.AppendLine("    [Required]");
-                    var index = indexes?.FirstOrDefault(i => string.Equals(i.ColumnName, colName, StringComparison.Ordinal));
-                    if (index is { IndexName.Length: > 0 })
+                    foreach (var index in (indexes ?? Array.Empty<ScaffoldIndex>())
+                        .Where(i => string.Equals(i.ColumnName, colName, StringComparison.Ordinal))
+                        .OrderBy(i => i.IndexName, StringComparer.Ordinal)
+                        .ThenBy(i => i.Ordinal))
                     {
-                        var safeIndexName = index.Value.IndexName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                        var uniqueSuffix = index.Value.IsUnique ? ", IsUnique = true" : string.Empty;
-                        var orderSuffix = index.Value.ColumnCount > 1 ? $", Order = {index.Value.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
+                        if (index.IndexName.Length == 0)
+                            continue;
+                        var safeIndexName = index.IndexName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
+                        var orderSuffix = index.ColumnCount > 1 ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
                         sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
                     }
                     sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");

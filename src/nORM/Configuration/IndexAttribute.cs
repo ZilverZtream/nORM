@@ -7,7 +7,7 @@ namespace nORM.Configuration
     /// Marks a property as participating in a named database index for migration
     /// snapshot generation.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public sealed class IndexAttribute : Attribute
     {
         /// <summary>

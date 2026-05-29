@@ -58,6 +58,26 @@ public class MigrationSqlGenerationTests
     }
 
     [Fact]
+    public void Sqlite_AddTable_WithUniqueCompositeIndex_EmitsUniqueIndex_NotPerColumnUnique()
+    {
+        var tenant = Col("TenantId", nullable: false, clrType: typeof(int).FullName!);
+        tenant.Indexes.Add(new ColumnIndexSchema { Name = "IX_Orders_Tenant_OrderNo", IsUnique = true, Order = 0 });
+        var orderNo = Col("OrderNo", nullable: false);
+        orderNo.Indexes.Add(new ColumnIndexSchema { Name = "IX_Orders_Tenant_OrderNo", IsUnique = true, Order = 1 });
+        var table = MakeTable("Orders", PkCol("Id"), tenant, orderNo);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        var createTable = sql.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.DoesNotContain("UNIQUE (\"TenantId\")", createTable);
+        Assert.DoesNotContain("UNIQUE (\"OrderNo\")", createTable);
+        Assert.Contains(sql.Up, s =>
+            s == "CREATE UNIQUE INDEX \"IX_Orders_Tenant_OrderNo\" ON \"Orders\" (\"TenantId\", \"OrderNo\")");
+    }
+
+    [Fact]
     public void Sqlite_AddTable_WithNullableColumn_EmitsNull()
     {
         var table = MakeTable("TestTable",

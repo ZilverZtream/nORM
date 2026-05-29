@@ -38,9 +38,10 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 `[Key]`/identity/`[Required]`/`[MaxLength]` metadata, deterministic C#
 identifier cleanup, de-duplicated generated names, `INormQueryable<T>` context
 properties, single-column FK navigations, and single-column/composite index
-metadata. It is a bounded bootstrap tool, not a database-first completeness
-claim; composite FK, owned-type, inheritance, and provider-specific
-computed/default/trigger inference remain explicit post-processing.
+metadata, including columns that participate in multiple indexes. It is a
+bounded bootstrap tool, not a database-first completeness claim; composite FK,
+owned-type, inheritance, and provider-specific computed/default/trigger
+inference remain explicit post-processing.
 
 ## Provider Mobility Certification
 
