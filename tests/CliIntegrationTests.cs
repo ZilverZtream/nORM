@@ -225,6 +225,10 @@ public class CliIntegrationTests
                         CONSTRAINT FK_Shipment_BillingAddress FOREIGN KEY (BillingAddressId) REFERENCES Address(Id),
                         CONSTRAINT FK_Shipment_ShippingAddress FOREIGN KEY (ShippingAddressId) REFERENCES Address(Id)
                     );
+                    CREATE TABLE "audit.events" (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        "value.part" TEXT NOT NULL
+                    );
                     CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
                     CREATE INDEX "IX_Author_Bad""Col
                     Line" ON Author("bad""col\name<&>
