@@ -70,14 +70,23 @@ namespace nORM.Scaffolding
         {
             ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
-            if (connection.State != ConnectionState.Open)
+            var connectionWasOpen = connection.State == ConnectionState.Open;
+            if (!connectionWasOpen)
                 await connection.OpenAsync().ConfigureAwait(false);
 
-            var (schemaName, bareTable) = SplitSchema(tableName);
-            // Materialize columns eagerly so the reader is closed before type building begins.
-            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+            try
+            {
+                var (schemaName, bareTable) = SplitSchema(tableName);
+                // Materialize columns eagerly so the reader is closed before type building begins.
+                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
 
-            return BuildDynamicType(tableName, columns);
+                return BuildDynamicType(tableName, columns);
+            }
+            finally
+            {
+                if (!connectionWasOpen)
+                    await connection.CloseAsync().ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -95,14 +104,23 @@ namespace nORM.Scaffolding
         {
             ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
-            if (connection.State != ConnectionState.Open)
+            var connectionWasOpen = connection.State == ConnectionState.Open;
+            if (!connectionWasOpen)
                 connection.Open();
 
-            var (schemaName, bareTable) = SplitSchema(tableName);
-            // Materialize columns eagerly so the reader is closed before type building begins.
-            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+            try
+            {
+                var (schemaName, bareTable) = SplitSchema(tableName);
+                // Materialize columns eagerly so the reader is closed before type building begins.
+                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
 
-            return BuildDynamicType(tableName, columns);
+                return BuildDynamicType(tableName, columns);
+            }
+            finally
+            {
+                if (!connectionWasOpen)
+                    connection.Close();
+            }
         }
 
         /// <summary>
@@ -232,16 +250,25 @@ namespace nORM.Scaffolding
         {
             ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(tableName));
-            if (connection.State != ConnectionState.Open)
+            var connectionWasOpen = connection.State == ConnectionState.Open;
+            if (!connectionWasOpen)
                 connection.Open();
-            var (schemaName, bareTable) = SplitSchema(tableName);
-            var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-            // Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
-            // configs produce different signatures.
-            var descriptor = string.Join(",", columns.Select(c =>
-                $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(IsNullableType(c.PropertyType) ? "N" : "NN")}"));
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
-            return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
+            try
+            {
+                var (schemaName, bareTable) = SplitSchema(tableName);
+                var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
+                // Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
+                // configs produce different signatures.
+                var descriptor = string.Join(",", columns.Select(c =>
+                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(IsNullableType(c.PropertyType) ? "N" : "NN")}"));
+                var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
+                return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
+            }
+            finally
+            {
+                if (!connectionWasOpen)
+                    connection.Close();
+            }
         }
 
         private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)

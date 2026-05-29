@@ -70,11 +70,13 @@ must be reviewed and edited like handwritten model code.
   single-column/composite index generation and columns that participate in
   multiple indexes, plus composite-FK, many-to-many candidate, and
   provider-owned schema diagnostics.
-- `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
-  duplicate generated property handling.
+- `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
+  duplicate generated property handling, quoted identifier preservation, and
+  connection ownership for sync/async dynamic scaffolding calls.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
-  scaffolding and composite-FK diagnostic shape against SQLite and any
-  configured SQL Server, PostgreSQL, and MySQL live providers.
+  scaffolding, composite-FK diagnostic shape, provider-owned/default and
+  keyless-table diagnostics, and skipped-view table-filter failures against
+  SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 
 ## Not Yet Stable
 

@@ -1,7 +1,10 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Scaffolding;
 using Xunit;
@@ -25,6 +28,17 @@ public class SchemaSignatureTests
     }
 
     private static DynamicEntityTypeGenerator Gen() => new();
+
+    private static string CreateFileDatabase(string tableName)
+    {
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_dynamic_scaffold_" + Guid.NewGuid().ToString("N") + ".db");
+        using var cn = new SqliteConnection($"Data Source={dbFile}");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = $"CREATE TABLE {tableName} (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+        return dbFile;
+    }
 
     [Fact]
     public void Signature_Is_32_Char_Hex()
@@ -160,5 +174,47 @@ public class SchemaSignatureTests
 
         Assert.Equal("dynamic\"quote", table.Name);
         Assert.Equal("quoted\"column", column.Name);
+    }
+
+    [Fact]
+    public void DynamicScaffolding_ClosedConnection_IsClosedAfterSynchronousUse()
+    {
+        var dbFile = CreateFileDatabase("LifecycleSync");
+        try
+        {
+            using var cn = new SqliteConnection($"Data Source={dbFile}");
+            Assert.Equal(ConnectionState.Closed, cn.State);
+
+            var type = Gen().GenerateEntityType(cn, "LifecycleSync");
+            Assert.Equal("LifecycleSync", type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>().Single().Name);
+            Assert.Equal(ConnectionState.Closed, cn.State);
+
+            var signature = Gen().ComputeSchemaSignature(cn, "LifecycleSync");
+            Assert.Equal(32, signature.Length);
+            Assert.Equal(ConnectionState.Closed, cn.State);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DynamicScaffolding_ClosedConnection_IsClosedAfterAsyncUse()
+    {
+        var dbFile = CreateFileDatabase("LifecycleAsync");
+        try
+        {
+            await using var cn = new SqliteConnection($"Data Source={dbFile}");
+            Assert.Equal(ConnectionState.Closed, cn.State);
+
+            var type = await Gen().GenerateEntityTypeAsync(cn, "LifecycleAsync");
+            Assert.Equal("LifecycleAsync", type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>().Single().Name);
+            Assert.Equal(ConnectionState.Closed, cn.State);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+        }
     }
 }
