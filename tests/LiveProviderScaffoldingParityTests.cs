@@ -1,8 +1,10 @@
 #nullable enable
 using System;
 using System.Data.Common;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using nORM.Providers;
@@ -78,6 +80,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($".UsingTable(\"", contextCode);
                 Assert.Contains(BookLabelTable, contextCode);
                 Assert.Contains("\"BookId\", \"LabelId\");", contextCode);
+
+                AssertScaffoldOutputBuilds(dir);
             }
             finally
             {
@@ -485,6 +489,52 @@ public sealed class LiveProviderScaffoldingParityTests
         await using var cmd = connection.CreateCommand();
         cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static void AssertScaffoldOutputBuilds(string outputDirectory)
+    {
+        var root = FindRepositoryRoot();
+        File.WriteAllText(Path.Combine(outputDirectory, "LiveScaffolded.csproj"), $$"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <Nullable>enable</Nullable>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+              </ItemGroup>
+            </Project>
+            """, Encoding.UTF8);
+
+        var psi = new ProcessStartInfo("dotnet", "build -c Release --nologo")
+        {
+            WorkingDirectory = outputDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start dotnet build.");
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0,
+            $"Scaffolded live-provider output failed to build with exit code {process.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{stderr}");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (File.Exists(Path.Combine(dir, "nORM.sln")))
+                return dir;
+
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root from " + AppContext.BaseDirectory);
     }
 
     private static string DropTable(ProviderKind kind, string rawName, string escapedName) => kind == ProviderKind.SqlServer
