@@ -25,7 +25,7 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, int? MaxLength);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, bool IsComputed, int? MaxLength);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -180,11 +180,12 @@ namespace nORM.Scaffolding
                         propertyBuilder.SetCustomAttribute(keyAttr);
                     }
 
-                    // Add [DatabaseGenerated(Identity)] attribute for auto-increment columns
-                    if (col.IsAuto)
+                    // Add database-generated attribute for identity/computed columns.
+                    if (col.IsAuto || col.IsComputed)
                     {
                         var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
-                        var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { DatabaseGeneratedOption.Identity });
+                        var option = col.IsAuto ? DatabaseGeneratedOption.Identity : DatabaseGeneratedOption.Computed;
+                        var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { option });
                         propertyBuilder.SetCustomAttribute(dbGenAttr);
                     }
 
@@ -276,6 +277,7 @@ namespace nORM.Scaffolding
                 AppendDescriptorPart(sb, column.IsKey ? "PK" : "C");
                 AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
                 AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
+                AppendDescriptorPart(sb, column.IsComputed ? "CMP" : "NCMP");
                 AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
             }
 
@@ -300,6 +302,7 @@ namespace nORM.Scaffolding
             if (schema is null)
                 yield break;
             var existingPropertyNames = CreateReservedMemberNameSet();
+            var sqliteComputedColumns = GetSqliteComputedColumns(connection, schemaName, tableName);
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
@@ -314,6 +317,8 @@ namespace nORM.Scaffolding
 
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                 var isAuto = schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+                var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
+                    || sqliteComputedColumns.Contains(colName);
 
                 int? maxLength = null;
                 if (clrType == typeof(string) && schema.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
@@ -322,8 +327,37 @@ namespace nORM.Scaffolding
                         maxLength = size;
                 }
 
-                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, isComputed, maxLength);
             }
+        }
+
+        private static IReadOnlySet<string> GetSqliteComputedColumns(DbConnection connection, string? schemaName, string tableName)
+        {
+            if (!connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                ? string.Empty
+                : EscapeIdentifier(connection, schemaName!) + ".";
+            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (!ReaderHasColumn(reader, "hidden")
+                    || !ReaderHasColumn(reader, "name")
+                    || Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture) is not (2 or 3))
+                {
+                    continue;
+                }
+
+                var name = Convert.ToString(reader["name"]);
+                if (!string.IsNullOrWhiteSpace(name))
+                    result.Add(name);
+            }
+
+            return result;
         }
 
         private static (string? schema, string table) SplitSchema(string identifier)
@@ -380,6 +414,17 @@ namespace nORM.Scaffolding
             return string.IsNullOrEmpty(schema)
                 ? EscapeIdentifier(connection, table)
                 : $"{EscapeIdentifier(connection, schema!)}.{EscapeIdentifier(connection, table)}";
+        }
+
+        private static bool ReaderHasColumn(DbDataReader reader, string name)
+        {
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>

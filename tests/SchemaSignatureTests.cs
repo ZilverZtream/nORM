@@ -174,6 +174,45 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void ComputedColumn_MetadataAffectsSignatureAndDynamicAttributes()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE T5Computed (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE T5Computed (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                NameLength INTEGER
+            )
+            """;
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var computedSig = gen.ComputeSchemaSignature(cn, "T5Computed");
+        var normalSig = gen.ComputeSchemaSignature(cn2, "T5Computed");
+        var type = gen.GenerateEntityType(cn, "T5Computed");
+        var generated = type.GetProperty("NameLength")!
+            .GetCustomAttributes(typeof(DatabaseGeneratedAttribute), inherit: false)
+            .Cast<DatabaseGeneratedAttribute>()
+            .SingleOrDefault();
+
+        Assert.NotEqual(normalSig, computedSig);
+        Assert.NotNull(generated);
+        Assert.Equal(DatabaseGeneratedOption.Computed, generated.DatabaseGeneratedOption);
+    }
+
+    [Fact]
     public void DifferentPrimaryKey_DifferentSignature()
     {
         using var cn = OpenMemory();
