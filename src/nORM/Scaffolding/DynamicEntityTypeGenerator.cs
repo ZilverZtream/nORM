@@ -299,7 +299,7 @@ namespace nORM.Scaffolding
             var schema = reader.GetSchemaTable();
             if (schema is null)
                 yield break;
-            var existingPropertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var existingPropertyNames = CreateReservedMemberNameSet();
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
@@ -449,6 +449,12 @@ namespace nORM.Scaffolding
             existingNames.Add(unique);
             return unique;
         }
+
+        private static HashSet<string> CreateReservedMemberNameSet()
+            => typeof(object)
+                .GetMembers(BindingFlags.Instance | BindingFlags.Public)
+                .Select(member => member.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         private static void AppendPascalSegment(StringBuilder sb, ReadOnlySpan<char> segment)
         {

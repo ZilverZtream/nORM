@@ -235,6 +235,31 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void GenerateEntityType_WithObjectMemberColumnNames_GeneratesUniqueProperties()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "dynamic-object-members" (
+                Id INTEGER PRIMARY KEY,
+                ToString TEXT NOT NULL,
+                Equals TEXT NOT NULL,
+                GetHashCode TEXT NOT NULL,
+                GetType TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "dynamic-object-members");
+        var propertyNames = type.GetProperties().Select(p => p.Name).ToArray();
+
+        Assert.Contains("ToString2", propertyNames);
+        Assert.Contains("Equals2", propertyNames);
+        Assert.Contains("GetHashCode2", propertyNames);
+        Assert.Contains("GetType2", propertyNames);
+    }
+
+    [Fact]
     public void GenerateEntityType_WithQuotedIdentifierCharacters_PreservesOriginalNames()
     {
         using var cn = OpenMemory();
