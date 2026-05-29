@@ -142,6 +142,10 @@ namespace nORM.Scaffolding
                     generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
                     generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys)));
                 }
+                else
+                {
+                    EnsureNoStaleScaffoldWarningReports(outputDirectory, options);
+                }
 
                 EnsureNoOutputFileConflicts(generatedFiles.Select(file => file.Path), options);
                 foreach (var (path, content) in generatedFiles)
@@ -695,6 +699,29 @@ namespace nORM.Scaffolding
                         $"Scaffolding output file already exists: '{path}'. Enable overwrite or choose an empty output directory.");
                 }
             }
+        }
+
+        private static void EnsureNoStaleScaffoldWarningReports(string outputDirectory, ScaffoldOptions options)
+        {
+            var warningPaths = new[]
+            {
+                Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"),
+                Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json")
+            };
+            var existingWarnings = warningPaths.Where(File.Exists).ToArray();
+            if (existingWarnings.Length == 0)
+                return;
+
+            if (!options.OverwriteFiles)
+            {
+                throw new NormConfigurationException(
+                    "Scaffolding produced no warnings, but stale scaffold warning report files already exist: " +
+                    string.Join(", ", existingWarnings.Select(path => $"'{path}'")) +
+                    ". Enable overwrite or remove the stale report files before running with overwrite protection.");
+            }
+
+            foreach (var path in existingWarnings)
+                File.Delete(path);
         }
 
         private static async Task WriteGeneratedFileAsync(string path, string content)

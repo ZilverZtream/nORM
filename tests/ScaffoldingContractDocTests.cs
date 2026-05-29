@@ -138,12 +138,14 @@ public class ScaffoldingContractDocTests
         Assert.Contains("severity", doc, StringComparison.Ordinal);
         Assert.Contains("category", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
+        Assert.Contains("stale `nORM.ScaffoldWarnings.*` files", doc, StringComparison.Ordinal);
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
         Assert.Contains("code =", source, StringComparison.Ordinal);
         Assert.Contains("severity =", source, StringComparison.Ordinal);
         Assert.Contains("category =", source, StringComparison.Ordinal);
         Assert.Contains("totalWarnings =", source, StringComparison.Ordinal);
         Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
     }
 

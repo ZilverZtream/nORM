@@ -92,6 +92,9 @@ must be reviewed and edited like handwritten model code.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
+- Warning reports are deterministic per run: if a later scaffold produces no
+  diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
+  is allowed, or reported as an error when overwrite protection is enabled.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys are
   listed there instead of being silently ignored or converted into fake

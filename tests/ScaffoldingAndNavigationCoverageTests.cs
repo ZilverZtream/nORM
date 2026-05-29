@@ -850,6 +850,69 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithNoWarnings_RemovesStaleWarningReportsWhenOverwriteAllowed()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE CleanWidget (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var warningMd = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+        var warningJson = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+        await File.WriteAllTextAsync(warningMd, "stale");
+        await File.WriteAllTextAsync(warningJson, """{"stale":true}""");
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CleanCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "CleanWidget.cs")));
+            Assert.False(File.Exists(warningMd));
+            Assert.False(File.Exists(warningJson));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNoWarningsAndNoOverwrite_FailsOnStaleWarningReports()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE CleanNoOverwriteWidget (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var warningMd = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+        await File.WriteAllTextAsync(warningMd, "stale");
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "CleanNoOverwriteCtx",
+                    new ScaffoldOptions { OverwriteFiles = false }));
+
+            Assert.Contains("stale scaffold warning report", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.True(File.Exists(warningMd));
+            Assert.False(File.Exists(Path.Combine(dir, "CleanNoOverwriteWidget.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSingleColumnForeignKey_GeneratesNavigationsAndModelConfig()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
