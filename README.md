@@ -1,32 +1,64 @@
-﻿# nORM (The Norm) - Performance-Focused ORM for .NET
+﻿# nORM (The Norm) - The Provider-Mobile ORM for .NET
 
-nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being tuned for low-overhead hot paths while keeping familiar ORM features such as LINQ queries, change tracking, migrations, multi-tenancy, and provider-specific bulk operations.
+nORM is a modern Object-Relational Mapping (ORM) library for .NET built around one
+idea: **the same application code should run, unchanged, on SQLite, SQL Server,
+PostgreSQL, and MySQL.** You write normal LINQ; nORM acts as a translation layer
+between your code and whichever provider you point it at. Switching databases is
+meant to be as routine as changing a connection string - not a rewrite.
+
+It does this without giving up the ergonomics you expect from an EF Core-style
+ORM: LINQ queries, change tracking, migrations, multi-tenancy, temporal history,
+compiled queries, and provider-native bulk operations - and it stays competitive
+with hand-written ADO.NET on the hot path (see [Performance](#performance)).
 
 ## Why Choose nORM?
 
-- **Performance-focused**: compiled queries, native bulk operations, and BenchmarkDotNet suites for comparing tuned paths
-- **Documented LINQ Support**: Provider-tested LINQ support for common query shapes, with explicit limits documented in [the LINQ support matrix](docs/linq-support.md)
-- **Explicit Deployment Boundaries**: JIT-first runtime with source-generation support and documented [AOT/trimming limits](docs/aot-trimming.md)
-- **Bounded Cache Policy**: Process-wide and per-context caches have documented lifetimes, limits, and diagnostics in [the cache policy](docs/cache-policy.md)
-- **Familiar API**: EF Core-style context, configuration, and change-tracking patterns
-- **Bulk Operations**: provider-specific bulk insert, update, and delete operations with documented semantics
-- **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
-- **Connection Management**: context-level connection ownership plus database-driver pooling
-- **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
-- **Provider Mobility Contract**: supported portable shapes must translate,
-  emulate, or fail deterministically across the supported provider matrix
-- **Strict Provider Mobility Mode**: certification can run with
-  `UseStrictProviderMobility()` so generated nORM paths are portable while raw
-  SQL, stored procedures, direct connection access, provider-native DDL, and
-  client-eval escape hatches are explicit migration findings through the shared
-  [provider mobility translation layer](docs/provider-mobility-translation-layer.md)
-- **Smart Relationship Handling**: Automatic relationship discovery and lazy loading (see [docs/linq-support.md](docs/linq-support.md) for relationship loading constraints)
-- **Flexible Configuration**: Fluent API and attribute-based configuration
-- **Developer Tools**: Preview database scaffolding and reverse engineering
-- **Modern Features**: JSON querying, window functions, temporal queries
-- **Operational Features**: Multi-tenancy, caching, retry policies, and interceptors with explicit support contracts
-- **Tenant/Temporal Hardening**: generated-path tenant isolation, optional SQL Server/PostgreSQL native tenant session context/RLS DDL with explicit apply/drop APIs, nORM-managed temporal history, and explicit SQL Server native temporal mode/bootstrap
-- **Product-Proof Sample**: `samples/nORM.Sample.Store` is a provider-swappable tenant and temporal web app with a browser frontend, authenticated tenant flow, and verification mode.
+### 1. Provider mobility is the product, not a footnote
+
+- **Swap providers like changing a connection string.** Supported LINQ and API
+  shapes must translate, emulate, or fail *deterministically and identically*
+  across all four providers - that is the enforced
+  [Provider Mobility Contract](docs/provider-mobility-contract.md), not a
+  best-effort hope.
+- **Strict Provider Mobility Mode.** Turn on `UseStrictProviderMobility()` during
+  development and nORM blocks exactly the things that *can't* move between
+  databases - raw SQL, stored procedures, direct connection/command access,
+  provider-native DDL, command interceptors, and client-eval escape hatches -
+  while admitting every portable, nORM-translated feature. You find out you've
+  painted yourself into a provider-specific corner at dev time, not in
+  production. See the [translation layer](docs/provider-mobility-translation-layer.md).
+- **Certification tooling.** `dotnet norm portability certify` scans an existing
+  codebase and schema and reports which assets are portable and which are
+  provider-bound migration findings, with concrete translation strategies and
+  optional live server-version/feature probes.
+- **A translation layer that keeps growing.** Hard, real-world LINQ shapes
+  (multi-join analytics, `GroupBy` with element selectors and projection tails,
+  left joins, correlated aggregates, `DistinctBy`, `SequenceEqual`,
+  `Take/SkipWhile`, regex predicates, `DateTimeOffset` arithmetic) are covered by
+  live cross-provider parity tests so "portable" means "verified on all four,"
+  not "probably fine."
+
+### 2. Fast where it counts
+
+- **Fastest method on every provider in our matrix is a nORM path** (corrected,
+  threshold-gated RC2 evidence; see [Performance](#performance)).
+- Compiled/prepared query paths, IL-generated materializers, low-allocation
+  execution, and database-native bulk operations - benchmarked against EF Core,
+  Dapper, and optimized Raw ADO.NET with [explicit baseline rules](docs/benchmark-governance.md).
+
+### 3. Everything you expect from a real ORM
+
+- **Familiar API**: EF Core-style context, configuration, and change tracking
+- **Documented LINQ Support** with explicit limits in [the LINQ support matrix](docs/linq-support.md)
+- **Bulk Operations**: provider-specific bulk insert/update/delete with documented semantics
+- **Multi-tenancy** enforced on every generated query and write path
+- **Temporal queries & versioning** with nORM-managed history and `AsOf(tag)`
+- **Migrations** with provider-correct DDL, advisory-locked concurrent deploys, and safe rename detection
+- **Operational features**: caching, retry policies, interceptors, JSON querying, window functions
+- **Explicit deployment boundaries**: JIT-first with source-generation support and documented [AOT/trimming limits](docs/aot-trimming.md)
+- **Bounded cache policy** with documented lifetimes, limits, and diagnostics ([cache policy](docs/cache-policy.md))
+- **Multi-database support**: SQL Server, PostgreSQL, SQLite, and MySQL
+- **Product-Proof Sample**: `samples/nORM.Sample.Store` is a provider-swappable tenant + temporal web app with a browser frontend, authenticated tenant flow, and a verification mode.
 
 ## Sample Store App
 
@@ -71,31 +103,64 @@ profiles, live server-version evidence when connection strings are supplied,
 feature probes such as JSON availability, and concrete translation-strategy
 rows for dialect differences.
 
-## Performance Validation
+<a name="performance"></a>
+## Performance
 
-nORM ships with BenchmarkDotNet suites that compare EF Core, Dapper, Raw ADO.NET, and nORM across SQLite, SQL Server, PostgreSQL, and MySQL. Release decisions should be based on fresh local or CI benchmark output, not hard-coded numbers in this README. All benchmark paths are expected to use the same seeded schema, equivalent SQL shape, typed result materialization, and comparable compiled/prepared modes. Raw ADO.NET results are split into explicit convenience and optimized categories so public claims do not blur easy handwritten ADO with ordinal-based, typed-getter ADO.
+nORM ships BenchmarkDotNet suites that compare nORM against EF Core, Dapper, and
+Raw ADO.NET across all four providers, using the same seeded schema, equivalent
+SQL shape, typed materialization, and matched compiled/prepared modes. The
+numbers below are from the threshold-gated RC2 provider matrix
+(commit `a4c3017`, `launchCount/warmupCount/iterationCount` per
+[governance](docs/benchmark-governance.md), Windows x64, .NET 8.0.417). They are
+representative, not a substitute for re-running on your own hardware before a
+release decision.
 
-### Read Queries
+### nORM runtime latency, full provider matrix (mean, lower is better)
 
-| Operation                        | Compared modes |
-|----------------------------------|----------------|
-| Simple query                     | runtime, compiled/prepared, Dapper, Raw ADO convenience/optimized/prepared-optimized |
-| Complex query                    | runtime, compiled/prepared, Dapper, Raw ADO convenience/optimized/prepared-optimized |
-| JOIN query                       | runtime, compiled, typed Dapper, Raw ADO optimized |
-| Count                            | runtime, compiled/prepared, Dapper, Raw ADO optimized |
+| Operation (runtime nORM)   | SQLite | PostgreSQL | SQL Server | MySQL |
+|----------------------------|-------:|-----------:|-----------:|------:|
+| Simple query               | 23.2 µs | 46.8 µs | 57.1 µs | 202.3 µs |
+| Complex query (filter/order/skip/take) | 64.1 µs | 154.0 µs | 242.9 µs | 568.4 µs |
+| Join query                 | 49.5 µs | 106.6 µs | 160.5 µs | 314.2 µs |
+| Count                      | 15.2 µs | 131.7 µs | 85.7 µs | 253.4 µs |
+| Single insert †            | 54.2 µs | 129.0 µs | 110.9 µs | 1,692.1 µs |
+| Bulk insert (idiomatic `BulkInsertAsync`) | 657 µs | 963 µs | 4,353 µs | 6,065 µs |
 
-### Write Operations
+### How that compares (baseline category named per governance)
 
-| Operation                        | Compared modes |
-|----------------------------------|----------------|
-| Single insert                    | EF Core, Dapper, Raw ADO, nORM |
-| Bulk insert - naive              | EF Core, Dapper, Raw ADO, nORM |
-| Bulk insert - batched/prepared   | EF Core, Dapper, Raw ADO, nORM |
-| Bulk insert - idiomatic API      | provider-native nORM path |
+- **Fastest read path on every provider is a nORM method.** Simple query beats the
+  fastest optimized Raw ADO baseline on SQLite (23.2 vs 29.5 µs `RawAdo_Optimized`),
+  PostgreSQL (46.8 vs 112.7 µs), and SQL Server (57.1 vs 82.5 µs), and stays within
+  range on MySQL (202.3 vs 212.7 µs `RawAdo_PreparedOptimized`).
+- **Joins and complex reads** match or beat typed Dapper and optimized Raw ADO on
+  every provider (e.g. PostgreSQL join 106.6 µs vs 211.2 µs `RawAdo_Optimized`;
+  SQL Server complex 242.9 µs ≈ Dapper 243.6 µs).
+- **Single insert** is the fastest measured path on every provider - SQLite
+  (54.2 µs vs Raw ADO 59.1, Dapper 60.0, EF 76.8, all under *equalized* durability
+  settings), PostgreSQL (129.0 µs vs Raw ADO 212.4), SQL Server (110.9 µs vs
+  Raw ADO 135.0), and MySQL (1,692 µs vs Raw ADO 1,757, Dapper 1,797, EF 2,925).
+- **Idiomatic bulk insert** is **2.4×–4.6× faster** than EF `AddRange` / Dapper-in-
+  transaction across providers (PostgreSQL 963 µs vs EF 4,483 µs; MySQL 6,065 µs vs
+  Dapper 20,226 µs).
 
-> nORM's compiled query cache is intended to deliver the largest gains on warm paths. Performance-sensitive work should run `benchmarks/nORM.Benchmarks.csproj` before release decisions; generated BenchmarkDotNet output is intentionally not tracked in source control.
+> † **SQLite single-insert is measured under equalized durability.** Every
+> compared connection (nORM, EF Core, Dapper, Raw ADO) uses identical
+> `journal_mode = WAL` / `synchronous = NORMAL` / `busy_timeout` settings, per
+> [benchmark governance](docs/benchmark-governance.md), so the row reflects
+> data-layer overhead rather than mismatched fsync policy. (Earlier runs showed a
+> misleading ~7× SQLite insert advantage purely from durability mismatch; that
+> artifact is gone.) MySQL's high absolute latency is the local server/connector
+> round-trip and fsync cost - Raw ADO.NET is equally slow there - not nORM
+> overhead.
 
-Raw ADO.NET labels are precise: `Convenience` means straightforward handwritten ADO using name lookup/conversions, `Optimized` means ordinal-based typed getters where provider values permit them, and `PreparedOptimized` means prepared command reuse plus the optimized reader path. Any public performance comparison against Raw ADO.NET must name the exact category, provider, and benchmark artifact.
+Raw ADO.NET baselines are labeled precisely: `Convenience` (name lookup /
+conversion helpers), `Optimized` (ordinal-based typed getters), and
+`PreparedOptimized` (prepared command reuse plus the optimized reader). Any public
+performance claim must name the exact category, provider, and benchmark artifact,
+and must come from generated BenchmarkDotNet reports - run
+`eng/run-benchmark-isolated.ps1 -- --provider-matrix` (see
+[benchmark governance](docs/benchmark-governance.md)) rather than hand-copying
+numbers.
 
 ## Installation
 
