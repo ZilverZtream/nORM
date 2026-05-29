@@ -87,7 +87,8 @@ namespace nORM.Scaffolding
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
-                var unsupportedFeatures = await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false);
+                var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
+                AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
@@ -935,6 +936,25 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static void AddMissingPrimaryKeyDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldTable> tables,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable)
+        {
+            foreach (var table in tables)
+            {
+                var tableKey = TableKey(table.Schema, table.Name);
+                if (primaryKeyColumnsByTable.TryGetValue(tableKey, out var keys) && keys.Count > 0)
+                    continue;
+
+                features.Add(new ScaffoldUnsupportedFeature(
+                    tableKey,
+                    "MissingPrimaryKey",
+                    table.Name,
+                    "Table has no primary key; generated entity is a query/bootstrap artifact until a key is configured."));
+            }
+        }
+
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
@@ -1011,7 +1031,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, triggers, and provider-native temporal tables are discovered for review, but are not emitted as provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Table | Object | Detail |");
                     sb.AppendLine("| --- | --- | --- | --- |");

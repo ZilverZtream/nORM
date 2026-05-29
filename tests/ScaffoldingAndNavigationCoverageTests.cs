@@ -960,6 +960,38 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithKeylessTable_EmitsMissingPrimaryKeyDiagnostic()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE KeylessImport (ExternalId TEXT NOT NULL, Payload TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "KeylessCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "KeylessImport.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain("[Key]", entityCode);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            Assert.Contains("KeylessImport", warnings);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                item.GetProperty("table").GetString() == "KeylessImport");
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_FailOnWarnings_WritesDiagnosticsThenThrows()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
