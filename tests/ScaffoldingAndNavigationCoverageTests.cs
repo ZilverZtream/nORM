@@ -689,7 +689,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Table(\"SchemaAuthor\", Schema = \"aux\")]", authorCode);
             Assert.Contains("[Table(\"SchemaBook\", Schema = \"aux\")]", bookCode);
             Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
-            Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id)", contextCode);
+            Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false)", contextCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title\")]", bookCode);
             Assert.Contains("aux.SchemaBook", warnings);
             Assert.Contains("TR_SchemaBook_Audit", warnings);
