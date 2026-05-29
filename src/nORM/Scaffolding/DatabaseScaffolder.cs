@@ -1030,6 +1030,7 @@ namespace nORM.Scaffolding
                         await using var infoCommand = connection.CreateCommand();
                         infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", indexName);
                         await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                        var reportedDescending = false;
                         while (await infoReader.ReadAsync().ConfigureAwait(false))
                         {
                             if (ReaderHasColumn(infoReader, "key")
@@ -1043,6 +1044,14 @@ namespace nORM.Scaffolding
                             {
                                 features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, "SQLite expression index"));
                                 break;
+                            }
+
+                            if (!reportedDescending
+                                && ReaderHasColumn(infoReader, "desc")
+                                && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0)
+                            {
+                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "DescendingIndex", indexName, "SQLite descending index key"));
+                                reportedDescending = true;
                             }
                         }
                     }
@@ -1124,6 +1133,21 @@ namespace nORM.Scaffolding
                             AND included.index_id = i.index_id
                             AND included.is_included_column = 1
                       )
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'DescendingIndex', 'SQL Server descending index key'
+                    FROM sys.indexes i
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND i.is_primary_key = 0
+                      AND i.name IS NOT NULL
+                      AND EXISTS (
+                          SELECT 1
+                          FROM sys.index_columns ic
+                          WHERE ic.object_id = i.object_id
+                            AND ic.index_id = i.index_id
+                            AND ic.key_ordinal > 0
+                            AND ic.is_descending_key = 1
+                      )
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -1194,6 +1218,15 @@ namespace nORM.Scaffolding
                     WHERE ix.indisprimary = false
                       AND ix.indnatts <> ix.indnkeyatts
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'DescendingIndex', 'PostgreSQL descending index key'
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    WHERE ix.indisprimary = false
+                      AND pg_get_indexdef(ix.indexrelid) ILIKE '% DESC%'
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -1249,6 +1282,12 @@ namespace nORM.Scaffolding
                       AND data_type IN ('decimal', 'numeric')
                       AND numeric_precision IS NOT NULL
                       AND numeric_scale IS NOT NULL
+                    UNION ALL
+                    SELECT NULL, table_name, index_name, 'DescendingIndex', 'MySQL descending index key'
+                    FROM information_schema.statistics
+                    WHERE table_schema = DATABASE()
+                      AND index_name <> 'PRIMARY'
+                      AND collation = 'D'
                     """).ConfigureAwait(false);
             }
 
@@ -1477,6 +1516,7 @@ namespace nORM.Scaffolding
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
                 "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
+                "DescendingIndex" => "Keep index sort direction in provider migrations; v1 scaffolding emits key-column index membership but not per-column ASC/DESC metadata.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."

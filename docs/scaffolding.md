@@ -51,8 +51,9 @@ must be reviewed and edited like handwritten model code.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
-  filtered/partial, expression, and included-column indexes are reported as
-  diagnostics rather than emitted as portable `[Index]` attributes.
+  filtered/partial, expression, included-column, and descending-key index
+  semantics are reported as diagnostics rather than emitted as portable
+  `[Index]` attributes.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   single-column foreign keys, no payload columns, and both references targeting
   single-column primary keys. Both entity sides receive collection navigations,
@@ -121,9 +122,10 @@ must be reviewed and edited like handwritten model code.
   provider-native temporal tables, keyless tables, views, routines, and
   sequences are discovered and reported in scaffold diagnostics, but not
   converted into complete provider-neutral model code.
-- Provider-specific filtered/partial indexes, expression indexes, and
-  included-column indexes. These are discovered and reported for review; v1
-  scaffolding emits provider-neutral key-column indexes only.
+- Provider-specific filtered/partial indexes, expression indexes,
+  included-column indexes, and descending index key sort direction. These are
+  discovered and reported for review; v1 scaffolding emits provider-neutral
+  key-column indexes only.
 
 ## v1 Guidance
 

@@ -116,9 +116,11 @@ public class ScaffoldingContractDocTests
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
         Assert.Contains("expression", doc, StringComparison.Ordinal);
         Assert.Contains("included-column", doc, StringComparison.Ordinal);
+        Assert.Contains("descending", doc, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PartialIndex", source, StringComparison.Ordinal);
         Assert.Contains("ExpressionIndex", source, StringComparison.Ordinal);
         Assert.Contains("IncludedColumnIndex", source, StringComparison.Ordinal);
+        Assert.Contains("DescendingIndex", source, StringComparison.Ordinal);
     }
 
     [Fact]

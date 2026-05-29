@@ -1042,6 +1042,44 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithDescendingIndex_EmitsDiagnosticsForSortDirection()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IndexedDirection (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE INDEX IX_IndexedDirection_Name_Desc ON IndexedDirection(Name DESC);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DirectionIndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedDirection.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[Index(\"IX_IndexedDirection_Name_Desc\")]", entityCode);
+            Assert.Contains("DescendingIndex", warnings);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "DescendingIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedDirection_Name_Desc" &&
+                item.GetProperty("suggestedAction").GetString()!.Contains("ASC/DESC", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCompositeForeignKey_EmitsDiagnosticsAndNoFakeNavigation()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
