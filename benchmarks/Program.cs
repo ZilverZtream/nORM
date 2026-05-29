@@ -156,9 +156,12 @@ namespace nORM.Benchmarks
             var config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithOptions(ConfigOptions.DisableOptimizationsValidator);
 
-            BenchmarkSwitcher
+            var summaries = BenchmarkSwitcher
                 .FromAssembly(typeof(Program).Assembly)
                 .Run(benchmarkArgs, config);
+
+            if (summaries.Any(HasBenchmarkFailures))
+                throw new InvalidOperationException("Filtered benchmark validation failed.");
         }
 
         private static string[] BuildFastBenchmarkArgs(string[] args)

@@ -73,6 +73,11 @@ $runStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 if (-not $NoIsolation) {
     $duplicates = Get-DuplicateBenchmarkProjects
     if ($duplicates.Count -gt 0) {
+        $dirty = @(git -C $root status --porcelain)
+        if ($dirty.Count -gt 0) {
+            throw "Duplicate benchmark projects require isolated execution, but the working tree has uncommitted changes. Commit/stash them before collecting release benchmark evidence, or rerun with -NoIsolation from a checkout without duplicate benchmark projects."
+        }
+
         $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('norm-bench-iso-' + $runStamp)
         Write-Host "Duplicate benchmark projects detected under repo ($($duplicates.Count) extra). Running isolated worktree at $tempRoot"
         git -C $root worktree add --detach $tempRoot HEAD | Write-Host

@@ -109,11 +109,12 @@ rows for dialect differences.
 nORM ships BenchmarkDotNet suites that compare nORM against EF Core, Dapper, and
 Raw ADO.NET across all four providers, using the same seeded schema, equivalent
 SQL shape, typed materialization, and matched compiled/prepared modes. The
-numbers below are from the threshold-gated RC2 provider matrix
-(commit `a4c3017`, `launchCount/warmupCount/iterationCount` per
-[governance](docs/benchmark-governance.md), Windows x64, .NET 8.0.417). They are
-representative, not a substitute for re-running on your own hardware before a
-release decision.
+numbers below are a pre-RC3 evidence snapshot from the threshold-gated RC2
+provider matrix plus the follow-up SQLite single-insert fairness slice after
+durability settings were equalized. They are representative, not final RC3
+release evidence. Final RC3 claims must come from a fresh provider-matrix run on
+the release commit, using the job settings and claim rules in
+[benchmark governance](docs/benchmark-governance.md).
 
 ### nORM runtime latency, full provider matrix (mean, lower is better)
 
@@ -128,10 +129,11 @@ release decision.
 
 ### How that compares (baseline category named per governance)
 
-- **Fastest read path on every provider is a nORM method.** Simple query beats the
-  fastest optimized Raw ADO baseline on SQLite (23.2 vs 29.5 µs `RawAdo_Optimized`),
-  PostgreSQL (46.8 vs 112.7 µs), and SQL Server (57.1 vs 82.5 µs), and stays within
-  range on MySQL (202.3 vs 212.7 µs `RawAdo_PreparedOptimized`).
+- **Hot read paths are competitive with the fastest measured baselines.** Simple
+  query beats the fastest optimized Raw ADO baseline on SQLite (23.2 vs 29.5 µs
+  `RawAdo_Optimized`), PostgreSQL (46.8 vs 112.7 µs), and SQL Server (57.1 vs
+  82.5 µs), and is within the same local-server band on MySQL (202.3 vs 212.7 µs
+  `RawAdo_PreparedOptimized`).
 - **Joins and complex reads** match or beat typed Dapper and optimized Raw ADO on
   every provider (e.g. PostgreSQL join 106.6 µs vs 211.2 µs `RawAdo_Optimized`;
   SQL Server complex 242.9 µs ≈ Dapper 243.6 µs).
@@ -154,10 +156,11 @@ release decision.
 > overhead.
 
 Raw ADO.NET baselines are labeled precisely: `Convenience` (name lookup /
-conversion helpers), `Optimized` (ordinal-based typed getters), and
-`PreparedOptimized` (prepared command reuse plus the optimized reader). Any public
-performance claim must name the exact category, provider, and benchmark artifact,
-and must come from generated BenchmarkDotNet reports - run
+conversion helpers), `Optimized` (ordinal-based typed getters with portable
+conversion helpers when needed), `TypedNoBox` (typed getter allocation floor),
+`PreparedOptimized`, and `PreparedTypedNoBox`. Any public performance claim must
+name the exact category, provider, and benchmark artifact, and must come from
+generated BenchmarkDotNet reports - run
 `eng/run-benchmark-isolated.ps1 -- --provider-matrix` (see
 [benchmark governance](docs/benchmark-governance.md)) rather than hand-copying
 numbers.

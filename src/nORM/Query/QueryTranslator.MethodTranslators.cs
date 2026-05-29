@@ -1374,8 +1374,12 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                var elementType = node.Method.GetGenericArguments()[0];
+
                 // Determine the default element: null for no-arg, provided value for 1-arg.
-                object? defaultVal = null;
+                object? defaultVal = elementType.IsValueType && Nullable.GetUnderlyingType(elementType) == null
+                    ? Activator.CreateInstance(elementType)
+                    : null;
                 if (node.Arguments.Count >= 2)
                 {
                     if (TryGetConstantValue(node.Arguments[1], out var dv))
@@ -1387,12 +1391,17 @@ namespace nORM.Query
                 var captured = defaultVal;
                 System.Collections.IList ApplyDefault(DbContext ctx, System.Collections.IList list)
                 {
+                    var output = CreateRuntimeList(elementType, Math.Max(list.Count, 1));
+                    foreach (var item in list)
+                        output.Add(item);
+
                     if (list.Count == 0)
-                        list.Add(captured);
-                    return list;
+                        output.Add(captured);
+                    return output;
                 }
 
                 t._postMaterializeTransform = ApplyDefault;
+                t._postMaterializeElementType = elementType;
                 return t.Visit(node.Arguments[0]);
             }
         }

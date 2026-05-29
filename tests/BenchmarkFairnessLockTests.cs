@@ -103,6 +103,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("OpenBenchmarkConnectionAsync(Provider, _connectionString)", code);
         Assert.Contains("PRAGMA synchronous = NORMAL", code);
         Assert.Contains("PRAGMA busy_timeout = 5000", code);
+        Assert.Contains("private const int UserCount = 12_000", code);
         AssertMethodContains(code, "Query_Simple_RawAdo_Optimized", "ReadUsersOptimizedAsync");
         AssertMethodContains(code, "Query_Simple_RawAdo_TypedNoBox", "ReadUsersTypedNoBoxAsync");
         AssertMethodContains(code, "Query_Complex_RawAdo_Optimized", "ReadUsersOptimizedAsync");
@@ -126,6 +127,8 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Query_Complex_RawAdo_PreparedOptimized", code);
         Assert.Contains("ReadUserOptimized", code);
         Assert.Contains("reader.GetInt32(0)", code);
+        Assert.Contains("PRAGMA synchronous = NORMAL", code);
+        Assert.Contains("PRAGMA busy_timeout = 5000", code);
         Assert.DoesNotContain("Query_Simple_Dapper_Prepared", code);
         Assert.DoesNotContain("Query_Complex_Dapper_Prepared", code);
     }
@@ -164,6 +167,7 @@ public sealed class BenchmarkFairnessLockTests
         var gate = ReadRepoFile("eng/v1-release-gate.ps1");
         var evidence = ReadRepoFile("eng/benchmark-evidence.ps1");
         var thresholdGate = ReadRepoFile("eng/check-benchmark-thresholds.ps1");
+        var isolatedRunner = ReadRepoFile("eng/run-benchmark-isolated.ps1");
         var sliceRunner = ReadRepoFile("eng/run-provider-benchmark-slice.ps1");
         var thresholds = ReadRepoFile("eng/benchmark-thresholds.json");
         var governance = ReadRepoFile("docs/benchmark-governance.md");
@@ -175,6 +179,8 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Get-DuplicateBenchmarkProjects", gate);
         Assert.Contains("running isolated benchmark worktree", gate);
         Assert.Contains("Benchmark command failed with exit code", gate);
+        Assert.Contains("uncommitted changes", isolatedRunner);
+        Assert.Contains("Commit/stash them before collecting release benchmark evidence", isolatedRunner);
         Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
         Assert.Contains("BulkInsert_Idiomatic_*", governance);
         Assert.Contains("Tx + per row", governance);
@@ -182,6 +188,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("eng/check-benchmark-thresholds.ps1", governance);
         Assert.Contains("TenantTemporalBenchmarks", governance);
         Assert.Contains("RawAdo_TypedNoBox", governance);
+        Assert.Contains("12,000 users in the provider matrix", ReadRepoFile("benchmarks/README.md"));
         Assert.Contains("Query_Scale10k_*", governance);
         Assert.Contains("Query_ParallelThroughput_*", governance);
         Assert.Contains("synchronous = NORMAL", governance);
@@ -248,6 +255,7 @@ public sealed class BenchmarkFairnessLockTests
         var code = ReadRepoFile("benchmarks/Program.cs");
 
         Assert.Contains("Fast nORM benchmark validation failed", code);
+        Assert.Contains("Filtered benchmark validation failed", code);
         Assert.Contains("Provider matrix benchmark validation failed", code);
         Assert.Contains("Console.WriteLine($\"❌ Error running benchmarks: {ex.Message}\");", code);
         Assert.Contains("Console.WriteLine($\"❌ Error running fast benchmarks: {ex.Message}\");", code);

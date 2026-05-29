@@ -104,7 +104,8 @@ eng/run-provider-benchmark-slice.ps1 `
 
 ## Test Data
 
-- 1,000 users
+- 12,000 users in the provider matrix; 1,000 users in the legacy SQLite-only
+  comparison
 - 2,000 orders
 - Provider-specific DDL with equivalent columns and indexes
 - Deterministic seed values for stable cross-provider comparisons

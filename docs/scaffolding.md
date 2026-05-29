@@ -1,11 +1,14 @@
 # Scaffolding Contract
 
-Scaffolding ships as a documented v1 feature with the scope below. The "Supported" section is
-the v1 contract; everything in "Not Yet Stable" is explicitly out of scope for v1.0 and tracked
-for v1.x. Generated code is still meant to be reviewed and edited (it is a starting point, not a
-hand-off), but the public surface (`nORM.Scaffolding.DatabaseScaffolder`,
-`nORM.Scaffolding.DynamicEntityTypeGenerator`, and the `dotnet-norm scaffold` command) is
-stable v1.
+Scaffolding ships as a preview v1 tooling surface with the scope below. The
+public entry points (`nORM.Scaffolding.DatabaseScaffolder`,
+`nORM.Scaffolding.DynamicEntityTypeGenerator`, and the `dotnet-norm scaffold`
+command) are API-snapshotted so callers can experiment without churn, but the
+generated model is intentionally a bootstrap artifact, not a database-first completeness claim.
+
+The "Supported" section is the v1 preview contract; everything in "Not Yet
+Stable" is explicitly out of scope for v1.0 and tracked for v1.x. Generated code
+must be reviewed and edited like handwritten model code.
 
 ## Supported
 
@@ -34,3 +37,7 @@ and review diffs like handwritten model code.
 The `dotnet-norm scaffold` command shares the v1 contract above. It uses the same
 `DatabaseScaffolder` implementation as the runtime API; both surfaces support the same
 "Supported" scope and have the same out-of-scope items.
+
+Do not use scaffolding as evidence for provider mobility by itself. Provider
+mobility is proven by generated nORM query/write paths, strict certification,
+provider capability reports, and live provider gates after the model exists.

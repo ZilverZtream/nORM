@@ -23,11 +23,12 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
-    public void Doc_describes_stable_v1_contract()
+    public void Doc_describes_preview_v1_contract()
     {
         var doc = ReadDoc();
         Assert.Contains("Scaffolding Contract", doc, StringComparison.Ordinal);
-        Assert.Contains("stable v1", doc, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("preview v1", doc, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not a database-first completeness claim", doc, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -56,5 +57,13 @@ public class ScaffoldingContractDocTests
         Assert.Contains("DatabaseScaffolder", doc, StringComparison.Ordinal);
         Assert.Contains("DynamicEntityTypeGenerator", doc, StringComparison.Ordinal);
         Assert.Contains("dotnet-norm scaffold", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_does_not_use_scaffolding_as_provider_mobility_evidence()
+    {
+        var doc = ReadDoc();
+        Assert.Contains("Do not use scaffolding as evidence for provider mobility by itself.", doc, StringComparison.Ordinal);
+        Assert.Contains("live provider gates", doc, StringComparison.Ordinal);
     }
 }

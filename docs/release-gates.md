@@ -138,7 +138,9 @@ MySQL configured. `TenantTemporalProviderSwapTests` executes the same sample
 scenario on SQLite and every configured live provider.
 
 Current RC3 local evidence with SQL Server, PostgreSQL, and MySQL configured:
-`eng\live-provider-gate.cmd live` passed 1381/1381, and
+`dotnet test tests\nORM.Tests.csproj -c Release --no-build --filter
+"Tenant|Temporal|Sample|ProviderSwap|ProviderMobilityStrict"` passed 594/594,
+`eng\live-provider-gate.cmd live` passed 1425/1425, and
 `dotnet run --project samples/nORM.Sample.Store -c Release --no-build --
 verify-providers` passed SQLite, SQL Server, PostgreSQL, and MySQL.
 The sample certification report records error/warning totals and recommended
