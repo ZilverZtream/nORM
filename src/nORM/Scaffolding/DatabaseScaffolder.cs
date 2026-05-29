@@ -1514,7 +1514,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default FK referential actions, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- |");
