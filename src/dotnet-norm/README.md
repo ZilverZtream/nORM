@@ -3,6 +3,8 @@
 `dotnet-norm` provides command-line tooling for the nORM ORM framework. Use it to scaffold, validate, and manage nORM projects from the terminal.
 
 ## Features
+- Scaffold entity classes and a DbContext from existing SQLite, SQL Server,
+  PostgreSQL, and MySQL schemas.
 - Validate connection strings before applying migrations.
 - Generate boilerplate configuration for nORM projects.
 - Certify provider mobility by scanning app source and nORM schema metadata.
@@ -22,6 +24,23 @@ norm --help
 ```
 
 The tool package follows the same versioning as the nORM repository release it ships with.
+
+## Scaffolding
+
+Use `norm scaffold` to bootstrap a nORM model from an existing database:
+
+```bash
+norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
+norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite
+```
+
+The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
+`[Key]`/identity/`[Required]`/`[MaxLength]` metadata, deterministic C#
+identifier cleanup, de-duplicated generated names, `INormQueryable<T>` context
+properties, single-column FK navigations, and single-column index metadata. It
+is a bounded bootstrap tool, not a database-first completeness claim; composite
+FK/index, owned-type, inheritance, and provider-specific computed/default/trigger
+inference remain explicit post-processing.
 
 ## Provider Mobility Certification
 
