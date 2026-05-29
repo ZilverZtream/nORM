@@ -2069,6 +2069,41 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSameTableNameAcrossSchemas_UsesSchemaQualifiedEntityNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS auxa;
+            ATTACH DATABASE ':memory:' AS auxb;
+            CREATE TABLE "auxa"."DuplicateName" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "auxb"."DuplicateName" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SchemaDuplicateCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "AuxaDuplicateName.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "AuxbDuplicateName.cs")));
+            var auxaCode = File.ReadAllText(Path.Combine(dir, "AuxaDuplicateName.cs"));
+            var auxbCode = File.ReadAllText(Path.Combine(dir, "AuxbDuplicateName.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SchemaDuplicateCtx.cs"));
+            Assert.Contains("[Table(\"DuplicateName\", Schema = \"auxa\")]", auxaCode);
+            Assert.Contains("[Table(\"DuplicateName\", Schema = \"auxb\")]", auxbCode);
+            Assert.Contains("IQueryable<AuxaDuplicateName> AuxaDuplicateNames", contextCode);
+            Assert.Contains("IQueryable<AuxbDuplicateName> AuxbDuplicateNames", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithLiteralDottedTableFilterCollision_ThrowsNormConfigurationException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

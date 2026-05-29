@@ -59,6 +59,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Schema-qualified table names are preserved for SQL Server, PostgreSQL, and", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL scaffolding uses the current database for", doc, StringComparison.Ordinal);
         Assert.Contains("does not emit the database/catalog name as a model schema", doc, StringComparison.Ordinal);
+        Assert.Contains("same table name appears in multiple schemas", doc, StringComparison.Ordinal);
+        Assert.Contains("include the schema name", doc, StringComparison.Ordinal);
     }
 
     [Fact]

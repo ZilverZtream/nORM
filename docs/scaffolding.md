@@ -46,6 +46,8 @@ must be reviewed and edited like handwritten model code.
   different database identifiers normalize to the same C# identifier. Property
   and navigation names also avoid inherited `object` member names such as
   `ToString`, `Equals`, `GetHashCode`, and `GetType`.
+- When the same table name appears in multiple schemas, generated entity names
+  include the schema name instead of relying on opaque numeric suffixes.
 - The requested namespace is validated before files are written, and the
   generated context file name follows the escaped context class name rather
   than the raw CLI/API input. If that context name collides with an entity

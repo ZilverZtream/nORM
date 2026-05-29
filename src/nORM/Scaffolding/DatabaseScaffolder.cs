@@ -2154,9 +2154,20 @@ namespace nORM.Scaffolding
         {
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var duplicateTableNames = tables
+                .GroupBy(table => table.Name, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             foreach (var table in tables)
             {
-                var baseName = EscapeCSharpIdentifier(ToPascalCase(table.Name));
+                var sourceName = duplicateTableNames.Contains(table.Name)
+                    ? string.IsNullOrWhiteSpace(table.Schema)
+                        ? "Default_" + table.Name
+                        : table.Schema + "_" + table.Name
+                    : table.Name;
+                var baseName = EscapeCSharpIdentifier(ToPascalCase(sourceName));
                 names[TableKey(table.Schema, table.Name)] = MakeUnique(baseName, existingNames);
             }
 
