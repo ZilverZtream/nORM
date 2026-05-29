@@ -16,9 +16,12 @@ must be reviewed and edited like handwritten model code.
 - Schema-qualified table names are preserved for SQL Server, PostgreSQL, and
   SQLite attached databases. MySQL scaffolding uses the current database for
   discovery but does not emit the database/catalog name as a model schema.
-- Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity,
+- Entity class generation with `[Table]`, `[Column]`, `[Key]`, provider metadata-backed identity,
   computed/generated-column metadata, and simple `[Required]`/`[MaxLength]` annotations
-  when provider metadata exposes them. Computed/generated columns are marked
+  when provider metadata exposes them. SQLite rowid integer primary keys,
+  SQL Server identity columns, PostgreSQL identity/serial columns, and MySQL
+  `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.
+  Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
   SQL Server rowversion/timestamp columns are marked as `[Timestamp]` and

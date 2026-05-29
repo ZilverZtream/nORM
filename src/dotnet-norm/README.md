@@ -35,7 +35,7 @@ norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.
 ```
 
 The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
-`[Key]`/identity/computed/`[Timestamp]`/`[Required]`/`[MaxLength]` metadata,
+`[Key]`/provider metadata-backed identity/computed/`[Timestamp]`/`[Required]`/`[MaxLength]` metadata,
 deterministic C# identifier cleanup, de-duplicated generated names,
 `IQueryable<T>` context properties backed by nORM's query provider,
 single-column FK navigations with cascade/non-cascade delete behavior

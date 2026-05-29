@@ -91,6 +91,7 @@ namespace nORM.Scaffolding
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var identityColumnsByTable = await GetIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
@@ -126,7 +127,8 @@ namespace nORM.Scaffolding
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
                     computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
                     rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns).ConfigureAwait(false);
+                    identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
@@ -175,6 +177,7 @@ namespace nORM.Scaffolding
         /// <param name="manyToManyCollections">Many-to-many collection navigations from this entity through pure join tables.</param>
         /// <param name="computedColumns">Column names known to be database-computed/generated.</param>
         /// <param name="rowVersionColumns">Column names known to be database-managed rowversion/timestamp tokens.</param>
+        /// <param name="identityColumns">Column names known to be database-generated identity/auto-increment values.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -189,7 +192,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldRelationship>? collections = null,
             IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null,
             IReadOnlySet<string>? computedColumns = null,
-            IReadOnlySet<string>? rowVersionColumns = null)
+            IReadOnlySet<string>? rowVersionColumns = null,
+            IReadOnlySet<string>? identityColumns = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -232,7 +236,8 @@ namespace nORM.Scaffolding
                     var typeName = GetTypeName(clrType, allowNull);
 
                     var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                    var isAuto = row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai;
+                    var isAuto = (row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
+                        || identityColumns?.Contains(colName) == true;
                     var isComputed = computedColumns?.Contains(colName) == true;
                     var isRowVersion = rowVersionColumns?.Contains(colName) == true;
 
@@ -2127,6 +2132,123 @@ namespace nORM.Scaffolding
 
             return result;
         }
+
+        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetIdentityColumnNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var providerName = provider.GetType().Name;
+            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (provider is SqliteProvider)
+            {
+                var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var table in tables)
+                {
+                    await using var cmd = connection.CreateCommand();
+                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
+                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        rows.Add((
+                            Convert.ToString(reader["name"]) ?? string.Empty,
+                            Convert.ToString(reader["type"]) ?? string.Empty,
+                            ReaderHasColumn(reader, "pk")
+                                ? Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture)
+                                : 0));
+                    }
+
+                    var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
+                    if (primaryKeyColumns.Length != 1)
+                        continue;
+
+                    var key = primaryKeyColumns[0];
+                    if (key.Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var tableKey = TableKey(table.Schema, table.Name);
+                        result[tableKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };
+                    }
+                }
+
+                return ToReadOnlySetDictionary(result);
+            }
+
+            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryColumnNameMapAsync(connection, tableKeys, """
+                    SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ColumnName
+                    FROM sys.identity_columns ic
+                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
+                    WHERE t.is_ms_shipped = 0
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryColumnNameMapAsync(connection, tableKeys, """
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                      AND (
+                          is_identity = 'YES'
+                          OR column_default LIKE 'nextval(%'
+                      )
+                    """).ConfigureAwait(false);
+            }
+
+            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return await QueryColumnNameMapAsync(connection, tableKeys, """
+                    SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND LOWER(extra) LIKE '%auto_increment%'
+                    """).ConfigureAwait(false);
+            }
+
+            return new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> QueryColumnNameMapAsync(
+            DbConnection connection,
+            HashSet<string> tableKeys,
+            string sql)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
+                if (!tableKeys.Contains(tableKey))
+                    continue;
+
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName))
+                    continue;
+
+                if (!result.TryGetValue(tableKey, out var columns))
+                {
+                    columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    result[tableKey] = columns;
+                }
+
+                columns.Add(columnName);
+            }
+
+            return ToReadOnlySetDictionary(result);
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlySet<string>> ToReadOnlySetDictionary(
+            Dictionary<string, HashSet<string>> source)
+            => source.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlySet<string>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
 
         private static string GetColumnPropertyName(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,

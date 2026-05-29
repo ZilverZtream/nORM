@@ -1240,6 +1240,36 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSqliteIntegerPrimaryKey_EmitsIdentityMetadata()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IdentityBacked (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "IdentityCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "IdentityBacked.cs"));
+            Assert.Contains("[Key]", entityCode);
+            Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Identity)]", entityCode);
+            Assert.Contains("public long Id { get; set; }", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSqliteVirtualTable_ReportsSkippedObject()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

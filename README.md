@@ -264,8 +264,9 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 schema-preserving table mapping, identifier cleanup, table filtering,
-preflighted overwrite protection, nullable-safe output, computed/generated
-column metadata, SQL Server rowversion/timestamp metadata, single-column FK
+preflighted overwrite protection, nullable-safe output, provider
+metadata-backed identity columns, computed/generated column metadata, SQL
+Server rowversion/timestamp metadata, single-column FK
 navigation generation with cascade/non-cascade delete behavior, pure
 many-to-many join mapping, and single-column/composite index metadata are
 supported, including columns that participate in multiple indexes. SQL Server

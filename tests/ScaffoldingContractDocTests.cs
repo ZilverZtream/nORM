@@ -88,9 +88,14 @@ public class ScaffoldingContractDocTests
         Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific column types", doc, StringComparison.Ordinal);
         Assert.Contains("decimal precision/scale", doc, StringComparison.Ordinal);
+        Assert.Contains("provider metadata-backed identity", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL identity/serial", doc, StringComparison.Ordinal);
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK referential actions", doc, StringComparison.Ordinal);
+        Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);
+        Assert.Contains("auto_increment", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("nextval(%", source, StringComparison.Ordinal);
         Assert.Contains("temporal_type <> 0", source, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", source, StringComparison.Ordinal);
         Assert.Contains("MissingPrimaryKey", source, StringComparison.Ordinal);
