@@ -103,7 +103,13 @@ namespace nORM.Scaffolding
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode, options).ConfigureAwait(false);
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
+                {
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
+                    if (options.FailOnWarnings)
+                        throw new NormConfigurationException(
+                            "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
+                            "Review nORM.ScaffoldWarnings.md or disable ScaffoldOptions.FailOnWarnings.");
+                }
             }
             finally
             {

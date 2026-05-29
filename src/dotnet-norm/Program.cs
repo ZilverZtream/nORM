@@ -33,6 +33,7 @@ var nsOpt = new Option<string>("--namespace") { Description = "Namespace for gen
 var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
 var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names." };
 var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
+var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md." };
 scaffold.Add(connOpt);
 scaffold.Add(providerOpt);
 scaffold.Add(outputOpt);
@@ -40,6 +41,7 @@ scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
 scaffold.Add(tablesOpt);
 scaffold.Add(noOverwriteOpt);
+scaffold.Add(failOnWarningsOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
     try
@@ -55,7 +57,8 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         var options = new ScaffoldOptions
         {
             Tables = ParseCsvList(result.GetValue(tablesOpt)),
-            OverwriteFiles = !result.GetValue(noOverwriteOpt)
+            OverwriteFiles = !result.GetValue(noOverwriteOpt),
+            FailOnWarnings = result.GetValue(failOnWarningsOpt)
         };
         await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
         Console.WriteLine($"Scaffolding completed. Files written to {output}.");

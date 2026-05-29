@@ -268,6 +268,8 @@ single-column FK navigation generation, and single-column/composite index
 metadata are supported, including columns that participate in multiple indexes.
 Unsupported composite foreign keys are reported in `nORM.ScaffoldWarnings.md`
 instead of being silently converted into invalid navigations.
+Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
+scaffolds fail in CI after the warning report is written.
 Composite FK, owned-type, inheritance, and provider-specific
 computed/default/trigger inference remain explicit post-processing. See
 [Scaffolding Contract](docs/scaffolding.md).

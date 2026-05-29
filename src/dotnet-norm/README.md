@@ -31,7 +31,7 @@ Use `norm scaffold` to bootstrap a nORM model from an existing database:
 
 ```bash
 norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
-norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite
+norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite --fail-on-warnings
 ```
 
 The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
@@ -43,7 +43,8 @@ bounded bootstrap tool, not a database-first completeness claim; unsupported
 composite foreign keys are reported in `nORM.ScaffoldWarnings.md`, while
 composite FK navigation generation, owned-type, inheritance, and
 provider-specific computed/default/trigger inference remain explicit
-post-processing.
+post-processing. Use `--fail-on-warnings` in CI to reject lossy scaffolds after
+the warning report is written.
 
 ## Provider Mobility Certification
 

@@ -759,6 +759,45 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_FailOnWarnings_WritesDiagnosticsThenThrows()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE WarningOwned (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Status TEXT NOT NULL DEFAULT 'new'
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "WarningOwnedCtx",
+                    new ScaffoldOptions { FailOnWarnings = true }));
+
+            Assert.Contains("Scaffolding produced warnings", ex.Message);
+            Assert.True(File.Exists(Path.Combine(dir, "WarningOwned.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "WarningOwnedCtx.cs")));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            Assert.Contains("Default", warnings);
+            Assert.Contains("Status", warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

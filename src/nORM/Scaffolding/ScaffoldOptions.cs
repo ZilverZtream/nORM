@@ -21,5 +21,12 @@ namespace nORM.Scaffolding
         /// overwritten. The default preserves the historical scaffolder behavior.
         /// </summary>
         public bool OverwriteFiles { get; init; } = true;
+
+        /// <summary>
+        /// Gets a value indicating whether scaffolding should fail when diagnostics
+        /// are produced for schema features that cannot be emitted as runnable nORM
+        /// model code.
+        /// </summary>
+        public bool FailOnWarnings { get; init; }
     }
 }

@@ -1284,6 +1284,7 @@ P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandTy
 P:nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
+P:nORM.Scaffolding.ScaffoldOptions.FailOnWarnings:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.OverwriteFiles:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.Tables:System.Collections.Generic.IReadOnlyCollection{System.String}
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String

@@ -38,6 +38,9 @@ must be reviewed and edited like handwritten model code.
   `--tables`.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
+- Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
+  `--fail-on-warnings`, which fails the scaffold run after writing
+  `nORM.ScaffoldWarnings.md`.
 - Deterministic `nORM.ScaffoldWarnings.md` diagnostics for discovered database
   features that are not converted into runnable model code. Composite foreign
   keys are listed there instead of being silently ignored or converted into
@@ -82,7 +85,7 @@ Examples:
 
 ```bash
 norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
-norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite
+norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite --fail-on-warnings
 ```
 
 Do not use scaffolding as evidence for provider mobility by itself. Provider
