@@ -953,6 +953,26 @@ namespace nORM.Scaffolding
                     }
                 }
 
+                foreach (var table in tables)
+                {
+                    await using var checkCommand = connection.CreateCommand();
+                    var schema = string.IsNullOrWhiteSpace(table.Schema) ? "main" : table.Schema!;
+                    checkCommand.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
+                    var tableNameParameter = checkCommand.CreateParameter();
+                    tableNameParameter.ParameterName = "@tableName";
+                    tableNameParameter.Value = table.Name;
+                    checkCommand.Parameters.Add(tableNameParameter);
+                    var createSql = Convert.ToString(await checkCommand.ExecuteScalarAsync().ConfigureAwait(false));
+                    if (ContainsCheckConstraint(createSql))
+                    {
+                        features.Add(new ScaffoldUnsupportedFeature(
+                            TableKey(table.Schema, table.Name),
+                            "CheckConstraint",
+                            table.Name,
+                            "SQLite CHECK constraint"));
+                    }
+                }
+
                 foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
                 {
                     await using var triggerCmd = connection.CreateCommand();
@@ -1037,6 +1057,11 @@ namespace nORM.Scaffolding
                     INNER JOIN sys.tables t ON t.object_id = cc.object_id
                     WHERE t.is_ms_shipped = 0
                     UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, cc.name, 'CheckConstraint', cc.definition
+                    FROM sys.check_constraints cc
+                    INNER JOIN sys.tables t ON t.object_id = cc.parent_object_id
+                    WHERE t.is_ms_shipped = 0
+                    UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
@@ -1087,6 +1112,10 @@ namespace nORM.Scaffolding
                     FROM information_schema.triggers
                     WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
+                    SELECT table_schema, table_name, constraint_name, 'CheckConstraint', 'PostgreSQL CHECK constraint'
+                    FROM information_schema.table_constraints
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND constraint_type = 'CHECK'
+                    UNION ALL
                     SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
@@ -1131,6 +1160,10 @@ namespace nORM.Scaffolding
                     SELECT NULL, event_object_table, trigger_name, 'Trigger', 'MySQL trigger'
                     FROM information_schema.triggers
                     WHERE trigger_schema = DATABASE()
+                    UNION ALL
+                    SELECT NULL, table_name, constraint_name, 'CheckConstraint', 'MySQL CHECK constraint'
+                    FROM information_schema.table_constraints
+                    WHERE table_schema = DATABASE() AND constraint_type = 'CHECK'
                     """).ConfigureAwait(false);
             }
 
@@ -1177,6 +1210,10 @@ namespace nORM.Scaffolding
                     "Table has no primary key; generated entity is a query/bootstrap artifact until a key is configured."));
             }
         }
+
+        private static bool ContainsCheckConstraint(string? createTableSql)
+            => !string.IsNullOrWhiteSpace(createTableSql)
+               && createTableSql.IndexOf("CHECK", StringComparison.OrdinalIgnoreCase) >= 0;
 
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -1337,6 +1374,7 @@ namespace nORM.Scaffolding
             {
                 "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
                 "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
+                "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",

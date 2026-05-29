@@ -1091,7 +1091,8 @@ public class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE FeatureOwned (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Name TEXT NOT NULL DEFAULT 'new',
-                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL,
+                CONSTRAINT CK_FeatureOwned_Name CHECK (length(Name) > 0)
             );
             CREATE TRIGGER TR_FeatureOwned_Audit AFTER INSERT ON FeatureOwned BEGIN SELECT 1; END;
             CREATE VIEW FeatureOwnedView AS SELECT Id, Name FROM FeatureOwned;
@@ -1113,12 +1114,14 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("NameLength", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
+            Assert.Contains("CheckConstraint", warnings);
             Assert.Contains("Skipped Database Objects", warnings);
             Assert.Contains("FeatureOwnedView", warnings);
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("name").GetString() == "Name");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint" && item.GetProperty("name").GetString() == "FeatureOwned");
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
