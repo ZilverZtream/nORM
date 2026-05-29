@@ -984,11 +984,12 @@ namespace nORM.Scaffolding
                 if (!tableKeys.Contains(joinTableKey))
                     continue;
 
-                var fkRows = group
+                var fkRows = OrderManyToManyForeignKeys(
+                    GetUnqualifiedName(joinTableKey),
+                    group
                     .GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
                     .Select(g => g.First())
-                    .OrderBy(fk => fk.DependentColumn, StringComparer.Ordinal)
-                    .ToArray();
+                    .ToArray());
 
                 if (fkRows.Length != 2)
                     continue;
@@ -1036,6 +1037,20 @@ namespace nORM.Scaffolding
             }
 
             return joins;
+        }
+
+        private static ScaffoldForeignKey[] OrderManyToManyForeignKeys(string joinTableName, ScaffoldForeignKey[] foreignKeys)
+        {
+            return foreignKeys
+                .OrderBy(fk => PrincipalNamePosition(joinTableName, fk.PrincipalTable))
+                .ThenBy(fk => fk.DependentColumn, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static int PrincipalNamePosition(string joinTableName, string principalTable)
+        {
+            var position = joinTableName.IndexOf(principalTable, StringComparison.OrdinalIgnoreCase);
+            return position < 0 ? int.MaxValue : position;
         }
 
         private static bool HasSinglePrimaryKeyColumn(

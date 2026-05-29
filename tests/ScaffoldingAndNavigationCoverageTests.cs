@@ -932,6 +932,46 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithPureJoinTable_UsesJoinTableNameForNavigationDirection()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Student (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Course (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE StudentCourse (
+                CourseId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                PRIMARY KEY (CourseId, StudentId),
+                CONSTRAINT FK_StudentCourse_Course FOREIGN KEY (CourseId) REFERENCES Course(Id),
+                CONSTRAINT FK_StudentCourse_Student FOREIGN KEY (StudentId) REFERENCES Student(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinCtx");
+
+            var studentCode = File.ReadAllText(Path.Combine(dir, "Student.cs"));
+            var courseCode = File.ReadAllText(Path.Combine(dir, "Course.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "JoinCtx.cs"));
+
+            Assert.Contains("public List<Course> Courses { get; set; } = new();", studentCode);
+            Assert.DoesNotContain("public List<Student>", courseCode);
+            Assert.Contains(".HasMany<Course>(p => p.Courses)", contextCode);
+            Assert.Contains(".UsingTable(\"StudentCourse\", \"StudentId\", \"CourseId\");", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
