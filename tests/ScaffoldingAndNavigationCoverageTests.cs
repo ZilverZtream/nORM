@@ -551,6 +551,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.True(File.Exists(Path.Combine(dir, "MyCtx2.cs")));
             Assert.True(File.Exists(Path.Combine(dir, "SanWidget2.cs")));
             var entityCode = File.ReadAllText(Path.Combine(dir, "SanWidget2.cs"));
+            Assert.Contains("[Required]", entityCode);
             Assert.Contains("public string Name { get; set; } = default!;", entityCode);
         }
         finally
@@ -624,6 +625,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "BadTable.cs"));
             Assert.Contains("public class BadTable", entityCode);
+            Assert.Contains("[Required]", entityCode);
             Assert.Contains("public string _1stName { get; set; } = default!;", entityCode);
             Assert.Contains("public long? HasSpace", entityCode);
             Assert.Contains("public string? Class", entityCode);

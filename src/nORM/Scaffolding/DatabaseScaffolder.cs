@@ -189,6 +189,8 @@ namespace nORM.Scaffolding
                         sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
                     if (maxLength.HasValue)
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
+                    if (!clrType.IsValueType && !allowNull)
+                        sb.AppendLine("    [Required]");
                     sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");
                     var initializer = !clrType.IsValueType && !allowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");

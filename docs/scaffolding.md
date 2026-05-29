@@ -14,7 +14,8 @@ must be reviewed and edited like handwritten model code.
 
 - Table discovery for SQL Server, PostgreSQL, MySQL, and SQLite.
 - Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity, and
-  simple `[MaxLength]` annotations when provider metadata exposes them.
+  simple `[Required]`/`[MaxLength]` annotations when provider metadata exposes
+  them.
 - Nullable reference/value type generation from database nullability metadata.
 - Non-null reference properties are initialized with `default!` so generated
   nullable-enabled code compiles cleanly before the application adds its own
