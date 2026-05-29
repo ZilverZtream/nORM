@@ -111,3 +111,19 @@ norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.
 Do not use scaffolding as evidence for provider mobility by itself. Provider
 mobility is proven by generated nORM query/write paths, strict certification,
 provider capability reports, and live provider gates after the model exists.
+
+## Warning Report Shape
+
+When diagnostics exist, scaffolding writes both `nORM.ScaffoldWarnings.md` and
+`nORM.ScaffoldWarnings.json`. The JSON report is intended for CI checks and has
+these top-level fields:
+
+- `version`
+- `compositeForeignKeys`
+- `possibleManyToManyJoinTables`
+- `providerOwnedSchemaFeatures`
+- `skippedDatabaseObjects`
+
+The report is additive: new fields may be added in later versions, but v1 tools
+should tolerate unknown fields and should not treat an empty diagnostics file as
+provider-mobility evidence.

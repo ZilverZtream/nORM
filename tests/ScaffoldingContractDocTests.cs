@@ -88,6 +88,18 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_defines_warning_report_json_shape()
+    {
+        var doc = ReadDoc();
+        Assert.Contains("Warning Report Shape", doc, StringComparison.Ordinal);
+        Assert.Contains("nORM.ScaffoldWarnings.json", doc, StringComparison.Ordinal);
+        Assert.Contains("compositeForeignKeys", doc, StringComparison.Ordinal);
+        Assert.Contains("possibleManyToManyJoinTables", doc, StringComparison.Ordinal);
+        Assert.Contains("providerOwnedSchemaFeatures", doc, StringComparison.Ordinal);
+        Assert.Contains("skippedDatabaseObjects", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_names_the_public_scaffolder_types()
     {
         var doc = ReadDoc();
