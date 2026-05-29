@@ -128,10 +128,15 @@ benchmark:
 dotnet run --project benchmarks/nORM.Benchmarks.csproj -c Release -- --filter "*TenantTemporalBenchmarks*"
 ```
 
-Current local RC3 overhead evidence: tenant count query measured 58.81 us
-versus 54.25 us without tenant filtering (1.10x), and temporal
-insert/update/delete measured 3.32 ms versus 1.48 ms without temporal triggers.
-Write allocations stayed effectively flat at 8.86 KB versus 8.87 KB.
+Current local RC3 overhead evidence from isolated BenchmarkDotNet run
+`TenantTemporalBenchmarks` at commit `48c721e5`: generated tenant count query
+measured 64.29 us versus 64.53 us for the same manual tenant predicate
+(1.03x, 99.9% CI overlap) while allocating 2.66 KB versus 7.07 KB.
+Temporal insert measured 37.80 us versus 36.79 us without temporal triggers.
+Temporal update measured 2.16 ms versus 2.06 ms without temporal triggers, and
+temporal delete measured 2.12 ms versus 1.81 ms without temporal triggers. The
+write measurements have wide intervals and must be cited with the raw
+BenchmarkDotNet report, not as a precise point claim.
 
 For RC evidence, run the live provider gate with SQL Server, PostgreSQL, and
 MySQL configured. `TenantTemporalProviderSwapTests` executes the same sample
