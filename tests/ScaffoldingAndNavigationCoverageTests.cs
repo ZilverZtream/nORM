@@ -608,6 +608,62 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_SqliteAttachedDatabase_PreservesSchemaAndDiagnostics()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                PRAGMA foreign_keys=ON;
+                ATTACH DATABASE ':memory:' AS aux;
+                CREATE TABLE "aux"."SchemaAuthor" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                CREATE TABLE "aux"."SchemaBook" (
+                    Id INTEGER PRIMARY KEY,
+                    AuthorId INTEGER NOT NULL,
+                    Title TEXT NOT NULL DEFAULT 'untitled',
+                    CONSTRAINT FK_SchemaBook_Author FOREIGN KEY (AuthorId) REFERENCES SchemaAuthor(Id)
+                );
+                CREATE INDEX "aux"."IX_SchemaBook_Title" ON "SchemaBook"(Title);
+                CREATE TRIGGER "aux"."TR_SchemaBook_Audit" AFTER INSERT ON "SchemaBook" BEGIN SELECT 1; END;
+                CREATE VIEW "aux"."SchemaBookView" AS SELECT Id, Title FROM "SchemaBook";
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "AttachedCtx");
+
+            var authorCode = File.ReadAllText(Path.Combine(dir, "SchemaAuthor.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "SchemaBook.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "AttachedCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[Table(\"SchemaAuthor\", Schema = \"aux\")]", authorCode);
+            Assert.Contains("[Table(\"SchemaBook\", Schema = \"aux\")]", bookCode);
+            Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
+            Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id)", contextCode);
+            Assert.Contains("[Index(\"IX_SchemaBook_Title\")]", bookCode);
+            Assert.Contains("aux.SchemaBook", warnings);
+            Assert.Contains("TR_SchemaBook_Audit", warnings);
+            Assert.Contains("aux.SchemaBookView", warnings);
+
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Default");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Trigger");
+            var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
+            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("name").GetString() == "aux.SchemaBookView");
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TableAttributeSchema_IsUsedInNavigationProjectionSubqueries()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

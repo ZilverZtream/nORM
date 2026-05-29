@@ -279,9 +279,15 @@ namespace nORM.Scaffolding
             var providerName = provider.GetType().Name;
             if (provider is SqliteProvider)
             {
-                return await QueryTablesAsync(
-                    connection,
-                    "SELECT NULL AS TABLE_SCHEMA, name AS TABLE_NAME FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").ConfigureAwait(false);
+                var tables = new List<ScaffoldTable>();
+                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
+                {
+                    tables.AddRange(await QueryTablesAsync(
+                        connection,
+                        $"SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, name AS TABLE_NAME FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").ConfigureAwait(false));
+                }
+
+                return tables;
             }
 
             if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
@@ -313,9 +319,15 @@ namespace nORM.Scaffolding
             var providerName = provider.GetType().Name;
             if (provider is SqliteProvider)
             {
-                return await QuerySkippedObjectsAsync(
-                    connection,
-                    "SELECT NULL AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail FROM sqlite_master WHERE type = 'view' ORDER BY name").ConfigureAwait(false);
+                var objects = new List<ScaffoldSkippedObject>();
+                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
+                {
+                    objects.AddRange(await QuerySkippedObjectsAsync(
+                        connection,
+                        $"SELECT {SqliteSchemaResult(schema)} AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'view' ORDER BY name").ConfigureAwait(false));
+                }
+
+                return objects;
             }
 
             if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
@@ -371,6 +383,40 @@ namespace nORM.Scaffolding
             }
 
             return objects;
+        }
+
+        private static async Task<IReadOnlyList<string>> GetSqliteSchemasAsync(DbConnection connection)
+        {
+            var schemas = new List<string>();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA database_list";
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var schema = Convert.ToString(reader["name"]);
+                if (string.IsNullOrWhiteSpace(schema)
+                    || string.Equals(schema, "temp", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                schemas.Add(schema);
+            }
+
+            return schemas.Count == 0 ? new[] { "main" } : schemas;
+        }
+
+        private static string SqliteSchemaResult(string schema)
+            => string.Equals(schema, "main", StringComparison.OrdinalIgnoreCase)
+                ? "NULL"
+                : "'" + schema.Replace("'", "''") + "'";
+
+        private static string SqlitePragma(DatabaseProvider provider, string? schema, string pragmaName, string argument)
+        {
+            var prefix = string.IsNullOrWhiteSpace(schema)
+                ? string.Empty
+                : provider.Escape(schema!) + ".";
+            return $"PRAGMA {prefix}{pragmaName}({provider.Escape(argument)})";
         }
 
         private static IReadOnlyList<ScaffoldTable> FilterTables(IReadOnlyList<ScaffoldTable> tables, ScaffoldOptions options)
@@ -455,7 +501,7 @@ namespace nORM.Scaffolding
                 foreach (var table in tables)
                 {
                     await using var listCommand = connection.CreateCommand();
-                    listCommand.CommandText = $"PRAGMA index_list({provider.Escape(table.Name)})";
+                    listCommand.CommandText = SqlitePragma(provider, table.Schema, "index_list", table.Name);
                     await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
                     var tableIndexes = new List<(string Name, bool IsUnique, string Origin)>();
                     while (await listReader.ReadAsync().ConfigureAwait(false))
@@ -476,7 +522,7 @@ namespace nORM.Scaffolding
                             continue;
 
                         await using var infoCommand = connection.CreateCommand();
-                        infoCommand.CommandText = $"PRAGMA index_info({provider.Escape(name)})";
+                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_info", name);
                         await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
                         var columns = new List<(int Ordinal, string Name)>();
                         while (await infoReader.ReadAsync().ConfigureAwait(false))
@@ -608,7 +654,7 @@ namespace nORM.Scaffolding
                 foreach (var table in tables)
                 {
                     await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = $"PRAGMA foreign_key_list({provider.Escape(table.Name)})";
+                    cmd.CommandText = SqlitePragma(provider, table.Schema, "foreign_key_list", table.Name);
                     await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
 
                     var rows = new List<(long Id, long Seq, string PrincipalTable, string DependentColumn, string PrincipalColumn)>();
@@ -638,7 +684,7 @@ namespace nORM.Scaffolding
                                 DependentSchema: table.Schema,
                                 DependentTable: table.Name,
                                 DependentColumn: row.DependentColumn,
-                                PrincipalSchema: null,
+                                PrincipalSchema: table.Schema,
                                 PrincipalTable: row.PrincipalTable,
                                 PrincipalColumn: row.PrincipalColumn,
                                 ConstraintName: "sqlite_fk_" + row.Id,
@@ -769,7 +815,7 @@ namespace nORM.Scaffolding
                 foreach (var table in tables)
                 {
                     await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = $"PRAGMA table_xinfo({provider.Escape(table.Name)})";
+                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
                     await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                     while (await reader.ReadAsync().ConfigureAwait(false))
                     {
@@ -783,16 +829,19 @@ namespace nORM.Scaffolding
                     }
                 }
 
-                await using var triggerCmd = connection.CreateCommand();
-                triggerCmd.CommandText = "SELECT tbl_name AS TableName, name AS TriggerName FROM sqlite_master WHERE type = 'trigger'";
-                await using var triggerReader = await triggerCmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await triggerReader.ReadAsync().ConfigureAwait(false))
+                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
                 {
-                    var tableName = Convert.ToString(triggerReader["TableName"]);
-                    var triggerName = Convert.ToString(triggerReader["TriggerName"]);
-                    var tableKey = TableKey(null, tableName ?? string.Empty);
-                    if (!string.IsNullOrWhiteSpace(tableName) && tableKeys.Contains(tableKey))
-                        features.Add(new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger"));
+                    await using var triggerCmd = connection.CreateCommand();
+                    triggerCmd.CommandText = $"SELECT {SqliteSchemaResult(schema)} AS TableSchema, tbl_name AS TableName, name AS TriggerName FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'trigger'";
+                    await using var triggerReader = await triggerCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await triggerReader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var tableName = Convert.ToString(triggerReader["TableName"]);
+                        var triggerName = Convert.ToString(triggerReader["TriggerName"]);
+                        var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(triggerReader["TableSchema"])), tableName ?? string.Empty);
+                        if (!string.IsNullOrWhiteSpace(tableName) && tableKeys.Contains(tableKey))
+                            features.Add(new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger"));
+                    }
                 }
 
                 return features;
