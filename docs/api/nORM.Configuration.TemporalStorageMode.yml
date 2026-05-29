@@ -1,0 +1,124 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.TemporalStorageMode
+  commentId: T:nORM.Configuration.TemporalStorageMode
+  id: TemporalStorageMode
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.TemporalStorageMode.NormManaged
+  - nORM.Configuration.TemporalStorageMode.ProviderNative
+  langs:
+  - csharp
+  - vb
+  name: TemporalStorageMode
+  nameWithType: TemporalStorageMode
+  fullName: nORM.Configuration.TemporalStorageMode
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/TemporalStorageMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalStorageMode
+    path: src/nORM/Configuration/TemporalStorageMode.cs
+    startLine: 5
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Selects the storage engine used by temporal versioning.
+  example: []
+  syntax:
+    content: public enum TemporalStorageMode
+    content.vb: Public Enum TemporalStorageMode
+- uid: nORM.Configuration.TemporalStorageMode.NormManaged
+  commentId: F:nORM.Configuration.TemporalStorageMode.NormManaged
+  id: NormManaged
+  parent: nORM.Configuration.TemporalStorageMode
+  langs:
+  - csharp
+  - vb
+  name: NormManaged
+  nameWithType: TemporalStorageMode.NormManaged
+  fullName: nORM.Configuration.TemporalStorageMode.NormManaged
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/TemporalStorageMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NormManaged
+    path: src/nORM/Configuration/TemporalStorageMode.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Use nORM-managed history tables and provider triggers/functions.
+
+    This is the provider-neutral v1 default.
+  example: []
+  syntax:
+    content: NormManaged = 0
+    return:
+      type: nORM.Configuration.TemporalStorageMode
+- uid: nORM.Configuration.TemporalStorageMode.ProviderNative
+  commentId: F:nORM.Configuration.TemporalStorageMode.ProviderNative
+  id: ProviderNative
+  parent: nORM.Configuration.TemporalStorageMode
+  langs:
+  - csharp
+  - vb
+  name: ProviderNative
+  nameWithType: TemporalStorageMode.ProviderNative
+  fullName: nORM.Configuration.TemporalStorageMode.ProviderNative
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/TemporalStorageMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderNative
+    path: src/nORM/Configuration/TemporalStorageMode.cs
+    startLine: 17
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Use provider-native temporal storage when the database provider supports it.
+
+    Unsupported providers fail closed during context initialization.
+  example: []
+  syntax:
+    content: ProviderNative = 1
+    return:
+      type: nORM.Configuration.TemporalStorageMode
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.TemporalStorageMode
+  commentId: T:nORM.Configuration.TemporalStorageMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.TemporalStorageMode.html
+  name: TemporalStorageMode
+  nameWithType: TemporalStorageMode
+  fullName: nORM.Configuration.TemporalStorageMode

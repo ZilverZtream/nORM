@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 29
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -64,7 +64,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 32
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -95,7 +95,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 34
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -126,7 +126,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 36
+    startLine: 37
   assemblies:
   - nORM
   namespace: nORM.Migration

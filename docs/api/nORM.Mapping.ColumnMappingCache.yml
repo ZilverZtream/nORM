@@ -27,8 +27,18 @@ items:
   summary: Provides cached reflection-based metadata describing how entity properties map to database columns.
   example: []
   syntax:
-    content: public static class ColumnMappingCache
-    content.vb: Public Module ColumnMappingCache
+    content: >-
+      [RequiresDynamicCode("ColumnMappingCache reflects over entity properties; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("ColumnMappingCache reflects over entity properties; trimming may remove the required members.")]
+
+      public static class ColumnMappingCache
+    content.vb: >-
+      <RequiresDynamicCode("ColumnMappingCache reflects over entity properties; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("ColumnMappingCache reflects over entity properties; trimming may remove the required members.")>
+
+      Public Module ColumnMappingCache
   inheritance:
   - System.Object
   inheritedMembers:
@@ -39,6 +49,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: ColumnMappingCache reflects over entity properties; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: ColumnMappingCache reflects over entity properties; trimming may remove the required members.
 - uid: nORM.Mapping.ColumnMappingCache.GetCachedColumns(System.Type,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration)
   commentId: M:nORM.Mapping.ColumnMappingCache.GetCachedColumns(System.Type,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration)
   id: GetCachedColumns(System.Type,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration)
@@ -57,7 +78,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCachedColumns
     path: src/nORM/Mapping/ColumnMappingCache.cs
-    startLine: 33
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Mapping

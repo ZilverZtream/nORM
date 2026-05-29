@@ -6,6 +6,7 @@ items:
   parent: nORM.Core
   children:
   - nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+  - nORM.Core.DatabaseFacade.CurrentContextTransaction
   - nORM.Core.DatabaseFacade.CurrentTransaction
   langs:
   - csharp
@@ -79,6 +80,42 @@ items:
       type: System.Data.Common.DbTransaction
     content.vb: Public ReadOnly Property CurrentTransaction As DbTransaction
   overload: nORM.Core.DatabaseFacade.CurrentTransaction*
+- uid: nORM.Core.DatabaseFacade.CurrentContextTransaction
+  commentId: P:nORM.Core.DatabaseFacade.CurrentContextTransaction
+  id: CurrentContextTransaction
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: CurrentContextTransaction
+  nameWithType: DatabaseFacade.CurrentContextTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentContextTransaction
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CurrentContextTransaction
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 37
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets the active nORM-managed transaction wrapper for the context, if one exists.
+
+    This property does not expose the underlying provider transaction handle and is
+
+    safe to use with strict provider mobility.
+  example: []
+  syntax:
+    content: public DbContextTransaction? CurrentContextTransaction { get; }
+    parameters: []
+    return:
+      type: nORM.Core.DbContextTransaction
+    content.vb: Public ReadOnly Property CurrentContextTransaction As DbContextTransaction
+  overload: nORM.Core.DatabaseFacade.CurrentContextTransaction*
 - uid: nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
   commentId: M:nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
   id: BeginTransactionAsync(System.Threading.CancellationToken)
@@ -97,7 +134,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BeginTransactionAsync
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 31
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1140,8 +1177,15 @@ references:
     name: Common
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: nORM.Core.DatabaseFacade.CurrentContextTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.CurrentContextTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentContextTransaction
+  name: CurrentContextTransaction
+  nameWithType: DatabaseFacade.CurrentContextTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentContextTransaction
 - uid: nORM.Core.DbContextTransaction
   commentId: T:nORM.Core.DbContextTransaction
+  parent: nORM.Core
   href: nORM.Core.DbContextTransaction.html
   name: DbContextTransaction
   nameWithType: DbContextTransaction

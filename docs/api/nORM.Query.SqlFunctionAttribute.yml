@@ -2675,6 +2675,7 @@ references:
     href: nORM.Navigation.html
 - uid: nORM.Query.SqlFunctionAttribute
   commentId: T:nORM.Query.SqlFunctionAttribute
+  parent: nORM.Query
   href: nORM.Query.SqlFunctionAttribute.html
   name: SqlFunctionAttribute
   nameWithType: SqlFunctionAttribute

@@ -8,6 +8,8 @@ items:
   - nORM.Core.DbContext.#ctor(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
   - nORM.Core.DbContext.#ctor(System.String,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
   - nORM.Core.DbContext.Add``1(``0)
+  - nORM.Core.DbContext.ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  - nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync``1(System.Threading.CancellationToken)
   - nORM.Core.DbContext.Attach``1(``0)
   - nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
   - nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)
@@ -23,6 +25,7 @@ items:
   - nORM.Core.DbContext.Dispose
   - nORM.Core.DbContext.Dispose(System.Boolean)
   - nORM.Core.DbContext.DisposeAsync
+  - nORM.Core.DbContext.DropNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
   - nORM.Core.DbContext.Entry(System.Object)
   - nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{``0}},System.Threading.CancellationToken)
   - nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object)
@@ -30,19 +33,32 @@ items:
   - nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[])
   - nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
   - nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
+  - nORM.Core.DbContext.GenerateNativeTenantPolicySql``1
+  - nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql``1
   - nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String)
   - nORM.Core.DbContext.GetShadowProperty(System.Object,System.String)
+  - nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  - nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Object,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  - nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Object,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.GetTenantBoundaryDiagnostics``1(System.String)
   - nORM.Core.DbContext.InsertAsync``1(``0,System.Data.Common.DbTransaction,System.Threading.CancellationToken)
   - nORM.Core.DbContext.InsertAsync``1(``0,System.Threading.CancellationToken)
   - nORM.Core.DbContext.IsHealthyAsync(System.Threading.CancellationToken)
   - nORM.Core.DbContext.Options
   - nORM.Core.DbContext.PrepareInsertAsync``1(System.Threading.CancellationToken,System.Boolean)
   - nORM.Core.DbContext.Provider
+  - nORM.Core.DbContext.PruneTemporalHistoryAsync(System.DateTime,System.Boolean,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.PruneTemporalHistoryAsync``1(System.DateTime,System.Threading.CancellationToken)
   - nORM.Core.DbContext.Query(System.String)
   - nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[])
   - nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken)
   - nORM.Core.DbContext.RegisterForDisposal(System.IDisposable)
   - nORM.Core.DbContext.Remove``1(``0)
+  - nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.String,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.DateTime,System.Threading.CancellationToken)
+  - nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContext.SaveChangesAsync(System.Boolean,System.Threading.CancellationToken)
   - nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken)
@@ -81,8 +97,18 @@ items:
     intended to be short lived and not thread safe.
   example: []
   syntax:
-    content: 'public class DbContext : IDisposable, IAsyncDisposable'
-    content.vb: Public Class DbContext Implements IDisposable, IAsyncDisposable
+    content: >-
+      [RequiresDynamicCode("DbContext uses Expression-based query translation and reflection-built materializers; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("DbContext reflects over entity types to build mappings; trimming may remove the required members.")]
+
+      public class DbContext : IDisposable, IAsyncDisposable
+    content.vb: >-
+      <RequiresDynamicCode("DbContext uses Expression-based query translation and reflection-built materializers; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("DbContext reflects over entity types to build mappings; trimming may remove the required members.")>
+
+      Public Class DbContext Implements IDisposable, IAsyncDisposable
   inheritance:
   - System.Object
   implements:
@@ -102,6 +128,17 @@ items:
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TProperty}}})
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Core.DbContext.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DbContext,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: DbContext uses Expression-based query translation and reflection-built materializers; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: DbContext reflects over entity types to build mappings; trimming may remove the required members.
 - uid: nORM.Core.DbContext.Add``1(``0)
   commentId: M:nORM.Core.DbContext.Add``1(``0)
   id: Add``1(``0)
@@ -507,7 +544,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Options
     path: src/nORM/Core/DbContext.cs
-    startLine: 128
+    startLine: 135
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -541,7 +578,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ChangeTracker
     path: src/nORM/Core/DbContext.cs
-    startLine: 134
+    startLine: 141
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -575,7 +612,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Database
     path: src/nORM/Core/DbContext.cs
-    startLine: 140
+    startLine: 147
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -609,7 +646,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbContext.cs
-    startLine: 150
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -655,7 +692,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/DbContext.cs
-    startLine: 205
+    startLine: 213
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -703,7 +740,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Connection
     path: src/nORM/Core/DbContext.cs
-    startLine: 484
+    startLine: 585
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -739,7 +776,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Core/DbContext.cs
-    startLine: 490
+    startLine: 600
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -773,7 +810,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateCompiledQueryCommandAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 574
+    startLine: 717
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -784,7 +821,7 @@ items:
 
     command interception. Generated <code>[CompileTimeQuery]</code> methods must use this
 
-    instead of <code>ctx.Connection.CreateCommand()</code> to avoid bypassing connection
+    instead of <code>ctx.RawConnection.CreateCommand()</code> to avoid bypassing connection
 
     initialisation, transaction scope, and interceptor pipelines.
   example: []
@@ -817,7 +854,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteCompiledQueryListAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 592
+    startLine: 736
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -871,7 +908,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCompiledQueryMaterializer
     path: src/nORM/Core/DbContext.cs
-    startLine: 614
+    startLine: 759
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -922,7 +959,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsHealthyAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 645
+    startLine: 791
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -957,7 +994,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Query
     path: src/nORM/Core/DbContext.cs
-    startLine: 856
+    startLine: 1012
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1030,7 +1067,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateSavepointAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 903
+    startLine: 1060
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1084,7 +1121,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackToSavepointAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 922
+    startLine: 1085
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1117,6 +1154,191 @@ items:
   nameWithType.vb: DbContext.RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
   fullName.vb: nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction, String, System.Threading.CancellationToken)
   name.vb: RollbackToSavepointAsync(DbTransaction, String, CancellationToken)
+- uid: nORM.Core.DbContext.GetTenantBoundaryDiagnostics``1(System.String)
+  commentId: M:nORM.Core.DbContext.GetTenantBoundaryDiagnostics``1(System.String)
+  id: GetTenantBoundaryDiagnostics``1(System.String)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetTenantBoundaryDiagnostics<T>(string)
+  nameWithType: DbContext.GetTenantBoundaryDiagnostics<T>(string)
+  fullName: nORM.Core.DbContext.GetTenantBoundaryDiagnostics<T>(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetTenantBoundaryDiagnostics
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1259
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Describes the tenant predicate shape nORM applies to generated paths for a mapped entity.
+  example: []
+  syntax:
+    content: 'public TenantBoundaryDiagnostics GetTenantBoundaryDiagnostics<T>(string operation = "diagnostics") where T : class'
+    parameters:
+    - id: operation
+      type: System.String
+      description: Human-readable operation label used in deterministic failure messages.
+    typeParameters:
+    - id: T
+      description: Mapped entity type.
+    return:
+      type: nORM.Core.TenantBoundaryDiagnostics
+      description: Redacted tenant-boundary diagnostics for the mapped entity.
+    content.vb: Public Function GetTenantBoundaryDiagnostics(Of T As Class)(operation As String = "diagnostics") As TenantBoundaryDiagnostics
+  overload: nORM.Core.DbContext.GetTenantBoundaryDiagnostics*
+  nameWithType.vb: DbContext.GetTenantBoundaryDiagnostics(Of T)(String)
+  fullName.vb: nORM.Core.DbContext.GetTenantBoundaryDiagnostics(Of T)(String)
+  name.vb: GetTenantBoundaryDiagnostics(Of T)(String)
+- uid: nORM.Core.DbContext.GenerateNativeTenantPolicySql``1
+  commentId: M:nORM.Core.DbContext.GenerateNativeTenantPolicySql``1
+  id: GenerateNativeTenantPolicySql``1
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GenerateNativeTenantPolicySql<T>()
+  nameWithType: DbContext.GenerateNativeTenantPolicySql<T>()
+  fullName: nORM.Core.DbContext.GenerateNativeTenantPolicySql<T>()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateNativeTenantPolicySql
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1300
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Generates provider-native tenant policy DDL for the mapped entity.
+  example: []
+  syntax:
+    content: 'public string GenerateNativeTenantPolicySql<T>() where T : class'
+    typeParameters:
+    - id: T
+      description: Mapped tenant-scoped entity type.
+    return:
+      type: System.String
+      description: >-
+        Provider-specific DDL for optional database-native RLS defense in depth.
+
+        Applications own reviewing and executing the returned script.
+    content.vb: Public Function GenerateNativeTenantPolicySql(Of T As Class)() As String
+  overload: nORM.Core.DbContext.GenerateNativeTenantPolicySql*
+  exceptions:
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the provider has no database-native tenant policy generator.
+  nameWithType.vb: DbContext.GenerateNativeTenantPolicySql(Of T)()
+  fullName.vb: nORM.Core.DbContext.GenerateNativeTenantPolicySql(Of T)()
+  name.vb: GenerateNativeTenantPolicySql(Of T)()
+- uid: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  id: ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ApplyNativeTenantPolicyAsync<T>(CancellationToken)
+  nameWithType: DbContext.ApplyNativeTenantPolicyAsync<T>(CancellationToken)
+  fullName: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync<T>(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ApplyNativeTenantPolicyAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1324
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Applies provider-native tenant policy DDL for the mapped entity through
+
+    the current nORM connection and transaction.
+  remarks: >-
+    This method is explicit deployment tooling. nORM does not silently
+
+    install RLS policies during normal query or save operations.
+  example: []
+  syntax:
+    content: 'public Task ApplyNativeTenantPolicyAsync<T>(CancellationToken ct = default) where T : class'
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Mapped tenant-scoped entity type.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task representing the asynchronous operation.
+    content.vb: Public Function ApplyNativeTenantPolicyAsync(Of T As Class)(ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync*
+  exceptions:
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the provider has no database-native tenant policy generator.
+  nameWithType.vb: DbContext.ApplyNativeTenantPolicyAsync(Of T)(CancellationToken)
+  fullName.vb: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync(Of T)(System.Threading.CancellationToken)
+  name.vb: ApplyNativeTenantPolicyAsync(Of T)(CancellationToken)
+- uid: nORM.Core.DbContext.DropNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.DropNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  id: DropNativeTenantPolicyAsync``1(System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: DropNativeTenantPolicyAsync<T>(CancellationToken)
+  nameWithType: DbContext.DropNativeTenantPolicyAsync<T>(CancellationToken)
+  fullName: nORM.Core.DbContext.DropNativeTenantPolicyAsync<T>(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DropNativeTenantPolicyAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1345
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Drops provider-native tenant policy objects for the mapped entity through
+
+    the current nORM connection and transaction.
+  example: []
+  syntax:
+    content: 'public Task DropNativeTenantPolicyAsync<T>(CancellationToken ct = default) where T : class'
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Mapped tenant-scoped entity type.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task representing the asynchronous operation.
+    content.vb: Public Function DropNativeTenantPolicyAsync(Of T As Class)(ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContext.DropNativeTenantPolicyAsync*
+  exceptions:
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the provider has no database-native tenant policy generator.
+  nameWithType.vb: DbContext.DropNativeTenantPolicyAsync(Of T)(CancellationToken)
+  fullName.vb: nORM.Core.DbContext.DropNativeTenantPolicyAsync(Of T)(System.Threading.CancellationToken)
+  name.vb: DropNativeTenantPolicyAsync(Of T)(CancellationToken)
 - uid: nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)
   commentId: M:nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object)
   id: SetShadowProperty(System.Object,System.String,System.Object)
@@ -1135,7 +1357,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetShadowProperty
     path: src/nORM/Core/DbContext.cs
-    startLine: 982
+    startLine: 1404
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1176,7 +1398,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetShadowProperty
     path: src/nORM/Core/DbContext.cs
-    startLine: 994
+    startLine: 1416
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1217,7 +1439,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateTagAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 1006
+    startLine: 1428
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1240,6 +1462,574 @@ items:
   nameWithType.vb: DbContext.CreateTagAsync(String)
   fullName.vb: nORM.Core.DbContext.CreateTagAsync(String)
   name.vb: CreateTagAsync(String)
+- uid: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql``1
+  commentId: M:nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql``1
+  id: GenerateProviderNativeTemporalBootstrapSql``1
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GenerateProviderNativeTemporalBootstrapSql<T>()
+  nameWithType: DbContext.GenerateProviderNativeTemporalBootstrapSql<T>()
+  fullName: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql<T>()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateProviderNativeTemporalBootstrapSql
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1478
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Generates provider-native temporal bootstrap DDL for the mapped entity.
+  example: []
+  syntax:
+    content: 'public string GenerateProviderNativeTemporalBootstrapSql<T>() where T : class'
+    typeParameters:
+    - id: T
+      description: Mapped entity type.
+    return:
+      type: System.String
+      description: >-
+        Provider-specific DDL for optional native temporal storage. Applications
+
+        own reviewing and executing the returned script.
+    content.vb: Public Function GenerateProviderNativeTemporalBootstrapSql(Of T As Class)() As String
+  overload: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql*
+  exceptions:
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the provider has no native temporal table support.
+  nameWithType.vb: DbContext.GenerateProviderNativeTemporalBootstrapSql(Of T)()
+  fullName.vb: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql(Of T)()
+  name.vb: GenerateProviderNativeTemporalBootstrapSql(Of T)()
+- uid: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync``1(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync``1(System.Threading.CancellationToken)
+  id: ApplyProviderNativeTemporalBootstrapAsync``1(System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: ApplyProviderNativeTemporalBootstrapAsync<T>(CancellationToken)
+  nameWithType: DbContext.ApplyProviderNativeTemporalBootstrapAsync<T>(CancellationToken)
+  fullName: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync<T>(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ApplyProviderNativeTemporalBootstrapAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1500
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Applies provider-native temporal bootstrap DDL for the mapped entity through
+
+    the current nORM connection and transaction.
+  remarks: >-
+    This method is explicit deployment tooling for reviewed provider-native
+
+    temporal DDL. nORM-managed temporal bootstrap remains controlled by
+
+    <xref href="nORM.Configuration.DbContextOptions.EnableTemporalVersioning" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: 'public Task ApplyProviderNativeTemporalBootstrapAsync<T>(CancellationToken ct = default) where T : class'
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Mapped entity type.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task representing the asynchronous operation.
+    content.vb: Public Function ApplyProviderNativeTemporalBootstrapAsync(Of T As Class)(ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync*
+  exceptions:
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the provider has no native temporal table support.
+  nameWithType.vb: DbContext.ApplyProviderNativeTemporalBootstrapAsync(Of T)(CancellationToken)
+  fullName.vb: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync(Of T)(System.Threading.CancellationToken)
+  name.vb: ApplyProviderNativeTemporalBootstrapAsync(Of T)(CancellationToken)
+- uid: nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Object,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Object,System.Threading.CancellationToken)
+  id: GetTemporalHistoryAsync``1(System.Object,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetTemporalHistoryAsync<T>(object?, CancellationToken)
+  nameWithType: DbContext.GetTemporalHistoryAsync<T>(object?, CancellationToken)
+  fullName: nORM.Core.DbContext.GetTemporalHistoryAsync<T>(object?, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetTemporalHistoryAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1515
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Reads provider-neutral temporal history rows for a single-key entity.
+  example: []
+  syntax:
+    content: 'public Task<IReadOnlyList<TemporalHistoryEntry<T>>> GetTemporalHistoryAsync<T>(object? keyValue, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValue
+      type: System.Object
+      description: Primary-key value of the entity whose history should be read.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalHistoryEntry{{T}}}}
+      description: History rows ordered by validity start time and version id.
+    content.vb: Public Function GetTemporalHistoryAsync(Of T As Class)(keyValue As Object, ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of TemporalHistoryEntry(Of T)))
+  overload: nORM.Core.DbContext.GetTemporalHistoryAsync*
+  nameWithType.vb: DbContext.GetTemporalHistoryAsync(Of T)(Object, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.GetTemporalHistoryAsync(Of T)(Object, System.Threading.CancellationToken)
+  name.vb: GetTemporalHistoryAsync(Of T)(Object, CancellationToken)
+- uid: nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.GetTemporalHistoryAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  id: GetTemporalHistoryAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetTemporalHistoryAsync<T>(IReadOnlyList<object?>, CancellationToken)
+  nameWithType: DbContext.GetTemporalHistoryAsync<T>(IReadOnlyList<object?>, CancellationToken)
+  fullName: nORM.Core.DbContext.GetTemporalHistoryAsync<T>(System.Collections.Generic.IReadOnlyList<object?>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetTemporalHistoryAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1529
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Reads provider-neutral temporal history rows for an entity key.
+  example: []
+  syntax:
+    content: 'public Task<IReadOnlyList<TemporalHistoryEntry<T>>> GetTemporalHistoryAsync<T>(IReadOnlyList<object?> keyValues, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValues
+      type: System.Collections.Generic.IReadOnlyList{System.Object}
+      description: Primary-key values in mapping order.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalHistoryEntry{{T}}}}
+      description: History rows ordered by validity start time and version id.
+    content.vb: Public Function GetTemporalHistoryAsync(Of T As Class)(keyValues As IReadOnlyList(Of Object), ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of TemporalHistoryEntry(Of T)))
+  overload: nORM.Core.DbContext.GetTemporalHistoryAsync*
+  exceptions:
+  - type: nORM.Core.NormConfigurationException
+    commentId: T:nORM.Core.NormConfigurationException
+    description: Thrown when temporal versioning is not enabled.
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when the key shape does not match the mapped primary key.
+  nameWithType.vb: DbContext.GetTemporalHistoryAsync(Of T)(IReadOnlyList(Of Object), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.GetTemporalHistoryAsync(Of T)(System.Collections.Generic.IReadOnlyList(Of Object), System.Threading.CancellationToken)
+  name.vb: GetTemporalHistoryAsync(Of T)(IReadOnlyList(Of Object), CancellationToken)
+- uid: nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Object,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Object,System.Threading.CancellationToken)
+  id: GetTemporalDiffAsync``1(System.Object,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetTemporalDiffAsync<T>(object?, CancellationToken)
+  nameWithType: DbContext.GetTemporalDiffAsync<T>(object?, CancellationToken)
+  fullName: nORM.Core.DbContext.GetTemporalDiffAsync<T>(object?, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetTemporalDiffAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1604
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Reads changed mapped properties between consecutive temporal history versions for a single-key entity.
+  example: []
+  syntax:
+    content: 'public Task<IReadOnlyList<TemporalDiffEntry<T>>> GetTemporalDiffAsync<T>(object? keyValue, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValue
+      type: System.Object
+      description: Primary-key value of the entity whose history should be compared.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalDiffEntry{{T}}}}
+      description: Diff entries ordered by temporal history order.
+    content.vb: Public Function GetTemporalDiffAsync(Of T As Class)(keyValue As Object, ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of TemporalDiffEntry(Of T)))
+  overload: nORM.Core.DbContext.GetTemporalDiffAsync*
+  nameWithType.vb: DbContext.GetTemporalDiffAsync(Of T)(Object, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.GetTemporalDiffAsync(Of T)(Object, System.Threading.CancellationToken)
+  name.vb: GetTemporalDiffAsync(Of T)(Object, CancellationToken)
+- uid: nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.GetTemporalDiffAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  id: GetTemporalDiffAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: GetTemporalDiffAsync<T>(IReadOnlyList<object?>, CancellationToken)
+  nameWithType: DbContext.GetTemporalDiffAsync<T>(IReadOnlyList<object?>, CancellationToken)
+  fullName: nORM.Core.DbContext.GetTemporalDiffAsync<T>(System.Collections.Generic.IReadOnlyList<object?>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetTemporalDiffAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1616
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Reads changed mapped properties between consecutive temporal history versions for an entity key.
+  example: []
+  syntax:
+    content: 'public Task<IReadOnlyList<TemporalDiffEntry<T>>> GetTemporalDiffAsync<T>(IReadOnlyList<object?> keyValues, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValues
+      type: System.Collections.Generic.IReadOnlyList{System.Object}
+      description: Primary-key values in mapping order.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalDiffEntry{{T}}}}
+      description: Diff entries ordered by temporal history order.
+    content.vb: Public Function GetTemporalDiffAsync(Of T As Class)(keyValues As IReadOnlyList(Of Object), ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of TemporalDiffEntry(Of T)))
+  overload: nORM.Core.DbContext.GetTemporalDiffAsync*
+  nameWithType.vb: DbContext.GetTemporalDiffAsync(Of T)(IReadOnlyList(Of Object), CancellationToken)
+  fullName.vb: nORM.Core.DbContext.GetTemporalDiffAsync(Of T)(System.Collections.Generic.IReadOnlyList(Of Object), System.Threading.CancellationToken)
+  name.vb: GetTemporalDiffAsync(Of T)(IReadOnlyList(Of Object), CancellationToken)
+- uid: nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.String,System.Threading.CancellationToken)
+  id: RestoreTemporalVersionAsync``1(System.Object,System.String,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: RestoreTemporalVersionAsync<T>(object?, string, CancellationToken)
+  nameWithType: DbContext.RestoreTemporalVersionAsync<T>(object?, string, CancellationToken)
+  fullName: nORM.Core.DbContext.RestoreTemporalVersionAsync<T>(object?, string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RestoreTemporalVersionAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1657
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Restores an existing current row to the state visible at the specified temporal tag.
+  example: []
+  syntax:
+    content: 'public Task<int> RestoreTemporalVersionAsync<T>(object? keyValue, string tagName, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValue
+      type: System.Object
+      description: Primary-key value of the row to restore.
+    - id: tagName
+      type: System.String
+      description: Temporal tag identifying the historical state to restore.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: <code>1</code> when the current row was restored; <code>0</code> when no current row or no historical snapshot exists.
+    content.vb: Public Function RestoreTemporalVersionAsync(Of T As Class)(keyValue As Object, tagName As String, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.RestoreTemporalVersionAsync*
+  nameWithType.vb: DbContext.RestoreTemporalVersionAsync(Of T)(Object, String, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.RestoreTemporalVersionAsync(Of T)(Object, String, System.Threading.CancellationToken)
+  name.vb: RestoreTemporalVersionAsync(Of T)(Object, String, CancellationToken)
+- uid: nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.String,System.Threading.CancellationToken)
+  id: RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.String,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: RestoreTemporalVersionAsync<T>(IReadOnlyList<object?>, string, CancellationToken)
+  nameWithType: DbContext.RestoreTemporalVersionAsync<T>(IReadOnlyList<object?>, string, CancellationToken)
+  fullName: nORM.Core.DbContext.RestoreTemporalVersionAsync<T>(System.Collections.Generic.IReadOnlyList<object?>, string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RestoreTemporalVersionAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1671
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Restores an existing current row to the state visible at the specified temporal tag.
+  example: []
+  syntax:
+    content: 'public Task<int> RestoreTemporalVersionAsync<T>(IReadOnlyList<object?> keyValues, string tagName, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValues
+      type: System.Collections.Generic.IReadOnlyList{System.Object}
+      description: Primary-key values in mapping order.
+    - id: tagName
+      type: System.String
+      description: Temporal tag identifying the historical state to restore.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: <code>1</code> when the current row was restored; <code>0</code> when no current row or no historical snapshot exists.
+    content.vb: Public Function RestoreTemporalVersionAsync(Of T As Class)(keyValues As IReadOnlyList(Of Object), tagName As String, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.RestoreTemporalVersionAsync*
+  nameWithType.vb: DbContext.RestoreTemporalVersionAsync(Of T)(IReadOnlyList(Of Object), String, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.RestoreTemporalVersionAsync(Of T)(System.Collections.Generic.IReadOnlyList(Of Object), String, System.Threading.CancellationToken)
+  name.vb: RestoreTemporalVersionAsync(Of T)(IReadOnlyList(Of Object), String, CancellationToken)
+- uid: nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.DateTime,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Object,System.DateTime,System.Threading.CancellationToken)
+  id: RestoreTemporalVersionAsync``1(System.Object,System.DateTime,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: RestoreTemporalVersionAsync<T>(object?, DateTime, CancellationToken)
+  nameWithType: DbContext.RestoreTemporalVersionAsync<T>(object?, DateTime, CancellationToken)
+  fullName: nORM.Core.DbContext.RestoreTemporalVersionAsync<T>(object?, System.DateTime, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RestoreTemporalVersionAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1689
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Restores an existing current row to the state visible at the specified UTC timestamp.
+  example: []
+  syntax:
+    content: 'public Task<int> RestoreTemporalVersionAsync<T>(object? keyValue, DateTime timestamp, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValue
+      type: System.Object
+      description: Primary-key value of the row to restore.
+    - id: timestamp
+      type: System.DateTime
+      description: Point in time identifying the historical state to restore.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: <code>1</code> when the current row was restored; <code>0</code> when no current row or no historical snapshot exists.
+    content.vb: Public Function RestoreTemporalVersionAsync(Of T As Class)(keyValue As Object, timestamp As Date, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.RestoreTemporalVersionAsync*
+  nameWithType.vb: DbContext.RestoreTemporalVersionAsync(Of T)(Object, Date, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.RestoreTemporalVersionAsync(Of T)(Object, Date, System.Threading.CancellationToken)
+  name.vb: RestoreTemporalVersionAsync(Of T)(Object, Date, CancellationToken)
+- uid: nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken)
+  id: RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: RestoreTemporalVersionAsync<T>(IReadOnlyList<object?>, DateTime, CancellationToken)
+  nameWithType: DbContext.RestoreTemporalVersionAsync<T>(IReadOnlyList<object?>, DateTime, CancellationToken)
+  fullName: nORM.Core.DbContext.RestoreTemporalVersionAsync<T>(System.Collections.Generic.IReadOnlyList<object?>, System.DateTime, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RestoreTemporalVersionAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1703
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Restores an existing current row to the state visible at the specified UTC timestamp.
+  example: []
+  syntax:
+    content: 'public Task<int> RestoreTemporalVersionAsync<T>(IReadOnlyList<object?> keyValues, DateTime timestamp, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: keyValues
+      type: System.Collections.Generic.IReadOnlyList{System.Object}
+      description: Primary-key values in mapping order.
+    - id: timestamp
+      type: System.DateTime
+      description: Point in time identifying the historical state to restore.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: <code>1</code> when the current row was restored; <code>0</code> when no current row or no historical snapshot exists.
+    content.vb: Public Function RestoreTemporalVersionAsync(Of T As Class)(keyValues As IReadOnlyList(Of Object), timestamp As Date, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.RestoreTemporalVersionAsync*
+  nameWithType.vb: DbContext.RestoreTemporalVersionAsync(Of T)(IReadOnlyList(Of Object), Date, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.RestoreTemporalVersionAsync(Of T)(System.Collections.Generic.IReadOnlyList(Of Object), Date, System.Threading.CancellationToken)
+  name.vb: RestoreTemporalVersionAsync(Of T)(IReadOnlyList(Of Object), Date, CancellationToken)
+- uid: nORM.Core.DbContext.PruneTemporalHistoryAsync``1(System.DateTime,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.PruneTemporalHistoryAsync``1(System.DateTime,System.Threading.CancellationToken)
+  id: PruneTemporalHistoryAsync``1(System.DateTime,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: PruneTemporalHistoryAsync<T>(DateTime, CancellationToken)
+  nameWithType: DbContext.PruneTemporalHistoryAsync<T>(DateTime, CancellationToken)
+  fullName: nORM.Core.DbContext.PruneTemporalHistoryAsync<T>(System.DateTime, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PruneTemporalHistoryAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1780
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deletes closed temporal history rows older than the supplied cutoff for one mapped entity type.
+  example: []
+  syntax:
+    content: 'public Task<int> PruneTemporalHistoryAsync<T>(DateTime olderThan, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: olderThan
+      type: System.DateTime
+      description: UTC cutoff; rows whose validity ended before this value are removed.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity whose history is pruned.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of rows deleted by the provider, when reported.
+    content.vb: Public Function PruneTemporalHistoryAsync(Of T As Class)(olderThan As Date, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.PruneTemporalHistoryAsync*
+  exceptions:
+  - type: nORM.Core.NormConfigurationException
+    commentId: T:nORM.Core.NormConfigurationException
+    description: Thrown when temporal versioning is not enabled.
+  nameWithType.vb: DbContext.PruneTemporalHistoryAsync(Of T)(Date, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.PruneTemporalHistoryAsync(Of T)(Date, System.Threading.CancellationToken)
+  name.vb: PruneTemporalHistoryAsync(Of T)(Date, CancellationToken)
+- uid: nORM.Core.DbContext.PruneTemporalHistoryAsync(System.DateTime,System.Boolean,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContext.PruneTemporalHistoryAsync(System.DateTime,System.Boolean,System.Threading.CancellationToken)
+  id: PruneTemporalHistoryAsync(System.DateTime,System.Boolean,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContext
+  langs:
+  - csharp
+  - vb
+  name: PruneTemporalHistoryAsync(DateTime, bool, CancellationToken)
+  nameWithType: DbContext.PruneTemporalHistoryAsync(DateTime, bool, CancellationToken)
+  fullName: nORM.Core.DbContext.PruneTemporalHistoryAsync(System.DateTime, bool, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContext.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PruneTemporalHistoryAsync
+    path: src/nORM/Core/DbContext.cs
+    startLine: 1804
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deletes closed temporal history rows older than the supplied cutoff.
+  example: []
+  syntax:
+    content: public Task<int> PruneTemporalHistoryAsync(DateTime olderThan, bool pruneTags = false, CancellationToken ct = default)
+    parameters:
+    - id: olderThan
+      type: System.DateTime
+      description: UTC cutoff; rows whose validity ended before this value are removed.
+    - id: pruneTags
+      type: System.Boolean
+      description: When true, global temporal tags older than the cutoff are also removed.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the database operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+      description: The number of rows deleted by the provider, when reported.
+    content.vb: Public Function PruneTemporalHistoryAsync(olderThan As Date, pruneTags As Boolean = False, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbContext.PruneTemporalHistoryAsync*
+  exceptions:
+  - type: nORM.Core.NormConfigurationException
+    commentId: T:nORM.Core.NormConfigurationException
+    description: Thrown when temporal versioning is not enabled.
+  - type: nORM.Core.NormUnsupportedFeatureException
+    commentId: T:nORM.Core.NormUnsupportedFeatureException
+    description: Thrown when tag pruning is requested in tenant mode.
+  nameWithType.vb: DbContext.PruneTemporalHistoryAsync(Date, Boolean, CancellationToken)
+  fullName.vb: nORM.Core.DbContext.PruneTemporalHistoryAsync(Date, Boolean, System.Threading.CancellationToken)
+  name.vb: PruneTemporalHistoryAsync(Date, Boolean, CancellationToken)
 - uid: nORM.Core.DbContext.Dispose(System.Boolean)
   commentId: M:nORM.Core.DbContext.Dispose(System.Boolean)
   id: Dispose(System.Boolean)
@@ -1258,7 +2048,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContext.cs
-    startLine: 1033
+    startLine: 1956
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1298,7 +2088,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RegisterForDisposal
     path: src/nORM/Core/DbContext.cs
-    startLine: 1138
+    startLine: 2061
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1330,7 +2120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContext.cs
-    startLine: 1164
+    startLine: 2095
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1360,7 +2150,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContext.cs
-    startLine: 1174
+    startLine: 2105
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1508,7 +2298,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: QueryUnchangedInterpolatedAsync
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 63
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1551,7 +2341,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FromSqlRawAsync
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 168
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1596,7 +2386,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FromSqlInterpolatedAsync
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 200
+    startLine: 202
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1639,7 +2429,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteStoredProcedureAsync
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 229
+    startLine: 231
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1684,7 +2474,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteStoredProcedureAsAsyncEnumerable
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 276
+    startLine: 279
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1726,7 +2516,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteStoredProcedureWithOutputAsync
     path: src/nORM/Core/DbContext.RawSql.cs
-    startLine: 324
+    startLine: 328
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1867,7 +2657,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 102
+    startLine: 104
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1911,7 +2701,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 116
+    startLine: 118
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1958,7 +2748,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DeleteAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 129
+    startLine: 133
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -2002,7 +2792,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DeleteAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 143
+    startLine: 147
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -2049,7 +2839,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkInsertAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 677
+    startLine: 697
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -2098,7 +2888,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkUpdateAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 704
+    startLine: 724
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -2145,7 +2935,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkDeleteAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 731
+    startLine: 751
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -4079,6 +4869,43 @@ references:
   name: RollbackToSavepointAsync
   nameWithType: DbContext.RollbackToSavepointAsync
   fullName: nORM.Core.DbContext.RollbackToSavepointAsync
+- uid: nORM.Core.DbContext.GetTenantBoundaryDiagnostics*
+  commentId: Overload:nORM.Core.DbContext.GetTenantBoundaryDiagnostics
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetTenantBoundaryDiagnostics__1_System_String_
+  name: GetTenantBoundaryDiagnostics
+  nameWithType: DbContext.GetTenantBoundaryDiagnostics
+  fullName: nORM.Core.DbContext.GetTenantBoundaryDiagnostics
+- uid: nORM.Core.TenantBoundaryDiagnostics
+  commentId: T:nORM.Core.TenantBoundaryDiagnostics
+  parent: nORM.Core
+  href: nORM.Core.TenantBoundaryDiagnostics.html
+  name: TenantBoundaryDiagnostics
+  nameWithType: TenantBoundaryDiagnostics
+  fullName: nORM.Core.TenantBoundaryDiagnostics
+- uid: nORM.Core.NormUnsupportedFeatureException
+  commentId: T:nORM.Core.NormUnsupportedFeatureException
+  href: nORM.Core.NormUnsupportedFeatureException.html
+  name: NormUnsupportedFeatureException
+  nameWithType: NormUnsupportedFeatureException
+  fullName: nORM.Core.NormUnsupportedFeatureException
+- uid: nORM.Core.DbContext.GenerateNativeTenantPolicySql*
+  commentId: Overload:nORM.Core.DbContext.GenerateNativeTenantPolicySql
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GenerateNativeTenantPolicySql__1
+  name: GenerateNativeTenantPolicySql
+  nameWithType: DbContext.GenerateNativeTenantPolicySql
+  fullName: nORM.Core.DbContext.GenerateNativeTenantPolicySql
+- uid: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync*
+  commentId: Overload:nORM.Core.DbContext.ApplyNativeTenantPolicyAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ApplyNativeTenantPolicyAsync__1_System_Threading_CancellationToken_
+  name: ApplyNativeTenantPolicyAsync
+  nameWithType: DbContext.ApplyNativeTenantPolicyAsync
+  fullName: nORM.Core.DbContext.ApplyNativeTenantPolicyAsync
+- uid: nORM.Core.DbContext.DropNativeTenantPolicyAsync*
+  commentId: Overload:nORM.Core.DbContext.DropNativeTenantPolicyAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_DropNativeTenantPolicyAsync__1_System_Threading_CancellationToken_
+  name: DropNativeTenantPolicyAsync
+  nameWithType: DbContext.DropNativeTenantPolicyAsync
+  fullName: nORM.Core.DbContext.DropNativeTenantPolicyAsync
 - uid: nORM.Core.DbContext.SetShadowProperty*
   commentId: Overload:nORM.Core.DbContext.SetShadowProperty
   href: nORM.Core.DbContext.html#nORM_Core_DbContext_SetShadowProperty_System_Object_System_String_System_Object_
@@ -4097,6 +4924,287 @@ references:
   name: CreateTagAsync
   nameWithType: DbContext.CreateTagAsync
   fullName: nORM.Core.DbContext.CreateTagAsync
+- uid: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql*
+  commentId: Overload:nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GenerateProviderNativeTemporalBootstrapSql__1
+  name: GenerateProviderNativeTemporalBootstrapSql
+  nameWithType: DbContext.GenerateProviderNativeTemporalBootstrapSql
+  fullName: nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql
+- uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  commentId: M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableTemporalVersioning
+  name: EnableTemporalVersioning()
+  nameWithType: DbContextOptions.EnableTemporalVersioning()
+  fullName: nORM.Configuration.DbContextOptions.EnableTemporalVersioning()
+  spec.csharp:
+  - uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+    name: EnableTemporalVersioning
+    href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableTemporalVersioning
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+    name: EnableTemporalVersioning
+    href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableTemporalVersioning
+  - name: (
+  - name: )
+- uid: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync*
+  commentId: Overload:nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_ApplyProviderNativeTemporalBootstrapAsync__1_System_Threading_CancellationToken_
+  name: ApplyProviderNativeTemporalBootstrapAsync
+  nameWithType: DbContext.ApplyProviderNativeTemporalBootstrapAsync
+  fullName: nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync
+- uid: nORM.Core.DbContext.GetTemporalHistoryAsync*
+  commentId: Overload:nORM.Core.DbContext.GetTemporalHistoryAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetTemporalHistoryAsync__1_System_Object_System_Threading_CancellationToken_
+  name: GetTemporalHistoryAsync
+  nameWithType: DbContext.GetTemporalHistoryAsync
+  fullName: nORM.Core.DbContext.GetTemporalHistoryAsync
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalHistoryEntry{{T}}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalHistoryEntry{``0}}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<IReadOnlyList<TemporalHistoryEntry<T>>>
+  nameWithType: Task<IReadOnlyList<TemporalHistoryEntry<T>>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<nORM.Core.TemporalHistoryEntry<T>>>
+  nameWithType.vb: Task(Of IReadOnlyList(Of TemporalHistoryEntry(Of T)))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.IReadOnlyList(Of nORM.Core.TemporalHistoryEntry(Of T)))
+  name.vb: Task(Of IReadOnlyList(Of TemporalHistoryEntry(Of T)))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.NormConfigurationException
+  commentId: T:nORM.Core.NormConfigurationException
+  href: nORM.Core.NormConfigurationException.html
+  name: NormConfigurationException
+  nameWithType: NormConfigurationException
+  fullName: nORM.Core.NormConfigurationException
+- uid: System.Collections.Generic.IReadOnlyList{System.Object}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<object>
+  nameWithType: IReadOnlyList<object>
+  fullName: System.Collections.Generic.IReadOnlyList<object>
+  nameWithType.vb: IReadOnlyList(Of Object)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of Object)
+  name.vb: IReadOnlyList(Of Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.DbContext.GetTemporalDiffAsync*
+  commentId: Overload:nORM.Core.DbContext.GetTemporalDiffAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_GetTemporalDiffAsync__1_System_Object_System_Threading_CancellationToken_
+  name: GetTemporalDiffAsync
+  nameWithType: DbContext.GetTemporalDiffAsync
+  fullName: nORM.Core.DbContext.GetTemporalDiffAsync
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalDiffEntry{{T}}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalDiffEntry{``0}}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<IReadOnlyList<TemporalDiffEntry<T>>>
+  nameWithType: Task<IReadOnlyList<TemporalDiffEntry<T>>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<nORM.Core.TemporalDiffEntry<T>>>
+  nameWithType.vb: Task(Of IReadOnlyList(Of TemporalDiffEntry(Of T)))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.IReadOnlyList(Of nORM.Core.TemporalDiffEntry(Of T)))
+  name.vb: Task(Of IReadOnlyList(Of TemporalDiffEntry(Of T)))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Core.TemporalDiffEntry`1
+    name: TemporalDiffEntry
+    href: nORM.Core.TemporalDiffEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalDiffEntry`1
+    name: TemporalDiffEntry
+    href: nORM.Core.TemporalDiffEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.DbContext.RestoreTemporalVersionAsync*
+  commentId: Overload:nORM.Core.DbContext.RestoreTemporalVersionAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_RestoreTemporalVersionAsync__1_System_Object_System_String_System_Threading_CancellationToken_
+  name: RestoreTemporalVersionAsync
+  nameWithType: DbContext.RestoreTemporalVersionAsync
+  fullName: nORM.Core.DbContext.RestoreTemporalVersionAsync
+- uid: System.DateTime
+  commentId: T:System.DateTime
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.datetime
+  name: DateTime
+  nameWithType: DateTime
+  fullName: System.DateTime
+  nameWithType.vb: Date
+  fullName.vb: Date
+  name.vb: Date
+- uid: nORM.Core.DbContext.PruneTemporalHistoryAsync*
+  commentId: Overload:nORM.Core.DbContext.PruneTemporalHistoryAsync
+  href: nORM.Core.DbContext.html#nORM_Core_DbContext_PruneTemporalHistoryAsync__1_System_DateTime_System_Threading_CancellationToken_
+  name: PruneTemporalHistoryAsync
+  nameWithType: DbContext.PruneTemporalHistoryAsync
+  fullName: nORM.Core.DbContext.PruneTemporalHistoryAsync
 - uid: nORM.Core.DbContext.Dispose
   commentId: M:nORM.Core.DbContext.Dispose
   href: nORM.Core.DbContext.html#nORM_Core_DbContext_Dispose
@@ -4381,43 +5489,6 @@ references:
   - name: " "
   - name: T
   - name: )
-- uid: System.Collections.Generic
-  commentId: N:System.Collections.Generic
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Collections.Generic
-  nameWithType: System.Collections.Generic
-  fullName: System.Collections.Generic
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Collections
-    name: Collections
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections
-  - name: .
-  - uid: System.Collections.Generic
-    name: Generic
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Collections
-    name: Collections
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections
-  - name: .
-  - uid: System.Collections.Generic
-    name: Generic
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
 - uid: nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync*
   commentId: Overload:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync
   href: nORM.Core.DbContext.html#nORM_Core_DbContext_ExecuteStoredProcedureWithOutputAsync__1_System_String_System_Threading_CancellationToken_System_Object_nORM_Core_OutputParameter___

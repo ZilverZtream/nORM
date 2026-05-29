@@ -1,0 +1,135 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ProviderMobilityMode
+  commentId: T:nORM.Configuration.ProviderMobilityMode
+  id: ProviderMobilityMode
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ProviderMobilityMode.Compatibility
+  - nORM.Configuration.ProviderMobilityMode.Strict
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilityMode
+  nameWithType: ProviderMobilityMode
+  fullName: nORM.Configuration.ProviderMobilityMode
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilityMode
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Controls whether a context permits provider-bound escape hatches or enforces
+
+    nORM's strict provider mobility contract.
+  example: []
+  syntax:
+    content: public enum ProviderMobilityMode
+    content.vb: Public Enum ProviderMobilityMode
+- uid: nORM.Configuration.ProviderMobilityMode.Compatibility
+  commentId: F:nORM.Configuration.ProviderMobilityMode.Compatibility
+  id: Compatibility
+  parent: nORM.Configuration.ProviderMobilityMode
+  langs:
+  - csharp
+  - vb
+  name: Compatibility
+  nameWithType: ProviderMobilityMode.Compatibility
+  fullName: nORM.Configuration.ProviderMobilityMode.Compatibility
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Compatibility
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 76
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Preserve the full public API surface, including explicit provider-bound
+
+    escape hatches such as raw SQL, stored procedures and provider-native DDL.
+  example: []
+  syntax:
+    content: Compatibility = 0
+    return:
+      type: nORM.Configuration.ProviderMobilityMode
+- uid: nORM.Configuration.ProviderMobilityMode.Strict
+  commentId: F:nORM.Configuration.ProviderMobilityMode.Strict
+  id: Strict
+  parent: nORM.Configuration.ProviderMobilityMode
+  langs:
+  - csharp
+  - vb
+  name: Strict
+  nameWithType: ProviderMobilityMode.Strict
+  fullName: nORM.Configuration.ProviderMobilityMode.Strict
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Strict
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 83
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Permit only generated nORM paths whose semantics are translated,
+
+    emulated or rejected deterministically by nORM before execution.
+
+    Provider-bound escape hatches throw <xref href="nORM.Core.NormUnsupportedFeatureException" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: Strict = 1
+    return:
+      type: nORM.Configuration.ProviderMobilityMode
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ProviderMobilityMode
+  commentId: T:nORM.Configuration.ProviderMobilityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityMode.html
+  name: ProviderMobilityMode
+  nameWithType: ProviderMobilityMode
+  fullName: nORM.Configuration.ProviderMobilityMode
+- uid: nORM.Core.NormUnsupportedFeatureException
+  commentId: T:nORM.Core.NormUnsupportedFeatureException
+  href: nORM.Core.NormUnsupportedFeatureException.html
+  name: NormUnsupportedFeatureException
+  nameWithType: NormUnsupportedFeatureException
+  fullName: nORM.Core.NormUnsupportedFeatureException

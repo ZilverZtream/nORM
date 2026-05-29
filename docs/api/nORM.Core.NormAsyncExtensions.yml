@@ -5,17 +5,40 @@ items:
   id: NormAsyncExtensions
   parent: nORM.Core
   children:
+  - nORM.Core.NormAsyncExtensions.AllAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.AsAsyncEnumerable``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.CountSync``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormAsyncExtensions.ElementAtAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.ExecuteUpdateAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{``0},nORM.Core.SetPropertyCalls{``0}}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.IEnumerable{``1},``3}})
   - nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1,``3}})
+  - nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.MaxByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.MinByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.ToArrayAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.ToDictionaryAsync``2(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.ToDictionaryAsync``3(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Threading.CancellationToken)
+  - nORM.Core.NormAsyncExtensions.ToHashSetAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.ToListAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   - nORM.Core.NormAsyncExtensions.ToListSync``1(System.Linq.IQueryable{``0})
   langs:
@@ -121,7 +144,7 @@ items:
   summary: Converts nORM query to List asynchronously - only works with nORM queries
   example: []
   syntax:
-    content: 'public static Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    content: 'public static Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class?'
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
@@ -136,6 +159,149 @@ items:
   nameWithType.vb: NormAsyncExtensions.ToListAsync(Of T)(IQueryable(Of T), CancellationToken)
   fullName.vb: nORM.Core.NormAsyncExtensions.ToListAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
   name.vb: ToListAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ToDictionaryAsync``2(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ToDictionaryAsync``2(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Threading.CancellationToken)
+  id: ToDictionaryAsync``2(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ToDictionaryAsync<T, TKey>(IQueryable<T>, Func<T, TKey>, CancellationToken)
+  nameWithType: NormAsyncExtensions.ToDictionaryAsync<T, TKey>(IQueryable<T>, Func<T, TKey>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ToDictionaryAsync<T, TKey>(System.Linq.IQueryable<T>, System.Func<T, TKey>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToDictionaryAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 56
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Materializes an nORM query into a dictionary keyed by the supplied selector.
+
+    Server executes the query once; the dictionary is built on the client side, which is
+
+    the only place a CLR-only key selector can run.
+  example: []
+  syntax:
+    content: 'public static Task<Dictionary<TKey, T>> ToDictionaryAsync<T, TKey>(this IQueryable<T> source, Func<T, TKey> keySelector, CancellationToken ct = default) where T : class where TKey : notnull'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: keySelector
+      type: System.Func{{T},{TKey}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    - id: TKey
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{{TKey},{T}}}
+    content.vb: Public Shared Function ToDictionaryAsync(Of T As Class, TKey)(source As IQueryable(Of T), keySelector As Func(Of T, TKey), ct As CancellationToken = Nothing) As Task(Of Dictionary(Of TKey, T))
+  overload: nORM.Core.NormAsyncExtensions.ToDictionaryAsync*
+  nameWithType.vb: NormAsyncExtensions.ToDictionaryAsync(Of T, TKey)(IQueryable(Of T), Func(Of T, TKey), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ToDictionaryAsync(Of T, TKey)(System.Linq.IQueryable(Of T), System.Func(Of T, TKey), System.Threading.CancellationToken)
+  name.vb: ToDictionaryAsync(Of T, TKey)(IQueryable(Of T), Func(Of T, TKey), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ToDictionaryAsync``3(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ToDictionaryAsync``3(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Threading.CancellationToken)
+  id: ToDictionaryAsync``3(System.Linq.IQueryable{``0},System.Func{``0,``1},System.Func{``0,``2},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ToDictionaryAsync<T, TKey, TValue>(IQueryable<T>, Func<T, TKey>, Func<T, TValue>, CancellationToken)
+  nameWithType: NormAsyncExtensions.ToDictionaryAsync<T, TKey, TValue>(IQueryable<T>, Func<T, TKey>, Func<T, TValue>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ToDictionaryAsync<T, TKey, TValue>(System.Linq.IQueryable<T>, System.Func<T, TKey>, System.Func<T, TValue>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToDictionaryAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 75
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Materializes an nORM query into a dictionary keyed and valued by the supplied
+
+    selectors. Server executes the query once; client materializes the dictionary.
+  example: []
+  syntax:
+    content: 'public static Task<Dictionary<TKey, TValue>> ToDictionaryAsync<T, TKey, TValue>(this IQueryable<T> source, Func<T, TKey> keySelector, Func<T, TValue> valueSelector, CancellationToken ct = default) where T : class where TKey : notnull'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: keySelector
+      type: System.Func{{T},{TKey}}
+    - id: valueSelector
+      type: System.Func{{T},{TValue}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    - id: TKey
+    - id: TValue
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{{TKey},{TValue}}}
+    content.vb: Public Shared Function ToDictionaryAsync(Of T As Class, TKey, TValue)(source As IQueryable(Of T), keySelector As Func(Of T, TKey), valueSelector As Func(Of T, TValue), ct As CancellationToken = Nothing) As Task(Of Dictionary(Of TKey, TValue))
+  overload: nORM.Core.NormAsyncExtensions.ToDictionaryAsync*
+  nameWithType.vb: NormAsyncExtensions.ToDictionaryAsync(Of T, TKey, TValue)(IQueryable(Of T), Func(Of T, TKey), Func(Of T, TValue), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ToDictionaryAsync(Of T, TKey, TValue)(System.Linq.IQueryable(Of T), System.Func(Of T, TKey), System.Func(Of T, TValue), System.Threading.CancellationToken)
+  name.vb: ToDictionaryAsync(Of T, TKey, TValue)(IQueryable(Of T), Func(Of T, TKey), Func(Of T, TValue), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ToHashSetAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ToHashSetAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: ToHashSetAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ToHashSetAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.ToHashSetAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ToHashSetAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToHashSetAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 96
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Materializes an nORM query into a <xref href="System.Collections.Generic.HashSet%601" data-throw-if-not-resolved="false"></xref>. Server executes the query
+
+    once; the hash set is built on the client side using the default equality comparer.
+  example: []
+  syntax:
+    content: 'public static Task<HashSet<T>> ToHashSetAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.HashSet{{T}}}
+    content.vb: Public Shared Function ToHashSetAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of HashSet(Of T))
+  overload: nORM.Core.NormAsyncExtensions.ToHashSetAsync*
+  nameWithType.vb: NormAsyncExtensions.ToHashSetAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ToHashSetAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: ToHashSetAsync(Of T)(IQueryable(Of T), CancellationToken)
 - uid: nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   commentId: M:nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   id: CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
@@ -155,7 +321,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 54
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -177,6 +343,152 @@ items:
   nameWithType.vb: NormAsyncExtensions.CountAsync(Of T)(IQueryable(Of T), CancellationToken)
   fullName.vb: nORM.Core.NormAsyncExtensions.CountAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
   name.vb: CountAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: CountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: CountAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.CountAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.CountAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CountAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 138
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.CountAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>CountAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).CountAsync()</code>. Lowered to the same Where + Count pipeline
+
+    internally so the e438a53 SelectMany+Count silent-wrongness fix applies uniformly.
+  example: []
+  syntax:
+    content: 'public static Task<int> CountAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Shared Function CountAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.NormAsyncExtensions.CountAsync*
+  nameWithType.vb: NormAsyncExtensions.CountAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.CountAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: CountAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LongCountAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LongCountAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LongCountAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LongCountAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 150
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Counts rows in a nORM query asynchronously and returns a 64-bit total — use when the
+
+    expected row count may exceed Int32.MaxValue.
+  example: []
+  syntax:
+    content: 'public static Task<long> LongCountAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int64}
+    content.vb: Public Shared Function LongCountAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of Long)
+  overload: nORM.Core.NormAsyncExtensions.LongCountAsync*
+  nameWithType.vb: NormAsyncExtensions.LongCountAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LongCountAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LongCountAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: LongCountAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LongCountAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LongCountAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LongCountAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LongCountAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 177
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.LongCountAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>LongCountAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).LongCountAsync()</code>. Lowered to the same Where + LongCount
+
+    pipeline internally; the e438a53 SELECT-cols→COUNT(*) rewrite arm for
+
+    LongCount applies uniformly.
+  example: []
+  syntax:
+    content: 'public static Task<long> LongCountAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Int64}
+    content.vb: Public Shared Function LongCountAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of Long)
+  overload: nORM.Core.NormAsyncExtensions.LongCountAsync*
+  nameWithType.vb: NormAsyncExtensions.LongCountAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LongCountAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: LongCountAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
 - uid: nORM.Core.NormAsyncExtensions.ToListSync``1(System.Linq.IQueryable{``0})
   commentId: M:nORM.Core.NormAsyncExtensions.ToListSync``1(System.Linq.IQueryable{``0})
   id: ToListSync``1(System.Linq.IQueryable{``0})
@@ -196,7 +508,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListSync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 83
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -235,7 +547,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountSync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 97
+    startLine: 202
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -274,7 +586,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 116
+    startLine: 221
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -315,7 +627,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 135
+    startLine: 240
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -337,6 +649,274 @@ items:
   nameWithType.vb: NormAsyncExtensions.AnyAsync(Of T)(IQueryable(Of T), CancellationToken)
   fullName.vb: nORM.Core.NormAsyncExtensions.AnyAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
   name.vb: AnyAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: AnyAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: AnyAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.AnyAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.AnyAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AnyAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 266
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.AnyAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>AnyAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).AnyAsync()</code>. Lowered to the same Where + Any pipeline
+
+    internally.
+  example: []
+  syntax:
+    content: 'public static Task<bool> AnyAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Shared Function AnyAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.NormAsyncExtensions.AnyAsync*
+  nameWithType.vb: NormAsyncExtensions.AnyAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.AnyAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: AnyAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ElementAtAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ElementAtAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  id: ElementAtAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ElementAtAsync<T>(IQueryable<T>, int, CancellationToken)
+  nameWithType: NormAsyncExtensions.ElementAtAsync<T>(IQueryable<T>, int, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ElementAtAsync<T>(System.Linq.IQueryable<T>, int, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ElementAtAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 280
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the element at the specified zero-based index. EF Core parity:
+
+    <code>q.ElementAtAsync(index)</code>. The translator's <code>ElementAtTranslator</code>
+
+    rewrites this as <code>Skip(index).Take(1)</code>, so the underlying SQL fetches a
+
+    single row.
+  example: []
+  syntax:
+    content: 'public static Task<T> ElementAtAsync<T>(this IQueryable<T> source, int index, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: index
+      type: System.Int32
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function ElementAtAsync(Of T As Class)(source As IQueryable(Of T), index As Integer, ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.ElementAtAsync*
+  nameWithType.vb: NormAsyncExtensions.ElementAtAsync(Of T)(IQueryable(Of T), Integer, CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ElementAtAsync(Of T)(System.Linq.IQueryable(Of T), Integer, System.Threading.CancellationToken)
+  name.vb: ElementAtAsync(Of T)(IQueryable(Of T), Integer, CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  id: ElementAtOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Int32,System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ElementAtOrDefaultAsync<T>(IQueryable<T>, int, CancellationToken)
+  nameWithType: NormAsyncExtensions.ElementAtOrDefaultAsync<T>(IQueryable<T>, int, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync<T>(System.Linq.IQueryable<T>, int, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ElementAtOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 307
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the element at the specified zero-based index, or <code>null</code> when the
+
+    index is out of range. EF Core parity: <code>q.ElementAtOrDefaultAsync(index)</code>.
+  example: []
+  syntax:
+    content: 'public static Task<T?> ElementAtOrDefaultAsync<T>(this IQueryable<T> source, int index, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: index
+      type: System.Int32
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function ElementAtOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), index As Integer, ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.ElementAtOrDefaultAsync(Of T)(IQueryable(Of T), Integer, CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), Integer, System.Threading.CancellationToken)
+  name.vb: ElementAtOrDefaultAsync(Of T)(IQueryable(Of T), Integer, CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  id: ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: ContainsAsync<TSource>(IQueryable<TSource>, TSource, CancellationToken)
+  nameWithType: NormAsyncExtensions.ContainsAsync<TSource>(IQueryable<TSource>, TSource, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ContainsAsync<TSource>(System.Linq.IQueryable<TSource>, TSource, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ContainsAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 340
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns whether the nORM query contains the given value. EF Core parity:
+
+    <code>q.ContainsAsync(value)</code>. Lowered to <code>Queryable.Contains(source, value)</code>
+
+    which the existing translator routes through the EXISTS pipeline.
+
+
+    Unconstrained TSource (unlike the rest of the family) because the realistic
+
+    shape is <code>q.Select(x =&gt; x.Id).ContainsAsync(42)</code> over a primitive
+
+    projection -- reference-equality contains on entity types would only ever
+
+    match by identity-map shortcut, not translate to useful SQL.
+  example: []
+  syntax:
+    content: public static Task<bool> ContainsAsync<TSource>(this IQueryable<TSource> source, TSource value, CancellationToken ct = default)
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TSource}}
+    - id: value
+      type: '{TSource}'
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: TSource
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Shared Function ContainsAsync(Of TSource)(source As IQueryable(Of TSource), value As TSource, ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.NormAsyncExtensions.ContainsAsync*
+  nameWithType.vb: NormAsyncExtensions.ContainsAsync(Of TSource)(IQueryable(Of TSource), TSource, CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ContainsAsync(Of TSource)(System.Linq.IQueryable(Of TSource), TSource, System.Threading.CancellationToken)
+  name.vb: ContainsAsync(Of TSource)(IQueryable(Of TSource), TSource, CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.AllAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.AllAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: AllAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: AllAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.AllAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.AllAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AllAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 374
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns whether every element of a nORM query satisfies the predicate. EF Core parity:
+
+    <code>q.AllAsync(p =&gt; p.IsActive)</code>. Vacuously true on an empty source (matches
+
+    LINQ semantics).
+
+
+    Lowered to <code>!AnyAsync(!predicate)</code> -- the standard EF identity
+
+    <code>All(p) ≡ !Any(!p)</code>. The translator's direct <code>All</code> path emits the
+
+    predicate inside an EXISTS subquery but does not currently fold an outer
+
+    <code>Where</code>'s predicate into the same subquery, leaving the outer
+
+    predicate dangling against an outer SELECT that has no FROM clause and
+
+    crashing with "no such column" on composed <code>.Where(p1).AllAsync(p2)</code>
+
+    chains. The Any rewrite sidesteps the issue by reusing the well-tested
+
+    Where+Any pipeline; the same-shape sync <code>All</code> bug remains open.
+  example: []
+  syntax:
+    content: 'public static Task<bool> AllAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Shared Function AllAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.NormAsyncExtensions.AllAsync*
+  nameWithType.vb: NormAsyncExtensions.AllAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.AllAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: AllAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
 - uid: nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   commentId: M:nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   id: FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
@@ -356,7 +936,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 158
+    startLine: 388
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -378,6 +958,56 @@ items:
   nameWithType.vb: NormAsyncExtensions.FirstAsync(Of T)(IQueryable(Of T), CancellationToken)
   fullName.vb: nORM.Core.NormAsyncExtensions.FirstAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
   name.vb: FirstAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: FirstAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: FirstAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.FirstAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.FirstAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FirstAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 414
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.FirstAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>FirstAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).FirstAsync()</code>. Lowered to the same Where + First pipeline
+
+    internally.
+  example: []
+  syntax:
+    content: 'public static Task<T> FirstAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function FirstAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.FirstAsync*
+  nameWithType.vb: NormAsyncExtensions.FirstAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.FirstAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: FirstAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
 - uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   commentId: M:nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   id: FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
@@ -397,7 +1027,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 181
+    startLine: 425
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -419,6 +1049,427 @@ items:
   nameWithType.vb: NormAsyncExtensions.FirstOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
   fullName.vb: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
   name.vb: FirstOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: FirstOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.FirstOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FirstOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 451
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>FirstOrDefaultAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).FirstOrDefaultAsync()</code>. Lowered to the same Where + FirstOrDefault
+
+    pipeline internally.
+  example: []
+  syntax:
+    content: 'public static Task<T?> FirstOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function FirstOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.FirstOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: FirstOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LastAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LastAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 464
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets the last result from nORM query asynchronously. Requires an OrderBy to be
+
+    deterministic; the underlying Last translator flips the ORDER BY direction so the
+
+    SQL still reads only one row.
+  example: []
+  syntax:
+    content: 'public static Task<T> LastAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function LastAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.LastAsync*
+  nameWithType.vb: NormAsyncExtensions.LastAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LastAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: LastAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LastAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LastAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 489
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.LastAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>LastAsync(predicate)</code> spelling. Still requires an OrderBy
+
+    on the outer source to be deterministic.
+  example: []
+  syntax:
+    content: 'public static Task<T> LastAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function LastAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.LastAsync*
+  nameWithType.vb: NormAsyncExtensions.LastAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: LastAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LastOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LastOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 500
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Gets the last result or default from nORM query asynchronously.
+  example: []
+  syntax:
+    content: 'public static Task<T?> LastOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function LastOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.LastOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LastOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: LastOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LastOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 525
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.LastOrDefaultAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>LastOrDefaultAsync(predicate)</code> spelling. Still requires an OrderBy
+
+    on the outer source to be deterministic.
+  example: []
+  syntax:
+    content: 'public static Task<T?> LastOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function LastOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.LastOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: LastOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: SingleAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 539
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the single element of a nORM query asynchronously. Throws
+
+    <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref> if the source contains zero or more
+
+    than one element. The underlying translator emits LIMIT 2 so the duplicate
+
+    case is detected with a single round-trip.
+  example: []
+  syntax:
+    content: 'public static Task<T> SingleAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function SingleAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.SingleAsync*
+  nameWithType.vb: NormAsyncExtensions.SingleAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: SingleAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: SingleAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: SingleAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 564
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.SingleAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>SingleAsync(predicate)</code> spelling so users don't have to chain
+
+    <code>.Where(predicate).SingleAsync()</code>.
+  example: []
+  syntax:
+    content: 'public static Task<T> SingleAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function SingleAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.SingleAsync*
+  nameWithType.vb: NormAsyncExtensions.SingleAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: SingleAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  id: SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: SingleOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 577
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the single element of a nORM query asynchronously, or <code>null</code> if the
+
+    source is empty. Throws <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref> if the source
+
+    contains more than one element.
+  example: []
+  syntax:
+    content: 'public static Task<T?> SingleOrDefaultAsync<T>(this IQueryable<T> source, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function SingleOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.SingleOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: SingleOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  id: SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: SingleOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleOrDefaultAsync<T>(IQueryable<T>, Expression<Func<T, bool>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleOrDefaultAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 601
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Predicate-overload of <xref href="nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync%60%601(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> -- parity with
+
+    EF Core's <code>SingleOrDefaultAsync(predicate)</code> spelling.
+  example: []
+  syntax:
+    content: 'public static Task<T?> SingleOrDefaultAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function SingleOrDefaultAsync(Of T As Class)(source As IQueryable(Of T), predicate As Expression(Of Func(Of T, Boolean)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync*
+  nameWithType.vb: NormAsyncExtensions.SingleOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean)), System.Threading.CancellationToken)
+  name.vb: SingleOrDefaultAsync(Of T)(IQueryable(Of T), Expression(Of Func(Of T, Boolean)), CancellationToken)
 - uid: nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   commentId: M:nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
   id: ExecuteDeleteAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
@@ -438,7 +1489,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 208
+    startLine: 616
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -483,7 +1534,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 229
+    startLine: 637
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -531,7 +1582,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Join
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 246
+    startLine: 654
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -581,7 +1632,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GroupJoin
     path: src/nORM/Core/NormAsyncExtensions.cs
-    startLine: 259
+    startLine: 667
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -612,6 +1663,104 @@ items:
   nameWithType.vb: NormAsyncExtensions.GroupJoin(Of TOuter, TInner, TKey, TResult)(IQueryable(Of TOuter), IQueryable(Of TInner), Expression(Of Func(Of TOuter, TKey)), Expression(Of Func(Of TInner, TKey)), Expression(Of Func(Of TOuter, IEnumerable(Of TInner), TResult)))
   fullName.vb: nORM.Core.NormAsyncExtensions.GroupJoin(Of TOuter, TInner, TKey, TResult)(System.Linq.IQueryable(Of TOuter), System.Linq.IQueryable(Of TInner), System.Linq.Expressions.Expression(Of System.Func(Of TOuter, TKey)), System.Linq.Expressions.Expression(Of System.Func(Of TInner, TKey)), System.Linq.Expressions.Expression(Of System.Func(Of TOuter, System.Collections.Generic.IEnumerable(Of TInner), TResult)))
   name.vb: GroupJoin(Of TOuter, TInner, TKey, TResult)(IQueryable(Of TOuter), IQueryable(Of TInner), Expression(Of Func(Of TOuter, TKey)), Expression(Of Func(Of TInner, TKey)), Expression(Of Func(Of TOuter, IEnumerable(Of TInner), TResult)))
+- uid: nORM.Core.NormAsyncExtensions.MinByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.MinByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  id: MinByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: MinByAsync<T, TKey>(IQueryable<T>, Expression<Func<T, TKey>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.MinByAsync<T, TKey>(IQueryable<T>, Expression<Func<T, TKey>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.MinByAsync<T, TKey>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, TKey>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MinByAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 682
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the entity in the sequence that has the minimum value of the key selected by
+
+    <code class="paramref">keySelector</code>. Translates to <code>ORDER BY key ASC LIMIT 1</code>.
+
+    Throws <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref> when the sequence is empty.
+  example: []
+  syntax:
+    content: 'public static Task<T> MinByAsync<T, TKey>(this IQueryable<T> source, Expression<Func<T, TKey>> keySelector, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: keySelector
+      type: System.Linq.Expressions.Expression{System.Func{{T},{TKey}}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    - id: TKey
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function MinByAsync(Of T As Class, TKey)(source As IQueryable(Of T), keySelector As Expression(Of Func(Of T, TKey)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.MinByAsync*
+  nameWithType.vb: NormAsyncExtensions.MinByAsync(Of T, TKey)(IQueryable(Of T), Expression(Of Func(Of T, TKey)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.MinByAsync(Of T, TKey)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, TKey)), System.Threading.CancellationToken)
+  name.vb: MinByAsync(Of T, TKey)(IQueryable(Of T), Expression(Of Func(Of T, TKey)), CancellationToken)
+- uid: nORM.Core.NormAsyncExtensions.MaxByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.MaxByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  id: MaxByAsync``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExtensionMethod: true
+  parent: nORM.Core.NormAsyncExtensions
+  langs:
+  - csharp
+  - vb
+  name: MaxByAsync<T, TKey>(IQueryable<T>, Expression<Func<T, TKey>>, CancellationToken)
+  nameWithType: NormAsyncExtensions.MaxByAsync<T, TKey>(IQueryable<T>, Expression<Func<T, TKey>>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.MaxByAsync<T, TKey>(System.Linq.IQueryable<T>, System.Linq.Expressions.Expression<System.Func<T, TKey>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormAsyncExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxByAsync
+    path: src/nORM/Core/NormAsyncExtensions.cs
+    startLine: 711
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the entity in the sequence that has the maximum value of the key selected by
+
+    <code class="paramref">keySelector</code>. Translates to <code>ORDER BY key DESC LIMIT 1</code>.
+
+    Throws <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref> when the sequence is empty.
+  example: []
+  syntax:
+    content: 'public static Task<T> MaxByAsync<T, TKey>(this IQueryable<T> source, Expression<Func<T, TKey>> keySelector, CancellationToken ct = default) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+    - id: keySelector
+      type: System.Linq.Expressions.Expression{System.Func{{T},{TKey}}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    typeParameters:
+    - id: T
+    - id: TKey
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Shared Function MaxByAsync(Of T As Class, TKey)(source As IQueryable(Of T), keySelector As Expression(Of Func(Of T, TKey)), ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.NormAsyncExtensions.MaxByAsync*
+  nameWithType.vb: NormAsyncExtensions.MaxByAsync(Of T, TKey)(IQueryable(Of T), Expression(Of Func(Of T, TKey)), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.MaxByAsync(Of T, TKey)(System.Linq.IQueryable(Of T), System.Linq.Expressions.Expression(Of System.Func(Of T, TKey)), System.Threading.CancellationToken)
+  name.vb: MaxByAsync(Of T, TKey)(IQueryable(Of T), Expression(Of Func(Of T, TKey)), CancellationToken)
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -1205,6 +2354,291 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Core.NormAsyncExtensions.ToDictionaryAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.ToDictionaryAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ToDictionaryAsync__2_System_Linq_IQueryable___0__System_Func___0___1__System_Threading_CancellationToken_
+  name: ToDictionaryAsync
+  nameWithType: NormAsyncExtensions.ToDictionaryAsync
+  fullName: nORM.Core.NormAsyncExtensions.ToDictionaryAsync
+- uid: System.Func{{T},{TKey}}
+  commentId: T:System.Func{``0,``1}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TKey>
+  nameWithType: Func<T, TKey>
+  fullName: System.Func<T, TKey>
+  nameWithType.vb: Func(Of T, TKey)
+  fullName.vb: System.Func(Of T, TKey)
+  name.vb: Func(Of T, TKey)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{{TKey},{T}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{``1,``0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<Dictionary<TKey, T>>
+  nameWithType: Task<Dictionary<TKey, T>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<TKey, T>>
+  nameWithType.vb: Task(Of Dictionary(Of TKey, T))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.Dictionary(Of TKey, T))
+  name.vb: Task(Of Dictionary(Of TKey, T))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: System.Func{{T},{TValue}}
+  commentId: T:System.Func{``0,``2}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TValue>
+  nameWithType: Func<T, TValue>
+  fullName: System.Func<T, TValue>
+  nameWithType.vb: Func(Of T, TValue)
+  fullName.vb: System.Func(Of T, TValue)
+  name.vb: Func(Of T, TValue)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{{TKey},{TValue}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.Dictionary{``1,``2}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<Dictionary<TKey, TValue>>
+  nameWithType: Task<Dictionary<TKey, TValue>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<TKey, TValue>>
+  nameWithType.vb: Task(Of Dictionary(Of TKey, TValue))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.Dictionary(Of TKey, TValue))
+  name.vb: Task(Of Dictionary(Of TKey, TValue))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: <
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.Dictionary`2
+    name: Dictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: ','
+  - name: " "
+  - name: TValue
+  - name: )
+  - name: )
+- uid: System.Collections.Generic.HashSet`1
+  commentId: T:System.Collections.Generic.HashSet`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1
+  name: HashSet<T>
+  nameWithType: HashSet<T>
+  fullName: System.Collections.Generic.HashSet<T>
+  nameWithType.vb: HashSet(Of T)
+  fullName.vb: System.Collections.Generic.HashSet(Of T)
+  name.vb: HashSet(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.ToHashSetAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.ToHashSetAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ToHashSetAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: ToHashSetAsync
+  nameWithType: NormAsyncExtensions.ToHashSetAsync
+  fullName: nORM.Core.NormAsyncExtensions.ToHashSetAsync
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.HashSet{{T}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.HashSet{``0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<HashSet<T>>
+  nameWithType: Task<HashSet<T>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.HashSet<T>>
+  nameWithType.vb: Task(Of HashSet(Of T))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.HashSet(Of T))
+  name.vb: Task(Of HashSet(Of T))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.HashSet`1
+    name: HashSet
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
 - uid: nORM.Core.NormAsyncExtensions.CountAsync*
   commentId: Overload:nORM.Core.NormAsyncExtensions.CountAsync
   href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_CountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
@@ -1245,6 +2679,283 @@ references:
     name: Integer
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_CountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: CountAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.CountAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.CountAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.CountAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.CountAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: CountAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_CountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.CountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_CountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{{T},System.Boolean}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<T, bool>>
+  nameWithType: Expression<Func<T, bool>>
+  fullName: System.Linq.Expressions.Expression<System.Func<T, bool>>
+  nameWithType.vb: Expression(Of Func(Of T, Boolean))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of T, Boolean))
+  name.vb: Expression(Of Func(Of T, Boolean))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Core.NormAsyncExtensions.LongCountAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.LongCountAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LongCountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LongCountAsync
+  nameWithType: NormAsyncExtensions.LongCountAsync
+  fullName: nORM.Core.NormAsyncExtensions.LongCountAsync
+- uid: System.Threading.Tasks.Task{System.Int64}
+  commentId: T:System.Threading.Tasks.Task{System.Int64}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<long>
+  nameWithType: Task<long>
+  fullName: System.Threading.Tasks.Task<long>
+  nameWithType.vb: Task(Of Long)
+  fullName.vb: System.Threading.Tasks.Task(Of Long)
+  name.vb: Task(Of Long)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Int64
+    name: long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int64
+    name: Long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LongCountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LongCountAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LongCountAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LongCountAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.LongCountAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LongCountAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LongCountAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LongCountAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LongCountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.LongCountAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LongCountAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LongCountAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
 - uid: nORM.Core.NormAsyncExtensions.ToListSync*
   commentId: Overload:nORM.Core.NormAsyncExtensions.ToListSync
@@ -1406,12 +3117,70 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: )
-- uid: nORM.Core.NormAsyncExtensions.FirstAsync*
-  commentId: Overload:nORM.Core.NormAsyncExtensions.FirstAsync
-  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
-  name: FirstAsync
-  nameWithType: NormAsyncExtensions.FirstAsync
-  fullName: nORM.Core.NormAsyncExtensions.FirstAsync
+- uid: nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_AnyAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: AnyAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.AnyAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.AnyAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.AnyAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.AnyAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: AnyAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_AnyAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.AnyAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_AnyAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.ElementAtAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.ElementAtAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ElementAtAsync__1_System_Linq_IQueryable___0__System_Int32_System_Threading_CancellationToken_
+  name: ElementAtAsync
+  nameWithType: NormAsyncExtensions.ElementAtAsync
+  fullName: nORM.Core.NormAsyncExtensions.ElementAtAsync
 - uid: System.Threading.Tasks.Task{{T}}
   commentId: T:System.Threading.Tasks.Task{``0}
   parent: System.Threading.Tasks
@@ -1441,12 +3210,455 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ElementAtOrDefaultAsync__1_System_Linq_IQueryable___0__System_Int32_System_Threading_CancellationToken_
+  name: ElementAtOrDefaultAsync
+  nameWithType: NormAsyncExtensions.ElementAtOrDefaultAsync
+  fullName: nORM.Core.NormAsyncExtensions.ElementAtOrDefaultAsync
+- uid: nORM.Core.NormAsyncExtensions.ContainsAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.ContainsAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  name: ContainsAsync
+  nameWithType: NormAsyncExtensions.ContainsAsync
+  fullName: nORM.Core.NormAsyncExtensions.ContainsAsync
+- uid: System.Linq.IQueryable{{TSource}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<TSource>
+  nameWithType: IQueryable<TSource>
+  fullName: System.Linq.IQueryable<TSource>
+  nameWithType.vb: IQueryable(Of TSource)
+  fullName.vb: System.Linq.IQueryable(Of TSource)
+  name.vb: IQueryable(Of TSource)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TSource
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: )
+- uid: '{TSource}'
+  commentId: '!:TSource'
+  definition: TSource
+  name: TSource
+  nameWithType: TSource
+  fullName: TSource
+- uid: TSource
+  commentId: '!:TSource'
+  name: TSource
+  nameWithType: TSource
+  fullName: TSource
+- uid: nORM.Core.NormAsyncExtensions.AllAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.AllAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_AllAsync__1_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0_System_Boolean___System_Threading_CancellationToken_
+  name: AllAsync
+  nameWithType: NormAsyncExtensions.AllAsync
+  fullName: nORM.Core.NormAsyncExtensions.AllAsync
+- uid: nORM.Core.NormAsyncExtensions.FirstAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.FirstAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: FirstAsync
+  nameWithType: NormAsyncExtensions.FirstAsync
+  fullName: nORM.Core.NormAsyncExtensions.FirstAsync
+- uid: nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: FirstAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.FirstAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.FirstAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.FirstAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.FirstAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: FirstAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.FirstAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
 - uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync*
   commentId: Overload:nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync
   href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
   name: FirstOrDefaultAsync
   nameWithType: NormAsyncExtensions.FirstOrDefaultAsync
   fullName: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync
+- uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: FirstOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.FirstOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.FirstOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: FirstOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.FirstOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_FirstOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.LastAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.LastAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LastAsync
+  nameWithType: NormAsyncExtensions.LastAsync
+  fullName: nORM.Core.NormAsyncExtensions.LastAsync
+- uid: nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LastAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.LastAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LastAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LastAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.LastAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LastAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.LastOrDefaultAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LastOrDefaultAsync
+  nameWithType: NormAsyncExtensions.LastOrDefaultAsync
+  fullName: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync
+- uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: LastOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.LastOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.LastOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: LastOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LastOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.LastOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: LastOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_LastOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Core.NormAsyncExtensions.SingleAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.SingleAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: SingleAsync
+  nameWithType: NormAsyncExtensions.SingleAsync
+  fullName: nORM.Core.NormAsyncExtensions.SingleAsync
+- uid: nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: SingleAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.SingleAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: SingleAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.SingleAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: SingleOrDefaultAsync
+  nameWithType: NormAsyncExtensions.SingleOrDefaultAsync
+  fullName: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync
+- uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  name: SingleOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  nameWithType: NormAsyncExtensions.SingleOrDefaultAsync<T>(IQueryable<T>, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync<T>(System.Linq.IQueryable<T>, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.SingleOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync(Of T)(System.Linq.IQueryable(Of T), System.Threading.CancellationToken)
+  name.vb: SingleOrDefaultAsync(Of T)(IQueryable(Of T), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.SingleOrDefaultAsync``1(System.Linq.IQueryable{``0},System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_SingleOrDefaultAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
 - uid: nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync*
   commentId: Overload:nORM.Core.NormAsyncExtensions.ExecuteDeleteAsync
   href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ExecuteDeleteAsync__1_System_Linq_IQueryable___0__System_Threading_CancellationToken_
@@ -1532,71 +3744,6 @@ references:
   - name: )
   - name: )
   - name: )
-- uid: System.Linq.Expressions.Expression`1
-  commentId: T:System.Linq.Expressions.Expression`1
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  name: Expression<TDelegate>
-  nameWithType: Expression<TDelegate>
-  fullName: System.Linq.Expressions.Expression<TDelegate>
-  nameWithType.vb: Expression(Of TDelegate)
-  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
-  name.vb: Expression(Of TDelegate)
-  spec.csharp:
-  - uid: System.Linq.Expressions.Expression`1
-    name: Expression
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  - name: <
-  - name: TDelegate
-  - name: '>'
-  spec.vb:
-  - uid: System.Linq.Expressions.Expression`1
-    name: Expression
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: TDelegate
-  - name: )
-- uid: System.Linq.Expressions
-  commentId: N:System.Linq.Expressions
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Linq.Expressions
-  nameWithType: System.Linq.Expressions
-  fullName: System.Linq.Expressions
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Linq
-    name: Linq
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq
-  - name: .
-  - uid: System.Linq.Expressions
-    name: Expressions
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Linq
-    name: Linq
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq
-  - name: .
-  - uid: System.Linq.Expressions
-    name: Expressions
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
 - uid: nORM.Core.NormAsyncExtensions.Join*
   commentId: Overload:nORM.Core.NormAsyncExtensions.Join
   href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_Join__4_System_Linq_IQueryable___0__System_Linq_IQueryable___1__System_Linq_Expressions_Expression_System_Func___0___2___System_Linq_Expressions_Expression_System_Func___1___2___System_Linq_Expressions_Expression_System_Func___0___1___3___
@@ -1918,3 +4065,64 @@ references:
   - name: TResult
   - name: )
   - name: )
+- uid: nORM.Core.NormAsyncExtensions.MinByAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.MinByAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_MinByAsync__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: MinByAsync
+  nameWithType: NormAsyncExtensions.MinByAsync
+  fullName: nORM.Core.NormAsyncExtensions.MinByAsync
+- uid: System.Linq.Expressions.Expression{System.Func{{T},{TKey}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,``1}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<T, TKey>>
+  nameWithType: Expression<Func<T, TKey>>
+  fullName: System.Linq.Expressions.Expression<System.Func<T, TKey>>
+  nameWithType.vb: Expression(Of Func(Of T, TKey))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of T, TKey))
+  name.vb: Expression(Of Func(Of T, TKey))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions.MaxByAsync*
+  commentId: Overload:nORM.Core.NormAsyncExtensions.MaxByAsync
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_MaxByAsync__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: MaxByAsync
+  nameWithType: NormAsyncExtensions.MaxByAsync
+  fullName: nORM.Core.NormAsyncExtensions.MaxByAsync

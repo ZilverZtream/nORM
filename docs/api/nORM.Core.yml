@@ -42,7 +42,11 @@ items:
   - nORM.Core.QueryTrackingBehavior
   - nORM.Core.SetPropertyCalls`1
   - nORM.Core.StoredProcedureResult`1
+  - nORM.Core.TemporalDiffEntry`1
   - nORM.Core.TemporalExtensions
+  - nORM.Core.TemporalHistoryEntry`1
+  - nORM.Core.TemporalPropertyChange
+  - nORM.Core.TenantBoundaryDiagnostics
   - nORM.Core.WindowFunctionsExtensions
   langs:
   - csharp
@@ -179,6 +183,7 @@ references:
   - name: )
 - uid: nORM.Core.DbContextTransaction
   commentId: T:nORM.Core.DbContextTransaction
+  parent: nORM.Core
   href: nORM.Core.DbContextTransaction.html
   name: DbContextTransaction
   nameWithType: DbContextTransaction
@@ -429,6 +434,62 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Core.TemporalHistoryEntry`1
+  commentId: T:nORM.Core.TemporalHistoryEntry`1
+  href: nORM.Core.TemporalHistoryEntry-1.html
+  name: TemporalHistoryEntry<T>
+  nameWithType: TemporalHistoryEntry<T>
+  fullName: nORM.Core.TemporalHistoryEntry<T>
+  nameWithType.vb: TemporalHistoryEntry(Of T)
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T)
+  name.vb: TemporalHistoryEntry(Of T)
+  spec.csharp:
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.TemporalPropertyChange
+  commentId: T:nORM.Core.TemporalPropertyChange
+  href: nORM.Core.TemporalPropertyChange.html
+  name: TemporalPropertyChange
+  nameWithType: TemporalPropertyChange
+  fullName: nORM.Core.TemporalPropertyChange
+- uid: nORM.Core.TemporalDiffEntry`1
+  commentId: T:nORM.Core.TemporalDiffEntry`1
+  href: nORM.Core.TemporalDiffEntry-1.html
+  name: TemporalDiffEntry<T>
+  nameWithType: TemporalDiffEntry<T>
+  fullName: nORM.Core.TemporalDiffEntry<T>
+  nameWithType.vb: TemporalDiffEntry(Of T)
+  fullName.vb: nORM.Core.TemporalDiffEntry(Of T)
+  name.vb: TemporalDiffEntry(Of T)
+  spec.csharp:
+  - uid: nORM.Core.TemporalDiffEntry`1
+    name: TemporalDiffEntry
+    href: nORM.Core.TemporalDiffEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.TemporalDiffEntry`1
+    name: TemporalDiffEntry
+    href: nORM.Core.TemporalDiffEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.TemporalExtensions
   commentId: T:nORM.Core.TemporalExtensions
   parent: nORM.Core
@@ -436,6 +497,13 @@ references:
   name: TemporalExtensions
   nameWithType: TemporalExtensions
   fullName: nORM.Core.TemporalExtensions
+- uid: nORM.Core.TenantBoundaryDiagnostics
+  commentId: T:nORM.Core.TenantBoundaryDiagnostics
+  parent: nORM.Core
+  href: nORM.Core.TenantBoundaryDiagnostics.html
+  name: TenantBoundaryDiagnostics
+  nameWithType: TenantBoundaryDiagnostics
+  fullName: nORM.Core.TenantBoundaryDiagnostics
 - uid: nORM.Core.WindowFunctionsExtensions
   commentId: T:nORM.Core.WindowFunctionsExtensions
   href: nORM.Core.WindowFunctionsExtensions.html

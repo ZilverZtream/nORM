@@ -21,7 +21,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormIncludableQueryableExtensions
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 380
+    startLine: 391
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -31,8 +31,18 @@ items:
     a navigation property.
   example: []
   syntax:
-    content: public static class NormIncludableQueryableExtensions
-    content.vb: Public Module NormIncludableQueryableExtensions
+    content: >-
+      [RequiresDynamicCode("nORM Include extension methods emit MakeGenericMethod expressions; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("nORM Include extension methods reflect over navigation property metadata; trimming may remove the required members.")]
+
+      public static class NormIncludableQueryableExtensions
+    content.vb: >-
+      <RequiresDynamicCode("nORM Include extension methods emit MakeGenericMethod expressions; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("nORM Include extension methods reflect over navigation property metadata; trimming may remove the required members.")>
+
+      Public Module NormIncludableQueryableExtensions
   inheritance:
   - System.Object
   inheritedMembers:
@@ -43,6 +53,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Include extension methods emit MakeGenericMethod expressions; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Include extension methods reflect over navigation property metadata; trimming may remove the required members.
 - uid: nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   commentId: M:nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   id: ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
@@ -62,7 +83,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 391
+    startLine: 404
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -111,7 +132,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 413
+    startLine: 426
   assemblies:
   - nORM
   namespace: nORM.Core

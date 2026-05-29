@@ -35,8 +35,18 @@ items:
   summary: Executes migrations against a MySQL database using a supplied connection and migrations assembly.
   example: []
   syntax:
-    content: 'public class MySqlMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
-    content.vb: Public Class MySqlMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
+    content: >-
+      [RequiresDynamicCode("MySqlMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("MySqlMigrationRunner reflects over Migration types; trimming may remove the required members.")]
+
+      public class MySqlMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
+    content.vb: >-
+      <RequiresDynamicCode("MySqlMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("MySqlMigrationRunner reflects over Migration types; trimming may remove the required members.")>
+
+      Public Class MySqlMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
@@ -56,6 +66,17 @@ items:
   - nORM.Migration.MySqlMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.MySqlMigrationRunner,{TProperty}}})
   - nORM.Migration.MySqlMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.MySqlMigrationRunner,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Migration.MySqlMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.MySqlMigrationRunner,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: MySqlMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: MySqlMigrationRunner reflects over Migration types; trimming may remove the required members.
 - uid: nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
   commentId: M:nORM.Migration.MySqlMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)
   id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions)'
@@ -74,7 +95,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 45
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -115,7 +136,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 57
+    startLine: 59
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -159,7 +180,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 76
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -200,7 +221,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AcquireAdvisoryLockAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 143
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -240,7 +261,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReleaseAdvisoryLockAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 165
+    startLine: 167
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -273,7 +294,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 197
+    startLine: 199
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -310,7 +331,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 212
+    startLine: 214
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -347,7 +368,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 413
+    startLine: 415
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -379,7 +400,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Migration/MySqlMigrationRunner.cs
-    startLine: 428
+    startLine: 430
   assemblies:
   - nORM
   namespace: nORM.Migration

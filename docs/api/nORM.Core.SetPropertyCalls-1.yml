@@ -5,6 +5,7 @@ items:
   id: SetPropertyCalls`1
   parent: nORM.Core
   children:
+  - nORM.Core.SetPropertyCalls`1.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Linq.Expressions.Expression{System.Func{`0,``0}})
   - nORM.Core.SetPropertyCalls`1.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},``0)
   langs:
   - csharp
@@ -20,17 +21,16 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPropertyCalls
     path: src/nORM/Core/SetPropertyCalls.cs
-    startLine: 14
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Represents a fluent builder used to specify property assignments for bulk update operations.
   remarks: >-
-    v1 supports literal constants and precomputed captured local values as assignment
-
-    values. Method calls, inline computed values, column-based updates, and server
-
-    expressions are rejected by <code>ExecuteUpdateAsync</code>.
+    Two assignment forms are supported:
+      - Literal / precomputed value: SetProperty(x =&gt; x.Foo, 42)
+      - Server-side computed expression over the row being updated:
+        SetProperty(x =&gt; x.Counter, x =&gt; x.Counter + 1)
   example: []
   syntax:
     content: public sealed class SetPropertyCalls<T>
@@ -73,11 +73,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetProperty
     path: src/nORM/Core/SetPropertyCalls.cs
-    startLine: 23
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Specifies a property to set to the given value during a bulk update.
+  summary: Specifies a property to set to the given literal or captured value during a bulk update.
   example: []
   syntax:
     content: public SetPropertyCalls<T> SetProperty<TProperty>(Expression<Func<T, TProperty>> property, TProperty value)
@@ -99,6 +99,57 @@ items:
   nameWithType.vb: SetPropertyCalls(Of T).SetProperty(Of TProperty)(Expression(Of Func(Of T, TProperty)), TProperty)
   fullName.vb: nORM.Core.SetPropertyCalls(Of T).SetProperty(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), TProperty)
   name.vb: SetProperty(Of TProperty)(Expression(Of Func(Of T, TProperty)), TProperty)
+- uid: nORM.Core.SetPropertyCalls`1.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Core.SetPropertyCalls`1.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  id: SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  parent: nORM.Core.SetPropertyCalls`1
+  langs:
+  - csharp
+  - vb
+  name: SetProperty<TProperty>(Expression<Func<T, TProperty>>, Expression<Func<T, TProperty>>)
+  nameWithType: SetPropertyCalls<T>.SetProperty<TProperty>(Expression<Func<T, TProperty>>, Expression<Func<T, TProperty>>)
+  fullName: nORM.Core.SetPropertyCalls<T>.SetProperty<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/SetPropertyCalls.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SetProperty
+    path: src/nORM/Core/SetPropertyCalls.cs
+    startLine: 36
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Specifies a property to set to a server-side expression evaluated per row. Lets
+
+    callers write counter increments / arithmetic / string concatenation that
+
+    references columns of the row being updated, e.g.
+
+    <code>SetProperty(x =&gt; x.Counter, x =&gt; x.Counter + 1)</code>.
+  example: []
+  syntax:
+    content: public SetPropertyCalls<T> SetProperty<TProperty>(Expression<Func<T, TProperty>> property, Expression<Func<T, TProperty>> valueExpression)
+    parameters:
+    - id: property
+      type: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+      description: Expression pointing to the property to update.
+    - id: valueExpression
+      type: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+      description: Expression evaluated server-side that produces the assigned value.
+    typeParameters:
+    - id: TProperty
+      description: Type of the property value.
+    return:
+      type: nORM.Core.SetPropertyCalls`1
+      description: The same <xref href="nORM.Core.SetPropertyCalls%601" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function SetProperty(Of TProperty)([property] As Expression(Of Func(Of T, TProperty)), valueExpression As Expression(Of Func(Of T, TProperty))) As SetPropertyCalls(Of T)
+  overload: nORM.Core.SetPropertyCalls`1.SetProperty*
+  nameWithType.vb: SetPropertyCalls(Of T).SetProperty(Of TProperty)(Expression(Of Func(Of T, TProperty)), Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Core.SetPropertyCalls(Of T).SetProperty(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: SetProperty(Of TProperty)(Expression(Of Func(Of T, TProperty)), Expression(Of Func(Of T, TProperty)))
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core

@@ -1,0 +1,121 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.NativeTenantSecurityMode
+  commentId: T:nORM.Configuration.NativeTenantSecurityMode
+  id: NativeTenantSecurityMode
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.NativeTenantSecurityMode.Disabled
+  - nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  langs:
+  - csharp
+  - vb
+  name: NativeTenantSecurityMode
+  nameWithType: NativeTenantSecurityMode
+  fullName: nORM.Configuration.NativeTenantSecurityMode
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NativeTenantSecurityMode
+    path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+    startLine: 5
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Controls optional provider-native tenant security integration.
+  example: []
+  syntax:
+    content: public enum NativeTenantSecurityMode
+    content.vb: Public Enum NativeTenantSecurityMode
+- uid: nORM.Configuration.NativeTenantSecurityMode.Disabled
+  commentId: F:nORM.Configuration.NativeTenantSecurityMode.Disabled
+  id: Disabled
+  parent: nORM.Configuration.NativeTenantSecurityMode
+  langs:
+  - csharp
+  - vb
+  name: Disabled
+  nameWithType: NativeTenantSecurityMode.Disabled
+  fullName: nORM.Configuration.NativeTenantSecurityMode.Disabled
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Disabled
+    path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+    startLine: 10
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Do not set provider-native tenant session state.
+  example: []
+  syntax:
+    content: Disabled = 0
+    return:
+      type: nORM.Configuration.NativeTenantSecurityMode
+- uid: nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  commentId: F:nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  id: SessionContext
+  parent: nORM.Configuration.NativeTenantSecurityMode
+  langs:
+  - csharp
+  - vb
+  name: SessionContext
+  nameWithType: NativeTenantSecurityMode.SessionContext
+  fullName: nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SessionContext
+    path: src/nORM/Configuration/NativeTenantSecurityMode.cs
+    startLine: 16
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Set provider-native tenant session context before nORM commands run.
+
+    Applications can bind database-native RLS policies to that session value.
+  example: []
+  syntax:
+    content: SessionContext = 1
+    return:
+      type: nORM.Configuration.NativeTenantSecurityMode
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.NativeTenantSecurityMode
+  commentId: T:nORM.Configuration.NativeTenantSecurityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.NativeTenantSecurityMode.html
+  name: NativeTenantSecurityMode
+  nameWithType: NativeTenantSecurityMode
+  fullName: nORM.Configuration.NativeTenantSecurityMode

@@ -34,8 +34,18 @@ items:
     entities require the same navigation data.
   example: []
   syntax:
-    content: 'public sealed class BatchedNavigationLoader : IDisposable'
-    content.vb: Public NotInheritable Class BatchedNavigationLoader Implements IDisposable
+    content: >-
+      [RequiresDynamicCode("BatchedNavigationLoader reflects over navigation properties to batch related entity loads; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("BatchedNavigationLoader reflects over navigation property metadata; trimming may remove the required members.")]
+
+      public sealed class BatchedNavigationLoader : IDisposable
+    content.vb: >-
+      <RequiresDynamicCode("BatchedNavigationLoader reflects over navigation properties to batch related entity loads; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("BatchedNavigationLoader reflects over navigation property metadata; trimming may remove the required members.")>
+
+      Public NotInheritable Class BatchedNavigationLoader Implements IDisposable
   inheritance:
   - System.Object
   implements:
@@ -52,6 +62,17 @@ items:
   - nORM.Navigation.BatchedNavigationLoader.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.BatchedNavigationLoader,{TProperty}}})
   - nORM.Navigation.BatchedNavigationLoader.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.BatchedNavigationLoader,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Navigation.BatchedNavigationLoader.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.BatchedNavigationLoader,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: BatchedNavigationLoader reflects over navigation properties to batch related entity loads; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: BatchedNavigationLoader reflects over navigation property metadata; trimming may remove the required members.
 - uid: nORM.Navigation.BatchedNavigationLoader.#ctor(nORM.Core.DbContext)
   commentId: M:nORM.Navigation.BatchedNavigationLoader.#ctor(nORM.Core.DbContext)
   id: '#ctor(nORM.Core.DbContext)'
@@ -70,7 +91,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 53
+    startLine: 55
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -118,7 +139,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadNavigationAsync
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 72
+    startLine: 74
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -174,7 +195,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 574
+    startLine: 576
   assemblies:
   - nORM
   namespace: nORM.Navigation

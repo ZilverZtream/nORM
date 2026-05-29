@@ -1,0 +1,925 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ProviderMobilityTranslator
+  commentId: T:nORM.Configuration.ProviderMobilityTranslator
+  id: ProviderMobilityTranslator
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ProviderMobilityTranslator.Decide(nORM.Configuration.ProviderMobilityFeature)
+  - nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  - nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  - nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  - nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
+  - nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
+  - nORM.Configuration.ProviderMobilityTranslator.Decisions
+  - nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(System.String)
+  - nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision@)
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilityTranslator
+  nameWithType: ProviderMobilityTranslator
+  fullName: nORM.Configuration.ProviderMobilityTranslator
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilityTranslator
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 307
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Central provider-mobility translation classifier. This is the contract
+
+    nORM uses to decide whether a feature is translated, emulated, explicitly
+
+    provider-bound, or unsupported.
+  example: []
+  syntax:
+    content: public static class ProviderMobilityTranslator
+    content.vb: Public Module ProviderMobilityTranslator
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: nORM.Configuration.ProviderMobilityTranslator.Decisions
+  commentId: P:nORM.Configuration.ProviderMobilityTranslator.Decisions
+  id: Decisions
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: Decisions
+  nameWithType: ProviderMobilityTranslator.Decisions
+  fullName: nORM.Configuration.ProviderMobilityTranslator.Decisions
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Decisions
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 358
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: All known provider-mobility translation decisions.
+  example: []
+  syntax:
+    content: public static IReadOnlyList<ProviderMobilityTranslationDecision> Decisions { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityTranslationDecision}
+    content.vb: Public Shared ReadOnly Property Decisions As IReadOnlyList(Of ProviderMobilityTranslationDecision)
+  overload: nORM.Configuration.ProviderMobilityTranslator.Decisions*
+- uid: nORM.Configuration.ProviderMobilityTranslator.Decide(nORM.Configuration.ProviderMobilityFeature)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.Decide(nORM.Configuration.ProviderMobilityFeature)
+  id: Decide(nORM.Configuration.ProviderMobilityFeature)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: Decide(ProviderMobilityFeature)
+  nameWithType: ProviderMobilityTranslator.Decide(ProviderMobilityFeature)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.Decide(nORM.Configuration.ProviderMobilityFeature)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Decide
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 364
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets the provider-mobility decision for a known feature.
+  example: []
+  syntax:
+    content: public static ProviderMobilityTranslationDecision Decide(ProviderMobilityFeature feature)
+    parameters:
+    - id: feature
+      type: nORM.Configuration.ProviderMobilityFeature
+    return:
+      type: nORM.Configuration.ProviderMobilityTranslationDecision
+    content.vb: Public Shared Function Decide(feature As ProviderMobilityFeature) As ProviderMobilityTranslationDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.Decide*
+- uid: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision@)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision@)
+  id: TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision@)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: TryDecideFindingKind(string, out ProviderMobilityTranslationDecision)
+  nameWithType: ProviderMobilityTranslator.TryDecideFindingKind(string, out ProviderMobilityTranslationDecision)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(string, out nORM.Configuration.ProviderMobilityTranslationDecision)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TryDecideFindingKind
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 372
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets the provider-mobility decision for a static certification finding kind.
+  example: []
+  syntax:
+    content: public static bool TryDecideFindingKind(string kind, out ProviderMobilityTranslationDecision decision)
+    parameters:
+    - id: kind
+      type: System.String
+    - id: decision
+      type: nORM.Configuration.ProviderMobilityTranslationDecision
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function TryDecideFindingKind(kind As String, decision As ProviderMobilityTranslationDecision) As Boolean
+  overload: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind*
+  nameWithType.vb: ProviderMobilityTranslator.TryDecideFindingKind(String, ProviderMobilityTranslationDecision)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(String, nORM.Configuration.ProviderMobilityTranslationDecision)
+  name.vb: TryDecideFindingKind(String, ProviderMobilityTranslationDecision)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
+  id: DecideRuntimeFeature(System.String)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideRuntimeFeature(string)
+  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature(string)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideRuntimeFeature
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 387
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets the provider-mobility decision for a runtime strict-mode feature name.
+  example: []
+  syntax:
+    content: public static ProviderMobilityTranslationDecision DecideRuntimeFeature(string feature)
+    parameters:
+    - id: feature
+      type: System.String
+    return:
+      type: nORM.Configuration.ProviderMobilityTranslationDecision
+    content.vb: Public Shared Function DecideRuntimeFeature(feature As String) As ProviderMobilityTranslationDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
+  nameWithType.vb: ProviderMobilityTranslator.DecideRuntimeFeature(String)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(String)
+  name.vb: DecideRuntimeFeature(String)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
+  id: DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderVersion(ProviderCapabilities, Version?)
+  nameWithType: ProviderMobilityTranslator.DecideProviderVersion(ProviderCapabilities, Version?)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities, System.Version?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderVersion
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 393
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Decides whether a provider target satisfies its declared minimum server version.
+  example: []
+  syntax:
+    content: public static ProviderMobilityProviderDecision DecideProviderVersion(ProviderCapabilities capabilities, Version? actualServerVersion)
+    parameters:
+    - id: capabilities
+      type: nORM.Providers.ProviderCapabilities
+    - id: actualServerVersion
+      type: System.Version
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderDecision
+    content.vb: Public Shared Function DecideProviderVersion(capabilities As ProviderCapabilities, actualServerVersion As Version) As ProviderMobilityProviderDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion*
+  nameWithType.vb: ProviderMobilityTranslator.DecideProviderVersion(ProviderCapabilities, Version)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities, System.Version)
+  name.vb: DecideProviderVersion(ProviderCapabilities, Version)
+- uid: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(System.String)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(System.String)
+  id: ParseProviderVersion(System.String)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: ParseProviderVersion(string?)
+  nameWithType: ProviderMobilityTranslator.ParseProviderVersion(string?)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ParseProviderVersion
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 457
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Parses a provider-supplied server version string into a comparable version.
+  example: []
+  syntax:
+    content: public static Version? ParseProviderVersion(string? versionText)
+    parameters:
+    - id: versionText
+      type: System.String
+    return:
+      type: System.Version
+    content.vb: Public Shared Function ParseProviderVersion(versionText As String) As Version
+  overload: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion*
+  nameWithType.vb: ProviderMobilityTranslator.ParseProviderVersion(String)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(String)
+  name.vb: ParseProviderVersion(String)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  id: DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities, nORM.Configuration.ProviderMobilityProviderFeature)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderCapability
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 494
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Decides whether a provider capability can participate in provider-mobile certification.
+  example: []
+  syntax:
+    content: public static ProviderMobilityProviderDecision DecideProviderCapability(ProviderCapabilities capabilities, ProviderMobilityProviderFeature feature)
+    parameters:
+    - id: capabilities
+      type: nORM.Providers.ProviderCapabilities
+    - id: feature
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderDecision
+    content.vb: Public Shared Function DecideProviderCapability(capabilities As ProviderCapabilities, feature As ProviderMobilityProviderFeature) As ProviderMobilityProviderDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  id: DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version?, bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderCapabilityProfile
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 645
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Builds a provider target capability profile from a provider descriptor.
+  example: []
+  syntax:
+    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderCapabilityProfile(ProviderCapabilities capabilities, Version? actualServerVersion = null, bool requireActualServerVersion = false)
+    parameters:
+    - id: capabilities
+      type: nORM.Providers.ProviderCapabilities
+    - id: actualServerVersion
+      type: System.Version
+    - id: requireActualServerVersion
+      type: System.Boolean
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+    content.vb: Public Shared Function DecideProviderCapabilityProfile(capabilities As ProviderCapabilities, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
+  nameWithType.vb: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version, Boolean)
+  name.vb: DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  id: DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
+  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version?, bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderImplementationProfile
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 678
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Builds a provider target profile from the concrete nORM provider implementation.
+
+    This includes capability descriptors plus provider SQL translation strategies
+
+    that are not exposed on <xref href="nORM.Providers.ProviderCapabilities" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderImplementationProfile(DatabaseProvider provider, Version? actualServerVersion = null, bool requireActualServerVersion = false)
+    parameters:
+    - id: provider
+      type: nORM.Providers.DatabaseProvider
+    - id: actualServerVersion
+      type: System.Version
+    - id: requireActualServerVersion
+      type: System.Boolean
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+    content.vb: Public Shared Function DecideProviderImplementationProfile(provider As DatabaseProvider, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
+  nameWithType.vb: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version, Boolean)
+  name.vb: DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Configuration.ProviderMobilityTranslator.Decisions*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.Decisions
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_Decisions
+  name: Decisions
+  nameWithType: ProviderMobilityTranslator.Decisions
+  fullName: nORM.Configuration.ProviderMobilityTranslator.Decisions
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityTranslationDecision}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityTranslationDecision}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<ProviderMobilityTranslationDecision>
+  nameWithType: IReadOnlyList<ProviderMobilityTranslationDecision>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Configuration.ProviderMobilityTranslationDecision>
+  nameWithType.vb: IReadOnlyList(Of ProviderMobilityTranslationDecision)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Configuration.ProviderMobilityTranslationDecision)
+  name.vb: IReadOnlyList(Of ProviderMobilityTranslationDecision)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Configuration.ProviderMobilityTranslationDecision
+    name: ProviderMobilityTranslationDecision
+    href: nORM.Configuration.ProviderMobilityTranslationDecision.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.ProviderMobilityTranslationDecision
+    name: ProviderMobilityTranslationDecision
+    href: nORM.Configuration.ProviderMobilityTranslationDecision.html
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Configuration.ProviderMobilityTranslator.Decide*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.Decide
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_Decide_nORM_Configuration_ProviderMobilityFeature_
+  name: Decide
+  nameWithType: ProviderMobilityTranslator.Decide
+  fullName: nORM.Configuration.ProviderMobilityTranslator.Decide
+- uid: nORM.Configuration.ProviderMobilityFeature
+  commentId: T:nORM.Configuration.ProviderMobilityFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityFeature.html
+  name: ProviderMobilityFeature
+  nameWithType: ProviderMobilityFeature
+  fullName: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityTranslationDecision
+  commentId: T:nORM.Configuration.ProviderMobilityTranslationDecision
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityTranslationDecision.html
+  name: ProviderMobilityTranslationDecision
+  nameWithType: ProviderMobilityTranslationDecision
+  fullName: nORM.Configuration.ProviderMobilityTranslationDecision
+- uid: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_TryDecideFindingKind_System_String_nORM_Configuration_ProviderMobilityTranslationDecision__
+  name: TryDecideFindingKind
+  nameWithType: ProviderMobilityTranslator.TryDecideFindingKind
+  fullName: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideRuntimeFeature_System_String_
+  name: DecideRuntimeFeature
+  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderVersion_nORM_Providers_ProviderCapabilities_System_Version_
+  name: DecideProviderVersion
+  nameWithType: ProviderMobilityTranslator.DecideProviderVersion
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
+- uid: nORM.Providers.ProviderCapabilities
+  commentId: T:nORM.Providers.ProviderCapabilities
+  parent: nORM.Providers
+  href: nORM.Providers.ProviderCapabilities.html
+  name: ProviderCapabilities
+  nameWithType: ProviderCapabilities
+  fullName: nORM.Providers.ProviderCapabilities
+- uid: System.Version
+  commentId: T:System.Version
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.version
+  name: Version
+  nameWithType: Version
+  fullName: System.Version
+- uid: nORM.Configuration.ProviderMobilityProviderDecision
+  commentId: T:nORM.Configuration.ProviderMobilityProviderDecision
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderDecision.html
+  name: ProviderMobilityProviderDecision
+  nameWithType: ProviderMobilityProviderDecision
+  fullName: nORM.Configuration.ProviderMobilityProviderDecision
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_ParseProviderVersion_System_String_
+  name: ParseProviderVersion
+  nameWithType: ProviderMobilityTranslator.ParseProviderVersion
+  fullName: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapability_nORM_Providers_ProviderCapabilities_nORM_Configuration_ProviderMobilityProviderFeature_
+  name: DecideProviderCapability
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapability
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
+- uid: nORM.Configuration.ProviderMobilityProviderFeature
+  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderFeature.html
+  name: ProviderMobilityProviderFeature
+  nameWithType: ProviderMobilityProviderFeature
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapabilityProfile_nORM_Providers_ProviderCapabilities_System_Version_System_Boolean_
+  name: DecideProviderCapabilityProfile
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<ProviderMobilityProviderDecision>
+  nameWithType: IReadOnlyList<ProviderMobilityProviderDecision>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Configuration.ProviderMobilityProviderDecision>
+  nameWithType.vb: IReadOnlyList(Of ProviderMobilityProviderDecision)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Configuration.ProviderMobilityProviderDecision)
+  name.vb: IReadOnlyList(Of ProviderMobilityProviderDecision)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Configuration.ProviderMobilityProviderDecision
+    name: ProviderMobilityProviderDecision
+    href: nORM.Configuration.ProviderMobilityProviderDecision.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.ProviderMobilityProviderDecision
+    name: ProviderMobilityProviderDecision
+    href: nORM.Configuration.ProviderMobilityProviderDecision.html
+  - name: )
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderImplementationProfile_nORM_Providers_DatabaseProvider_System_Version_System_Boolean_
+  name: DecideProviderImplementationProfile
+  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider

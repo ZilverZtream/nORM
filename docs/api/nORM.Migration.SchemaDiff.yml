@@ -32,7 +32,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiff
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 448
+    startLine: 504
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -84,7 +84,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedTables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 451
+    startLine: 507
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -115,7 +115,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 453
+    startLine: 509
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -146,7 +146,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AlteredColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 455
+    startLine: 511
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -177,7 +177,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedIndexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 457
+    startLine: 513
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -208,7 +208,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedIndexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 459
+    startLine: 515
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -239,7 +239,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedTables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 461
+    startLine: 517
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -270,7 +270,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 463
+    startLine: 519
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -301,7 +301,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 465
+    startLine: 521
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -332,7 +332,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 467
+    startLine: 523
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -363,7 +363,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RenamedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 473
+    startLine: 529
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -399,7 +399,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasChanges
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 476
+    startLine: 532
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -430,7 +430,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasDestructiveChanges
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 485
+    startLine: 541
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -461,7 +461,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDestructiveChangeWarnings
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 490
+    startLine: 546
   assemblies:
   - nORM
   namespace: nORM.Migration

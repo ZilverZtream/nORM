@@ -20,15 +20,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 15
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Provides the entry point to query the database using LINQ.
   example: []
   syntax:
-    content: public static class NormQueryable
-    content.vb: Public Module NormQueryable
+    content: >-
+      [RequiresDynamicCode("nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members. Annotate consumer call sites accordingly.")]
+
+      public static class NormQueryable
+    content.vb: >-
+      <RequiresDynamicCode("nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members. Annotate consumer call sites accordingly.")>
+
+      Public Module NormQueryable
   inheritance:
   - System.Object
   inheritedMembers:
@@ -39,6 +49,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM LINQ uses Expression<T>.MakeGenericMethod / MakeGenericType to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members. Annotate consumer call sites accordingly.
 - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   commentId: M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   id: Query``1(nORM.Core.DbContext)
@@ -58,7 +79,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Query
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 29
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Core

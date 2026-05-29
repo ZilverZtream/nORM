@@ -12,24 +12,33 @@ items:
   - nORM.Configuration.DbContextOptions.CacheExpiration
   - nORM.Configuration.DbContextOptions.CacheProvider
   - nORM.Configuration.DbContextOptions.ClientEvaluationPolicy
+  - nORM.Configuration.DbContextOptions.Clone
   - nORM.Configuration.DbContextOptions.CommandInterceptors
   - nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
   - nORM.Configuration.DbContextOptions.EagerChangeTracking
+  - nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(System.String)
   - nORM.Configuration.DbContextOptions.EnableTemporalVersioning
+  - nORM.Configuration.DbContextOptions.EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode)
   - nORM.Configuration.DbContextOptions.GlobalFilters
   - nORM.Configuration.DbContextOptions.Logger
   - nORM.Configuration.DbContextOptions.MaxGroupJoinSize
   - nORM.Configuration.DbContextOptions.MaxRecursionDepth
+  - nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+  - nORM.Configuration.DbContextOptions.NativeTenantSessionKey
   - nORM.Configuration.DbContextOptions.OnModelCreating
+  - nORM.Configuration.DbContextOptions.ProviderMobilityMode
   - nORM.Configuration.DbContextOptions.RequireMatchedRowOccSemantics
   - nORM.Configuration.DbContextOptions.RetryPolicy
   - nORM.Configuration.DbContextOptions.SaveChangesInterceptors
+  - nORM.Configuration.DbContextOptions.TemporalStorageMode
   - nORM.Configuration.DbContextOptions.TenantColumnName
   - nORM.Configuration.DbContextOptions.TenantProvider
   - nORM.Configuration.DbContextOptions.TimeoutConfiguration
   - nORM.Configuration.DbContextOptions.UseBatchedBulkOps
   - nORM.Configuration.DbContextOptions.UseInMemoryCache
   - nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  - nORM.Configuration.DbContextOptions.UseStrictProviderMobility
+  - nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
   - nORM.Configuration.DbContextOptions.Validate
   langs:
   - csharp
@@ -45,7 +54,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContextOptions
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 71
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -74,6 +83,40 @@ items:
   - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}})
   - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Configuration.DbContextOptions.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Configuration.DbContextOptions,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Configuration.DbContextOptions.TemporalStorageMode
+  commentId: P:nORM.Configuration.DbContextOptions.TemporalStorageMode
+  id: TemporalStorageMode
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: TemporalStorageMode
+  nameWithType: DbContextOptions.TemporalStorageMode
+  fullName: nORM.Configuration.DbContextOptions.TemporalStorageMode
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalStorageMode
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 121
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the storage engine used when temporal versioning is enabled.
+
+    The default is provider-neutral nORM-managed history tables and triggers.
+  example: []
+  syntax:
+    content: public TemporalStorageMode TemporalStorageMode { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.TemporalStorageMode
+    content.vb: Public Property TemporalStorageMode As TemporalStorageMode
+  overload: nORM.Configuration.DbContextOptions.TemporalStorageMode*
 - uid: nORM.Configuration.DbContextOptions.TimeoutConfiguration
   commentId: P:nORM.Configuration.DbContextOptions.TimeoutConfiguration
   id: TimeoutConfiguration
@@ -92,7 +135,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutConfiguration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 106
+    startLine: 148
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -128,7 +171,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxRecursionDepth
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 114
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -166,7 +209,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxGroupJoinSize
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 133
+    startLine: 175
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -204,7 +247,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkBatchSize
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 149
+    startLine: 191
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -240,7 +283,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Logger
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 165
+    startLine: 207
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -274,7 +317,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RetryPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 171
+    startLine: 213
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -308,7 +351,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 177
+    startLine: 219
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -342,7 +385,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumnName
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 183
+    startLine: 225
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -358,6 +401,80 @@ items:
       type: System.String
     content.vb: Public Property TenantColumnName As String
   overload: nORM.Configuration.DbContextOptions.TenantColumnName*
+- uid: nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+  commentId: P:nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+  id: NativeTenantSecurityMode
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: NativeTenantSecurityMode
+  nameWithType: DbContextOptions.NativeTenantSecurityMode
+  fullName: nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NativeTenantSecurityMode
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 234
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets optional provider-native tenant security integration.
+
+    When set to <xref href="nORM.Configuration.NativeTenantSecurityMode.SessionContext" data-throw-if-not-resolved="false"></xref>,
+
+    nORM writes the current tenant ID into provider session state before
+
+    generated commands execute. Database-native RLS policies can then use
+
+    that value as defense in depth.
+  example: []
+  syntax:
+    content: public NativeTenantSecurityMode NativeTenantSecurityMode { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.NativeTenantSecurityMode
+    content.vb: Public Property NativeTenantSecurityMode As NativeTenantSecurityMode
+  overload: nORM.Configuration.DbContextOptions.NativeTenantSecurityMode*
+- uid: nORM.Configuration.DbContextOptions.NativeTenantSessionKey
+  commentId: P:nORM.Configuration.DbContextOptions.NativeTenantSessionKey
+  id: NativeTenantSessionKey
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: NativeTenantSessionKey
+  nameWithType: DbContextOptions.NativeTenantSessionKey
+  fullName: nORM.Configuration.DbContextOptions.NativeTenantSessionKey
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NativeTenantSessionKey
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 252
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets the provider-native session key used by
+
+    <xref href="nORM.Configuration.NativeTenantSecurityMode.SessionContext" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public string NativeTenantSessionKey { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property NativeTenantSessionKey As String
+  overload: nORM.Configuration.DbContextOptions.NativeTenantSessionKey*
 - uid: nORM.Configuration.DbContextOptions.OnModelCreating
   commentId: P:nORM.Configuration.DbContextOptions.OnModelCreating
   id: OnModelCreating
@@ -376,7 +493,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnModelCreating
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 189
+    startLine: 258
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -410,7 +527,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseBatchedBulkOps
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 195
+    startLine: 264
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -444,7 +561,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsePreciseChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 201
+    startLine: 270
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -478,7 +595,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EagerChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 207
+    startLine: 276
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -512,7 +629,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultTrackingBehavior
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 213
+    startLine: 282
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -546,7 +663,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClientEvaluationPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 221
+    startLine: 290
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -566,6 +683,42 @@ items:
       type: nORM.Configuration.ClientEvaluationPolicy
     content.vb: Public Property ClientEvaluationPolicy As ClientEvaluationPolicy
   overload: nORM.Configuration.DbContextOptions.ClientEvaluationPolicy*
+- uid: nORM.Configuration.DbContextOptions.ProviderMobilityMode
+  commentId: P:nORM.Configuration.DbContextOptions.ProviderMobilityMode
+  id: ProviderMobilityMode
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilityMode
+  nameWithType: DbContextOptions.ProviderMobilityMode
+  fullName: nORM.Configuration.DbContextOptions.ProviderMobilityMode
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilityMode
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 309
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets whether the context allows provider-bound escape hatches or
+
+    enforces the strict provider mobility contract. The default preserves
+
+    compatibility; release certification should use <xref href="nORM.Configuration.ProviderMobilityMode.Strict" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public ProviderMobilityMode ProviderMobilityMode { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ProviderMobilityMode
+    content.vb: Public Property ProviderMobilityMode As ProviderMobilityMode
+  overload: nORM.Configuration.DbContextOptions.ProviderMobilityMode*
 - uid: nORM.Configuration.DbContextOptions.CommandInterceptors
   commentId: P:nORM.Configuration.DbContextOptions.CommandInterceptors
   id: CommandInterceptors
@@ -584,7 +737,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 227
+    startLine: 339
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -618,7 +771,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SaveChangesInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 233
+    startLine: 345
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -652,7 +805,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 240
+    startLine: 352
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -686,7 +839,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheExpiration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 246
+    startLine: 358
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -702,6 +855,44 @@ items:
       type: System.TimeSpan
     content.vb: Public Property CacheExpiration As TimeSpan
   overload: nORM.Configuration.DbContextOptions.CacheExpiration*
+- uid: nORM.Configuration.DbContextOptions.Clone
+  commentId: M:nORM.Configuration.DbContextOptions.Clone
+  id: Clone
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: Clone()
+  nameWithType: DbContextOptions.Clone()
+  fullName: nORM.Configuration.DbContextOptions.Clone()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Clone
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 367
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Creates an independent options instance with the same configuration values.
+
+    Collection-backed settings are copied so generated contexts and other
+
+    composition layers can extend callbacks without mutating the caller-owned
+
+    options object.
+  example: []
+  syntax:
+    content: public DbContextOptions Clone()
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: A cloned <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance.
+    content.vb: Public Function Clone() As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.Clone*
 - uid: nORM.Configuration.DbContextOptions.UseInMemoryCache
   commentId: M:nORM.Configuration.DbContextOptions.UseInMemoryCache
   id: UseInMemoryCache
@@ -720,7 +911,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseInMemoryCache
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 254
+    startLine: 428
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -738,6 +929,146 @@ items:
       description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function UseInMemoryCache() As DbContextOptions
   overload: nORM.Configuration.DbContextOptions.UseInMemoryCache*
+- uid: nORM.Configuration.DbContextOptions.UseStrictProviderMobility
+  commentId: M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility
+  id: UseStrictProviderMobility
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UseStrictProviderMobility()
+  nameWithType: DbContextOptions.UseStrictProviderMobility()
+  fullName: nORM.Configuration.DbContextOptions.UseStrictProviderMobility()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseStrictProviderMobility
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 445
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Enforces nORM's strict provider mobility contract for this context.
+
+    In strict mode, generated nORM query/write/temporal paths may translate,
+
+    emulate or fail deterministically, while raw SQL, stored procedures,
+
+    provider-native RLS and provider-native temporal storage are rejected.
+
+    Client projection tails remain rejected by default; callers may opt
+
+    into <xref href="nORM.Configuration.ClientEvaluationPolicy.Warn" data-throw-if-not-resolved="false"></xref> for
+
+    explicit top-level projection tails after server filters, ordering and
+
+    paging have run.
+  example: []
+  syntax:
+    content: public DbContextOptions UseStrictProviderMobility()
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function UseStrictProviderMobility() As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.UseStrictProviderMobility*
+- uid: nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
+  commentId: M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
+  id: UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UseStrictProviderMobility(ClientEvaluationPolicy)
+  nameWithType: DbContextOptions.UseStrictProviderMobility(ClientEvaluationPolicy)
+  fullName: nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseStrictProviderMobility
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 467
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Enforces nORM's strict provider mobility contract while selecting the
+
+    client-evaluation policy for top-level projection tails. Strict mode
+
+    permits <xref href="nORM.Configuration.ClientEvaluationPolicy.Throw" data-throw-if-not-resolved="false"></xref> and
+
+    <xref href="nORM.Configuration.ClientEvaluationPolicy.Warn" data-throw-if-not-resolved="false"></xref> only; silent
+
+    <xref href="nORM.Configuration.ClientEvaluationPolicy.Allow" data-throw-if-not-resolved="false"></xref> remains a
+
+    compatibility-mode setting.
+  example: []
+  syntax:
+    content: public DbContextOptions UseStrictProviderMobility(ClientEvaluationPolicy clientEvaluationPolicy)
+    parameters:
+    - id: clientEvaluationPolicy
+      type: nORM.Configuration.ClientEvaluationPolicy
+      description: >-
+        Either <xref href="nORM.Configuration.ClientEvaluationPolicy.Throw" data-throw-if-not-resolved="false"></xref> to
+
+        reject projection tails or <xref href="nORM.Configuration.ClientEvaluationPolicy.Warn" data-throw-if-not-resolved="false"></xref>
+
+        to log and apply top-level projection tails after server-side filters,
+
+        ordering and paging.
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function UseStrictProviderMobility(clientEvaluationPolicy As ClientEvaluationPolicy) As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.UseStrictProviderMobility*
+- uid: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(System.String)
+  commentId: M:nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(System.String)
+  id: EnableNativeTenantSessionContext(System.String)
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: EnableNativeTenantSessionContext(string)
+  nameWithType: DbContextOptions.EnableNativeTenantSessionContext(string)
+  fullName: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnableNativeTenantSessionContext
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 483
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Enables provider-native tenant session context integration for
+
+    database-native RLS policies.
+  example: []
+  syntax:
+    content: public DbContextOptions EnableNativeTenantSessionContext(string sessionKey = "norm.tenant_id")
+    parameters:
+    - id: sessionKey
+      type: System.String
+      description: Provider session key used to store the tenant ID.
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function EnableNativeTenantSessionContext(sessionKey As String = "norm.tenant_id") As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext*
+  nameWithType.vb: DbContextOptions.EnableNativeTenantSessionContext(String)
+  fullName.vb: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext(String)
+  name.vb: EnableNativeTenantSessionContext(String)
 - uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning
   commentId: M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning
   id: EnableTemporalVersioning
@@ -756,7 +1087,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 265
+    startLine: 495
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -771,6 +1102,41 @@ items:
       type: nORM.Configuration.DbContextOptions
       description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
     content.vb: Public Function EnableTemporalVersioning() As DbContextOptions
+  overload: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
+- uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode)
+  commentId: M:nORM.Configuration.DbContextOptions.EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode)
+  id: EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode)
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: EnableTemporalVersioning(TemporalStorageMode)
+  nameWithType: DbContextOptions.EnableTemporalVersioning(TemporalStorageMode)
+  fullName: nORM.Configuration.DbContextOptions.EnableTemporalVersioning(nORM.Configuration.TemporalStorageMode)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnableTemporalVersioning
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 507
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Enables temporal versioning using the selected storage mode.
+  example: []
+  syntax:
+    content: public DbContextOptions EnableTemporalVersioning(TemporalStorageMode storageMode)
+    parameters:
+    - id: storageMode
+      type: nORM.Configuration.TemporalStorageMode
+      description: Temporal storage engine to use.
+    return:
+      type: nORM.Configuration.DbContextOptions
+      description: The current <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function EnableTemporalVersioning(storageMode As TemporalStorageMode) As DbContextOptions
   overload: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
 - uid: nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
   commentId: P:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy
@@ -790,7 +1156,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AmbientTransactionPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 283
+    startLine: 526
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -836,7 +1202,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RequireMatchedRowOccSemantics
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 303
+    startLine: 546
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -892,7 +1258,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GlobalFilters
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 318
+    startLine: 561
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -930,7 +1296,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 328
+    startLine: 571
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -976,7 +1342,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 345
+    startLine: 588
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1017,7 +1383,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Validate
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 358
+    startLine: 601
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2025,6 +2391,19 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
+- uid: nORM.Configuration.DbContextOptions.TemporalStorageMode*
+  commentId: Overload:nORM.Configuration.DbContextOptions.TemporalStorageMode
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_TemporalStorageMode
+  name: TemporalStorageMode
+  nameWithType: DbContextOptions.TemporalStorageMode
+  fullName: nORM.Configuration.DbContextOptions.TemporalStorageMode
+- uid: nORM.Configuration.TemporalStorageMode
+  commentId: T:nORM.Configuration.TemporalStorageMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.TemporalStorageMode.html
+  name: TemporalStorageMode
+  nameWithType: TemporalStorageMode
+  fullName: nORM.Configuration.TemporalStorageMode
 - uid: nORM.Configuration.DbContextOptions.TimeoutConfiguration*
   commentId: Overload:nORM.Configuration.DbContextOptions.TimeoutConfiguration
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_TimeoutConfiguration
@@ -2214,6 +2593,31 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  commentId: F:nORM.Configuration.NativeTenantSecurityMode.SessionContext
+  href: nORM.Configuration.NativeTenantSecurityMode.html#nORM_Configuration_NativeTenantSecurityMode_SessionContext
+  name: SessionContext
+  nameWithType: NativeTenantSecurityMode.SessionContext
+  fullName: nORM.Configuration.NativeTenantSecurityMode.SessionContext
+- uid: nORM.Configuration.DbContextOptions.NativeTenantSecurityMode*
+  commentId: Overload:nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_NativeTenantSecurityMode
+  name: NativeTenantSecurityMode
+  nameWithType: DbContextOptions.NativeTenantSecurityMode
+  fullName: nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
+- uid: nORM.Configuration.NativeTenantSecurityMode
+  commentId: T:nORM.Configuration.NativeTenantSecurityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.NativeTenantSecurityMode.html
+  name: NativeTenantSecurityMode
+  nameWithType: NativeTenantSecurityMode
+  fullName: nORM.Configuration.NativeTenantSecurityMode
+- uid: nORM.Configuration.DbContextOptions.NativeTenantSessionKey*
+  commentId: Overload:nORM.Configuration.DbContextOptions.NativeTenantSessionKey
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_NativeTenantSessionKey
+  name: NativeTenantSessionKey
+  nameWithType: DbContextOptions.NativeTenantSessionKey
+  fullName: nORM.Configuration.DbContextOptions.NativeTenantSessionKey
 - uid: nORM.Configuration.DbContextOptions.OnModelCreating*
   commentId: Overload:nORM.Configuration.DbContextOptions.OnModelCreating
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_OnModelCreating
@@ -2336,6 +2740,25 @@ references:
   name: ClientEvaluationPolicy
   nameWithType: ClientEvaluationPolicy
   fullName: nORM.Configuration.ClientEvaluationPolicy
+- uid: nORM.Configuration.ProviderMobilityMode.Strict
+  commentId: F:nORM.Configuration.ProviderMobilityMode.Strict
+  href: nORM.Configuration.ProviderMobilityMode.html#nORM_Configuration_ProviderMobilityMode_Strict
+  name: Strict
+  nameWithType: ProviderMobilityMode.Strict
+  fullName: nORM.Configuration.ProviderMobilityMode.Strict
+- uid: nORM.Configuration.DbContextOptions.ProviderMobilityMode*
+  commentId: Overload:nORM.Configuration.DbContextOptions.ProviderMobilityMode
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_ProviderMobilityMode
+  name: ProviderMobilityMode
+  nameWithType: DbContextOptions.ProviderMobilityMode
+  fullName: nORM.Configuration.DbContextOptions.ProviderMobilityMode
+- uid: nORM.Configuration.ProviderMobilityMode
+  commentId: T:nORM.Configuration.ProviderMobilityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityMode.html
+  name: ProviderMobilityMode
+  nameWithType: ProviderMobilityMode
+  fullName: nORM.Configuration.ProviderMobilityMode
 - uid: nORM.Configuration.DbContextOptions.CommandInterceptors*
   commentId: Overload:nORM.Configuration.DbContextOptions.CommandInterceptors
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_CommandInterceptors
@@ -2512,12 +2935,6 @@ references:
   name: TimeSpan
   nameWithType: TimeSpan
   fullName: System.TimeSpan
-- uid: nORM.Core.NormMemoryCacheProvider
-  commentId: T:nORM.Core.NormMemoryCacheProvider
-  href: nORM.Core.NormMemoryCacheProvider.html
-  name: NormMemoryCacheProvider
-  nameWithType: NormMemoryCacheProvider
-  fullName: nORM.Core.NormMemoryCacheProvider
 - uid: nORM.Configuration.DbContextOptions
   commentId: T:nORM.Configuration.DbContextOptions
   parent: nORM.Configuration
@@ -2525,12 +2942,54 @@ references:
   name: DbContextOptions
   nameWithType: DbContextOptions
   fullName: nORM.Configuration.DbContextOptions
+- uid: nORM.Configuration.DbContextOptions.Clone*
+  commentId: Overload:nORM.Configuration.DbContextOptions.Clone
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_Clone
+  name: Clone
+  nameWithType: DbContextOptions.Clone
+  fullName: nORM.Configuration.DbContextOptions.Clone
+- uid: nORM.Core.NormMemoryCacheProvider
+  commentId: T:nORM.Core.NormMemoryCacheProvider
+  href: nORM.Core.NormMemoryCacheProvider.html
+  name: NormMemoryCacheProvider
+  nameWithType: NormMemoryCacheProvider
+  fullName: nORM.Core.NormMemoryCacheProvider
 - uid: nORM.Configuration.DbContextOptions.UseInMemoryCache*
   commentId: Overload:nORM.Configuration.DbContextOptions.UseInMemoryCache
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UseInMemoryCache
   name: UseInMemoryCache
   nameWithType: DbContextOptions.UseInMemoryCache
   fullName: nORM.Configuration.DbContextOptions.UseInMemoryCache
+- uid: nORM.Configuration.ClientEvaluationPolicy.Warn
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Warn
+  href: nORM.Configuration.ClientEvaluationPolicy.html#nORM_Configuration_ClientEvaluationPolicy_Warn
+  name: Warn
+  nameWithType: ClientEvaluationPolicy.Warn
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Warn
+- uid: nORM.Configuration.DbContextOptions.UseStrictProviderMobility*
+  commentId: Overload:nORM.Configuration.DbContextOptions.UseStrictProviderMobility
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UseStrictProviderMobility
+  name: UseStrictProviderMobility
+  nameWithType: DbContextOptions.UseStrictProviderMobility
+  fullName: nORM.Configuration.DbContextOptions.UseStrictProviderMobility
+- uid: nORM.Configuration.ClientEvaluationPolicy.Throw
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Throw
+  href: nORM.Configuration.ClientEvaluationPolicy.html#nORM_Configuration_ClientEvaluationPolicy_Throw
+  name: Throw
+  nameWithType: ClientEvaluationPolicy.Throw
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Throw
+- uid: nORM.Configuration.ClientEvaluationPolicy.Allow
+  commentId: F:nORM.Configuration.ClientEvaluationPolicy.Allow
+  href: nORM.Configuration.ClientEvaluationPolicy.html#nORM_Configuration_ClientEvaluationPolicy_Allow
+  name: Allow
+  nameWithType: ClientEvaluationPolicy.Allow
+  fullName: nORM.Configuration.ClientEvaluationPolicy.Allow
+- uid: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext*
+  commentId: Overload:nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableNativeTenantSessionContext_System_String_
+  name: EnableNativeTenantSessionContext
+  nameWithType: DbContextOptions.EnableNativeTenantSessionContext
+  fullName: nORM.Configuration.DbContextOptions.EnableNativeTenantSessionContext
 - uid: nORM.Configuration.DbContextOptions.EnableTemporalVersioning*
   commentId: Overload:nORM.Configuration.DbContextOptions.EnableTemporalVersioning
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_EnableTemporalVersioning

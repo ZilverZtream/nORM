@@ -143,7 +143,7 @@ namespace nORM.Providers
         public override string NullSafeNotEqual(string left, string right)
             => $"{left} IS DISTINCT FROM {right}";
 
-        /// <inheritdoc />
+        /// <summary>Escapes a PostgreSQL identifier, including schema-qualified names.</summary>
         /// <param name="id">Identifier to escape (e.g., <c>"table"</c> or <c>"schema.table"</c>).</param>
         /// <returns>The escaped identifier with each segment wrapped in double quotes.</returns>
         /// <remarks>

@@ -35,15 +35,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AdvancedLinqExtensions
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 16
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Compact aggregate extensions for nORM using numeric generics
   example: []
   syntax:
-    content: public static class AdvancedLinqExtensions
-    content.vb: Public Module AdvancedLinqExtensions
+    content: >-
+      [RequiresDynamicCode("nORM aggregate extensions emit generic-method LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("nORM aggregate extensions reflect over LINQ method metadata; trimming may remove the required members.")]
+
+      public static class AdvancedLinqExtensions
+    content.vb: >-
+      <RequiresDynamicCode("nORM aggregate extensions emit generic-method LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("nORM aggregate extensions reflect over LINQ method metadata; trimming may remove the required members.")>
+
+      Public Module AdvancedLinqExtensions
   inheritance:
   - System.Object
   inheritedMembers:
@@ -54,6 +64,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM aggregate extensions emit generic-method LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM aggregate extensions reflect over LINQ method metadata; trimming may remove the required members.
 - uid: nORM.Core.AdvancedLinqExtensions.SumAsync``2(nORM.Core.INormQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
   commentId: M:nORM.Core.AdvancedLinqExtensions.SumAsync``2(nORM.Core.INormQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
   id: SumAsync``2(nORM.Core.INormQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
@@ -73,7 +94,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 30
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -126,7 +147,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 46
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -181,7 +202,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 60
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -231,7 +252,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SumAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 75
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -284,7 +305,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 93
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -334,7 +355,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 109
+    startLine: 112
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -389,7 +410,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 123
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -439,7 +460,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AverageAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 138
+    startLine: 141
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -492,7 +513,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 156
+    startLine: 159
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -542,7 +563,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 170
+    startLine: 173
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -592,7 +613,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 184
+    startLine: 187
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -642,7 +663,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MinAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 198
+    startLine: 201
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -692,7 +713,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 212
+    startLine: 215
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -742,7 +763,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 226
+    startLine: 229
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -792,7 +813,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 240
+    startLine: 243
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -842,7 +863,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxAsync
     path: src/nORM/Core/AdvancedLinqExtensions.cs
-    startLine: 254
+    startLine: 257
   assemblies:
   - nORM
   namespace: nORM.Core

@@ -33,7 +33,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IDbCommandInterceptor
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 28
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -80,7 +80,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 36
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -120,7 +120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 41
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -164,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 47
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -204,7 +204,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 52
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -248,7 +248,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecutingAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 58
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -288,7 +288,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecutedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 63
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -329,7 +329,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandFailedAsync
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 68
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -368,7 +368,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecuting
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 79
+    startLine: 84
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -408,7 +408,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NonQueryExecuted
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 86
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -451,7 +451,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecuting
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 93
+    startLine: 98
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -491,7 +491,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScalarExecuted
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 100
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -534,7 +534,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecuting
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 107
+    startLine: 112
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -574,7 +574,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReaderExecuted
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 114
+    startLine: 119
   assemblies:
   - nORM
   namespace: nORM.Enterprise
@@ -614,7 +614,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandFailed
     path: src/nORM/Enterprise/IDbCommandInterceptor.cs
-    startLine: 120
+    startLine: 125
   assemblies:
   - nORM
   namespace: nORM.Enterprise

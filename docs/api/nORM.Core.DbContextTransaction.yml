@@ -7,10 +7,12 @@ items:
   children:
   - nORM.Core.DbContextTransaction.Commit
   - nORM.Core.DbContextTransaction.CommitAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbContextTransaction.CreateSavepointAsync(System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContextTransaction.Dispose
   - nORM.Core.DbContextTransaction.DisposeAsync
   - nORM.Core.DbContextTransaction.Rollback
   - nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContextTransaction.Transaction
   langs:
   - csharp
@@ -111,7 +113,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Commit
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 40
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -148,7 +150,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommitAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 57
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -191,7 +193,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Rollback
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 85
+    startLine: 92
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -226,7 +228,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 101
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -249,6 +251,94 @@ items:
       type: System.Threading.Tasks.Task
     content.vb: Public Function RollbackAsync(ct As CancellationToken = Nothing) As Task
   overload: nORM.Core.DbContextTransaction.RollbackAsync*
+- uid: nORM.Core.DbContextTransaction.CreateSavepointAsync(System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContextTransaction.CreateSavepointAsync(System.String,System.Threading.CancellationToken)
+  id: CreateSavepointAsync(System.String,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContextTransaction
+  langs:
+  - csharp
+  - vb
+  name: CreateSavepointAsync(string, CancellationToken)
+  nameWithType: DbContextTransaction.CreateSavepointAsync(string, CancellationToken)
+  fullName: nORM.Core.DbContextTransaction.CreateSavepointAsync(string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContextTransaction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CreateSavepointAsync
+    path: src/nORM/Core/DbContextTransaction.cs
+    startLine: 134
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Creates a savepoint inside this nORM-managed transaction without
+
+    exposing the underlying provider transaction handle.
+  example: []
+  syntax:
+    content: public Task CreateSavepointAsync(string name, CancellationToken ct = default)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the savepoint to create.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task that completes when the savepoint has been created.
+    content.vb: Public Function CreateSavepointAsync(name As String, ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContextTransaction.CreateSavepointAsync*
+  nameWithType.vb: DbContextTransaction.CreateSavepointAsync(String, CancellationToken)
+  fullName.vb: nORM.Core.DbContextTransaction.CreateSavepointAsync(String, System.Threading.CancellationToken)
+  name.vb: CreateSavepointAsync(String, CancellationToken)
+- uid: nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken)
+  id: RollbackToSavepointAsync(System.String,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContextTransaction
+  langs:
+  - csharp
+  - vb
+  name: RollbackToSavepointAsync(string, CancellationToken)
+  nameWithType: DbContextTransaction.RollbackToSavepointAsync(string, CancellationToken)
+  fullName: nORM.Core.DbContextTransaction.RollbackToSavepointAsync(string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContextTransaction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RollbackToSavepointAsync
+    path: src/nORM/Core/DbContextTransaction.cs
+    startLine: 147
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Rolls this nORM-managed transaction back to a previously created
+
+    savepoint without exposing the underlying provider transaction handle.
+  example: []
+  syntax:
+    content: public Task RollbackToSavepointAsync(string name, CancellationToken ct = default)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the savepoint to roll back to.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task that completes when rollback to the savepoint has finished.
+    content.vb: Public Function RollbackToSavepointAsync(name As String, ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContextTransaction.RollbackToSavepointAsync*
+  nameWithType.vb: DbContextTransaction.RollbackToSavepointAsync(String, CancellationToken)
+  fullName.vb: nORM.Core.DbContextTransaction.RollbackToSavepointAsync(String, System.Threading.CancellationToken)
+  name.vb: RollbackToSavepointAsync(String, CancellationToken)
 - uid: nORM.Core.DbContextTransaction.Dispose
   commentId: M:nORM.Core.DbContextTransaction.Dispose
   id: Dispose
@@ -267,7 +357,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 124
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -300,7 +390,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 135
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1436,6 +1526,29 @@ references:
   name: RollbackAsync
   nameWithType: DbContextTransaction.RollbackAsync
   fullName: nORM.Core.DbContextTransaction.RollbackAsync
+- uid: nORM.Core.DbContextTransaction.CreateSavepointAsync*
+  commentId: Overload:nORM.Core.DbContextTransaction.CreateSavepointAsync
+  href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_CreateSavepointAsync_System_String_System_Threading_CancellationToken_
+  name: CreateSavepointAsync
+  nameWithType: DbContextTransaction.CreateSavepointAsync
+  fullName: nORM.Core.DbContextTransaction.CreateSavepointAsync
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Core.DbContextTransaction.RollbackToSavepointAsync*
+  commentId: Overload:nORM.Core.DbContextTransaction.RollbackToSavepointAsync
+  href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_RollbackToSavepointAsync_System_String_System_Threading_CancellationToken_
+  name: RollbackToSavepointAsync
+  nameWithType: DbContextTransaction.RollbackToSavepointAsync
+  fullName: nORM.Core.DbContextTransaction.RollbackToSavepointAsync
 - uid: nORM.Core.DbContextTransaction.Dispose*
   commentId: Overload:nORM.Core.DbContextTransaction.Dispose
   href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_Dispose

@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshot
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 20
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -71,7 +71,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Tables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 23
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Migration

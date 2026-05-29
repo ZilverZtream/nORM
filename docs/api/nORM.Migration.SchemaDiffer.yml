@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiffer
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 524
+    startLine: 580
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -57,7 +57,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Diff
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 532
+    startLine: 588
   assemblies:
   - nORM
   namespace: nORM.Migration

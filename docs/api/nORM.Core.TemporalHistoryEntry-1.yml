@@ -1,0 +1,1332 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.TemporalHistoryEntry`1
+  commentId: T:nORM.Core.TemporalHistoryEntry`1
+  id: TemporalHistoryEntry`1
+  parent: nORM.Core
+  children:
+  - nORM.Core.TemporalHistoryEntry`1.#ctor(`0,System.DateTime,System.DateTime,System.String)
+  - nORM.Core.TemporalHistoryEntry`1.Entity
+  - nORM.Core.TemporalHistoryEntry`1.Operation
+  - nORM.Core.TemporalHistoryEntry`1.ValidFrom
+  - nORM.Core.TemporalHistoryEntry`1.ValidTo
+  langs:
+  - csharp
+  - vb
+  name: TemporalHistoryEntry<T>
+  nameWithType: TemporalHistoryEntry<T>
+  fullName: nORM.Core.TemporalHistoryEntry<T>
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalHistoryEntry
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Represents one provider-neutral temporal history row for an entity.
+  example: []
+  syntax:
+    content: 'public sealed class TemporalHistoryEntry<T> where T : class'
+    typeParameters:
+    - id: T
+      description: Type of the mapped entity.
+    content.vb: Public NotInheritable Class TemporalHistoryEntry(Of T As Class)
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  - nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},{TProperty}}})
+  - nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  - nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},{TProperty}}},System.Threading.CancellationToken)
+  nameWithType.vb: TemporalHistoryEntry(Of T)
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T)
+  name.vb: TemporalHistoryEntry(Of T)
+- uid: nORM.Core.TemporalHistoryEntry`1.#ctor(`0,System.DateTime,System.DateTime,System.String)
+  commentId: M:nORM.Core.TemporalHistoryEntry`1.#ctor(`0,System.DateTime,System.DateTime,System.String)
+  id: '#ctor(`0,System.DateTime,System.DateTime,System.String)'
+  parent: nORM.Core.TemporalHistoryEntry`1
+  langs:
+  - csharp
+  - vb
+  name: TemporalHistoryEntry(T, DateTime, DateTime, string)
+  nameWithType: TemporalHistoryEntry<T>.TemporalHistoryEntry(T, DateTime, DateTime, string)
+  fullName: nORM.Core.TemporalHistoryEntry<T>.TemporalHistoryEntry(T, System.DateTime, System.DateTime, string)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 22
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Initializes a new temporal history entry.
+  example: []
+  syntax:
+    content: public TemporalHistoryEntry(T entity, DateTime validFrom, DateTime validTo, string operation)
+    parameters:
+    - id: entity
+      type: '{T}'
+      description: The historical entity snapshot.
+    - id: validFrom
+      type: System.DateTime
+      description: Timestamp when this version became valid.
+    - id: validTo
+      type: System.DateTime
+      description: Timestamp when this version stopped being valid.
+    - id: operation
+      type: System.String
+      description: 'Provider-neutral operation marker: I, U, or D.'
+    content.vb: Public Sub New(entity As T, validFrom As Date, validTo As Date, operation As String)
+  overload: nORM.Core.TemporalHistoryEntry`1.#ctor*
+  nameWithType.vb: TemporalHistoryEntry(Of T).New(T, Date, Date, String)
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).New(T, Date, Date, String)
+  name.vb: New(T, Date, Date, String)
+- uid: nORM.Core.TemporalHistoryEntry`1.Entity
+  commentId: P:nORM.Core.TemporalHistoryEntry`1.Entity
+  id: Entity
+  parent: nORM.Core.TemporalHistoryEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Entity
+  nameWithType: TemporalHistoryEntry<T>.Entity
+  fullName: nORM.Core.TemporalHistoryEntry<T>.Entity
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Entity
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 31
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Historical entity snapshot stored in the history table.
+  example: []
+  syntax:
+    content: public T Entity { get; }
+    parameters: []
+    return:
+      type: '{T}'
+    content.vb: Public ReadOnly Property Entity As T
+  overload: nORM.Core.TemporalHistoryEntry`1.Entity*
+  nameWithType.vb: TemporalHistoryEntry(Of T).Entity
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).Entity
+- uid: nORM.Core.TemporalHistoryEntry`1.ValidFrom
+  commentId: P:nORM.Core.TemporalHistoryEntry`1.ValidFrom
+  id: ValidFrom
+  parent: nORM.Core.TemporalHistoryEntry`1
+  langs:
+  - csharp
+  - vb
+  name: ValidFrom
+  nameWithType: TemporalHistoryEntry<T>.ValidFrom
+  fullName: nORM.Core.TemporalHistoryEntry<T>.ValidFrom
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValidFrom
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 34
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Timestamp when this version became valid.
+  example: []
+  syntax:
+    content: public DateTime ValidFrom { get; }
+    parameters: []
+    return:
+      type: System.DateTime
+    content.vb: Public ReadOnly Property ValidFrom As Date
+  overload: nORM.Core.TemporalHistoryEntry`1.ValidFrom*
+  nameWithType.vb: TemporalHistoryEntry(Of T).ValidFrom
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).ValidFrom
+- uid: nORM.Core.TemporalHistoryEntry`1.ValidTo
+  commentId: P:nORM.Core.TemporalHistoryEntry`1.ValidTo
+  id: ValidTo
+  parent: nORM.Core.TemporalHistoryEntry`1
+  langs:
+  - csharp
+  - vb
+  name: ValidTo
+  nameWithType: TemporalHistoryEntry<T>.ValidTo
+  fullName: nORM.Core.TemporalHistoryEntry<T>.ValidTo
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValidTo
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 37
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Timestamp when this version stopped being valid.
+  example: []
+  syntax:
+    content: public DateTime ValidTo { get; }
+    parameters: []
+    return:
+      type: System.DateTime
+    content.vb: Public ReadOnly Property ValidTo As Date
+  overload: nORM.Core.TemporalHistoryEntry`1.ValidTo*
+  nameWithType.vb: TemporalHistoryEntry(Of T).ValidTo
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).ValidTo
+- uid: nORM.Core.TemporalHistoryEntry`1.Operation
+  commentId: P:nORM.Core.TemporalHistoryEntry`1.Operation
+  id: Operation
+  parent: nORM.Core.TemporalHistoryEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Operation
+  nameWithType: TemporalHistoryEntry<T>.Operation
+  fullName: nORM.Core.TemporalHistoryEntry<T>.Operation
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/TemporalExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Operation
+    path: src/nORM/Core/TemporalExtensions.cs
+    startLine: 40
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: 'Provider-neutral operation marker: I, U, or D.'
+  example: []
+  syntax:
+    content: public string Operation { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property Operation As String
+  overload: nORM.Core.TemporalHistoryEntry`1.Operation*
+  nameWithType.vb: TemporalHistoryEntry(Of T).Operation
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).Operation
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<TemporalHistoryEntry<T>>(TemporalHistoryEntry<T>, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<TemporalHistoryEntry<T>>(TemporalHistoryEntry<T>, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<nORM.Core.TemporalHistoryEntry<T>>(nORM.Core.TemporalHistoryEntry<T>, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of TemporalHistoryEntry(Of T))(TemporalHistoryEntry(Of T), DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of nORM.Core.TemporalHistoryEntry(Of T))(nORM.Core.TemporalHistoryEntry(Of T), nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of TemporalHistoryEntry(Of T))(TemporalHistoryEntry(Of T), DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.TemporalHistoryEntry{`0},nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.TemporalHistoryEntry{`0},nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},{TProperty}}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<nORM.Core.TemporalHistoryEntry<T>, TProperty>(nORM.Core.TemporalHistoryEntry<T>, System.Linq.Expressions.Expression<System.Func<nORM.Core.TemporalHistoryEntry<T>, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of nORM.Core.TemporalHistoryEntry(Of T), TProperty)(nORM.Core.TemporalHistoryEntry(Of T), System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.TemporalHistoryEntry(Of T), TProperty)))
+  name.vb: IsLoaded(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Core.TemporalHistoryEntry<T>, TProperty>(nORM.Core.TemporalHistoryEntry<T>, System.Linq.Expressions.Expression<System.Func<nORM.Core.TemporalHistoryEntry<T>, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Core.TemporalHistoryEntry(Of T), TProperty)(nORM.Core.TemporalHistoryEntry(Of T), System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.TemporalHistoryEntry(Of T), System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.TemporalHistoryEntry`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{{T}},{TProperty}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  parent: nORM.Navigation.NavigationPropertyExtensions
+  definition: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<TemporalHistoryEntry<T>, TProperty>(TemporalHistoryEntry<T>, Expression<Func<TemporalHistoryEntry<T>, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<nORM.Core.TemporalHistoryEntry<T>, TProperty>(nORM.Core.TemporalHistoryEntry<T>, System.Linq.Expressions.Expression<System.Func<nORM.Core.TemporalHistoryEntry<T>, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of nORM.Core.TemporalHistoryEntry(Of T), TProperty)(nORM.Core.TemporalHistoryEntry(Of T), System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.TemporalHistoryEntry(Of T), TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of TemporalHistoryEntry(Of T), TProperty)(TemporalHistoryEntry(Of T), Expression(Of Func(Of TemporalHistoryEntry(Of T), TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(nORM.Core.TemporalHistoryEntry{`0},System.Linq.Expressions.Expression{System.Func{nORM.Core.TemporalHistoryEntry{`0},``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry
+    href: nORM.Core.TemporalHistoryEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  name: EnableLazyLoading<T>(T, DbContext)
+  nameWithType: NavigationPropertyExtensions.EnableLazyLoading<T>(T, DbContext)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading<T>(T, nORM.Core.DbContext)
+  nameWithType.vb: NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, DbContext)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(Of T)(T, nORM.Core.DbContext)
+  name.vb: EnableLazyLoading(Of T)(T, DbContext)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
+    name: EnableLazyLoading
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_EnableLazyLoading__1___0_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions
+  commentId: T:nORM.Navigation.NavigationPropertyExtensions
+  parent: nORM.Navigation
+  href: nORM.Navigation.NavigationPropertyExtensions.html
+  name: NavigationPropertyExtensions
+  nameWithType: NavigationPropertyExtensions
+  fullName: nORM.Navigation.NavigationPropertyExtensions
+- uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  name: IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  nameWithType: NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, Expression<Func<T, TProperty>>)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.IsLoaded<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.IsLoaded(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: IsLoaded(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: IsLoaded
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_IsLoaded__2___0_System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, ICollection<TProperty>>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, System.Collections.Generic.ICollection<TProperty>>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.ICollection{``1}}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0_System_Collections_Generic_ICollection___1____System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Collections.Generic.ICollection`1
+    name: ICollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.icollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  commentId: M:nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  name: LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  nameWithType: NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, Expression<Func<T, TProperty>>, CancellationToken)
+  fullName: nORM.Navigation.NavigationPropertyExtensions.LoadAsync<T, TProperty>(T, System.Linq.Expressions.Expression<System.Func<T, TProperty>>, System.Threading.CancellationToken)
+  nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
+  name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(``0,System.Linq.Expressions.Expression{System.Func{``0,``1}},System.Threading.CancellationToken)
+    name: LoadAsync
+    href: nORM.Navigation.NavigationPropertyExtensions.html#nORM_Navigation_NavigationPropertyExtensions_LoadAsync__2___0_System_Linq_Expressions_Expression_System_Func___0___1___System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - name: T
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Navigation
+  commentId: N:nORM.Navigation
+  href: nORM.html
+  name: nORM.Navigation
+  nameWithType: nORM.Navigation
+  fullName: nORM.Navigation
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Navigation
+    name: Navigation
+    href: nORM.Navigation.html
+- uid: nORM.Core.TemporalHistoryEntry`1.#ctor*
+  commentId: Overload:nORM.Core.TemporalHistoryEntry`1.#ctor
+  href: nORM.Core.TemporalHistoryEntry-1.html#nORM_Core_TemporalHistoryEntry_1__ctor__0_System_DateTime_System_DateTime_System_String_
+  name: TemporalHistoryEntry
+  nameWithType: TemporalHistoryEntry<T>.TemporalHistoryEntry
+  fullName: nORM.Core.TemporalHistoryEntry<T>.TemporalHistoryEntry
+  nameWithType.vb: TemporalHistoryEntry(Of T).New
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).New
+  name.vb: New
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: System.DateTime
+  commentId: T:System.DateTime
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.datetime
+  name: DateTime
+  nameWithType: DateTime
+  fullName: System.DateTime
+  nameWithType.vb: Date
+  fullName.vb: Date
+  name.vb: Date
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: nORM.Core.TemporalHistoryEntry`1.Entity*
+  commentId: Overload:nORM.Core.TemporalHistoryEntry`1.Entity
+  href: nORM.Core.TemporalHistoryEntry-1.html#nORM_Core_TemporalHistoryEntry_1_Entity
+  name: Entity
+  nameWithType: TemporalHistoryEntry<T>.Entity
+  fullName: nORM.Core.TemporalHistoryEntry<T>.Entity
+  nameWithType.vb: TemporalHistoryEntry(Of T).Entity
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).Entity
+- uid: nORM.Core.TemporalHistoryEntry`1.ValidFrom*
+  commentId: Overload:nORM.Core.TemporalHistoryEntry`1.ValidFrom
+  href: nORM.Core.TemporalHistoryEntry-1.html#nORM_Core_TemporalHistoryEntry_1_ValidFrom
+  name: ValidFrom
+  nameWithType: TemporalHistoryEntry<T>.ValidFrom
+  fullName: nORM.Core.TemporalHistoryEntry<T>.ValidFrom
+  nameWithType.vb: TemporalHistoryEntry(Of T).ValidFrom
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).ValidFrom
+- uid: nORM.Core.TemporalHistoryEntry`1.ValidTo*
+  commentId: Overload:nORM.Core.TemporalHistoryEntry`1.ValidTo
+  href: nORM.Core.TemporalHistoryEntry-1.html#nORM_Core_TemporalHistoryEntry_1_ValidTo
+  name: ValidTo
+  nameWithType: TemporalHistoryEntry<T>.ValidTo
+  fullName: nORM.Core.TemporalHistoryEntry<T>.ValidTo
+  nameWithType.vb: TemporalHistoryEntry(Of T).ValidTo
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).ValidTo
+- uid: nORM.Core.TemporalHistoryEntry`1.Operation*
+  commentId: Overload:nORM.Core.TemporalHistoryEntry`1.Operation
+  href: nORM.Core.TemporalHistoryEntry-1.html#nORM_Core_TemporalHistoryEntry_1_Operation
+  name: Operation
+  nameWithType: TemporalHistoryEntry<T>.Operation
+  fullName: nORM.Core.TemporalHistoryEntry<T>.Operation
+  nameWithType.vb: TemporalHistoryEntry(Of T).Operation
+  fullName.vb: nORM.Core.TemporalHistoryEntry(Of T).Operation

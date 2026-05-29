@@ -16,12 +16,22 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
   - nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
   - nORM.Configuration.IEntityTypeConfiguration
+  - nORM.Configuration.IndexAttribute
   - nORM.Configuration.ManyToManyConfiguration
   - nORM.Configuration.ModelBuilder
+  - nORM.Configuration.NativeTenantSecurityMode
   - nORM.Configuration.OwnedCollectionNavigation
   - nORM.Configuration.OwnedNavigation
+  - nORM.Configuration.ProviderMobilityFeature
+  - nORM.Configuration.ProviderMobilityMode
+  - nORM.Configuration.ProviderMobilityProviderDecision
+  - nORM.Configuration.ProviderMobilityProviderFeature
+  - nORM.Configuration.ProviderMobilitySupport
+  - nORM.Configuration.ProviderMobilityTranslationDecision
+  - nORM.Configuration.ProviderMobilityTranslator
   - nORM.Configuration.RelationshipConfiguration
   - nORM.Configuration.ShadowPropertyConfiguration
+  - nORM.Configuration.TemporalStorageMode
   langs:
   - csharp
   - vb
@@ -46,6 +56,13 @@ references:
   name: ClientEvaluationPolicy
   nameWithType: ClientEvaluationPolicy
   fullName: nORM.Configuration.ClientEvaluationPolicy
+- uid: nORM.Configuration.ProviderMobilityMode
+  commentId: T:nORM.Configuration.ProviderMobilityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityMode.html
+  name: ProviderMobilityMode
+  nameWithType: ProviderMobilityMode
+  fullName: nORM.Configuration.ProviderMobilityMode
 - uid: nORM.Configuration.DbContextOptions
   commentId: T:nORM.Configuration.DbContextOptions
   parent: nORM.Configuration
@@ -372,12 +389,73 @@ references:
   name: ManyToManyConfiguration
   nameWithType: ManyToManyConfiguration
   fullName: nORM.Configuration.ManyToManyConfiguration
+- uid: nORM.Configuration.IndexAttribute
+  commentId: T:nORM.Configuration.IndexAttribute
+  href: nORM.Configuration.IndexAttribute.html
+  name: IndexAttribute
+  nameWithType: IndexAttribute
+  fullName: nORM.Configuration.IndexAttribute
 - uid: nORM.Configuration.ModelBuilder
   commentId: T:nORM.Configuration.ModelBuilder
   href: nORM.Configuration.ModelBuilder.html
   name: ModelBuilder
   nameWithType: ModelBuilder
   fullName: nORM.Configuration.ModelBuilder
+- uid: nORM.Configuration.NativeTenantSecurityMode
+  commentId: T:nORM.Configuration.NativeTenantSecurityMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.NativeTenantSecurityMode.html
+  name: NativeTenantSecurityMode
+  nameWithType: NativeTenantSecurityMode
+  fullName: nORM.Configuration.NativeTenantSecurityMode
+- uid: nORM.Configuration.ProviderMobilitySupport
+  commentId: T:nORM.Configuration.ProviderMobilitySupport
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilitySupport.html
+  name: ProviderMobilitySupport
+  nameWithType: ProviderMobilitySupport
+  fullName: nORM.Configuration.ProviderMobilitySupport
+- uid: nORM.Configuration.ProviderMobilityFeature
+  commentId: T:nORM.Configuration.ProviderMobilityFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityFeature.html
+  name: ProviderMobilityFeature
+  nameWithType: ProviderMobilityFeature
+  fullName: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature
+  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderFeature.html
+  name: ProviderMobilityProviderFeature
+  nameWithType: ProviderMobilityProviderFeature
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityTranslationDecision
+  commentId: T:nORM.Configuration.ProviderMobilityTranslationDecision
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityTranslationDecision.html
+  name: ProviderMobilityTranslationDecision
+  nameWithType: ProviderMobilityTranslationDecision
+  fullName: nORM.Configuration.ProviderMobilityTranslationDecision
+- uid: nORM.Configuration.ProviderMobilityProviderDecision
+  commentId: T:nORM.Configuration.ProviderMobilityProviderDecision
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderDecision.html
+  name: ProviderMobilityProviderDecision
+  nameWithType: ProviderMobilityProviderDecision
+  fullName: nORM.Configuration.ProviderMobilityProviderDecision
+- uid: nORM.Configuration.ProviderMobilityTranslator
+  commentId: T:nORM.Configuration.ProviderMobilityTranslator
+  href: nORM.Configuration.ProviderMobilityTranslator.html
+  name: ProviderMobilityTranslator
+  nameWithType: ProviderMobilityTranslator
+  fullName: nORM.Configuration.ProviderMobilityTranslator
+- uid: nORM.Configuration.TemporalStorageMode
+  commentId: T:nORM.Configuration.TemporalStorageMode
+  parent: nORM.Configuration
+  href: nORM.Configuration.TemporalStorageMode.html
+  name: TemporalStorageMode
+  nameWithType: TemporalStorageMode
+  fullName: nORM.Configuration.TemporalStorageMode
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
   href: nORM.html

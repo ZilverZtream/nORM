@@ -6,6 +6,7 @@ items:
   children:
   - nORM.Scaffolding.DatabaseScaffolder
   - nORM.Scaffolding.DynamicEntityTypeGenerator
+  - nORM.Scaffolding.ScaffoldOptions
   langs:
   - csharp
   - vb
@@ -28,3 +29,32 @@ references:
   name: DynamicEntityTypeGenerator
   nameWithType: DynamicEntityTypeGenerator
   fullName: nORM.Scaffolding.DynamicEntityTypeGenerator
+- uid: nORM.Scaffolding.ScaffoldOptions
+  commentId: T:nORM.Scaffolding.ScaffoldOptions
+  parent: nORM.Scaffolding
+  href: nORM.Scaffolding.ScaffoldOptions.html
+  name: ScaffoldOptions
+  nameWithType: ScaffoldOptions
+  fullName: nORM.Scaffolding.ScaffoldOptions
+- uid: nORM.Scaffolding
+  commentId: N:nORM.Scaffolding
+  href: nORM.html
+  name: nORM.Scaffolding
+  nameWithType: nORM.Scaffolding
+  fullName: nORM.Scaffolding
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Scaffolding
+    name: Scaffolding
+    href: nORM.Scaffolding.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Scaffolding
+    name: Scaffolding
+    href: nORM.Scaffolding.html

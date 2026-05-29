@@ -8,6 +8,8 @@ items:
   - nORM.Migration.ColumnSchema.ClrType
   - nORM.Migration.ColumnSchema.DefaultValue
   - nORM.Migration.ColumnSchema.IndexName
+  - nORM.Migration.ColumnSchema.IndexOrder
+  - nORM.Migration.ColumnSchema.Indexes
   - nORM.Migration.ColumnSchema.IsIdentity
   - nORM.Migration.ColumnSchema.IsNullable
   - nORM.Migration.ColumnSchema.IsPrimaryKey
@@ -28,7 +30,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 67
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -70,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 70
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -101,7 +103,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PreviousName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 77
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -139,7 +141,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClrType
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 89
+    startLine: 90
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -181,7 +183,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 91
+    startLine: 92
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -212,7 +214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsPrimaryKey
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 93
+    startLine: 94
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -243,7 +245,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 95
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -274,7 +276,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 97
+    startLine: 98
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -287,6 +289,68 @@ items:
       type: System.String
     content.vb: Public Property IndexName As String
   overload: nORM.Migration.ColumnSchema.IndexName*
+- uid: nORM.Migration.ColumnSchema.IndexOrder
+  commentId: P:nORM.Migration.ColumnSchema.IndexOrder
+  id: IndexOrder
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IndexOrder
+  nameWithType: ColumnSchema.IndexOrder
+  fullName: nORM.Migration.ColumnSchema.IndexOrder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IndexOrder
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 100
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Zero-based order of this column within a named composite index.
+  example: []
+  syntax:
+    content: public int? IndexOrder { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property IndexOrder As Integer?
+  overload: nORM.Migration.ColumnSchema.IndexOrder*
+- uid: nORM.Migration.ColumnSchema.Indexes
+  commentId: P:nORM.Migration.ColumnSchema.Indexes
+  id: Indexes
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: Indexes
+  nameWithType: ColumnSchema.Indexes
+  fullName: nORM.Migration.ColumnSchema.Indexes
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Indexes
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 102
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Named indexes this column participates in.
+  example: []
+  syntax:
+    content: public List<ColumnIndexSchema> Indexes { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Migration.ColumnIndexSchema}
+    content.vb: Public ReadOnly Property Indexes As List(Of ColumnIndexSchema)
+  overload: nORM.Migration.ColumnSchema.Indexes*
 - uid: nORM.Migration.ColumnSchema.DefaultValue
   commentId: P:nORM.Migration.ColumnSchema.DefaultValue
   id: DefaultValue
@@ -305,7 +369,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValue
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 99
+    startLine: 104
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -336,7 +400,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsIdentity
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 101
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -1395,6 +1459,167 @@ references:
   name: IndexName
   nameWithType: ColumnSchema.IndexName
   fullName: nORM.Migration.ColumnSchema.IndexName
+- uid: nORM.Migration.ColumnSchema.IndexOrder*
+  commentId: Overload:nORM.Migration.ColumnSchema.IndexOrder
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexOrder
+  name: IndexOrder
+  nameWithType: ColumnSchema.IndexOrder
+  fullName: nORM.Migration.ColumnSchema.IndexOrder
+- uid: System.Nullable{System.Int32}
+  commentId: T:System.Nullable{System.Int32}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int?
+  nameWithType: int?
+  fullName: int?
+  nameWithType.vb: Integer?
+  fullName.vb: Integer?
+  name.vb: Integer?
+  spec.csharp:
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  spec.vb:
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Migration.ColumnSchema.Indexes*
+  commentId: Overload:nORM.Migration.ColumnSchema.Indexes
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Indexes
+  name: Indexes
+  nameWithType: ColumnSchema.Indexes
+  fullName: nORM.Migration.ColumnSchema.Indexes
+- uid: System.Collections.Generic.List{nORM.Migration.ColumnIndexSchema}
+  commentId: T:System.Collections.Generic.List{nORM.Migration.ColumnIndexSchema}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<ColumnIndexSchema>
+  nameWithType: List<ColumnIndexSchema>
+  fullName: System.Collections.Generic.List<nORM.Migration.ColumnIndexSchema>
+  nameWithType.vb: List(Of ColumnIndexSchema)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Migration.ColumnIndexSchema)
+  name.vb: List(Of ColumnIndexSchema)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Migration.ColumnIndexSchema
+    name: ColumnIndexSchema
+    href: nORM.Migration.ColumnIndexSchema.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Migration.ColumnIndexSchema
+    name: ColumnIndexSchema
+    href: nORM.Migration.ColumnIndexSchema.html
+  - name: )
+- uid: System.Collections.Generic.List`1
+  commentId: T:System.Collections.Generic.List`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<T>
+  nameWithType: List<T>
+  fullName: System.Collections.Generic.List<T>
+  nameWithType.vb: List(Of T)
+  fullName.vb: System.Collections.Generic.List(Of T)
+  name.vb: List(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
 - uid: nORM.Migration.ColumnSchema.DefaultValue*
   commentId: Overload:nORM.Migration.ColumnSchema.DefaultValue
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_DefaultValue

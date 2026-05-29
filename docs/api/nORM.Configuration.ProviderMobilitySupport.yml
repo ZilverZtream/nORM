@@ -1,0 +1,187 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ProviderMobilitySupport
+  commentId: T:nORM.Configuration.ProviderMobilitySupport
+  id: ProviderMobilitySupport
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ProviderMobilitySupport.Emulated
+  - nORM.Configuration.ProviderMobilitySupport.Portable
+  - nORM.Configuration.ProviderMobilitySupport.ProviderBound
+  - nORM.Configuration.ProviderMobilitySupport.Unsupported
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilitySupport
+  nameWithType: ProviderMobilitySupport
+  fullName: nORM.Configuration.ProviderMobilitySupport
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilitySupport
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Describes how nORM can carry a feature across supported providers.
+  example: []
+  syntax:
+    content: public enum ProviderMobilitySupport
+    content.vb: Public Enum ProviderMobilitySupport
+- uid: nORM.Configuration.ProviderMobilitySupport.Portable
+  commentId: F:nORM.Configuration.ProviderMobilitySupport.Portable
+  id: Portable
+  parent: nORM.Configuration.ProviderMobilitySupport
+  langs:
+  - csharp
+  - vb
+  name: Portable
+  nameWithType: ProviderMobilitySupport.Portable
+  fullName: nORM.Configuration.ProviderMobilitySupport.Portable
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Portable
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 19
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    nORM can translate the feature to each supported provider with the
+
+    same observable behavior.
+  example: []
+  syntax:
+    content: Portable = 0
+    return:
+      type: nORM.Configuration.ProviderMobilitySupport
+- uid: nORM.Configuration.ProviderMobilitySupport.Emulated
+  commentId: F:nORM.Configuration.ProviderMobilitySupport.Emulated
+  id: Emulated
+  parent: nORM.Configuration.ProviderMobilitySupport
+  langs:
+  - csharp
+  - vb
+  name: Emulated
+  nameWithType: ProviderMobilitySupport.Emulated
+  fullName: nORM.Configuration.ProviderMobilitySupport.Emulated
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Emulated
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 25
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    nORM can preserve behavior by rewriting, simulating, or using a
+
+    bounded fallback rather than a single provider-native primitive.
+  example: []
+  syntax:
+    content: Emulated = 1
+    return:
+      type: nORM.Configuration.ProviderMobilitySupport
+- uid: nORM.Configuration.ProviderMobilitySupport.ProviderBound
+  commentId: F:nORM.Configuration.ProviderMobilitySupport.ProviderBound
+  id: ProviderBound
+  parent: nORM.Configuration.ProviderMobilitySupport
+  langs:
+  - csharp
+  - vb
+  name: ProviderBound
+  nameWithType: ProviderMobilitySupport.ProviderBound
+  fullName: nORM.Configuration.ProviderMobilitySupport.ProviderBound
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderBound
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 32
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    The feature exposes caller-authored provider language or provider
+
+    handles. It can exist in compatibility mode but cannot be certified
+
+    as provider-mobile generated surface.
+  example: []
+  syntax:
+    content: ProviderBound = 2
+    return:
+      type: nORM.Configuration.ProviderMobilitySupport
+- uid: nORM.Configuration.ProviderMobilitySupport.Unsupported
+  commentId: F:nORM.Configuration.ProviderMobilitySupport.Unsupported
+  id: Unsupported
+  parent: nORM.Configuration.ProviderMobilitySupport
+  langs:
+  - csharp
+  - vb
+  name: Unsupported
+  nameWithType: ProviderMobilitySupport.Unsupported
+  fullName: nORM.Configuration.ProviderMobilitySupport.Unsupported
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Unsupported
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 37
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: nORM cannot preserve semantics safely and must fail deterministically.
+  example: []
+  syntax:
+    content: Unsupported = 3
+    return:
+      type: nORM.Configuration.ProviderMobilitySupport
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ProviderMobilitySupport
+  commentId: T:nORM.Configuration.ProviderMobilitySupport
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilitySupport.html
+  name: ProviderMobilitySupport
+  nameWithType: ProviderMobilitySupport
+  fullName: nORM.Configuration.ProviderMobilitySupport

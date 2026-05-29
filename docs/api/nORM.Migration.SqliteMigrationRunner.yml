@@ -33,8 +33,18 @@ items:
   summary: Executes migrations against a SQLite database using a supplied connection and migrations assembly.
   example: []
   syntax:
-    content: 'public class SqliteMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
-    content.vb: Public Class SqliteMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
+    content: >-
+      [RequiresDynamicCode("SqliteMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("SqliteMigrationRunner reflects over Migration types; trimming may remove the required members.")]
+
+      public class SqliteMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
+    content.vb: >-
+      <RequiresDynamicCode("SqliteMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("SqliteMigrationRunner reflects over Migration types; trimming may remove the required members.")>
+
+      Public Class SqliteMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
@@ -54,6 +64,17 @@ items:
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,{TProperty}}})
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Migration.SqliteMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.SqliteMigrationRunner,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: SqliteMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: SqliteMigrationRunner reflects over Migration types; trimming may remove the required members.
 - uid: nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   commentId: M:nORM.Migration.SqliteMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
@@ -72,7 +93,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 42
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -116,7 +137,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 55
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -163,7 +184,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 78
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -210,7 +231,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 121
+    startLine: 123
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -250,7 +271,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 137
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -290,7 +311,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 296
+    startLine: 298
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -322,7 +343,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Migration/SqliteMigrationRunner.cs
-    startLine: 313
+    startLine: 315
   assemblies:
   - nORM
   namespace: nORM.Migration

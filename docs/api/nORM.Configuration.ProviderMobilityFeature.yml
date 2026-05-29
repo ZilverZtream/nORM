@@ -1,0 +1,1104 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ProviderMobilityFeature
+  commentId: T:nORM.Configuration.ProviderMobilityFeature
+  id: ProviderMobilityFeature
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ProviderMobilityFeature.CertificationUnclassifiedFinding
+  - nORM.Configuration.ProviderMobilityFeature.CommandInterceptor
+  - nORM.Configuration.ProviderMobilityFeature.CompileTimeRawSql
+  - nORM.Configuration.ProviderMobilityFeature.ConstrainedLinqShape
+  - nORM.Configuration.ProviderMobilityFeature.CustomSqlFunction
+  - nORM.Configuration.ProviderMobilityFeature.DirectCommandAccess
+  - nORM.Configuration.ProviderMobilityFeature.DirectConnectionAccess
+  - nORM.Configuration.ProviderMobilityFeature.DirectProviderAccess
+  - nORM.Configuration.ProviderMobilityFeature.DirectTransactionAccess
+  - nORM.Configuration.ProviderMobilityFeature.DynamicTableQuery
+  - nORM.Configuration.ProviderMobilityFeature.ExplicitClientProjectionTail
+  - nORM.Configuration.ProviderMobilityFeature.ExternalTransactionWrite
+  - nORM.Configuration.ProviderMobilityFeature.GeneratedLinqQuery
+  - nORM.Configuration.ProviderMobilityFeature.GeneratedTenantBoundary
+  - nORM.Configuration.ProviderMobilityFeature.GeneratedWrite
+  - nORM.Configuration.ProviderMobilityFeature.NormManagedTemporal
+  - nORM.Configuration.ProviderMobilityFeature.ProviderBootstrap
+  - nORM.Configuration.ProviderMobilityFeature.ProviderNativeTemporal
+  - nORM.Configuration.ProviderMobilityFeature.ProviderNativeTenantSecurity
+  - nORM.Configuration.ProviderMobilityFeature.ProviderSpecificColumnType
+  - nORM.Configuration.ProviderMobilityFeature.ProviderTargetCapability
+  - nORM.Configuration.ProviderMobilityFeature.ProviderTargetOpen
+  - nORM.Configuration.ProviderMobilityFeature.ProviderTargetUnknown
+  - nORM.Configuration.ProviderMobilityFeature.RawSql
+  - nORM.Configuration.ProviderMobilityFeature.RawTransactionSavepoint
+  - nORM.Configuration.ProviderMobilityFeature.SchemaDefaultNeedsReview
+  - nORM.Configuration.ProviderMobilityFeature.SchemaInvalidMetadata
+  - nORM.Configuration.ProviderMobilityFeature.SchemaMissingPrimaryKey
+  - nORM.Configuration.ProviderMobilityFeature.SchemaNonPortableIdentity
+  - nORM.Configuration.ProviderMobilityFeature.SchemaProviderGenerationFailed
+  - nORM.Configuration.ProviderMobilityFeature.SchemaProviderSpecificDefault
+  - nORM.Configuration.ProviderMobilityFeature.SchemaUnsupportedClrType
+  - nORM.Configuration.ProviderMobilityFeature.SilentClientEvaluation
+  - nORM.Configuration.ProviderMobilityFeature.StoredProcedure
+  - nORM.Configuration.ProviderMobilityFeature.UnsupportedLinqShape
+  - nORM.Configuration.ProviderMobilityFeature.WrappedSavepoint
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilityFeature
+  nameWithType: ProviderMobilityFeature
+  fullName: nORM.Configuration.ProviderMobilityFeature
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilityFeature
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 43
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-mobility features known to nORM's runtime and certification layers.
+  example: []
+  syntax:
+    content: public enum ProviderMobilityFeature
+    content.vb: Public Enum ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.GeneratedLinqQuery
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.GeneratedLinqQuery
+  id: GeneratedLinqQuery
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: GeneratedLinqQuery
+  nameWithType: ProviderMobilityFeature.GeneratedLinqQuery
+  fullName: nORM.Configuration.ProviderMobilityFeature.GeneratedLinqQuery
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GeneratedLinqQuery
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Generated LINQ queries translated by nORM.
+  example: []
+  syntax:
+    content: GeneratedLinqQuery = 0
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.GeneratedWrite
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.GeneratedWrite
+  id: GeneratedWrite
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: GeneratedWrite
+  nameWithType: ProviderMobilityFeature.GeneratedWrite
+  fullName: nORM.Configuration.ProviderMobilityFeature.GeneratedWrite
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GeneratedWrite
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Generated direct write, change tracker, and bulk write paths.
+  example: []
+  syntax:
+    content: GeneratedWrite = 1
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.GeneratedTenantBoundary
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.GeneratedTenantBoundary
+  id: GeneratedTenantBoundary
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: GeneratedTenantBoundary
+  nameWithType: ProviderMobilityFeature.GeneratedTenantBoundary
+  fullName: nORM.Configuration.ProviderMobilityFeature.GeneratedTenantBoundary
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GeneratedTenantBoundary
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 50
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Generated tenant filters, write predicates, cache keys, and diagnostics.
+  example: []
+  syntax:
+    content: GeneratedTenantBoundary = 2
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.NormManagedTemporal
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.NormManagedTemporal
+  id: NormManagedTemporal
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: NormManagedTemporal
+  nameWithType: ProviderMobilityFeature.NormManagedTemporal
+  fullName: nORM.Configuration.ProviderMobilityFeature.NormManagedTemporal
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NormManagedTemporal
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 52
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: nORM-managed temporal history tables, tags, triggers, and AsOf queries.
+  example: []
+  syntax:
+    content: NormManagedTemporal = 3
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.WrappedSavepoint
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.WrappedSavepoint
+  id: WrappedSavepoint
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: WrappedSavepoint
+  nameWithType: ProviderMobilityFeature.WrappedSavepoint
+  fullName: nORM.Configuration.ProviderMobilityFeature.WrappedSavepoint
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WrappedSavepoint
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 54
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: nORM-owned transaction savepoint wrapper APIs.
+  example: []
+  syntax:
+    content: WrappedSavepoint = 4
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ExplicitClientProjectionTail
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ExplicitClientProjectionTail
+  id: ExplicitClientProjectionTail
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ExplicitClientProjectionTail
+  nameWithType: ProviderMobilityFeature.ExplicitClientProjectionTail
+  fullName: nORM.Configuration.ProviderMobilityFeature.ExplicitClientProjectionTail
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExplicitClientProjectionTail
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 56
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Explicit warning-level top-level client projection tail.
+  example: []
+  syntax:
+    content: ExplicitClientProjectionTail = 5
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SilentClientEvaluation
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SilentClientEvaluation
+  id: SilentClientEvaluation
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SilentClientEvaluation
+  nameWithType: ProviderMobilityFeature.SilentClientEvaluation
+  fullName: nORM.Configuration.ProviderMobilityFeature.SilentClientEvaluation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SilentClientEvaluation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 58
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Silent client evaluation opt-in.
+  example: []
+  syntax:
+    content: SilentClientEvaluation = 6
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.RawSql
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.RawSql
+  id: RawSql
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: RawSql
+  nameWithType: ProviderMobilityFeature.RawSql
+  fullName: nORM.Configuration.ProviderMobilityFeature.RawSql
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RawSql
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 60
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Raw SQL query APIs.
+  example: []
+  syntax:
+    content: RawSql = 7
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.StoredProcedure
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.StoredProcedure
+  id: StoredProcedure
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: StoredProcedure
+  nameWithType: ProviderMobilityFeature.StoredProcedure
+  fullName: nORM.Configuration.ProviderMobilityFeature.StoredProcedure
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StoredProcedure
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Stored procedure execution APIs and procedure definitions.
+  example: []
+  syntax:
+    content: StoredProcedure = 8
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.CustomSqlFunction
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.CustomSqlFunction
+  id: CustomSqlFunction
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: CustomSqlFunction
+  nameWithType: ProviderMobilityFeature.CustomSqlFunction
+  fullName: nORM.Configuration.ProviderMobilityFeature.CustomSqlFunction
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CustomSqlFunction
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 64
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: User-authored SQL function format strings.
+  example: []
+  syntax:
+    content: CustomSqlFunction = 9
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.DynamicTableQuery
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.DynamicTableQuery
+  id: DynamicTableQuery
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: DynamicTableQuery
+  nameWithType: ProviderMobilityFeature.DynamicTableQuery
+  fullName: nORM.Configuration.ProviderMobilityFeature.DynamicTableQuery
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DynamicTableQuery
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 66
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Runtime dynamic table query based on live provider schema.
+  example: []
+  syntax:
+    content: DynamicTableQuery = 10
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.DirectConnectionAccess
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.DirectConnectionAccess
+  id: DirectConnectionAccess
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: DirectConnectionAccess
+  nameWithType: ProviderMobilityFeature.DirectConnectionAccess
+  fullName: nORM.Configuration.ProviderMobilityFeature.DirectConnectionAccess
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DirectConnectionAccess
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 68
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Direct provider connection access.
+  example: []
+  syntax:
+    content: DirectConnectionAccess = 11
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.DirectProviderAccess
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.DirectProviderAccess
+  id: DirectProviderAccess
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: DirectProviderAccess
+  nameWithType: ProviderMobilityFeature.DirectProviderAccess
+  fullName: nORM.Configuration.ProviderMobilityFeature.DirectProviderAccess
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DirectProviderAccess
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Direct DatabaseProvider access.
+  example: []
+  syntax:
+    content: DirectProviderAccess = 12
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.DirectCommandAccess
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.DirectCommandAccess
+  id: DirectCommandAccess
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: DirectCommandAccess
+  nameWithType: ProviderMobilityFeature.DirectCommandAccess
+  fullName: nORM.Configuration.ProviderMobilityFeature.DirectCommandAccess
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DirectCommandAccess
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 72
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Direct DbCommand construction or usage.
+  example: []
+  syntax:
+    content: DirectCommandAccess = 13
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.DirectTransactionAccess
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.DirectTransactionAccess
+  id: DirectTransactionAccess
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: DirectTransactionAccess
+  nameWithType: ProviderMobilityFeature.DirectTransactionAccess
+  fullName: nORM.Configuration.ProviderMobilityFeature.DirectTransactionAccess
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DirectTransactionAccess
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 74
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Direct DbTransaction access.
+  example: []
+  syntax:
+    content: DirectTransactionAccess = 14
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ExternalTransactionWrite
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ExternalTransactionWrite
+  id: ExternalTransactionWrite
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ExternalTransactionWrite
+  nameWithType: ProviderMobilityFeature.ExternalTransactionWrite
+  fullName: nORM.Configuration.ProviderMobilityFeature.ExternalTransactionWrite
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExternalTransactionWrite
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 76
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Write overloads that accept caller-owned DbTransaction instances.
+  example: []
+  syntax:
+    content: ExternalTransactionWrite = 15
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.RawTransactionSavepoint
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.RawTransactionSavepoint
+  id: RawTransactionSavepoint
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: RawTransactionSavepoint
+  nameWithType: ProviderMobilityFeature.RawTransactionSavepoint
+  fullName: nORM.Configuration.ProviderMobilityFeature.RawTransactionSavepoint
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RawTransactionSavepoint
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 78
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Raw DbTransaction savepoint overloads.
+  example: []
+  syntax:
+    content: RawTransactionSavepoint = 16
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.CommandInterceptor
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.CommandInterceptor
+  id: CommandInterceptor
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: CommandInterceptor
+  nameWithType: ProviderMobilityFeature.CommandInterceptor
+  fullName: nORM.Configuration.ProviderMobilityFeature.CommandInterceptor
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CommandInterceptor
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 80
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Command interceptors that can inspect, rewrite, or suppress generated commands.
+  example: []
+  syntax:
+    content: CommandInterceptor = 17
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderNativeTenantSecurity
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderNativeTenantSecurity
+  id: ProviderNativeTenantSecurity
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderNativeTenantSecurity
+  nameWithType: ProviderMobilityFeature.ProviderNativeTenantSecurity
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderNativeTenantSecurity
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderNativeTenantSecurity
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 82
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-native tenant security or RLS bootstrap.
+  example: []
+  syntax:
+    content: ProviderNativeTenantSecurity = 18
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderNativeTemporal
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderNativeTemporal
+  id: ProviderNativeTemporal
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderNativeTemporal
+  nameWithType: ProviderMobilityFeature.ProviderNativeTemporal
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderNativeTemporal
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderNativeTemporal
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 84
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-native temporal/versioning bootstrap.
+  example: []
+  syntax:
+    content: ProviderNativeTemporal = 19
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.CompileTimeRawSql
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.CompileTimeRawSql
+  id: CompileTimeRawSql
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: CompileTimeRawSql
+  nameWithType: ProviderMobilityFeature.CompileTimeRawSql
+  fullName: nORM.Configuration.ProviderMobilityFeature.CompileTimeRawSql
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CompileTimeRawSql
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 86
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Raw SQL source-generation command paths.
+  example: []
+  syntax:
+    content: CompileTimeRawSql = 20
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderBootstrap
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderBootstrap
+  id: ProviderBootstrap
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderBootstrap
+  nameWithType: ProviderMobilityFeature.ProviderBootstrap
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderBootstrap
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderBootstrap
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 88
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-specific package or concrete provider bootstrap code.
+  example: []
+  syntax:
+    content: ProviderBootstrap = 21
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderSpecificColumnType
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderSpecificColumnType
+  id: ProviderSpecificColumnType
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderSpecificColumnType
+  nameWithType: ProviderMobilityFeature.ProviderSpecificColumnType
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderSpecificColumnType
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderSpecificColumnType
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 90
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-specific column type strings.
+  example: []
+  syntax:
+    content: ProviderSpecificColumnType = 22
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaUnsupportedClrType
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaUnsupportedClrType
+  id: SchemaUnsupportedClrType
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaUnsupportedClrType
+  nameWithType: ProviderMobilityFeature.SchemaUnsupportedClrType
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaUnsupportedClrType
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaUnsupportedClrType
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 92
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Unsupported or unresolved schema CLR type metadata.
+  example: []
+  syntax:
+    content: SchemaUnsupportedClrType = 23
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaInvalidMetadata
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaInvalidMetadata
+  id: SchemaInvalidMetadata
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaInvalidMetadata
+  nameWithType: ProviderMobilityFeature.SchemaInvalidMetadata
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaInvalidMetadata
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaInvalidMetadata
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 94
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Invalid, duplicate, or incomplete schema metadata.
+  example: []
+  syntax:
+    content: SchemaInvalidMetadata = 24
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaNonPortableIdentity
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaNonPortableIdentity
+  id: SchemaNonPortableIdentity
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaNonPortableIdentity
+  nameWithType: ProviderMobilityFeature.SchemaNonPortableIdentity
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaNonPortableIdentity
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaNonPortableIdentity
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 96
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Schema identity configuration that cannot translate across providers.
+  example: []
+  syntax:
+    content: SchemaNonPortableIdentity = 25
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaProviderSpecificDefault
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaProviderSpecificDefault
+  id: SchemaProviderSpecificDefault
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaProviderSpecificDefault
+  nameWithType: ProviderMobilityFeature.SchemaProviderSpecificDefault
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaProviderSpecificDefault
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaProviderSpecificDefault
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 98
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-specific schema default SQL.
+  example: []
+  syntax:
+    content: SchemaProviderSpecificDefault = 26
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaDefaultNeedsReview
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaDefaultNeedsReview
+  id: SchemaDefaultNeedsReview
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaDefaultNeedsReview
+  nameWithType: ProviderMobilityFeature.SchemaDefaultNeedsReview
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaDefaultNeedsReview
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaDefaultNeedsReview
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 100
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Schema default SQL requiring provider review.
+  example: []
+  syntax:
+    content: SchemaDefaultNeedsReview = 27
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaProviderGenerationFailed
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaProviderGenerationFailed
+  id: SchemaProviderGenerationFailed
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaProviderGenerationFailed
+  nameWithType: ProviderMobilityFeature.SchemaProviderGenerationFailed
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaProviderGenerationFailed
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaProviderGenerationFailed
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 102
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider migration generator could not emit DDL from the schema snapshot.
+  example: []
+  syntax:
+    content: SchemaProviderGenerationFailed = 28
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.SchemaMissingPrimaryKey
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.SchemaMissingPrimaryKey
+  id: SchemaMissingPrimaryKey
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: SchemaMissingPrimaryKey
+  nameWithType: ProviderMobilityFeature.SchemaMissingPrimaryKey
+  fullName: nORM.Configuration.ProviderMobilityFeature.SchemaMissingPrimaryKey
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaMissingPrimaryKey
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 104
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Keyless schema shape with constrained generated behavior.
+  example: []
+  syntax:
+    content: SchemaMissingPrimaryKey = 29
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderTargetUnknown
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderTargetUnknown
+  id: ProviderTargetUnknown
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderTargetUnknown
+  nameWithType: ProviderMobilityFeature.ProviderTargetUnknown
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderTargetUnknown
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderTargetUnknown
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 106
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Unknown provider target in certification.
+  example: []
+  syntax:
+    content: ProviderTargetUnknown = 30
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderTargetOpen
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderTargetOpen
+  id: ProviderTargetOpen
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderTargetOpen
+  nameWithType: ProviderMobilityFeature.ProviderTargetOpen
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderTargetOpen
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderTargetOpen
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 108
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider target connection could not be opened or validated.
+  example: []
+  syntax:
+    content: ProviderTargetOpen = 31
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ProviderTargetCapability
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ProviderTargetCapability
+  id: ProviderTargetCapability
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderTargetCapability
+  nameWithType: ProviderMobilityFeature.ProviderTargetCapability
+  fullName: nORM.Configuration.ProviderMobilityFeature.ProviderTargetCapability
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderTargetCapability
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 110
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider target capability failed certification.
+  example: []
+  syntax:
+    content: ProviderTargetCapability = 32
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.CertificationUnclassifiedFinding
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.CertificationUnclassifiedFinding
+  id: CertificationUnclassifiedFinding
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: CertificationUnclassifiedFinding
+  nameWithType: ProviderMobilityFeature.CertificationUnclassifiedFinding
+  fullName: nORM.Configuration.ProviderMobilityFeature.CertificationUnclassifiedFinding
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CertificationUnclassifiedFinding
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 112
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Certification emitted a finding kind not classified by the translation layer.
+  example: []
+  syntax:
+    content: CertificationUnclassifiedFinding = 33
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.ConstrainedLinqShape
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.ConstrainedLinqShape
+  id: ConstrainedLinqShape
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: ConstrainedLinqShape
+  nameWithType: ProviderMobilityFeature.ConstrainedLinqShape
+  fullName: nORM.Configuration.ProviderMobilityFeature.ConstrainedLinqShape
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ConstrainedLinqShape
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 114
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: LINQ shape that is translated only with documented provider constraints.
+  example: []
+  syntax:
+    content: ConstrainedLinqShape = 34
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+- uid: nORM.Configuration.ProviderMobilityFeature.UnsupportedLinqShape
+  commentId: F:nORM.Configuration.ProviderMobilityFeature.UnsupportedLinqShape
+  id: UnsupportedLinqShape
+  parent: nORM.Configuration.ProviderMobilityFeature
+  langs:
+  - csharp
+  - vb
+  name: UnsupportedLinqShape
+  nameWithType: ProviderMobilityFeature.UnsupportedLinqShape
+  fullName: nORM.Configuration.ProviderMobilityFeature.UnsupportedLinqShape
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UnsupportedLinqShape
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 116
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Unsupported LINQ operators or method/member translations.
+  example: []
+  syntax:
+    content: UnsupportedLinqShape = 35
+    return:
+      type: nORM.Configuration.ProviderMobilityFeature
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ProviderMobilityFeature
+  commentId: T:nORM.Configuration.ProviderMobilityFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityFeature.html
+  name: ProviderMobilityFeature
+  nameWithType: ProviderMobilityFeature
+  fullName: nORM.Configuration.ProviderMobilityFeature

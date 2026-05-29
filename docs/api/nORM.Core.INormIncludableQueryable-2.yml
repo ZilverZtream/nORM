@@ -19,7 +19,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormIncludableQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 116
+    startLine: 119
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -52,6 +52,7 @@ items:
   - System.Linq.IQueryable.Provider
   extensionMethods:
   - System.Linq.IQueryable{`0}.nORM.Core.CacheableExtensions.Cacheable``1(System.TimeSpan)
+  - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.ContainsAsync``1({TEntity},System.Threading.CancellationToken)
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TEntity},System.Collections.Generic.IEnumerable{{TInner}},{TResult}}})
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TInner},{TResult}}})
   - System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.DateTime)
@@ -698,6 +699,71 @@ references:
     name: TimeSpan
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.timespan
+  - name: )
+- uid: System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.ContainsAsync``1({TEntity},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  parent: nORM.Core.NormAsyncExtensions
+  definition: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  name: ContainsAsync<TEntity>(IQueryable<TEntity>, TEntity, CancellationToken)
+  nameWithType: NormAsyncExtensions.ContainsAsync<TEntity>(IQueryable<TEntity>, TEntity, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ContainsAsync<TEntity>(System.Linq.IQueryable<TEntity>, TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.ContainsAsync(Of TEntity)(IQueryable(Of TEntity), TEntity, CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ContainsAsync(Of TEntity)(System.Linq.IQueryable(Of TEntity), TEntity, System.Threading.CancellationToken)
+  name.vb: ContainsAsync(Of TEntity)(IQueryable(Of TEntity), TEntity, CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{`0},`0,System.Threading.CancellationToken)
+    name: ContainsAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{`0},`0,System.Threading.CancellationToken)
+    name: ContainsAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
 - uid: System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TEntity},System.Collections.Generic.IEnumerable{{TInner}},{TResult}}})
   commentId: M:nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.IEnumerable{``1},``3}})
@@ -2411,6 +2477,77 @@ references:
   name: CacheableExtensions
   nameWithType: CacheableExtensions
   fullName: nORM.Core.CacheableExtensions
+- uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  name: ContainsAsync<TSource>(IQueryable<TSource>, TSource, CancellationToken)
+  nameWithType: NormAsyncExtensions.ContainsAsync<TSource>(IQueryable<TSource>, TSource, CancellationToken)
+  fullName: nORM.Core.NormAsyncExtensions.ContainsAsync<TSource>(System.Linq.IQueryable<TSource>, TSource, System.Threading.CancellationToken)
+  nameWithType.vb: NormAsyncExtensions.ContainsAsync(Of TSource)(IQueryable(Of TSource), TSource, CancellationToken)
+  fullName.vb: nORM.Core.NormAsyncExtensions.ContainsAsync(Of TSource)(System.Linq.IQueryable(Of TSource), TSource, System.Threading.CancellationToken)
+  name.vb: ContainsAsync(Of TSource)(IQueryable(Of TSource), TSource, CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+    name: ContainsAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  - name: <
+  - name: TSource
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TSource
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TSource
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormAsyncExtensions.ContainsAsync``1(System.Linq.IQueryable{``0},``0,System.Threading.CancellationToken)
+    name: ContainsAsync
+    href: nORM.Core.NormAsyncExtensions.html#nORM_Core_NormAsyncExtensions_ContainsAsync__1_System_Linq_IQueryable___0____0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TSource
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TSource
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormAsyncExtensions
+  commentId: T:nORM.Core.NormAsyncExtensions
+  parent: nORM.Core
+  href: nORM.Core.NormAsyncExtensions.html
+  name: NormAsyncExtensions
+  nameWithType: NormAsyncExtensions
+  fullName: nORM.Core.NormAsyncExtensions
 - uid: nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.IEnumerable{``1},``3}})
   commentId: M:nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.IEnumerable{``1},``3}})
   isExternal: true
@@ -2635,13 +2772,6 @@ references:
   - name: )
   - name: )
   - name: )
-- uid: nORM.Core.NormAsyncExtensions
-  commentId: T:nORM.Core.NormAsyncExtensions
-  parent: nORM.Core
-  href: nORM.Core.NormAsyncExtensions.html
-  name: NormAsyncExtensions
-  nameWithType: NormAsyncExtensions
-  fullName: nORM.Core.NormAsyncExtensions
 - uid: nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1,``3}})
   commentId: M:nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{``0},System.Linq.IQueryable{``1},System.Linq.Expressions.Expression{System.Func{``0,``2}},System.Linq.Expressions.Expression{System.Func{``1,``2}},System.Linq.Expressions.Expression{System.Func{``0,``1,``3}})
   isExternal: true

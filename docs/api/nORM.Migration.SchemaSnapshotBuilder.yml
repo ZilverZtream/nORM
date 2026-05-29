@@ -21,7 +21,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshotBuilder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 108
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -31,8 +31,18 @@ items:
     scanning assemblies for entity types and their mapping attributes.
   example: []
   syntax:
-    content: public static class SchemaSnapshotBuilder
-    content.vb: Public Module SchemaSnapshotBuilder
+    content: >-
+      [RequiresDynamicCode("SchemaSnapshotBuilder scans assemblies via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("SchemaSnapshotBuilder reflects over entity types; trimming may remove the required members.")]
+
+      public static class SchemaSnapshotBuilder
+    content.vb: >-
+      <RequiresDynamicCode("SchemaSnapshotBuilder scans assemblies via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("SchemaSnapshotBuilder reflects over entity types; trimming may remove the required members.")>
+
+      Public Module SchemaSnapshotBuilder
   inheritance:
   - System.Object
   inheritedMembers:
@@ -43,6 +53,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: SchemaSnapshotBuilder scans assemblies via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: SchemaSnapshotBuilder reflects over entity types; trimming may remove the required members.
 - uid: nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
   commentId: M:nORM.Migration.SchemaSnapshotBuilder.Build(System.Reflection.Assembly)
   id: Build(System.Reflection.Assembly)
@@ -61,7 +82,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 134
+    startLine: 154
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -115,7 +136,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 281
+    startLine: 326
   assemblies:
   - nORM
   namespace: nORM.Migration

@@ -624,7 +624,10 @@ items:
     on a given object instance, boxing value types as necessary.
   example: []
   syntax:
-    content: public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)
+    content: >-
+      [RequiresDynamicCode("CreateGetterDelegate uses DynamicMethod which is not supported under NativeAOT.")]
+
+      public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)
     parameters:
     - id: property
       type: System.Reflection.PropertyInfo
@@ -632,8 +635,17 @@ items:
     return:
       type: System.Func{System.Object,System.Object}
       description: A delegate that returns the property's value for a supplied object.
-    content.vb: Public Shared Function CreateGetterDelegate([property] As PropertyInfo) As Func(Of Object, Object)
+    content.vb: >-
+      <RequiresDynamicCode("CreateGetterDelegate uses DynamicMethod which is not supported under NativeAOT.")>
+
+      Public Shared Function CreateGetterDelegate([property] As PropertyInfo) As Func(Of Object, Object)
   overload: nORM.Mapping.Column.CreateGetterDelegate*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: CreateGetterDelegate uses DynamicMethod which is not supported under NativeAOT.
 references:
 - uid: nORM.Mapping
   commentId: N:nORM.Mapping

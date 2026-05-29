@@ -4,6 +4,7 @@ items:
   commentId: N:nORM.Query
   id: nORM.Query
   children:
+  - nORM.Query.NormFunctions
   - nORM.Query.OptimizedSqlBuilder
   - nORM.Query.SqlFunctionAttribute
   langs:
@@ -16,6 +17,12 @@ items:
   assemblies:
   - nORM
 references:
+- uid: nORM.Query.NormFunctions
+  commentId: T:nORM.Query.NormFunctions
+  href: nORM.Query.NormFunctions.html
+  name: NormFunctions
+  nameWithType: NormFunctions
+  fullName: nORM.Query.NormFunctions
 - uid: nORM.Query.OptimizedSqlBuilder
   commentId: T:nORM.Query.OptimizedSqlBuilder
   parent: nORM.Query
@@ -25,6 +32,7 @@ references:
   fullName: nORM.Query.OptimizedSqlBuilder
 - uid: nORM.Query.SqlFunctionAttribute
   commentId: T:nORM.Query.SqlFunctionAttribute
+  parent: nORM.Query
   href: nORM.Query.SqlFunctionAttribute.html
   name: SqlFunctionAttribute
   nameWithType: SqlFunctionAttribute

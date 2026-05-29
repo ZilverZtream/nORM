@@ -6,6 +6,8 @@ items:
   parent: nORM.Scaffolding
   children:
   - nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
+  - nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  - nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
   langs:
   - csharp
   - vb
@@ -20,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseScaffolder
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 23
+    startLine: 24
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -60,7 +62,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 36
+    startLine: 37
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -91,6 +93,107 @@ items:
   nameWithType.vb: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String)
   fullName.vb: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, String, String, String)
   name.vb: ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String)
+- uid: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  commentId: M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  id: ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  parent: nORM.Scaffolding.DatabaseScaffolder
+  langs:
+  - csharp
+  - vb
+  name: ScaffoldAsync(DbConnection, DatabaseProvider, string, string, ScaffoldOptions)
+  nameWithType: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, string, string, ScaffoldOptions)
+  fullName: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, string, string, nORM.Scaffolding.ScaffoldOptions)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ScaffoldAsync
+    path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: Generates entity classes and a DbContext based on the current database schema.
+  example: []
+  syntax:
+    content: public static Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, ScaffoldOptions options)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open database connection.
+    - id: provider
+      type: nORM.Providers.DatabaseProvider
+      description: Database provider implementation.
+    - id: outputDirectory
+      type: System.String
+      description: Directory to write generated files into.
+    - id: namespaceName
+      type: System.String
+      description: Namespace for the generated classes.
+    - id: options
+      type: nORM.Scaffolding.ScaffoldOptions
+      description: Scaffolding options.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Shared Function ScaffoldAsync(connection As DbConnection, provider As DatabaseProvider, outputDirectory As String, namespaceName As String, options As ScaffoldOptions) As Task
+  overload: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync*
+  nameWithType.vb: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, String, String, ScaffoldOptions)
+  fullName.vb: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, String, String, nORM.Scaffolding.ScaffoldOptions)
+  name.vb: ScaffoldAsync(DbConnection, DatabaseProvider, String, String, ScaffoldOptions)
+- uid: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  commentId: M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  id: ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String,nORM.Scaffolding.ScaffoldOptions)
+  parent: nORM.Scaffolding.DatabaseScaffolder
+  langs:
+  - csharp
+  - vb
+  name: ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string, ScaffoldOptions?)
+  nameWithType: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string, ScaffoldOptions?)
+  fullName: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, string, string, string, nORM.Scaffolding.ScaffoldOptions?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ScaffoldAsync
+    path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+    startLine: 60
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: Generates entity classes and a DbContext based on the current database schema.
+  example: []
+  syntax:
+    content: public static Task ScaffoldAsync(DbConnection connection, DatabaseProvider provider, string outputDirectory, string namespaceName, string contextName, ScaffoldOptions? options)
+    parameters:
+    - id: connection
+      type: System.Data.Common.DbConnection
+      description: Open database connection.
+    - id: provider
+      type: nORM.Providers.DatabaseProvider
+      description: Database provider implementation.
+    - id: outputDirectory
+      type: System.String
+      description: Directory to write generated files into.
+    - id: namespaceName
+      type: System.String
+      description: Namespace for the generated classes.
+    - id: contextName
+      type: System.String
+      description: Name of the generated DbContext.
+    - id: options
+      type: nORM.Scaffolding.ScaffoldOptions
+      description: Scaffolding options.
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Shared Function ScaffoldAsync(connection As DbConnection, provider As DatabaseProvider, outputDirectory As String, namespaceName As String, contextName As String, options As ScaffoldOptions) As Task
+  overload: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync*
+  nameWithType.vb: DatabaseScaffolder.ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String, ScaffoldOptions)
+  fullName.vb: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection, nORM.Providers.DatabaseProvider, String, String, String, nORM.Scaffolding.ScaffoldOptions)
+  name.vb: ScaffoldAsync(DbConnection, DatabaseProvider, String, String, String, ScaffoldOptions)
 references:
 - uid: nORM.Scaffolding
   commentId: N:nORM.Scaffolding
@@ -487,3 +590,10 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Scaffolding.ScaffoldOptions
+  commentId: T:nORM.Scaffolding.ScaffoldOptions
+  parent: nORM.Scaffolding
+  href: nORM.Scaffolding.ScaffoldOptions.html
+  name: ScaffoldOptions
+  nameWithType: ScaffoldOptions
+  fullName: nORM.Scaffolding.ScaffoldOptions

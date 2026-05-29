@@ -4,6 +4,7 @@ items:
   commentId: N:nORM.Migration
   id: nORM.Migration
   children:
+  - nORM.Migration.ColumnIndexSchema
   - nORM.Migration.ColumnSchema
   - nORM.Migration.ForeignKeySchema
   - nORM.Migration.IMigrationRunner
@@ -143,6 +144,12 @@ references:
   name: ColumnSchema
   nameWithType: ColumnSchema
   fullName: nORM.Migration.ColumnSchema
+- uid: nORM.Migration.ColumnIndexSchema
+  commentId: T:nORM.Migration.ColumnIndexSchema
+  href: nORM.Migration.ColumnIndexSchema.html
+  name: ColumnIndexSchema
+  nameWithType: ColumnIndexSchema
+  fullName: nORM.Migration.ColumnIndexSchema
 - uid: nORM.Migration.SchemaSnapshotBuilder
   commentId: T:nORM.Migration.SchemaSnapshotBuilder
   href: nORM.Migration.SchemaSnapshotBuilder.html

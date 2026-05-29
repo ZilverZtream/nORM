@@ -1,0 +1,1107 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ProviderMobilityProviderFeature
+  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
+  id: ProviderMobilityProviderFeature
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ProviderMobilityProviderFeature.BitwiseXorTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.BooleanPredicateTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.BulkInsert
+  - nORM.Configuration.ProviderMobilityProviderFeature.CaseSensitiveStringComparison
+  - nORM.Configuration.ProviderMobilityProviderFeature.CharacterTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.CudSubqueryRewrite
+  - nORM.Configuration.ProviderMobilityProviderFeature.DateTimeComparisonNormalization
+  - nORM.Configuration.ProviderMobilityProviderFeature.DecimalComparisonNormalization
+  - nORM.Configuration.ProviderMobilityProviderFeature.FormattingTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.GeneratedKeyRetrieval
+  - nORM.Configuration.ProviderMobilityProviderFeature.IdentifierEscaping
+  - nORM.Configuration.ProviderMobilityProviderFeature.InsertOrIgnoreTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.JsonPathTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.JsonTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.LikeEscapeTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.NativeTenantSessionContext
+  - nORM.Configuration.ProviderMobilityProviderFeature.NullSemantics
+  - nORM.Configuration.ProviderMobilityProviderFeature.OrderedStringAggregate
+  - nORM.Configuration.ProviderMobilityProviderFeature.PagingTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.ParameterBinding
+  - nORM.Configuration.ProviderMobilityProviderFeature.ParameterLimit
+  - nORM.Configuration.ProviderMobilityProviderFeature.ProviderNativeTemporalTables
+  - nORM.Configuration.ProviderMobilityProviderFeature.RegexTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.RowTupleComparison
+  - nORM.Configuration.ProviderMobilityProviderFeature.Savepoints
+  - nORM.Configuration.ProviderMobilityProviderFeature.ServerVersion
+  - nORM.Configuration.ProviderMobilityProviderFeature.SqlStatementLengthLimit
+  - nORM.Configuration.ProviderMobilityProviderFeature.StringConcatTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.StringPredicateTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.TemporalArithmeticTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.TemporalClockSource
+  - nORM.Configuration.ProviderMobilityProviderFeature.TemporalConstructionTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.TemporalVersioning
+  - nORM.Configuration.ProviderMobilityProviderFeature.TimeSpanComparisonNormalization
+  - nORM.Configuration.ProviderMobilityProviderFeature.TypeConversionTranslation
+  - nORM.Configuration.ProviderMobilityProviderFeature.WindowFunctionTranslation
+  langs:
+  - csharp
+  - vb
+  name: ProviderMobilityProviderFeature
+  nameWithType: ProviderMobilityProviderFeature
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderMobilityProviderFeature
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 123
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Provider target capabilities that affect whether generated nORM semantics
+
+    can be certified for a concrete database/version.
+  example: []
+  syntax:
+    content: public enum ProviderMobilityProviderFeature
+    content.vb: Public Enum ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.ServerVersion
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.ServerVersion
+  id: ServerVersion
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: ServerVersion
+  nameWithType: ProviderMobilityProviderFeature.ServerVersion
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.ServerVersion
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ServerVersion
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 126
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Minimum supported database server version.
+  example: []
+  syntax:
+    content: ServerVersion = 0
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.JsonTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.JsonTranslation
+  id: JsonTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: JsonTranslation
+  nameWithType: ProviderMobilityProviderFeature.JsonTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.JsonTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: JsonTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 128
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-backed JSON translation.
+  example: []
+  syntax:
+    content: JsonTranslation = 1
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.JsonPathTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.JsonPathTranslation
+  id: JsonPathTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: JsonPathTranslation
+  nameWithType: ProviderMobilityProviderFeature.JsonPathTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.JsonPathTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: JsonPathTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 130
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider JSON path extraction and validation strategy.
+  example: []
+  syntax:
+    content: JsonPathTranslation = 2
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TemporalVersioning
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TemporalVersioning
+  id: TemporalVersioning
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TemporalVersioning
+  nameWithType: ProviderMobilityProviderFeature.TemporalVersioning
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TemporalVersioning
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalVersioning
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 132
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: nORM-managed temporal history support.
+  example: []
+  syntax:
+    content: TemporalVersioning = 3
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.BulkInsert
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.BulkInsert
+  id: BulkInsert
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: BulkInsert
+  nameWithType: ProviderMobilityProviderFeature.BulkInsert
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.BulkInsert
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BulkInsert
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 134
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Generated bulk insert behavior, native or emulated.
+  example: []
+  syntax:
+    content: BulkInsert = 4
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.Savepoints
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.Savepoints
+  id: Savepoints
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: Savepoints
+  nameWithType: ProviderMobilityProviderFeature.Savepoints
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.Savepoints
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Savepoints
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 136
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider transaction savepoint support.
+  example: []
+  syntax:
+    content: Savepoints = 5
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.ParameterLimit
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.ParameterLimit
+  id: ParameterLimit
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: ParameterLimit
+  nameWithType: ProviderMobilityProviderFeature.ParameterLimit
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.ParameterLimit
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ParameterLimit
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 138
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Maximum parameter count and required batching behavior.
+  example: []
+  syntax:
+    content: ParameterLimit = 6
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.NativeTenantSessionContext
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.NativeTenantSessionContext
+  id: NativeTenantSessionContext
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: NativeTenantSessionContext
+  nameWithType: ProviderMobilityProviderFeature.NativeTenantSessionContext
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.NativeTenantSessionContext
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NativeTenantSessionContext
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 140
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-native tenant session context support.
+  example: []
+  syntax:
+    content: NativeTenantSessionContext = 7
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.ProviderNativeTemporalTables
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.ProviderNativeTemporalTables
+  id: ProviderNativeTemporalTables
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: ProviderNativeTemporalTables
+  nameWithType: ProviderMobilityProviderFeature.ProviderNativeTemporalTables
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.ProviderNativeTemporalTables
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ProviderNativeTemporalTables
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 142
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider-native temporal table support.
+  example: []
+  syntax:
+    content: ProviderNativeTemporalTables = 8
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.RowTupleComparison
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.RowTupleComparison
+  id: RowTupleComparison
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: RowTupleComparison
+  nameWithType: ProviderMobilityProviderFeature.RowTupleComparison
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.RowTupleComparison
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RowTupleComparison
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 144
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider native or emulated row-value tuple comparison support.
+  example: []
+  syntax:
+    content: RowTupleComparison = 9
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.OrderedStringAggregate
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.OrderedStringAggregate
+  id: OrderedStringAggregate
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: OrderedStringAggregate
+  nameWithType: ProviderMobilityProviderFeature.OrderedStringAggregate
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.OrderedStringAggregate
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OrderedStringAggregate
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 146
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider native or emulated ordered string aggregate support.
+  example: []
+  syntax:
+    content: OrderedStringAggregate = 10
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.RegexTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.RegexTranslation
+  id: RegexTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: RegexTranslation
+  nameWithType: ProviderMobilityProviderFeature.RegexTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.RegexTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RegexTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 148
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider native, emulated, or unsupported regular-expression translation support.
+  example: []
+  syntax:
+    content: RegexTranslation = 11
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.IdentifierEscaping
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.IdentifierEscaping
+  id: IdentifierEscaping
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: IdentifierEscaping
+  nameWithType: ProviderMobilityProviderFeature.IdentifierEscaping
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.IdentifierEscaping
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IdentifierEscaping
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 150
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider identifier escaping strategy.
+  example: []
+  syntax:
+    content: IdentifierEscaping = 12
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.ParameterBinding
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.ParameterBinding
+  id: ParameterBinding
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: ParameterBinding
+  nameWithType: ProviderMobilityProviderFeature.ParameterBinding
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.ParameterBinding
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ParameterBinding
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 152
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider parameter prefix and binding strategy.
+  example: []
+  syntax:
+    content: ParameterBinding = 13
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.PagingTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.PagingTranslation
+  id: PagingTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: PagingTranslation
+  nameWithType: ProviderMobilityProviderFeature.PagingTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.PagingTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PagingTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 154
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider paging syntax strategy.
+  example: []
+  syntax:
+    content: PagingTranslation = 14
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.BooleanPredicateTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.BooleanPredicateTranslation
+  id: BooleanPredicateTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: BooleanPredicateTranslation
+  nameWithType: ProviderMobilityProviderFeature.BooleanPredicateTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.BooleanPredicateTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BooleanPredicateTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 156
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider boolean predicate translation strategy.
+  example: []
+  syntax:
+    content: BooleanPredicateTranslation = 15
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.NullSemantics
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.NullSemantics
+  id: NullSemantics
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: NullSemantics
+  nameWithType: ProviderMobilityProviderFeature.NullSemantics
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.NullSemantics
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullSemantics
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 158
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider null-safe equality translation strategy.
+  example: []
+  syntax:
+    content: NullSemantics = 16
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.LikeEscapeTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.LikeEscapeTranslation
+  id: LikeEscapeTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: LikeEscapeTranslation
+  nameWithType: ProviderMobilityProviderFeature.LikeEscapeTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.LikeEscapeTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LikeEscapeTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 160
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider LIKE wildcard escaping strategy.
+  example: []
+  syntax:
+    content: LikeEscapeTranslation = 17
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.StringConcatTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.StringConcatTranslation
+  id: StringConcatTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: StringConcatTranslation
+  nameWithType: ProviderMobilityProviderFeature.StringConcatTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.StringConcatTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StringConcatTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 162
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider string concatenation translation strategy.
+  example: []
+  syntax:
+    content: StringConcatTranslation = 18
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TypeConversionTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TypeConversionTranslation
+  id: TypeConversionTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TypeConversionTranslation
+  nameWithType: ProviderMobilityProviderFeature.TypeConversionTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TypeConversionTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TypeConversionTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 164
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider scalar cast and conversion translation strategy.
+  example: []
+  syntax:
+    content: TypeConversionTranslation = 19
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.StringPredicateTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.StringPredicateTranslation
+  id: StringPredicateTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: StringPredicateTranslation
+  nameWithType: ProviderMobilityProviderFeature.StringPredicateTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.StringPredicateTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StringPredicateTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 166
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider string predicate translation strategy.
+  example: []
+  syntax:
+    content: StringPredicateTranslation = 20
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.CharacterTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.CharacterTranslation
+  id: CharacterTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: CharacterTranslation
+  nameWithType: ProviderMobilityProviderFeature.CharacterTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.CharacterTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CharacterTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 168
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider character code-point translation strategy.
+  example: []
+  syntax:
+    content: CharacterTranslation = 21
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.FormattingTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.FormattingTranslation
+  id: FormattingTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: FormattingTranslation
+  nameWithType: ProviderMobilityProviderFeature.FormattingTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.FormattingTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FormattingTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 170
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider fixed numeric and temporal formatting translation strategy.
+  example: []
+  syntax:
+    content: FormattingTranslation = 22
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.DateTimeComparisonNormalization
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.DateTimeComparisonNormalization
+  id: DateTimeComparisonNormalization
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: DateTimeComparisonNormalization
+  nameWithType: ProviderMobilityProviderFeature.DateTimeComparisonNormalization
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.DateTimeComparisonNormalization
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DateTimeComparisonNormalization
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 172
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider DateTime comparison normalization strategy.
+  example: []
+  syntax:
+    content: DateTimeComparisonNormalization = 23
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.DecimalComparisonNormalization
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.DecimalComparisonNormalization
+  id: DecimalComparisonNormalization
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: DecimalComparisonNormalization
+  nameWithType: ProviderMobilityProviderFeature.DecimalComparisonNormalization
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.DecimalComparisonNormalization
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecimalComparisonNormalization
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 174
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider decimal comparison, sort, and aggregate normalization strategy.
+  example: []
+  syntax:
+    content: DecimalComparisonNormalization = 24
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TimeSpanComparisonNormalization
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TimeSpanComparisonNormalization
+  id: TimeSpanComparisonNormalization
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TimeSpanComparisonNormalization
+  nameWithType: ProviderMobilityProviderFeature.TimeSpanComparisonNormalization
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TimeSpanComparisonNormalization
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TimeSpanComparisonNormalization
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 176
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider TimeSpan comparison normalization strategy.
+  example: []
+  syntax:
+    content: TimeSpanComparisonNormalization = 25
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TemporalConstructionTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TemporalConstructionTranslation
+  id: TemporalConstructionTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TemporalConstructionTranslation
+  nameWithType: ProviderMobilityProviderFeature.TemporalConstructionTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TemporalConstructionTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalConstructionTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 178
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider DateTime/DateOnly/TimeOnly construction from SQL parts.
+  example: []
+  syntax:
+    content: TemporalConstructionTranslation = 26
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TemporalArithmeticTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TemporalArithmeticTranslation
+  id: TemporalArithmeticTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TemporalArithmeticTranslation
+  nameWithType: ProviderMobilityProviderFeature.TemporalArithmeticTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TemporalArithmeticTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalArithmeticTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 180
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider DateTime/DateOnly/TimeOnly/TimeSpan arithmetic strategy.
+  example: []
+  syntax:
+    content: TemporalArithmeticTranslation = 27
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.TemporalClockSource
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.TemporalClockSource
+  id: TemporalClockSource
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: TemporalClockSource
+  nameWithType: ProviderMobilityProviderFeature.TemporalClockSource
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.TemporalClockSource
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TemporalClockSource
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 182
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider temporal tag clock-source strategy.
+  example: []
+  syntax:
+    content: TemporalClockSource = 28
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.GeneratedKeyRetrieval
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.GeneratedKeyRetrieval
+  id: GeneratedKeyRetrieval
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: GeneratedKeyRetrieval
+  nameWithType: ProviderMobilityProviderFeature.GeneratedKeyRetrieval
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.GeneratedKeyRetrieval
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GeneratedKeyRetrieval
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 184
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider generated-key retrieval strategy.
+  example: []
+  syntax:
+    content: GeneratedKeyRetrieval = 29
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.InsertOrIgnoreTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.InsertOrIgnoreTranslation
+  id: InsertOrIgnoreTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: InsertOrIgnoreTranslation
+  nameWithType: ProviderMobilityProviderFeature.InsertOrIgnoreTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.InsertOrIgnoreTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: InsertOrIgnoreTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 186
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider idempotent insert-or-ignore strategy.
+  example: []
+  syntax:
+    content: InsertOrIgnoreTranslation = 30
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.CudSubqueryRewrite
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.CudSubqueryRewrite
+  id: CudSubqueryRewrite
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: CudSubqueryRewrite
+  nameWithType: ProviderMobilityProviderFeature.CudSubqueryRewrite
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.CudSubqueryRewrite
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CudSubqueryRewrite
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 188
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider generated CUD subquery rewrite strategy.
+  example: []
+  syntax:
+    content: CudSubqueryRewrite = 31
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.BitwiseXorTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.BitwiseXorTranslation
+  id: BitwiseXorTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: BitwiseXorTranslation
+  nameWithType: ProviderMobilityProviderFeature.BitwiseXorTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.BitwiseXorTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BitwiseXorTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 190
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider bitwise XOR translation strategy.
+  example: []
+  syntax:
+    content: BitwiseXorTranslation = 32
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.WindowFunctionTranslation
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.WindowFunctionTranslation
+  id: WindowFunctionTranslation
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: WindowFunctionTranslation
+  nameWithType: ProviderMobilityProviderFeature.WindowFunctionTranslation
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.WindowFunctionTranslation
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: WindowFunctionTranslation
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 192
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider window-function translation strategy.
+  example: []
+  syntax:
+    content: WindowFunctionTranslation = 33
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.CaseSensitiveStringComparison
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.CaseSensitiveStringComparison
+  id: CaseSensitiveStringComparison
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: CaseSensitiveStringComparison
+  nameWithType: ProviderMobilityProviderFeature.CaseSensitiveStringComparison
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.CaseSensitiveStringComparison
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CaseSensitiveStringComparison
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 194
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider case-sensitive string comparison strategy.
+  example: []
+  syntax:
+    content: CaseSensitiveStringComparison = 34
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderFeature.SqlStatementLengthLimit
+  commentId: F:nORM.Configuration.ProviderMobilityProviderFeature.SqlStatementLengthLimit
+  id: SqlStatementLengthLimit
+  parent: nORM.Configuration.ProviderMobilityProviderFeature
+  langs:
+  - csharp
+  - vb
+  name: SqlStatementLengthLimit
+  nameWithType: ProviderMobilityProviderFeature.SqlStatementLengthLimit
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature.SqlStatementLengthLimit
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SqlStatementLengthLimit
+    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+    startLine: 196
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider maximum SQL statement length and generated SQL splitting strategy.
+  example: []
+  syntax:
+    content: SqlStatementLengthLimit = 35
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ProviderMobilityProviderFeature
+  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderFeature.html
+  name: ProviderMobilityProviderFeature
+  nameWithType: ProviderMobilityProviderFeature
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature

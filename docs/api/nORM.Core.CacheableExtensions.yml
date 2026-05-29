@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheableExtensions
     path: src/nORM/Core/CacheableExtensions.cs
-    startLine: 10
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -58,14 +58,23 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Cacheable
     path: src/nORM/Core/CacheableExtensions.cs
-    startLine: 17
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Marks a query's results to be cached.
+  remarks: >-
+    This method builds a LINQ expression call using reflection and is not compatible
+
+    with NativeAOT or aggressive trimming. Annotate consuming APIs accordingly.
   example: []
   syntax:
-    content: public static IQueryable<T> Cacheable<T>(this IQueryable<T> source, TimeSpan absoluteExpiration)
+    content: >-
+      [RequiresDynamicCode("Cacheable<T> calls MakeGenericMethod to construct a LINQ call expression; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("Cacheable<T> uses reflection to resolve the open generic method; trimming may remove it.")]
+
+      public static IQueryable<T> Cacheable<T>(this IQueryable<T> source, TimeSpan absoluteExpiration)
     parameters:
     - id: source
       type: System.Linq.IQueryable{{T}}
@@ -77,8 +86,24 @@ items:
     - id: T
     return:
       type: System.Linq.IQueryable{{T}}
-    content.vb: Public Shared Function Cacheable(Of T)(source As IQueryable(Of T), absoluteExpiration As TimeSpan) As IQueryable(Of T)
+    content.vb: >-
+      <RequiresDynamicCode("Cacheable<T> calls MakeGenericMethod to construct a LINQ call expression; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("Cacheable<T> uses reflection to resolve the open generic method; trimming may remove it.")>
+
+      Public Shared Function Cacheable(Of T)(source As IQueryable(Of T), absoluteExpiration As TimeSpan) As IQueryable(Of T)
   overload: nORM.Core.CacheableExtensions.Cacheable*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Cacheable<T> calls MakeGenericMethod to construct a LINQ call expression; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Cacheable<T> uses reflection to resolve the open generic method; trimming may remove it.
   nameWithType.vb: CacheableExtensions.Cacheable(Of T)(IQueryable(Of T), TimeSpan)
   fullName.vb: nORM.Core.CacheableExtensions.Cacheable(Of T)(System.Linq.IQueryable(Of T), System.TimeSpan)
   name.vb: Cacheable(Of T)(IQueryable(Of T), TimeSpan)

@@ -111,6 +111,22 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Generated_api_docs_include_scaffold_options_and_overloads()
+    {
+        var namespaceDoc = ReadRepoFile("docs", "api", "nORM.Scaffolding.yml");
+        var scaffolderDoc = ReadRepoFile("docs", "api", "nORM.Scaffolding.DatabaseScaffolder.yml");
+        var optionsDoc = ReadRepoFile("docs", "api", "nORM.Scaffolding.ScaffoldOptions.yml");
+        var toc = ReadRepoFile("docs", "api", "toc.yml");
+
+        Assert.Contains("nORM.Scaffolding.ScaffoldOptions", namespaceDoc, StringComparison.Ordinal);
+        Assert.Contains("nORM.Scaffolding.ScaffoldOptions", toc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync(DbConnection, DatabaseProvider, string, string, ScaffoldOptions)", scaffolderDoc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string, ScaffoldOptions?)", scaffolderDoc, StringComparison.Ordinal);
+        Assert.Contains("Null or blank filters are", optionsDoc, StringComparison.Ordinal);
+        Assert.Contains("FailOnWarnings", optionsDoc, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_does_not_use_scaffolding_as_provider_mobility_evidence()
     {
         var doc = ReadDoc();

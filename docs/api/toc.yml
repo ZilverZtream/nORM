@@ -47,17 +47,44 @@ items:
   - uid: nORM.Configuration.IEntityTypeConfiguration
     name: IEntityTypeConfiguration
     type: Interface
+  - uid: nORM.Configuration.IndexAttribute
+    name: IndexAttribute
+    type: Class
   - uid: nORM.Configuration.ManyToManyConfiguration
     name: ManyToManyConfiguration
     type: Class
   - uid: nORM.Configuration.ModelBuilder
     name: ModelBuilder
     type: Class
+  - uid: nORM.Configuration.NativeTenantSecurityMode
+    name: NativeTenantSecurityMode
+    type: Enum
   - uid: nORM.Configuration.OwnedCollectionNavigation
     name: OwnedCollectionNavigation
     type: Class
   - uid: nORM.Configuration.OwnedNavigation
     name: OwnedNavigation
+    type: Class
+  - uid: nORM.Configuration.ProviderMobilityFeature
+    name: ProviderMobilityFeature
+    type: Enum
+  - uid: nORM.Configuration.ProviderMobilityMode
+    name: ProviderMobilityMode
+    type: Enum
+  - uid: nORM.Configuration.ProviderMobilityProviderDecision
+    name: ProviderMobilityProviderDecision
+    type: Class
+  - uid: nORM.Configuration.ProviderMobilityProviderFeature
+    name: ProviderMobilityProviderFeature
+    type: Enum
+  - uid: nORM.Configuration.ProviderMobilitySupport
+    name: ProviderMobilitySupport
+    type: Enum
+  - uid: nORM.Configuration.ProviderMobilityTranslationDecision
+    name: ProviderMobilityTranslationDecision
+    type: Class
+  - uid: nORM.Configuration.ProviderMobilityTranslator
+    name: ProviderMobilityTranslator
     type: Class
   - uid: nORM.Configuration.RelationshipConfiguration
     name: RelationshipConfiguration
@@ -65,6 +92,9 @@ items:
   - uid: nORM.Configuration.ShadowPropertyConfiguration
     name: ShadowPropertyConfiguration
     type: Class
+  - uid: nORM.Configuration.TemporalStorageMode
+    name: TemporalStorageMode
+    type: Enum
 - uid: nORM.Core
   name: nORM.Core
   type: Namespace
@@ -183,8 +213,20 @@ items:
   - uid: nORM.Core.StoredProcedureResult`1
     name: StoredProcedureResult<T>
     type: Class
+  - uid: nORM.Core.TemporalDiffEntry`1
+    name: TemporalDiffEntry<T>
+    type: Class
   - uid: nORM.Core.TemporalExtensions
     name: TemporalExtensions
+    type: Class
+  - uid: nORM.Core.TemporalHistoryEntry`1
+    name: TemporalHistoryEntry<T>
+    type: Class
+  - uid: nORM.Core.TemporalPropertyChange
+    name: TemporalPropertyChange
+    type: Class
+  - uid: nORM.Core.TenantBoundaryDiagnostics
+    name: TenantBoundaryDiagnostics
     type: Class
   - uid: nORM.Core.WindowFunctionsExtensions
     name: WindowFunctionsExtensions
@@ -287,6 +329,9 @@ items:
   name: nORM.Migration
   type: Namespace
   items:
+  - uid: nORM.Migration.ColumnIndexSchema
+    name: ColumnIndexSchema
+    type: Class
   - uid: nORM.Migration.ColumnSchema
     name: ColumnSchema
     type: Class
@@ -416,6 +461,9 @@ items:
   name: nORM.Query
   type: Namespace
   items:
+  - uid: nORM.Query.NormFunctions
+    name: NormFunctions
+    type: Class
   - uid: nORM.Query.OptimizedSqlBuilder
     name: OptimizedSqlBuilder
     type: Class
@@ -431,6 +479,9 @@ items:
     type: Class
   - uid: nORM.Scaffolding.DynamicEntityTypeGenerator
     name: DynamicEntityTypeGenerator
+    type: Class
+  - uid: nORM.Scaffolding.ScaffoldOptions
+    name: ScaffoldOptions
     type: Class
 - uid: nORM.SourceGeneration
   name: nORM.SourceGeneration

@@ -21,15 +21,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalExtensions
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 10
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Provides helper methods for querying temporal tables at specific points in time.
   example: []
   syntax:
-    content: public static class TemporalExtensions
-    content.vb: Public Module TemporalExtensions
+    content: >-
+      [RequiresDynamicCode("nORM temporal extensions emit reflection-built LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("nORM temporal extensions reflect over LINQ method metadata; trimming may remove the required members.")]
+
+      public static class TemporalExtensions
+    content.vb: >-
+      <RequiresDynamicCode("nORM temporal extensions emit reflection-built LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("nORM temporal extensions reflect over LINQ method metadata; trimming may remove the required members.")>
+
+      Public Module TemporalExtensions
   inheritance:
   - System.Object
   inheritedMembers:
@@ -40,6 +50,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM temporal extensions emit reflection-built LINQ expressions; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM temporal extensions reflect over LINQ method metadata; trimming may remove the required members.
 - uid: nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   commentId: M:nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   id: AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
@@ -59,7 +80,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsOf
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 19
+    startLine: 117
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -104,7 +125,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsOf
     path: src/nORM/Core/TemporalExtensions.cs
-    startLine: 34
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core

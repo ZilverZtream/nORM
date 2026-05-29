@@ -34,8 +34,18 @@ items:
     Delivers an EF Core-like experience without sacrificing nORM's performance characteristics.
   example: []
   syntax:
-    content: public static class NavigationPropertyExtensions
-    content.vb: Public Module NavigationPropertyExtensions
+    content: >-
+      [RequiresDynamicCode("Lazy navigation loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("Lazy navigation loading uses reflection over entity properties; trimming may remove the required members.")]
+
+      public static class NavigationPropertyExtensions
+    content.vb: >-
+      <RequiresDynamicCode("Lazy navigation loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("Lazy navigation loading uses reflection over entity properties; trimming may remove the required members.")>
+
+      Public Module NavigationPropertyExtensions
   inheritance:
   - System.Object
   inheritedMembers:
@@ -46,6 +56,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy navigation loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy navigation loading uses reflection over entity properties; trimming may remove the required members.
 - uid: nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
   commentId: M:nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(``0,nORM.Core.DbContext)
   id: EnableLazyLoading``1(``0,nORM.Core.DbContext)
@@ -65,7 +86,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableLazyLoading
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 49
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -112,7 +133,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CleanupNavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 65
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -149,7 +170,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 86
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -193,7 +214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 105
+    startLine: 107
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -237,7 +258,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 124
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Navigation

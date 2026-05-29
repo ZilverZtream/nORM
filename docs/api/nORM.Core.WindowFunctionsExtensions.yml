@@ -24,15 +24,25 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WindowFunctionsExtensions
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 10
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Provides LINQ extension methods for SQL window functions.
   example: []
   syntax:
-    content: public static class WindowFunctionsExtensions
-    content.vb: Public Module WindowFunctionsExtensions
+    content: >-
+      [RequiresDynamicCode("nORM window functions emit MakeGenericMethod-built expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("nORM window functions reflect over LINQ method metadata; trimming may remove the required members.")]
+
+      public static class WindowFunctionsExtensions
+    content.vb: >-
+      <RequiresDynamicCode("nORM window functions emit MakeGenericMethod-built expressions; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("nORM window functions reflect over LINQ method metadata; trimming may remove the required members.")>
+
+      Public Module WindowFunctionsExtensions
   inheritance:
   - System.Object
   inheritedMembers:
@@ -43,6 +53,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM window functions emit MakeGenericMethod-built expressions; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM window functions reflect over LINQ method metadata; trimming may remove the required members.
 - uid: nORM.Core.WindowFunctionsExtensions.WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
   commentId: M:nORM.Core.WindowFunctionsExtensions.WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
   id: WithRowNumber``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,System.Int32,``1}})
@@ -62,7 +83,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithRowNumber
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 15
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -104,7 +125,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithRank
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 33
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -146,7 +167,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithDenseRank
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 51
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -188,7 +209,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithLag
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 69
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -237,7 +258,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithLead
     path: src/nORM/Core/WindowFunctionsExtensions.cs
-    startLine: 103
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Core

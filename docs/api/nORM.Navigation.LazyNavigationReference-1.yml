@@ -23,17 +23,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationReference
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 694
+    startLine: 698
   assemblies:
   - nORM
   namespace: nORM.Navigation
   summary: Lazy loading reference that defers database access until the value is first requested.
   example: []
   syntax:
-    content: 'public sealed class LazyNavigationReference<T> where T : class'
+    content: >-
+      [RequiresDynamicCode("Lazy reference loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("Lazy reference loading uses reflection over entity properties; trimming may remove the required members.")]
+
+      public sealed class LazyNavigationReference<T> where T : class
     typeParameters:
     - id: T
-    content.vb: Public NotInheritable Class LazyNavigationReference(Of T As Class)
+    content.vb: >-
+      <RequiresDynamicCode("Lazy reference loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("Lazy reference loading uses reflection over entity properties; trimming may remove the required members.")>
+
+      Public NotInheritable Class LazyNavigationReference(Of T As Class)
   inheritance:
   - System.Object
   inheritedMembers:
@@ -48,6 +58,17 @@ items:
   - nORM.Navigation.LazyNavigationReference`1.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationReference{{T}},{TProperty}}})
   - nORM.Navigation.LazyNavigationReference`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationReference{{T}},System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Navigation.LazyNavigationReference`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationReference{{T}},{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy reference loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy reference loading uses reflection over entity properties; trimming may remove the required members.
   nameWithType.vb: LazyNavigationReference(Of T)
   fullName.vb: nORM.Navigation.LazyNavigationReference(Of T)
   name.vb: LazyNavigationReference(Of T)
@@ -69,7 +90,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 710
+    startLine: 716
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -114,7 +135,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetValueAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 723
+    startLine: 729
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -151,7 +172,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetValue
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 735
+    startLine: 741
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -186,7 +207,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: op_Implicit
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 749
+    startLine: 755
   assemblies:
   - nORM
   namespace: nORM.Navigation

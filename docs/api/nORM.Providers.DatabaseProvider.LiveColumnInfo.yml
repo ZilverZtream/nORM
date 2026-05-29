@@ -23,7 +23,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LiveColumnInfo
     path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 250
+    startLine: 466
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -74,7 +74,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 250
+    startLine: 466
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -119,7 +119,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 250
+    startLine: 466
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -148,7 +148,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlType
     path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 250
+    startLine: 466
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -177,7 +177,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 250
+    startLine: 466
   assemblies:
   - nORM
   namespace: nORM.Providers

@@ -33,8 +33,18 @@ items:
   summary: Executes migrations against a PostgreSQL database using a supplied connection and migrations assembly.
   example: []
   syntax:
-    content: 'public class PostgresMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable'
-    content.vb: Public Class PostgresMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
+    content: >-
+      [RequiresDynamicCode("PostgresMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("PostgresMigrationRunner reflects over Migration types; trimming may remove the required members.")]
+
+      public class PostgresMigrationRunner : IMigrationRunner, IAsyncDisposable, IDisposable
+    content.vb: >-
+      <RequiresDynamicCode("PostgresMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("PostgresMigrationRunner reflects over Migration types; trimming may remove the required members.")>
+
+      Public Class PostgresMigrationRunner Implements IMigrationRunner, IAsyncDisposable, IDisposable
   inheritance:
   - System.Object
   implements:
@@ -54,6 +64,17 @@ items:
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,{TProperty}}})
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Migration.PostgresMigrationRunner.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Migration.PostgresMigrationRunner,{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: PostgresMigrationRunner scans assemblies via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: PostgresMigrationRunner reflects over Migration types; trimming may remove the required members.
 - uid: nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   commentId: M:nORM.Migration.PostgresMigrationRunner.#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)
   id: '#ctor(System.Data.Common.DbConnection,System.Reflection.Assembly,nORM.Configuration.DbContextOptions,Microsoft.Extensions.Logging.ILogger)'
@@ -72,7 +93,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 48
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -116,7 +137,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 61
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -163,7 +184,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 81
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -204,7 +225,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPendingMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 182
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -241,7 +262,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetPendingMigrationsAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 197
+    startLine: 199
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -278,7 +299,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 347
+    startLine: 349
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -310,7 +331,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Migration/PostgresMigrationRunner.cs
-    startLine: 362
+    startLine: 364
   assemblies:
   - nORM
   namespace: nORM.Migration

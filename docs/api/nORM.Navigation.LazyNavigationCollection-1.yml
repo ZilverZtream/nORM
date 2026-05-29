@@ -33,17 +33,27 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationCollection
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 567
+    startLine: 569
   assemblies:
   - nORM
   namespace: nORM.Navigation
   summary: Lazy loading collection that defers database access until first enumeration or mutation.
   example: []
   syntax:
-    content: 'public sealed class LazyNavigationCollection<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IAsyncEnumerable<T> where T : class'
+    content: >-
+      [RequiresDynamicCode("Lazy collection loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("Lazy collection loading uses reflection over entity properties; trimming may remove the required members.")]
+
+      public sealed class LazyNavigationCollection<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IAsyncEnumerable<T> where T : class
     typeParameters:
     - id: T
-    content.vb: Public NotInheritable Class LazyNavigationCollection(Of T As Class) Implements IList(Of T), ICollection(Of T), IEnumerable(Of T), IEnumerable, IAsyncEnumerable(Of T)
+    content.vb: >-
+      <RequiresDynamicCode("Lazy collection loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("Lazy collection loading uses reflection over entity properties; trimming may remove the required members.")>
+
+      Public NotInheritable Class LazyNavigationCollection(Of T As Class) Implements IList(Of T), ICollection(Of T), IEnumerable(Of T), IEnumerable, IAsyncEnumerable(Of T)
   inheritance:
   - System.Object
   implements:
@@ -64,6 +74,17 @@ items:
   - nORM.Navigation.LazyNavigationCollection`1.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationCollection{{T}},{TProperty}}})
   - nORM.Navigation.LazyNavigationCollection`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationCollection{{T}},System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Navigation.LazyNavigationCollection`1.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Navigation.LazyNavigationCollection{{T}},{TProperty}}},System.Threading.CancellationToken)
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy collection loading reflects over navigation property metadata at runtime; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Lazy collection loading uses reflection over entity properties; trimming may remove the required members.
   nameWithType.vb: LazyNavigationCollection(Of T)
   fullName.vb: nORM.Navigation.LazyNavigationCollection(Of T)
   name.vb: LazyNavigationCollection(Of T)
@@ -85,7 +106,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 580
+    startLine: 584
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -130,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 606
+    startLine: 610
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -164,7 +185,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetAsyncEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 618
+    startLine: 622
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -203,7 +224,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Add
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 631
+    startLine: 635
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -238,7 +259,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 636
+    startLine: 640
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -270,7 +291,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Contains
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 641
+    startLine: 645
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -307,7 +328,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CopyTo
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 646
+    startLine: 650
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -345,7 +366,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 651
+    startLine: 655
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -382,7 +403,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Count
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 656
+    startLine: 660
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -417,7 +438,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsReadOnly
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 663
+    startLine: 667
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -457,7 +478,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOf
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 668
+    startLine: 672
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -494,7 +515,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Insert
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 673
+    startLine: 677
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -532,7 +553,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveAt
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 678
+    startLine: 682
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -568,7 +589,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: this[]
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 684
+    startLine: 688
   assemblies:
   - nORM
   namespace: nORM.Navigation
