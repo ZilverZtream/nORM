@@ -16,8 +16,8 @@ must be reviewed and edited like handwritten model code.
 - Schema-qualified table names are preserved for SQL Server, PostgreSQL, and
   SQLite attached databases. MySQL scaffolding uses the current database for
   discovery but does not emit the database/catalog name as a model schema.
-- Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity, and
-  computed/generated-column, and simple `[Required]`/`[MaxLength]` annotations
+- Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity,
+  computed/generated-column metadata, and simple `[Required]`/`[MaxLength]` annotations
   when provider metadata exposes them. Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
@@ -86,12 +86,13 @@ must be reviewed and edited like handwritten model code.
   single-column navigations; defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
-  non-default SQL Server identity seed/increment settings, non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
-  schema; SQLite virtual tables and their shadow tables, views, routines,
-  sequences, SQL Server synonyms, PostgreSQL materialized views, and MySQL
-  events are discovered and reported as skipped database objects; likely
-  many-to-many join tables are flagged when they are scaffolded as normal
-  entities.
+  non-default SQL Server identity seed/increment settings, non-default FK referential actions,
+  and triggers are inventoried for review; SQL Server provider-native temporal tables
+  and tables without primary keys are reported as provider-owned schema; SQLite virtual tables and their shadow tables,
+  views, routines, sequences, SQL Server synonyms, PostgreSQL materialized
+  views, and MySQL events are discovered and reported as skipped database
+  objects; likely many-to-many join tables are flagged when they are scaffolded
+  as normal entities.
 
 ## Evidence
 
@@ -118,6 +119,12 @@ must be reviewed and edited like handwritten model code.
   scaffolding, composite-FK diagnostic shape, provider-owned/default and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
+- `RelationshipConfigurationTests` covers generated non-cascade relationship
+  metadata and proves the public fluent API keeps cascade behavior explicit.
+- `UpdateNoMutableColumnsTests` covers generated/computed-column exclusion from
+  insert and update column sets.
+- `PublicApiSnapshotTests` and `PublicApiClassificationTests` keep scaffold
+  API additions intentional and documented.
 
 ## Not Yet Stable
 

@@ -263,8 +263,10 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 ```
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
-schema-preserving table mapping, identifier cleanup, table filtering, overwrite
-protection, nullable-safe output, single-column FK navigation generation, pure
+schema-preserving table mapping, identifier cleanup, table filtering,
+preflighted overwrite protection, nullable-safe output, computed/generated
+column metadata, SQL Server rowversion/timestamp metadata, single-column FK
+navigation generation with cascade/non-cascade delete behavior, pure
 many-to-many join mapping, and single-column/composite index metadata are
 supported, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
@@ -272,9 +274,12 @@ preserved, and MySQL discovery does not bake the current database/catalog name
 into the model.
 
 Unsupported composite foreign keys, payload join tables, provider-specific
-defaults/computed columns/triggers, SQL Server provider-native temporal tables,
-tables without primary keys, skipped views, routines, and sequences are reported in
-`nORM.ScaffoldWarnings.md` and
+defaults, computed column expressions, check constraints, collations, provider
+column types, numeric precision/scale, non-default identity settings,
+non-default FK referential actions, triggers, SQL Server provider-native
+temporal tables, tables without primary keys, SQLite virtual tables and shadow
+tables, skipped views, routines, sequences, synonyms, materialized views, and
+events are reported in `nORM.ScaffoldWarnings.md` and
 `nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
 model code.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
