@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseScaffolder
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 24
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -62,7 +62,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 37
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -111,7 +111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 48
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -160,7 +160,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 60
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Scaffolding

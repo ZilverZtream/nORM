@@ -703,7 +703,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPrimaryKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 300
+    startLine: 302
   assemblies:
   - nORM
   namespace: nORM.Mapping

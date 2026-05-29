@@ -7,6 +7,7 @@ items:
   children:
   - nORM.Configuration.ManyToManyConfiguration.#ctor(System.String,System.Type,System.String,System.String,System.String,System.String)
   - nORM.Configuration.ManyToManyConfiguration.JoinTableName
+  - nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
   - nORM.Configuration.ManyToManyConfiguration.LeftFkColumn
   - nORM.Configuration.ManyToManyConfiguration.NavPropertyName
   - nORM.Configuration.ManyToManyConfiguration.RelatedNavPropertyName
@@ -288,6 +289,37 @@ items:
       type: System.String
     content.vb: Public Property RelatedNavPropertyName As String
   overload: nORM.Configuration.ManyToManyConfiguration.RelatedNavPropertyName*
+- uid: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
+  id: JoinTableSchema
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: JoinTableSchema
+  nameWithType: ManyToManyConfiguration.JoinTableSchema
+  fullName: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: JoinTableSchema
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 121
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Optional schema containing the join table.
+  example: []
+  syntax:
+    content: public string? JoinTableSchema { get; init; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property JoinTableSchema As String
+  overload: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema*
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1377,3 +1409,9 @@ references:
   name: RelatedNavPropertyName
   nameWithType: ManyToManyConfiguration.RelatedNavPropertyName
   fullName: nORM.Configuration.ManyToManyConfiguration.RelatedNavPropertyName
+- uid: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_JoinTableSchema
+  name: JoinTableSchema
+  nameWithType: ManyToManyConfiguration.JoinTableSchema
+  fullName: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema

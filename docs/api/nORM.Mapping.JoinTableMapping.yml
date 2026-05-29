@@ -20,6 +20,7 @@ items:
   - nORM.Mapping.JoinTableMapping.RightNavPropertyName
   - nORM.Mapping.JoinTableMapping.RightPkGetter
   - nORM.Mapping.JoinTableMapping.RightType
+  - nORM.Mapping.JoinTableMapping.SchemaName
   - nORM.Mapping.JoinTableMapping.TableName
   langs:
   - csharp
@@ -89,6 +90,37 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property TableName As String
   overload: nORM.Mapping.JoinTableMapping.TableName*
+- uid: nORM.Mapping.JoinTableMapping.SchemaName
+  commentId: P:nORM.Mapping.JoinTableMapping.SchemaName
+  id: SchemaName
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: SchemaName
+  nameWithType: JoinTableMapping.SchemaName
+  fullName: nORM.Mapping.JoinTableMapping.SchemaName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaName
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Optional schema containing the join table.
+  example: []
+  syntax:
+    content: public string? SchemaName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property SchemaName As String
+  overload: nORM.Mapping.JoinTableMapping.SchemaName*
 - uid: nORM.Mapping.JoinTableMapping.EscTableName
   commentId: P:nORM.Mapping.JoinTableMapping.EscTableName
   id: EscTableName
@@ -107,7 +139,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTableName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 20
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -138,7 +170,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscLeftFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 23
+    startLine: 26
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -169,7 +201,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscRightFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 26
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -200,7 +232,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 29
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -231,7 +263,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 32
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -262,7 +294,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftType
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 35
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -293,7 +325,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightType
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 38
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -324,7 +356,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftNavPropertyName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 41
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -355,7 +387,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightNavPropertyName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 44
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -386,7 +418,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftPkGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 47
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -417,7 +449,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightPkGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 50
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -448,7 +480,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftCollectionGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 53
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -479,7 +511,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftCollectionSetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 56
+    startLine: 59
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -510,7 +542,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightCollectionGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 59
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -541,7 +573,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightCollectionSetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 62
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1511,6 +1543,12 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Mapping.JoinTableMapping.SchemaName*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.SchemaName
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_SchemaName
+  name: SchemaName
+  nameWithType: JoinTableMapping.SchemaName
+  fullName: nORM.Mapping.JoinTableMapping.SchemaName
 - uid: nORM.Mapping.JoinTableMapping.EscTableName*
   commentId: Overload:nORM.Mapping.JoinTableMapping.EscTableName
   href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscTableName

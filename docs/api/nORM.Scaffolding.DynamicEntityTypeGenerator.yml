@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DynamicEntityTypeGenerator
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 22
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -90,7 +90,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityTypeAsync
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 66
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -162,7 +162,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityType
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 100
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -234,7 +234,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputeSchemaSignature
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 248
+    startLine: 246
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -243,9 +243,11 @@ items:
 
     The signature is derived from ordered column names, their CLR types, primary-key status,
 
-    and nullability. Including this in the dynamic-type cache key ensures that schema changes
+    nullability, identity, and length metadata. Including this in the dynamic-type cache key ensures
 
-    (added columns, changed types) produce a new cache entry rather than returning a stale type.
+    that schema changes (added columns, changed types, generated attributes) produce a new cache entry
+
+    rather than returning a stale type.
 
     Uses SHA-256 truncated to <xref href="nORM.Scaffolding.DynamicEntityTypeGenerator.SchemaSignatureTruncationBytes" data-throw-if-not-resolved="false"></xref> bytes (32-char hex)
 

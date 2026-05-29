@@ -6,6 +6,7 @@ items:
   parent: nORM.Configuration
   children:
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
   langs:
   - csharp
   - vb
@@ -98,6 +99,60 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String)
   name.vb: UsingTable(String, String, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
+  id: UsingTable(System.String,System.String,System.String,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, string, string, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 589
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies the schema-qualified join table, left FK column (this entity's PK) and right FK column (related entity's PK).
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk, string? schema)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFk
+      type: System.String
+      description: Column referencing this entity's PK.
+    - id: rightFk
+      type: System.String
+      description: Column referencing the related entity's PK.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFk As String, rightFk As String, schema As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: >-
+      Thrown when any required parameter is null or whitespace, when <code class="paramref">schema</code>
+
+      is whitespace, or when <code class="paramref">leftFk</code> and <code class="paramref">rightFk</code> are the same column name.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, String)
+  name.vb: UsingTable(String, String, String, String)
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration

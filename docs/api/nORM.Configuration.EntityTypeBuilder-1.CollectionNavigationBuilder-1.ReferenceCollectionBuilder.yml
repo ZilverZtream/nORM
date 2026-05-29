@@ -5,7 +5,7 @@ items:
   id: EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   parent: nORM.Configuration
   children:
-  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean)
   langs:
   - csharp
   - vb
@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReferenceCollectionBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 602
+    startLine: 622
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -50,16 +50,16 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
   name.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder
-- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
-  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
-  id: HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean)
+  id: HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean)
   parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   langs:
   - csharp
   - vb
-  name: HasForeignKey(Expression<Func<TDependent, object>>, Expression<Func<TEntity, object>>?)
-  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey(Expression<Func<TDependent, object>>, Expression<Func<TEntity, object>>?)
-  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression<System.Func<TDependent, object>>, System.Linq.Expressions.Expression<System.Func<TEntity, object>>?)
+  name: HasForeignKey(Expression<Func<TDependent, object>>, Expression<Func<TEntity, object>>?, bool)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey(Expression<Func<TDependent, object>>, Expression<Func<TEntity, object>>?, bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression<System.Func<TDependent, object>>, System.Linq.Expressions.Expression<System.Func<TEntity, object>>?, bool)
   type: Method
   source:
     remote:
@@ -68,14 +68,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasForeignKey
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 623
+    startLine: 644
   assemblies:
   - nORM
   namespace: nORM.Configuration
   summary: Defines the foreign key used by the dependent entity in this relationship.
   example: []
   syntax:
-    content: public EntityTypeBuilder<TEntity> HasForeignKey(Expression<Func<TDependent, object>> foreignKeyExpression, Expression<Func<TEntity, object>>? principalKeyExpression = null)
+    content: public EntityTypeBuilder<TEntity> HasForeignKey(Expression<Func<TDependent, object>> foreignKeyExpression, Expression<Func<TEntity, object>>? principalKeyExpression = null, bool cascadeDelete = true)
     parameters:
     - id: foreignKeyExpression
       type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
@@ -83,10 +83,13 @@ items:
     - id: principalKeyExpression
       type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
       description: Optional expression selecting the referenced principal key property.
+    - id: cascadeDelete
+      type: System.Boolean
+      description: Whether nORM should cascade deletes through the tracked object graph.
     return:
       type: nORM.Configuration.EntityTypeBuilder`1
       description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for further configuration.
-    content.vb: Public Function HasForeignKey(foreignKeyExpression As Expression(Of Func(Of TDependent, Object)), principalKeyExpression As Expression(Of Func(Of TEntity, Object)) = Nothing) As EntityTypeBuilder(Of TEntity)
+    content.vb: Public Function HasForeignKey(foreignKeyExpression As Expression(Of Func(Of TDependent, Object)), principalKeyExpression As Expression(Of Func(Of TEntity, Object)) = Nothing, cascadeDelete As Boolean = True) As EntityTypeBuilder(Of TEntity)
   overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey*
   exceptions:
   - type: System.ArgumentNullException
@@ -95,9 +98,9 @@ items:
   - type: nORM.Core.NormConfigurationException
     commentId: T:nORM.Core.NormConfigurationException
     description: Thrown when the principal key cannot be inferred.
-  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder.HasForeignKey(Expression(Of Func(Of TDependent, Object)), Expression(Of Func(Of TEntity, Object)))
-  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)))
-  name.vb: HasForeignKey(Expression(Of Func(Of TDependent, Object)), Expression(Of Func(Of TEntity, Object)))
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder.HasForeignKey(Expression(Of Func(Of TDependent, Object)), Expression(Of Func(Of TEntity, Object)), Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ReferenceCollectionBuilder.HasForeignKey(System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), Boolean)
+  name.vb: HasForeignKey(Expression(Of Func(Of TDependent, Object)), Expression(Of Func(Of TEntity, Object)), Boolean)
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1103,7 +1106,7 @@ references:
   fullName: nORM.Core.NormConfigurationException
 - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder.HasForeignKey
-  href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.html#nORM_Configuration_EntityTypeBuilder_1_CollectionNavigationBuilder_1_ReferenceCollectionBuilder_HasForeignKey_System_Linq_Expressions_Expression_System_Func__1_System_Object___System_Linq_Expressions_Expression_System_Func__0_System_Object___
+  href: nORM.Configuration.EntityTypeBuilder-1.CollectionNavigationBuilder-1.ReferenceCollectionBuilder.html#nORM_Configuration_EntityTypeBuilder_1_CollectionNavigationBuilder_1_ReferenceCollectionBuilder_HasForeignKey_System_Linq_Expressions_Expression_System_Func__1_System_Object___System_Linq_Expressions_Expression_System_Func__0_System_Object___System_Boolean_
   name: HasForeignKey
   nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ReferenceCollectionBuilder.HasForeignKey
@@ -1219,6 +1222,17 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.object
   - name: )
   - name: )
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
 - uid: System.Linq.Expressions.Expression`1
   commentId: T:System.Linq.Expressions.Expression`1
   isExternal: true
