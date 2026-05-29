@@ -639,7 +639,16 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND i.is_primary_key = 0
                       AND i.is_hypothetical = 0
+                      AND i.has_filter = 0
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM sys.index_columns included
+                          WHERE included.object_id = i.object_id
+                            AND included.index_id = i.index_id
+                            AND included.is_included_column = 1
+                      )
                       AND i.name IS NOT NULL
+                      AND ic.is_included_column = 0
                     ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.key_ordinal
                     """).ConfigureAwait(false);
             }
@@ -662,6 +671,10 @@ namespace nORM.Scaffolding
                     INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
                     INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
                     WHERE ix.indisprimary = false
+                      AND ix.indpred IS NULL
+                      AND ix.indexprs IS NULL
+                      AND ix.indnatts = ix.indnkeyatts
+                      AND key.ord <= ix.indnkeyatts
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
                     """).ConfigureAwait(false);
@@ -999,6 +1012,28 @@ namespace nORM.Scaffolding
                         CASE t.temporal_type WHEN 1 THEN 'SQL Server temporal history table' ELSE 'SQL Server system-versioned temporal table' END
                     FROM sys.tables t
                     WHERE t.is_ms_shipped = 0 AND t.temporal_type <> 0
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'PartialIndex', 'SQL Server filtered index'
+                    FROM sys.indexes i
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND i.is_primary_key = 0
+                      AND i.has_filter = 1
+                      AND i.name IS NOT NULL
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'IncludedColumnIndex', 'SQL Server index with included columns'
+                    FROM sys.indexes i
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND i.is_primary_key = 0
+                      AND i.name IS NOT NULL
+                      AND EXISTS (
+                          SELECT 1
+                          FROM sys.index_columns included
+                          WHERE included.object_id = i.object_id
+                            AND included.index_id = i.index_id
+                            AND included.is_included_column = 1
+                      )
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -1017,6 +1052,33 @@ namespace nORM.Scaffolding
                     SELECT event_object_schema, event_object_table, trigger_name, 'Trigger', 'PostgreSQL trigger'
                     FROM information_schema.triggers
                     WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    WHERE ix.indisprimary = false
+                      AND ix.indpred IS NOT NULL
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', 'PostgreSQL expression index'
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    WHERE ix.indisprimary = false
+                      AND ix.indexprs IS NOT NULL
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'IncludedColumnIndex', 'PostgreSQL index with included columns'
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    WHERE ix.indisprimary = false
+                      AND ix.indnatts <> ix.indnkeyatts
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -1234,6 +1296,7 @@ namespace nORM.Scaffolding
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
+                "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."

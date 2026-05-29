@@ -27,6 +27,10 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
     private const string WarningView = "ScaffoldLiveWarningView";
+    private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
+    private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
+    private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
+    private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -234,6 +238,66 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_reports_provider_specific_index_diagnostics_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupProviderSpecificIndexesAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_provider_index_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldProviderIndexContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var warnings = await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+                Assert.DoesNotContain(ProviderPartialIndex, entityCode, StringComparison.Ordinal);
+                Assert.Contains("PartialIndex", warnings, StringComparison.Ordinal);
+                Assert.Contains(ProviderPartialIndex, warnings, StringComparison.Ordinal);
+
+                if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
+                {
+                    Assert.DoesNotContain(ProviderExpressionIndex, entityCode, StringComparison.Ordinal);
+                    Assert.Contains("ExpressionIndex", warnings, StringComparison.Ordinal);
+                    Assert.Contains(ProviderExpressionIndex, warnings, StringComparison.Ordinal);
+                }
+
+                if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
+                {
+                    Assert.DoesNotContain(ProviderIncludedIndex, entityCode, StringComparison.Ordinal);
+                    Assert.Contains("IncludedColumnIndex", warnings, StringComparison.Ordinal);
+                    Assert.Contains(ProviderIncludedIndex, warnings, StringComparison.Ordinal);
+                }
+
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "PartialIndex" &&
+                    item.GetProperty("name").GetString() == ProviderPartialIndex);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, kind);
+            }
+        }
+    }
+
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
@@ -320,6 +384,33 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE VIEW {view} AS SELECT {id}, {status} FROM {warning}");
     }
 
+    private static async Task SetupProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var active = provider.Escape("Active");
+        var includedValue = provider.Escape("IncludedValue");
+        var activeType = kind == ProviderKind.SqlServer ? "BIT" : kind == ProviderKind.Postgres ? "BOOLEAN" : "INTEGER";
+        var activePredicate = kind == ProviderKind.SqlServer
+            ? $"{active} = 1"
+            : kind == ProviderKind.Postgres
+                ? $"{active} = TRUE"
+                : $"{active} = 1";
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {active} {activeType} NOT NULL, {includedValue} {IntType(kind)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPartialIndex)} ON {table} ({name}) WHERE {activePredicate}");
+
+        if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionIndex)} ON {table} (lower({name}))");
+
+        if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderIncludedIndex)} ON {table} ({name}) INCLUDE ({includedValue})");
+    }
+
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try
@@ -367,6 +458,18 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropView(kind, WarningView, provider.Escape(WarningView)));
             await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
         }
         catch
         {
