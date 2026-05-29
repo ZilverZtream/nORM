@@ -83,6 +83,7 @@ namespace nORM.Scaffolding
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
                 var tables = FilterTables(discoveredTables, discoveredSkippedObjects, options);
+                EnsureNoTableKeyCollisions(tables);
                 var skippedObjects = FilterSkippedObjects(discoveredSkippedObjects, options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
@@ -515,6 +516,31 @@ namespace nORM.Scaffolding
             => string.IsNullOrWhiteSpace(table.Schema)
                 ? "<default>." + table.Name
                 : TableKey(table.Schema, table.Name);
+
+        private static void EnsureNoTableKeyCollisions(IReadOnlyList<ScaffoldTable> tables)
+        {
+            var collisions = tables
+                .GroupBy(table => TableKey(table.Schema, table.Name), StringComparer.OrdinalIgnoreCase)
+                .Select(group => new
+                {
+                    DisplayKey = group.Key,
+                    Matches = group
+                        .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
+                        .Select(inner => DisplayTableMatch(inner.First()))
+                        .OrderBy(value => value, StringComparer.Ordinal)
+                        .ToArray()
+                })
+                .Where(group => group.Matches.Length > 1)
+                .ToArray();
+
+            if (collisions.Length == 0)
+                return;
+
+            throw new NormConfigurationException(
+                "Scaffolding discovered tables whose display names collide with schema-qualified names: " +
+                string.Join("; ", collisions.Select(c => $"{c.DisplayKey} matched {string.Join(", ", c.Matches)}")) +
+                ". Rename one table or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names.");
+        }
 
         private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(IReadOnlyList<ScaffoldSkippedObject> skippedObjects, ScaffoldOptions options)
         {

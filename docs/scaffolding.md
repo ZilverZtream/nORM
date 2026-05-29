@@ -57,7 +57,9 @@ must be reviewed and edited like handwritten model code.
   `--tables`; null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an
   actionable error when the same table name exists in multiple schemas; use a
-  schema-qualified filter in that case.
+  schema-qualified filter in that case. If a literal dotted table name collides
+  with the same display string as a schema-qualified table, scaffolding fails
+  deterministically because v1 filter syntax cannot disambiguate those objects.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI

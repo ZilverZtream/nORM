@@ -1670,6 +1670,34 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSelectedTableKeyCollision_ThrowsBeforeGeneratingAmbiguousModel()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE "aux.orders" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "aux"."orders" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CollisionCtx"));
+
+            Assert.Contains("display names collide", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("literal dotted table names", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
