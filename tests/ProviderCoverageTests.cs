@@ -1136,7 +1136,7 @@ public class DatabaseScaffolderHelperTests
     public void ToPascalCase_AlreadyCamelCase_FirstLetterCapitalized()
     {
         var result = Invoke("ToPascalCase", new object?[] { "blogPost" });
-        Assert.Equal("Blogpost", result);
+        Assert.Equal("BlogPost", result);
     }
 
     [Fact]

@@ -237,12 +237,13 @@ namespace nORM.Scaffolding
             var schema = reader.GetSchemaTable();
             if (schema is null)
                 yield break;
+            var existingPropertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
                 if (string.IsNullOrEmpty(colName))
                     continue;
-                var propName = EscapeCSharpIdentifier(ToPascalCase(colName));
+                var propName = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(colName)), existingPropertyNames);
                 if (row["DataType"] is not Type clrType)
                     continue;
                 var allowNull = row["AllowDBNull"] is bool b && b;
@@ -323,18 +324,58 @@ namespace nORM.Scaffolding
 
         private static string ToPascalCase(string name)
         {
-            var parts = name.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (string.IsNullOrWhiteSpace(name))
+                return name;
+
             var sb = new StringBuilder(name.Length);
-            foreach (var part in parts)
+            var segmentStart = 0;
+            for (var i = 0; i <= name.Length; i++)
             {
-                if (part.Length > 0)
+                if (i < name.Length && char.IsLetterOrDigit(name[i]))
+                    continue;
+
+                AppendPascalSegment(sb, name.AsSpan(segmentStart, i - segmentStart));
+                segmentStart = i + 1;
+            }
+
+            return sb.ToString();
+        }
+
+        private static string MakeUnique(string baseName, HashSet<string> existingNames)
+        {
+            var candidate = string.IsNullOrWhiteSpace(baseName) ? "_" : baseName;
+            var unique = candidate;
+            var suffix = 2;
+            while (existingNames.Contains(unique))
+            {
+                unique = candidate + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                suffix++;
+            }
+
+            existingNames.Add(unique);
+            return unique;
+        }
+
+        private static void AppendPascalSegment(StringBuilder sb, ReadOnlySpan<char> segment)
+        {
+            if (segment.IsEmpty)
+                return;
+
+            var hasLower = false;
+            for (var i = 0; i < segment.Length; i++)
+            {
+                if (char.IsLower(segment[i]))
                 {
-                    sb.Append(char.ToUpperInvariant(part[0]));
-                    if (part.Length > 1)
-                        sb.Append(part[1..].ToLowerInvariant());
+                    hasLower = true;
+                    break;
                 }
             }
-            return sb.ToString();
+
+            sb.Append(char.ToUpperInvariant(segment[0]));
+            for (var i = 1; i < segment.Length; i++)
+            {
+                sb.Append(hasLower ? segment[i] : char.ToLowerInvariant(segment[i]));
+            }
         }
 
         /// <summary>

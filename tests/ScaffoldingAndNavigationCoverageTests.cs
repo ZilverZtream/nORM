@@ -188,6 +188,20 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("X", result);
     }
 
+    [Fact]
+    public void ToPascalCase_CamelCase_PreservesInnerWordCapital()
+    {
+        var result = InvokeToPascalCase("blogPost");
+        Assert.Equal("BlogPost", result);
+    }
+
+    [Fact]
+    public void ToPascalCase_InvalidSeparators_BecomeWordBoundaries()
+    {
+        var result = InvokeToPascalCase("bad-table.name");
+        Assert.Equal("BadTableName", result);
+    }
+
     // ── EscapeCSharpIdentifier ──────────────────────────────────────────────
 
     [Fact]
@@ -430,6 +444,14 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_UsesReadablePluralizedQueryPropertyNames()
+    {
+        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Category", "Class" });
+        Assert.Contains("INormQueryable<Category> Categories", code);
+        Assert.Contains("INormQueryable<Class> Classes", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_EntitiesAreSortedAlphabetically()
     {
         var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Zebra", "Apple" });
@@ -527,7 +549,52 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx2");
             Assert.True(File.Exists(Path.Combine(dir, "MyCtx2.cs")));
-            Assert.True(File.Exists(Path.Combine(dir, "Sanwidget2.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "SanWidget2.cs")));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "SanWidget2.cs"));
+            Assert.Contains("public string Name { get; set; } = default!;", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSingleColumnForeignKey_GeneratesNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE Book (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Author_Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                FOREIGN KEY (Author_Id) REFERENCES Author(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "BookStoreContext");
+
+            var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "BookStoreContext.cs"));
+
+            Assert.Contains("public List<Book> Books { get; set; } = new();", authorCode);
+            Assert.Contains("public Author? Author { get; set; }", bookCode);
+            Assert.Contains(".HasMany(p => p.Books)", contextCode);
+            Assert.Contains(".WithOne(d => d.Author)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
+            Assert.Contains("configure?.Invoke(mb);", contextCode);
         }
         finally
         {
@@ -555,13 +622,53 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx3");
 
-            var entityCode = File.ReadAllText(Path.Combine(dir, "Bad-table.cs"));
-            Assert.Contains("public class Bad_table", entityCode);
-            Assert.Contains("public string _1st_name", entityCode);
+            var entityCode = File.ReadAllText(Path.Combine(dir, "BadTable.cs"));
+            Assert.Contains("public class BadTable", entityCode);
+            Assert.Contains("public string _1stName { get; set; } = default!;", entityCode);
             Assert.Contains("public long? HasSpace", entityCode);
             Assert.Contains("public string? Class", entityCode);
             Assert.DoesNotContain("@1st-name", entityCode);
             Assert.DoesNotContain("Has space", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithIdentifierCollisions_GeneratesUniqueNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "sales-order" (
+                Id INTEGER PRIMARY KEY,
+                "first-name" TEXT NOT NULL,
+                "first_name" TEXT NOT NULL
+            );
+            CREATE TABLE "sales_order" (
+                Id INTEGER PRIMARY KEY,
+                Value TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CollisionCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "SalesOrder.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "SalesOrder2.cs")));
+            var firstEntityCode = File.ReadAllText(Path.Combine(dir, "SalesOrder.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CollisionCtx.cs"));
+
+            Assert.Contains("public string FirstName { get; set; } = default!;", firstEntityCode);
+            Assert.Contains("public string FirstName2 { get; set; } = default!;", firstEntityCode);
+            Assert.Contains("public INormQueryable<SalesOrder> SalesOrders", contextCode);
+            Assert.Contains("public INormQueryable<SalesOrder2> SalesOrder2s", contextCode);
         }
         finally
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using nORM.Scaffolding;
@@ -115,5 +116,26 @@ public class SchemaSignatureTests
         var sig2 = gen.ComputeSchemaSignature(cn2, "T5a");
 
         Assert.NotEqual(sig1, sig2);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithIdentifierCollisions_GeneratesUniqueProperties()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "dynamic-collision" (
+                Id INTEGER PRIMARY KEY,
+                "first-name" TEXT NOT NULL,
+                "first_name" TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "dynamic-collision");
+        var propertyNames = type.GetProperties().Select(p => p.Name).ToArray();
+
+        Assert.Contains("FirstName", propertyNames);
+        Assert.Contains("FirstName2", propertyNames);
     }
 }

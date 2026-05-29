@@ -16,14 +16,23 @@ must be reviewed and edited like handwritten model code.
 - Entity class generation with `[Table]`, `[Column]`, `[Key]`, identity, and
   simple `[MaxLength]` annotations when provider metadata exposes them.
 - Nullable reference/value type generation from database nullability metadata.
+- Non-null reference properties are initialized with `default!` so generated
+  nullable-enabled code compiles cleanly before the application adds its own
+  constructors or required-member style.
 - `DbContext` generation with `INormQueryable<T>` properties.
 - Provider-specific identifier escaping for the zero-row schema query.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
+- Generated class and property names are de-duplicated deterministically when
+  different database identifiers normalize to the same C# identifier.
+- Single-column foreign key relationship generation when provider metadata
+  exposes the constraint. Generated entities include reference/collection
+  navigations and the generated `DbContext` wires them through
+  `OnModelCreating` while preserving caller-supplied model configuration.
 
 ## Not Yet Stable
 
-- Relationship and navigation generation.
+- Composite foreign key relationship generation.
 - Index generation.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
 - Owned types, many-to-many join-table modeling, and inheritance inference.
