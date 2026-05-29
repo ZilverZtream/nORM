@@ -779,8 +779,20 @@ namespace nORM.Scaffolding
                 .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
                 .ToArray();
+            var possibleJoinTables = foreignKeys
+                .Where(fk => fk.ColumnCount == 1)
+                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new
+                {
+                    TableKey = g.Key,
+                    PrincipalTables = g.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+                    ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
+                })
+                .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .OrderBy(g => g.TableKey, StringComparer.Ordinal)
+                .ToArray();
 
-            if (compositeForeignKeys.Length == 0 && unsupportedFeatures.Count == 0)
+            if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0)
                 return string.Empty;
 
             var sb = _stringBuilderPool.Get();
@@ -805,6 +817,19 @@ namespace nORM.Scaffolding
                     var dependent = TableKey(first.DependentSchema, first.DependentTable);
                     var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
                     sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                }
+
+                if (possibleJoinTables.Length > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("## Possible Many-To-Many Join Tables");
+                    sb.AppendLine();
+                    sb.AppendLine("These tables have two single-column foreign key constraints. They are scaffolded as normal entities; review them if you want nORM fluent many-to-many mapping instead.");
+                    sb.AppendLine();
+                    sb.AppendLine("| Table | Principal Tables | Constraints |");
+                    sb.AppendLine("| --- | --- | --- |");
+                    foreach (var table in possibleJoinTables)
+                        sb.AppendLine($"| {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} |");
                 }
 
                 if (unsupportedFeatures.Count > 0)

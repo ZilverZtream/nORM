@@ -45,7 +45,8 @@ must be reviewed and edited like handwritten model code.
   features that are not converted into runnable model code. Composite foreign
   keys are listed there instead of being silently ignored or converted into
   fake single-column navigations; defaults, computed/generated columns, and
-  triggers are inventoried for review.
+  triggers are inventoried for review; likely many-to-many join tables are
+  flagged when they are scaffolded as normal entities.
 
 ## Evidence
 
@@ -53,7 +54,8 @@ must be reviewed and edited like handwritten model code.
   duplicate generated-name handling, table filtering, overwrite protection,
   nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
-  multiple indexes, plus composite-FK and provider-owned schema diagnostics.
+  multiple indexes, plus composite-FK, many-to-many candidate, and
+  provider-owned schema diagnostics.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
   duplicate generated property handling.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
@@ -66,6 +68,8 @@ must be reviewed and edited like handwritten model code.
   constraints are discovered and reported in scaffold diagnostics.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
 - Owned types, many-to-many join-table modeling, and inheritance inference.
+  Likely join tables are discovered and reported in scaffold diagnostics, but
+  not converted into fluent many-to-many mappings.
 - Provider-specific computed columns, default constraints, triggers, and
   temporal tables. Defaults, computed/generated columns, and triggers are
   discovered and reported in scaffold diagnostics, but not converted into

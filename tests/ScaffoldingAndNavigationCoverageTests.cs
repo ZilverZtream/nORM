@@ -798,6 +798,43 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithPossibleJoinTable_EmitsManyToManyDiagnostics()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinCtx");
+
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            Assert.Contains("Possible Many-To-Many Join Tables", warnings);
+            Assert.Contains("AuthorBook", warnings);
+            Assert.Contains("Author", warnings);
+            Assert.Contains("Book", warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
