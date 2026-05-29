@@ -39,9 +39,11 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 identifier cleanup, de-duplicated generated names, `INormQueryable<T>` context
 properties, single-column FK navigations, and single-column/composite index
 metadata, including columns that participate in multiple indexes. It is a
-bounded bootstrap tool, not a database-first completeness claim; composite FK,
-owned-type, inheritance, and provider-specific computed/default/trigger
-inference remain explicit post-processing.
+bounded bootstrap tool, not a database-first completeness claim; unsupported
+composite foreign keys are reported in `nORM.ScaffoldWarnings.md`, while
+composite FK navigation generation, owned-type, inheritance, and
+provider-specific computed/default/trigger inference remain explicit
+post-processing.
 
 ## Provider Mobility Certification
 

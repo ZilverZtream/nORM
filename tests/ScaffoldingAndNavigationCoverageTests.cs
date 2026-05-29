@@ -673,6 +673,56 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCompositeForeignKey_EmitsDiagnosticsAndNoFakeNavigation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE TenantOrder (
+                TenantId INTEGER NOT NULL,
+                OrderId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (TenantId, OrderId)
+            );
+            CREATE TABLE TenantOrderLine (
+                TenantId INTEGER NOT NULL,
+                OrderId INTEGER NOT NULL,
+                LineNo INTEGER NOT NULL,
+                Sku TEXT NOT NULL,
+                PRIMARY KEY (TenantId, OrderId, LineNo),
+                CONSTRAINT FK_Line_Order FOREIGN KEY (TenantId, OrderId) REFERENCES TenantOrder(TenantId, OrderId)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeFkCtx");
+
+            var principalCode = File.ReadAllText(Path.Combine(dir, "TenantOrder.cs"));
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "TenantOrderLine.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeFkCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+
+            Assert.DoesNotContain("List<TenantOrderLine>", principalCode);
+            Assert.DoesNotContain("public TenantOrder?", dependentCode);
+            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("Composite Foreign Keys", warnings);
+            Assert.Contains("sqlite_fk_", warnings);
+            Assert.Contains("TenantId, OrderId", warnings);
+            Assert.Contains("TenantOrderLine", warnings);
+            Assert.Contains("TenantOrder", warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

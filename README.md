@@ -266,6 +266,8 @@ Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 identifier cleanup, table filtering, overwrite protection, nullable-safe output,
 single-column FK navigation generation, and single-column/composite index
 metadata are supported, including columns that participate in multiple indexes.
+Unsupported composite foreign keys are reported in `nORM.ScaffoldWarnings.md`
+instead of being silently converted into invalid navigations.
 Composite FK, owned-type, inheritance, and provider-specific
 computed/default/trigger inference remain explicit post-processing. See
 [Scaffolding Contract](docs/scaffolding.md).

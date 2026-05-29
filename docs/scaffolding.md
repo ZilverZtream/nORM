@@ -38,6 +38,10 @@ must be reviewed and edited like handwritten model code.
   `--tables`.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
+- Deterministic `nORM.ScaffoldWarnings.md` diagnostics for discovered database
+  features that are not converted into runnable model code. Composite foreign
+  keys are listed there instead of being silently ignored or converted into
+  fake single-column navigations.
 
 ## Evidence
 
@@ -45,7 +49,7 @@ must be reviewed and edited like handwritten model code.
   duplicate generated-name handling, table filtering, overwrite protection,
   nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
-  multiple indexes.
+  multiple indexes, plus composite-FK diagnostics.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
   duplicate generated property handling.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
@@ -54,7 +58,8 @@ must be reviewed and edited like handwritten model code.
 
 ## Not Yet Stable
 
-- Composite foreign key relationship generation.
+- Composite foreign key relationship navigation generation. Composite FK
+  constraints are discovered and reported in scaffold diagnostics.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
 - Owned types, many-to-many join-table modeling, and inheritance inference.
 - Provider-specific computed columns, default constraints, triggers, and

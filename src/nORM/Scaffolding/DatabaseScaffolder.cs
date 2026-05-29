@@ -100,6 +100,9 @@ namespace nORM.Scaffolding
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships);
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, contextName + ".cs"), ctxCode, options).ConfigureAwait(false);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys);
+                if (!string.IsNullOrWhiteSpace(diagnostics))
+                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
             }
             finally
             {
@@ -498,25 +501,28 @@ namespace nORM.Scaffolding
                             Convert.ToString(reader["to"]) ?? string.Empty));
                     }
 
-                    foreach (var group in rows.GroupBy(r => r.Id).Where(g => g.Count() == 1))
+                    foreach (var group in rows.GroupBy(r => r.Id))
                     {
-                        var row = group.Single();
-                        if (string.IsNullOrWhiteSpace(row.PrincipalTable)
-                            || string.IsNullOrWhiteSpace(row.DependentColumn)
-                            || string.IsNullOrWhiteSpace(row.PrincipalColumn))
+                        var groupRows = group.OrderBy(r => r.Seq).ToArray();
+                        foreach (var row in groupRows)
                         {
-                            continue;
-                        }
+                            if (string.IsNullOrWhiteSpace(row.PrincipalTable)
+                                || string.IsNullOrWhiteSpace(row.DependentColumn)
+                                || string.IsNullOrWhiteSpace(row.PrincipalColumn))
+                            {
+                                continue;
+                            }
 
-                        foreignKeys.Add(new ScaffoldForeignKey(
-                            DependentSchema: table.Schema,
-                            DependentTable: table.Name,
-                            DependentColumn: row.DependentColumn,
-                            PrincipalSchema: null,
-                            PrincipalTable: row.PrincipalTable,
-                            PrincipalColumn: row.PrincipalColumn,
-                            ConstraintName: "sqlite_fk_" + row.Id,
-                            ColumnCount: 1));
+                            foreignKeys.Add(new ScaffoldForeignKey(
+                                DependentSchema: table.Schema,
+                                DependentTable: table.Name,
+                                DependentColumn: row.DependentColumn,
+                                PrincipalSchema: null,
+                                PrincipalTable: row.PrincipalTable,
+                                PrincipalColumn: row.PrincipalColumn,
+                                ConstraintName: "sqlite_fk_" + row.Id,
+                                ColumnCount: groupRows.Length));
+                        }
                     }
                 }
 
@@ -615,10 +621,6 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                var columnCount = Convert.ToInt32(reader["ColumnCount"]);
-                if (columnCount != 1)
-                    continue;
-
                 foreignKeys.Add(new ScaffoldForeignKey(
                     NullIfWhiteSpace(Convert.ToString(reader["DependentSchema"])),
                     dependentTable,
@@ -627,11 +629,60 @@ namespace nORM.Scaffolding
                     principalTable,
                     principalColumn,
                     Convert.ToString(reader["ConstraintName"]) ?? string.Empty,
-                    columnCount));
+                    Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture)));
             }
 
             return foreignKeys;
         }
+
+        private static string ScaffoldDiagnostics(IReadOnlyList<ScaffoldForeignKey> foreignKeys)
+        {
+            var compositeForeignKeys = foreignKeys
+                .Where(fk => fk.ColumnCount > 1)
+                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
+                .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
+                .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
+                .ToArray();
+
+            if (compositeForeignKeys.Length == 0)
+                return string.Empty;
+
+            var sb = _stringBuilderPool.Get();
+            try
+            {
+                sb.AppendLine("# nORM Scaffold Warnings");
+                sb.AppendLine();
+                sb.AppendLine("The scaffolder detected database features that were not converted into runnable nORM model code.");
+                sb.AppendLine("Review these items before using the generated model for migrations or navigation queries.");
+                sb.AppendLine();
+                sb.AppendLine("## Composite Foreign Keys");
+                sb.AppendLine();
+                sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
+                sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
+                sb.AppendLine();
+                sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns |");
+                sb.AppendLine("| --- | --- | --- | --- | --- |");
+                foreach (var group in compositeForeignKeys)
+                {
+                    var rows = group.ToArray();
+                    var first = rows[0];
+                    var dependent = TableKey(first.DependentSchema, first.DependentTable);
+                    var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
+                    sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                }
+
+                return sb.ToString();
+            }
+            finally
+            {
+                sb.Clear();
+                _stringBuilderPool.Return(sb);
+            }
+        }
+
+        private static string EscapeMarkdown(string value)
+            => value.Replace("\\", "\\\\").Replace("|", "\\|");
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
