@@ -4376,8 +4376,8 @@ public class DatabaseScaffolderCoverageTests
     [InlineData("class",        "@class")]    // C# keyword
     [InlineData("int",          "@int")]
     [InlineData("string",       "@string")]
-    [InlineData("123abc",       "@123abc")]   // starts with digit
-    [InlineData("has space",    "@has space")]// contains space
+    [InlineData("123abc",       "_123abc")]   // starts with digit
+    [InlineData("has space",    "has_space")] // contains space
     public void EscapeCSharpIdentifier_Variants(string input, string expected)
     {
         var result = EscapeCSharpIdentifier(input);
@@ -4385,10 +4385,10 @@ public class DatabaseScaffolderCoverageTests
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_EmptyString_ReturnsEmpty()
+    public void EscapeCSharpIdentifier_EmptyString_ReturnsFallbackIdentifier()
     {
         var result = EscapeCSharpIdentifier("");
-        Assert.Equal("", result);
+        Assert.Equal("_", result);
     }
 
     // ── GetUnqualifiedName ────────────────────────────────────────────────────

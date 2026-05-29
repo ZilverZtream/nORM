@@ -339,17 +339,34 @@ namespace nORM.Scaffolding
 
         /// <summary>
         /// Escapes a candidate C# identifier so it is valid syntax. Reserved keywords and common
-        /// contextual keywords are prefixed with <c>@</c>. Identifiers that start with a digit or
-        /// contain non-alphanumeric characters are also prefixed. An empty or null input returns
-        /// <c>"_"</c> as a safe fallback since an empty string is not a valid C# identifier.
+        /// contextual keywords are prefixed with <c>@</c>; other invalid characters are replaced
+        /// with underscores.
         /// </summary>
         private static string EscapeCSharpIdentifier(string identifier)
         {
-            if (string.IsNullOrEmpty(identifier)) return "_";
-            bool needsAt = _csharpKeywords.Contains(identifier)
-                           || !(char.IsLetter(identifier[0]) || identifier[0] == '_')
-                           || identifier.Any(ch => !(char.IsLetterOrDigit(ch) || ch == '_'));
-            return needsAt ? "@" + identifier : identifier;
+            if (string.IsNullOrWhiteSpace(identifier)) return "_";
+
+            var sb = new StringBuilder(identifier.Length + 1);
+            for (var i = 0; i < identifier.Length; i++)
+            {
+                var ch = identifier[i];
+                var valid = i == 0
+                    ? char.IsLetter(ch) || ch == '_'
+                    : char.IsLetterOrDigit(ch) || ch == '_';
+
+                if (valid)
+                    sb.Append(ch);
+                else if (i == 0 && char.IsDigit(ch))
+                    sb.Append('_').Append(ch);
+                else
+                    sb.Append('_');
+            }
+
+            if (sb.Length == 0)
+                sb.Append('_');
+
+            var escaped = sb.ToString();
+            return _csharpKeywords.Contains(escaped) ? "@" + escaped : escaped;
         }
 
         /// <summary>

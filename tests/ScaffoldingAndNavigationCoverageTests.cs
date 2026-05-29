@@ -227,23 +227,23 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_StartsWithDigit_PrependsAt()
+    public void EscapeCSharpIdentifier_StartsWithDigit_PrefixesUnderscore()
     {
-        Assert.Equal("@123abc", InvokeEscapeCSharpIdentifier("123abc"));
+        Assert.Equal("_123abc", InvokeEscapeCSharpIdentifier("123abc"));
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_ContainsHyphen_PrependsAt()
+    public void EscapeCSharpIdentifier_ContainsHyphen_ReplacesWithUnderscore()
     {
         // Hyphens are invalid in C# identifiers
         var result = InvokeEscapeCSharpIdentifier("my-field");
-        Assert.Equal("@my-field", result);
+        Assert.Equal("my_field", result);
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_EmptyString_ReturnsEmpty()
+    public void EscapeCSharpIdentifier_EmptyString_ReturnsFallbackIdentifier()
     {
-        Assert.Equal("", InvokeEscapeCSharpIdentifier(""));
+        Assert.Equal("_", InvokeEscapeCSharpIdentifier(""));
     }
 
     [Fact]
@@ -528,6 +528,40 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx2");
             Assert.True(File.Exists(Path.Combine(dir, "MyCtx2.cs")));
             Assert.True(File.Exists(Path.Combine(dir, "Sanwidget2.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithInvalidSqlIdentifiers_GeneratesValidCSharpIdentifiers()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "bad-table" (
+                "1st-name" TEXT NOT NULL,
+                "has space" INTEGER NULL,
+                "class" TEXT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx3");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "Bad-table.cs"));
+            Assert.Contains("public class Bad_table", entityCode);
+            Assert.Contains("public string _1st_name", entityCode);
+            Assert.Contains("public long? HasSpace", entityCode);
+            Assert.Contains("public string? Class", entityCode);
+            Assert.DoesNotContain("@1st-name", entityCode);
+            Assert.DoesNotContain("Has space", entityCode);
         }
         finally
         {

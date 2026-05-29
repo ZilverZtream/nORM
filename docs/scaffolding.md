@@ -18,6 +18,8 @@ must be reviewed and edited like handwritten model code.
 - Nullable reference/value type generation from database nullability metadata.
 - `DbContext` generation with `INormQueryable<T>` properties.
 - Provider-specific identifier escaping for the zero-row schema query.
+- Generated C# identifiers are sanitized: invalid characters become `_`,
+  leading digits are prefixed with `_`, and C# keywords use `@`.
 
 ## Not Yet Stable
 

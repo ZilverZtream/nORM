@@ -1259,17 +1259,17 @@ public class DatabaseScaffolderHelperTests
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_StartsWithDigit_PrefixedWithAt()
+    public void EscapeCSharpIdentifier_StartsWithDigit_PrefixesUnderscore()
     {
         var result = Invoke("EscapeCSharpIdentifier", new object?[] { "1Table" });
-        Assert.Equal("@1Table", result);
+        Assert.Equal("_1Table", result);
     }
 
     [Fact]
-    public void EscapeCSharpIdentifier_ContainsHyphen_PrefixedWithAt()
+    public void EscapeCSharpIdentifier_ContainsHyphen_ReplacesWithUnderscore()
     {
         var result = Invoke("EscapeCSharpIdentifier", new object?[] { "my-table" });
-        Assert.Equal("@my-table", result);
+        Assert.Equal("my_table", result);
     }
 
     [Fact]
