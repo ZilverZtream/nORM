@@ -450,6 +450,29 @@ namespace nORM.Scaffolding
             if (requested.Length == 0)
                 return tables;
 
+            var ambiguousBareRequests = requested
+                .Where(request => !request.Contains('.'))
+                .Select(request => new
+                {
+                    Request = request,
+                    Matches = tables
+                        .Where(table => string.Equals(table.Name, request, StringComparison.OrdinalIgnoreCase))
+                        .Select(table => TableKey(table.Schema, table.Name))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(value => value, StringComparer.Ordinal)
+                        .ToArray()
+                })
+                .Where(match => match.Matches.Length > 1)
+                .ToArray();
+
+            if (ambiguousBareRequests.Length > 0)
+            {
+                throw new NormConfigurationException(
+                    "Scaffolding table filter is ambiguous because the same table name exists in multiple schemas: " +
+                    string.Join("; ", ambiguousBareRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
+                    ". Use schema-qualified table filters.");
+            }
+
             var selected = tables
                 .Where(table => requested.Any(request => MatchesTableFilter(table, request)))
                 .ToArray();

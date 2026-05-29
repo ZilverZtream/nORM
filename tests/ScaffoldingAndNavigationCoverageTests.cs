@@ -1341,6 +1341,56 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithAmbiguousBareTableFilter_RequiresSchemaQualifiedName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS auxa;
+            ATTACH DATABASE ':memory:' AS auxb;
+            CREATE TABLE "auxa"."DuplicateName" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "auxb"."DuplicateName" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var ambiguousDir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        var qualifiedDir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    ambiguousDir,
+                    "TestNs",
+                    "AmbiguousFilterCtx",
+                    new ScaffoldOptions { Tables = new[] { "DuplicateName" } }));
+
+            Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("auxa.DuplicateName", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("auxb.DuplicateName", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("schema-qualified", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                qualifiedDir,
+                "TestNs",
+                "QualifiedFilterCtx",
+                new ScaffoldOptions { Tables = new[] { "auxa.DuplicateName" } });
+
+            var entityCode = File.ReadAllText(Path.Combine(qualifiedDir, "DuplicateName.cs"));
+            Assert.Contains("[Table(\"DuplicateName\", Schema = \"auxa\")]", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(ambiguousDir)) Directory.Delete(ambiguousDir, recursive: true);
+            if (Directory.Exists(qualifiedDir)) Directory.Delete(qualifiedDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

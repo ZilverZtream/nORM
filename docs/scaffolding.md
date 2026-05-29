@@ -47,7 +47,9 @@ must be reviewed and edited like handwritten model code.
   `HasMany().WithMany().UsingTable(...)` configuration instead of a join entity.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`; null or blank API filters are treated as empty rather than
-  producing raw runtime exceptions.
+  producing raw runtime exceptions. Bare table-name filters fail with an
+  actionable error when the same table name exists in multiple schemas; use a
+  schema-qualified filter in that case.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
