@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -31,7 +31,7 @@ namespace nORM.Providers
         /// <returns>Total rows inserted.</returns>
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             var sw = Stopwatch.StartNew();
 
             var entityList = entities.ToList();
@@ -46,7 +46,7 @@ namespace nORM.Providers
             var totalInserted = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
                 async (batch, tx, token) =>
                 {
-                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection, SqlBulkCopyOptions.Default, (SqlTransaction)tx)
+                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.RawConnection, SqlBulkCopyOptions.Default, (SqlTransaction)tx)
                     {
                         DestinationTableName = m.EscTable,
                         BatchSize = batch.Count,
@@ -81,7 +81,7 @@ namespace nORM.Providers
         /// <returns>Number of rows updated.</returns>
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
@@ -115,14 +115,17 @@ namespace nORM.Providers
                 {
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk updates
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                        cmd.AddParam("@__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
+                    var tenantCol = ctx.Options.TenantProvider != null
+                        ? ctx.RequireTenantColumn(m, "SQL Server bulk update")
+                        : null;
+                    if (tenantCol != null)
+                        cmd.AddParam("@__tenant_bulk", ctx.GetRequiredTenantId(m, "SQL Server bulk update"));
                     cmd.CommandText = BuildBulkUpdateSql(
                         m.EscTable,
                         tempTableName,
                         setClause,
                         joinClause,
-                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
+                        tenantCol?.EscCol);
                     updatedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }
@@ -162,7 +165,7 @@ namespace nORM.Providers
             for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
             {
                 var batch = entityList.GetRange(i, Math.Min(sizing.OptimalBatchSize, entityList.Count - i));
-                using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
+                using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.RawConnection)
                 {
                     DestinationTableName = destinationTableName,
                     BatchSize = batch.Count,
@@ -195,7 +198,7 @@ namespace nORM.Providers
         /// <returns>Total number of rows deleted.</returns>
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            ValidateConnection(ctx.Connection);
+            ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
@@ -214,7 +217,7 @@ namespace nORM.Providers
                 }
                 tempCreated = true;
 
-                using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.Connection)
+                using (var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.RawConnection)
                 {
                     DestinationTableName = tempTableName,
                     BatchSize = ctx.Options.BulkBatchSize,
@@ -243,13 +246,16 @@ namespace nORM.Providers
                 {
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
                     // X1: Add tenant predicate to prevent cross-tenant bulk deletes
-                    if (ctx.Options.TenantProvider != null && m.TenantColumn != null)
-                        cmd.AddParam("@__tenant_bulk", ctx.Options.TenantProvider.GetCurrentTenantId());
+                    var tenantCol = ctx.Options.TenantProvider != null
+                        ? ctx.RequireTenantColumn(m, "SQL Server bulk delete")
+                        : null;
+                    if (tenantCol != null)
+                        cmd.AddParam("@__tenant_bulk", ctx.GetRequiredTenantId(m, "SQL Server bulk delete"));
                     cmd.CommandText = BuildBulkDeleteSql(
                         m.EscTable,
                         tempTableName,
                         joinClause,
-                        ctx.Options.TenantProvider != null ? m.TenantColumn?.EscCol : null);
+                        tenantCol?.EscCol);
                     deletedCount = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
             }

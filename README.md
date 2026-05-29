@@ -13,11 +13,63 @@ nORM is a modern Object-Relational Mapping (ORM) library for .NET that is being 
 - **Advanced Query Capabilities**: Raw SQL, stored procedures, and compiled queries
 - **Connection Management**: context-level connection ownership plus database-driver pooling
 - **Multi-Database Support**: SQL Server, PostgreSQL, SQLite, and MySQL
+- **Provider Mobility Contract**: supported portable shapes must translate,
+  emulate, or fail deterministically across the supported provider matrix
+- **Strict Provider Mobility Mode**: certification can run with
+  `UseStrictProviderMobility()` so generated nORM paths are portable while raw
+  SQL, stored procedures, direct connection access, provider-native DDL, and
+  client-eval escape hatches are explicit migration findings through the shared
+  [provider mobility translation layer](docs/provider-mobility-translation-layer.md)
 - **Smart Relationship Handling**: Automatic relationship discovery and lazy loading (see [docs/linq-support.md](docs/linq-support.md) for relationship loading constraints)
 - **Flexible Configuration**: Fluent API and attribute-based configuration
 - **Developer Tools**: Preview database scaffolding and reverse engineering
 - **Modern Features**: JSON querying, window functions, temporal queries
 - **Operational Features**: Multi-tenancy, caching, retry policies, and interceptors with explicit support contracts
+- **Tenant/Temporal Hardening**: generated-path tenant isolation, optional SQL Server/PostgreSQL native tenant session context/RLS DDL with explicit apply/drop APIs, nORM-managed temporal history, and explicit SQL Server native temporal mode/bootstrap
+- **Product-Proof Sample**: `samples/nORM.Sample.Store` is a provider-swappable tenant and temporal web app with a browser frontend, authenticated tenant flow, and verification mode.
+
+## Sample Store App
+
+Run the RC3 product-proof sample locally with SQLite:
+
+```bash
+dotnet run --project samples/nORM.Sample.Store -- --provider sqlite
+```
+
+The same app can target SQL Server, PostgreSQL, or MySQL by setting
+`NORM_SAMPLE_*` or `NORM_TEST_*` connection strings and changing only
+`--provider`. The sample demonstrates generated-path tenant boundaries,
+representative LINQ, bulk insert, compiled query, `Include().AsSplitQuery()`,
+and nORM-managed temporal `AsOf(tag)`. See
+[samples/nORM.Sample.Store/README.md](samples/nORM.Sample.Store/README.md),
+[Tenant Boundary](docs/tenant-boundary.md), and
+[Temporal Versioning](docs/temporal-versioning.md).
+
+For the strict provider-swap release gate, see
+[Provider Mobility Contract](docs/provider-mobility-contract.md). The sample
+can emit a certification artifact:
+
+```powershell
+dotnet run --project samples/nORM.Sample.Store -c Release --no-build -- certify-provider-swap --report ../../artifacts/provider-swap/sample-store.json
+```
+
+Provider-bound assets in existing applications, such as SQL Server stored
+procedures or provider-specific raw SQL, should be inventoried as migration
+findings. nORM should translate or emulate generated nORM features; arbitrary
+caller-authored database language needs a generated nORM rewrite or an explicit
+human-reviewed remediation.
+
+Existing applications can run the reusable certification scanner through the
+tool package:
+
+```powershell
+norm portability certify --scan-path src/MyApp --assembly bin/Release/net8.0/MyApp.dll --report artifacts/provider-mobility.json --html artifacts/provider-mobility.html
+```
+
+The report includes source findings, schema metadata findings, provider target
+profiles, live server-version evidence when connection strings are supplied,
+feature probes such as JSON availability, and concrete translation-strategy
+rows for dialect differences.
 
 ## Performance Validation
 
@@ -188,7 +240,10 @@ options.RetryPolicy = new RetryPolicy
 Multi-tenancy is enforced on ORM-generated query and write paths. Raw SQL,
 stored procedures, migrations, scaffolding, and direct connection access are
 caller-controlled privileged paths. See the
-[Multi-Tenancy Security Contract](docs/multi-tenancy-security.md).
+[Multi-Tenancy Security Contract](docs/multi-tenancy-security.md),
+[Tenant Boundary](docs/tenant-boundary.md),
+[Tenant Deployment Patterns](docs/tenant-deployment-patterns.md), and
+[Tenant Database-Native RLS](docs/tenant-database-native-rls.md).
 
 ### Temporal Queries & Versioning
 
@@ -207,7 +262,8 @@ var releaseData = await context.Query<Product>()
 
 Temporal versioning is implemented with nORM-managed history tables and
 provider-specific triggers. See [Temporal Versioning](docs/temporal-versioning.md)
-for the stable v1 contract.
+and [Temporal Precision](docs/temporal-precision.md) for the stable v1
+contract.
 
 ## Database Providers
 

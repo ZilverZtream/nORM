@@ -352,7 +352,7 @@ public class ParameterOptimizerPublicApiTests
     }
 
     [Fact]
-    public void AddOptimizedParam_Guid_SetsGuidDbType()
+    public void AddOptimizedParam_Guid_BindsCanonicalTextForSqlite()
     {
         using var cn = OpenMemory();
         using var cmd = cn.CreateCommand();
@@ -361,7 +361,8 @@ public class ParameterOptimizerPublicApiTests
         ParameterOptimizer.AddOptimizedParam(cmd, "@id", id);
 
         Assert.Single(cmd.Parameters);
-        Assert.Equal(DbType.Guid, cmd.Parameters[0].DbType);
+        Assert.Equal(DbType.String, cmd.Parameters[0].DbType);
+        Assert.Equal(id.ToString("D"), cmd.Parameters[0].Value);
     }
 
     [Fact]

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nORM Sample Store</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section id="login" class="login-view">
+      <div class="login-copy">
+        <p class="eyebrow">nORM sample store</p>
+        <h1>Provider-mobile tenant commerce</h1>
+        <p class="lede">A small authenticated store admin that keeps the same app code while switching SQLite, SQL Server, PostgreSQL, and MySQL.</p>
+      </div>
+      <div class="login-panel" aria-label="Sign in">
+        <div>
+          <p class="eyebrow">Tenant session</p>
+          <h2>Choose a tenant</h2>
+          <p class="muted">The dashboard, writes, compiled query path, includes, bulk events, and temporal reads run behind the selected tenant boundary.</p>
+        </div>
+        <div class="tenant-picker" role="group" aria-label="Tenant">
+          <button class="tenant-button active" data-tenant="tenant-a">Tenant A</button>
+          <button class="tenant-button" data-tenant="tenant-b">Tenant B</button>
+        </div>
+        <button id="loginButton" class="primary-button">Sign in</button>
+      </div>
+    </section>
+
+    <section id="app" class="app-view hidden">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">nORM Sample Store</p>
+          <h1>Operations Dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="providerBadge" class="badge">provider</span>
+          <span id="tenantBadge" class="badge strong">tenant</span>
+          <button id="refreshButton" class="ghost-button">Refresh</button>
+          <button id="logoutButton" class="ghost-button">Sign out</button>
+        </div>
+      </header>
+
+      <section class="status-band" aria-label="Store metrics">
+        <article>
+          <span>Active products</span>
+          <strong id="metricProducts">-</strong>
+        </article>
+        <article>
+          <span>Open orders</span>
+          <strong id="metricOrders">-</strong>
+        </article>
+        <article>
+          <span>Tenant revenue</span>
+          <strong id="metricRevenue">-</strong>
+        </article>
+        <article>
+          <span>Audit events</span>
+          <strong id="metricEvents">-</strong>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <section class="main-column">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Queryable store state</p>
+              <h2>Products</h2>
+            </div>
+            <span class="query-chip">Where + Select DTO + OrderBy</span>
+          </div>
+          <div id="products" class="product-grid"></div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Navigation loading</p>
+              <h2>Orders</h2>
+            </div>
+            <span id="orderSummary" class="query-chip"></span>
+          </div>
+          <div id="orders" class="order-list"></div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Bulk writes</p>
+              <h2>Recent Events</h2>
+            </div>
+            <button id="bulkButton" class="secondary-button">Bulk Insert Events</button>
+          </div>
+          <div id="events" class="event-list"></div>
+        </section>
+
+        <aside class="side-column">
+          <section class="panel">
+            <p class="eyebrow">Tenant boundary</p>
+            <h2>Cross-tenant write proof</h2>
+            <p class="muted">Attempts to update/delete a known row owned by the other tenant. The generated write path must affect zero rows.</p>
+            <pre id="tenantDiagnostic" class="result-box compact">Loading tenant diagnostics...</pre>
+            <button id="tenantProofButton" class="secondary-button">Run Proof</button>
+            <pre id="tenantProofResult" class="result-box">Not run yet.</pre>
+          </section>
+
+          <section class="panel">
+            <p class="eyebrow">Temporal history</p>
+            <h2>Tag, update, read back</h2>
+            <label>
+              Product ID
+              <input id="productIdInput" type="number" value="1000">
+            </label>
+            <label>
+              New price
+              <input id="priceInput" type="number" step="0.01" value="19.95">
+            </label>
+            <div class="button-row">
+              <button id="tagButton" class="secondary-button">Create Tag</button>
+              <button id="updatePriceButton" class="secondary-button">Update Price</button>
+              <button id="asOfButton" class="secondary-button">Read As Of</button>
+              <button id="historyButton" class="secondary-button">History</button>
+              <button id="diffButton" class="secondary-button">Diff</button>
+              <button id="restoreButton" class="secondary-button">Restore</button>
+              <button id="pruneButton" class="secondary-button">Prune Closed</button>
+            </div>
+            <pre id="temporalResult" class="result-box">No temporal action yet.</pre>
+            <div id="historyTimeline" class="timeline" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <p class="eyebrow">Provider evidence</p>
+            <h2>Scenario gate</h2>
+            <p class="muted">Runs the same tenant, LINQ, bulk, compiled query, include, and temporal scenario behind this provider.</p>
+            <button id="verifyButton" class="secondary-button">Verify Scenario</button>
+            <pre id="evidenceResult" class="result-box">Ready.</pre>
+          </section>
+        </aside>
+      </section>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

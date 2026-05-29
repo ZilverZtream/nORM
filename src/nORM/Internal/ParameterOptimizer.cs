@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 
 #nullable enable
 
@@ -145,11 +146,19 @@ namespace nORM.Internal
                 }
                 if (lookupType != null && _typeMap.TryGetValue(lookupType, out var dbType))
                 {
-                    param.DbType = dbType;
-                    if (dbType == DbType.Decimal)
-                        ApplyProviderDecimalMetadata(param, null);
-                    else if (IsVariableLengthType(dbType))
-                        param.Size = GetTypedNullSize(dbType);
+                    if (lookupType == typeof(Guid) && param is SqliteParameter)
+                    {
+                        param.DbType = DbType.String;
+                        param.Size = 36;
+                    }
+                    else
+                    {
+                        param.DbType = dbType;
+                        if (dbType == DbType.Decimal)
+                            ApplyProviderDecimalMetadata(param, null);
+                        else if (IsVariableLengthType(dbType))
+                            param.Size = GetTypedNullSize(dbType);
+                    }
                 }
                 else
                 {
@@ -222,6 +231,15 @@ namespace nORM.Internal
                     param.Value = value.ToString();
                     param.DbType = DbType.StringFixedLength;
                     param.Size = 1;
+                }
+                else if (valueType == typeof(Guid) && param is SqliteParameter)
+                {
+                    // SQLite has no native Guid type and nORM maps Guid columns to TEXT.
+                    // Binding DbType.Guid can compare as provider-specific binary/blob data
+                    // and silently miss TEXT-stored rows, including tenant predicates.
+                    param.Value = ((Guid)value).ToString("D");
+                    param.DbType = DbType.String;
+                    param.Size = 36;
                 }
                 else if (valueType.IsEnum)
                 {

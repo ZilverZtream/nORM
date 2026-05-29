@@ -18,8 +18,8 @@ namespace nORM.Tests;
 /// Add per-provider case-insensitive routing for <c>RegexOptions.IgnoreCase</c>:
 /// PostgreSQL has <c>~*</c> for case-insensitive match; MySQL / SQLite emit
 /// <c>LOWER(input) REGEXP LOWER(pattern)</c> (the portable shape that works
-/// regardless of the REGEXP UDF's case-sensitivity); SqlServer continues to
-/// throw -- no T-SQL regex primitive of any kind.
+/// regardless of the REGEXP UDF's case-sensitivity); SQL Server lowers nORM's
+/// simple ASCII-safe subset to <c>LOWER(input) LIKE ...</c>.
 /// </summary>
 [Trait("Category", "Fast")]
 public sealed class RegexOptionsCaseInsensitiveProviderShapeTests : TestBase
@@ -33,7 +33,8 @@ public sealed class RegexOptionsCaseInsensitiveProviderShapeTests : TestBase
     [Theory]
     [InlineData(ProviderKind.Sqlite,   "LOWER(")]
     [InlineData(ProviderKind.Postgres, "~*")]
-    [InlineData(ProviderKind.MySql,    "LOWER(")]
+    [InlineData(ProviderKind.MySql,    "REGEXP_LIKE(")]
+    [InlineData(ProviderKind.SqlServer, "LIKE")]
     public void Where_with_Regex_IsMatch_IgnoreCase_emits_case_insensitive_form(ProviderKind providerKind, string expectedFragment)
     {
         var setup = CreateProvider(providerKind);
@@ -57,7 +58,7 @@ public sealed class RegexOptionsCaseInsensitiveProviderShapeTests : TestBase
     [Theory]
     [InlineData(ProviderKind.Sqlite,   "LOWER(")]
     [InlineData(ProviderKind.Postgres, "'gi'")]   // native flag preserves non-matched case
-    [InlineData(ProviderKind.MySql,    "LOWER(")]
+    [InlineData(ProviderKind.MySql,    "'i'")]
     public void Where_with_Regex_Replace_IgnoreCase_emits_case_insensitive_form(ProviderKind providerKind, string expectedFragment)
     {
         var setup = CreateProvider(providerKind);
@@ -81,7 +82,7 @@ public sealed class RegexOptionsCaseInsensitiveProviderShapeTests : TestBase
     }
 
     [Fact]
-    public void Where_with_Regex_IsMatch_IgnoreCase_on_SqlServer_still_throws()
+    public void Where_with_complex_Regex_IsMatch_IgnoreCase_on_SqlServer_still_throws()
     {
         var setup = CreateProvider(ProviderKind.SqlServer);
         using var connection = setup.Connection;
@@ -93,7 +94,7 @@ public sealed class RegexOptionsCaseInsensitiveProviderShapeTests : TestBase
         var text = Expression.Property(param, nameof(Row.Text));
         var call = Expression.Call(method,
             text,
-            Expression.Constant("^[a-z]"),
+            Expression.Constant("^(foo|bar)$"),
             Expression.Constant(RegexOptions.IgnoreCase));
         var lambda = Expression.Lambda<Func<Row, bool>>(call, param);
 

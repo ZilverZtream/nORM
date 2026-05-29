@@ -114,7 +114,7 @@ public class M2MCrossTenantAddTests
     // ── SEC1-2: Cross-tenant add throws ───────────────────────────────────
 
     [Fact]
-    public async Task SEC1_CrossTenantAdd_ThrowsInvalidOperationException()
+    public async Task SEC1_CrossTenantAdd_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
         SeedCourse(cn, 20, "T2", "Physics"); // belongs to T2
@@ -128,7 +128,7 @@ public class M2MCrossTenantAddTests
         };
         ctx.Add(student);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("T2", ex.Message);
         Assert.Contains("T1", ex.Message);
         // No join rows must have been inserted
@@ -138,7 +138,7 @@ public class M2MCrossTenantAddTests
     // ── SEC1-3: Null right-entity tenant throws ───────────────────────────
 
     [Fact]
-    public async Task SEC1_NullRightEntityTenant_ThrowsInvalidOperationException()
+    public async Task SEC1_NullRightEntityTenant_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
         // Course seeded with valid tenant — but the in-memory object has null
@@ -154,7 +154,7 @@ public class M2MCrossTenantAddTests
         };
         ctx.Add(student);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("null", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0L, CountJoinRows(cn));
     }
@@ -190,7 +190,7 @@ public class M2MCrossTenantAddTests
     // ── SEC1-5: Update path — attaching cross-tenant course throws ─────────
 
     [Fact]
-    public async Task SEC1_Update_AddCrossTenantCourse_ThrowsInvalidOperationException()
+    public async Task SEC1_Update_AddCrossTenantCourse_ThrowsNormConfigurationException()
     {
         using var cn = OpenDb();
 
@@ -222,7 +222,7 @@ public class M2MCrossTenantAddTests
         student.Courses.Add(dance);
         ctx.Update(student);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.SaveChangesAsync());
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() => ctx.SaveChangesAsync());
         Assert.Contains("T2", ex.Message);
         Assert.Contains("T1", ex.Message);
     }

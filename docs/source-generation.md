@@ -36,6 +36,15 @@ the runtime materializer guard and fall back to runtime materialization. The
 generator cannot see those fluent decisions at compile time, so source-generation
 diagnostics focus on shapes visible in source.
 
+## Compile-Time SQL Portability
+
+`[CompileTimeQuery]` embeds caller-authored SQL. It is supported as a
+compatibility/performance tool, but it is provider-bound and is not certified
+provider-mobile generated surface. `UseStrictProviderMobility()` rejects the
+runtime command helper used by generated compile-time SQL methods. For portable
+compiled queries, use `Norm.CompileQuery` over LINQ so nORM owns translation per
+provider.
+
 ## Diagnostics
 
 | Id | Severity | Meaning |

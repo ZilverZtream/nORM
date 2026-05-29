@@ -310,6 +310,9 @@ namespace nORM.Providers
         internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
             => $"FLOOR(EXTRACT(EPOCH FROM {dtoSql}) * 1000.0)::bigint";
 
+        internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
+            => $"FLOOR(EXTRACT(EPOCH FROM {dtoSql}) * 1000000.0)::bigint";
+
         /// <summary>PostgreSQL: date + int is native (`(date + 7)`).</summary>
         public override string? AddDaysToDateOnlySql(string dateOnlySql, string daysSqlFragment)
             => $"({dateOnlySql} + {daysSqlFragment})";
@@ -651,6 +654,9 @@ namespace nORM.Providers
                     _ => null
                 };
             }
+
+            if (declaringType == typeof(Guid) && name == nameof(Guid.NewGuid) && args.Length == 0)
+                return "gen_random_uuid()";
 
             if (declaringType == typeof(Math))
             {
@@ -1059,6 +1065,20 @@ CREATE TABLE {historyTable} (
         }
 
         /// <summary>
+        /// Creates temporal tags using the PostgreSQL UTC database clock so tag
+        /// timestamps are comparable to trigger-generated history windows.
+        /// </summary>
+        public override string GetCreateTagSql(string pTagName, string pTimestamp)
+        {
+            var table = Escape("__NormTemporalTags");
+            var tagCol = Escape("TagName");
+            var tsCol = Escape("Timestamp");
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, (now() at time zone 'utc'))";
+        }
+
+        internal override bool UsesDatabaseClockForTemporalTags => true;
+
+        /// <summary>
         /// Produces the trigger definitions required to track changes in the temporal history table.
         /// </summary>
         /// <param name="mapping">The mapping describing the target table.</param>
@@ -1106,6 +1126,53 @@ DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalTrigger")} ON {tabl
 CREATE TRIGGER {Escape(mapping.TableName + "_TemporalTrigger")}
 AFTER INSERT OR UPDATE OR DELETE ON {table}
 FOR EACH ROW EXECUTE FUNCTION {functionName}();";
+        }
+
+        /// <inheritdoc />
+        public override bool SupportsNativeTenantSessionContext => true;
+
+        /// <inheritdoc />
+        public override string GetSetNativeTenantSessionContextSql(string sessionKey, string tenantParameterName)
+        {
+            EnsureValidParameterName(tenantParameterName, nameof(tenantParameterName));
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+            return $"SELECT set_config('{sessionKey}', {tenantParameterName}, false);";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateNativeTenantPolicySql(TableMapping mapping, string sessionKey)
+        {
+            var tenantCol = mapping.TenantColumn
+                ?? throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native PostgreSQL RLS.");
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionKey.Contains('\'', StringComparison.Ordinal))
+                throw new ArgumentException("Session key must be non-empty and must not contain single quotes.", nameof(sessionKey));
+
+            var table = Escape(mapping.TableName);
+            var policy = Escape("norm_rls_" + mapping.TableName);
+            return $@"
+ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {table} FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS {policy} ON {table};
+CREATE POLICY {policy} ON {table}
+USING ({tenantCol.EscCol}::text = current_setting('{sessionKey}', true))
+WITH CHECK ({tenantCol.EscCol}::text = current_setting('{sessionKey}', true));";
+        }
+
+        /// <inheritdoc />
+        public override string GenerateDropNativeTenantPolicySql(TableMapping mapping)
+        {
+            if (mapping.TenantColumn == null)
+                throw new NormConfigurationException(
+                    $"Entity '{mapping.Type.Name}' does not map tenant column required for native PostgreSQL RLS.");
+
+            var table = Escape(mapping.TableName);
+            var policy = Escape("norm_rls_" + mapping.TableName);
+            return $@"
+DROP POLICY IF EXISTS {policy} ON {table};
+ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;";
         }
 
         /// <summary>

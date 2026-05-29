@@ -32,7 +32,7 @@ namespace nORM.Core
             // Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
             // This avoids 4 async state machine allocations by inlining the entire chain.
             var map = GetMapping(typeof(T));
-            var tx = Database.CurrentTransaction;
+            var tx = CurrentTransaction;
             if (tx == null && Options.TenantProvider == null && Options.RetryPolicy == null
                 && System.Transactions.Transaction.Current == null)
             {
@@ -88,6 +88,8 @@ namespace nORM.Core
         public Task<int> InsertAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
             ThrowIfDisposed();
+            if (transaction != null)
+                ThrowIfStrictProviderMobilityEscapeHatch("external DbTransaction insert");
             var result = WriteOptimizedAsync(entity, WriteOperation.Insert, ct, transaction);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
             return result;
@@ -117,6 +119,8 @@ namespace nORM.Core
         public Task<int> UpdateAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
             ThrowIfDisposed();
+            if (transaction != null)
+                ThrowIfStrictProviderMobilityEscapeHatch("external DbTransaction update");
             return WriteOptimizedAsync(entity, WriteOperation.Update, ct, transaction);
         }
 
@@ -144,6 +148,8 @@ namespace nORM.Core
         public Task<int> DeleteAsync<T>(T entity, DbTransaction? transaction, CancellationToken ct = default) where T : class
         {
             ThrowIfDisposed();
+            if (transaction != null)
+                ThrowIfStrictProviderMobilityEscapeHatch("external DbTransaction delete");
             return WriteOptimizedAsync(entity, WriteOperation.Delete, ct, transaction);
         }
 
@@ -154,7 +160,7 @@ namespace nORM.Core
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             var map = GetMapping(typeof(T));
             ValidateTenantContext(entity, map, operation);
-            var tx = transaction ?? Database.CurrentTransaction;
+            var tx = transaction ?? CurrentTransaction;
             var ambientTransaction = tx == null ? System.Transactions.Transaction.Current : null;
 
             if (operation == WriteOperation.Insert)
@@ -197,7 +203,7 @@ namespace nORM.Core
             DbTransaction? ownedTransaction = null;
             if (ownsTransaction)
             {
-                ownedTransaction = await Connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                ownedTransaction = await RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
                 currentTransaction = ownedTransaction;
             }
             else
@@ -288,11 +294,13 @@ namespace nORM.Core
             }
 
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var commandScope = new CommandScope(Connection, transaction);
+            await using var commandScope = new CommandScope(RawConnection, transaction);
             await using var cmd = commandScope.CreateCommand();
             // X1: pass includeTenant so the WHERE clause targets only the current tenant's rows,
             // matching the predicate parity of the batched SaveChangesAsync path.
-            var includeTenant = Options.TenantProvider != null && map.TenantColumn != null;
+            if (Options.TenantProvider != null)
+                RequireTenantColumn(map, operation.ToString());
+            var includeTenant = Options.TenantProvider != null;
             cmd.CommandText = operation switch
             {
                 WriteOperation.Insert => _p.BuildInsert(map),
@@ -372,9 +380,12 @@ namespace nORM.Core
                     // Skip if TenantColumn is already in UpdateColumns � same @PropName is already bound
                     // for the SET clause, and SQLite/ADO.NET providers reuse named params by name, so
                     // the SET-bound value is used for the WHERE predicate too. Adding it twice throws.
-                    if (Options.TenantProvider != null && map.TenantColumn != null
-                        && !map.UpdateColumns.Any(c => c.PropName == map.TenantColumn.PropName))
-                        cmd.AddParam(_p.ParamPrefix + map.TenantColumn.PropName, Options.TenantProvider.GetCurrentTenantId());
+                    if (Options.TenantProvider != null)
+                    {
+                        var tenantCol = RequireTenantColumn(map, "update");
+                        if (!map.UpdateColumns.Any(c => c.PropName == tenantCol.PropName))
+                            cmd.AddParam(_p.ParamPrefix + tenantCol.PropName, GetRequiredTenantId(map, "update"));
+                    }
                     break;
 
                 case WriteOperation.Delete:
@@ -392,8 +403,11 @@ namespace nORM.Core
                         cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildDelete(includeTenant=true).
-                    if (Options.TenantProvider != null && map.TenantColumn != null)
-                        cmd.AddParam(_p.ParamPrefix + map.TenantColumn.PropName, Options.TenantProvider.GetCurrentTenantId());
+                    if (Options.TenantProvider != null)
+                    {
+                        var tenantCol = RequireTenantColumn(map, "delete");
+                        cmd.AddParam(_p.ParamPrefix + tenantCol.PropName, GetRequiredTenantId(map, "delete"));
+                    }
                     break;
             }
         }
@@ -515,8 +529,11 @@ namespace nORM.Core
                 whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
                 idx++;
             }
-            if (Options.TenantProvider != null && map.TenantColumn != null)
-                whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (Options.TenantProvider != null)
+            {
+                var tenantCol = RequireTenantColumn(map, "update batch");
+                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
+            }
             var where = string.Join(" AND ", whereParts);
             return $"UPDATE {map.EscTable} SET {setSb} WHERE {where}";
         }
@@ -537,8 +554,11 @@ namespace nORM.Core
                 whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
                 idx++;
             }
-            if (Options.TenantProvider != null && map.TenantColumn != null)
-                whereParts.Add($"{map.TenantColumn.EscCol}={_p.ParamPrefix}p{idx++}");
+            if (Options.TenantProvider != null)
+            {
+                var tenantCol = RequireTenantColumn(map, "delete batch");
+                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
+            }
             var where = string.Join(" AND ", whereParts);
             return $"DELETE FROM {map.EscTable} WHERE {where}";
         }
@@ -576,8 +596,8 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
-                    if (Options.TenantProvider != null && map.TenantColumn != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
+                    if (Options.TenantProvider != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", GetRequiredTenantId(map, "update batch"));
                     break;
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
@@ -592,8 +612,8 @@ namespace nORM.Core
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
-                    if (Options.TenantProvider != null && map.TenantColumn != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", Options.TenantProvider.GetCurrentTenantId());
+                    if (Options.TenantProvider != null)
+                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", GetRequiredTenantId(map, "delete batch"));
                     break;
             }
             return index;

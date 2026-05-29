@@ -29,7 +29,14 @@ namespace nORM.Core
         /// Gets the underlying <see cref="DbTransaction"/> represented by this wrapper.
         /// May be <c>null</c> when no transaction was started.
         /// </summary>
-        public DbTransaction? Transaction => _transaction;
+        public DbTransaction? Transaction
+        {
+            get
+            {
+                _context.ThrowIfStrictProviderMobilityEscapeHatch(nameof(Transaction));
+                return _transaction;
+            }
+        }
 
         /// <summary>
         /// Commits the underlying database transaction and disposes this wrapper
@@ -119,6 +126,32 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Creates a savepoint inside this nORM-managed transaction without
+        /// exposing the underlying provider transaction handle.
+        /// </summary>
+        /// <param name="name">Name of the savepoint to create.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when the savepoint has been created.</returns>
+        public Task CreateSavepointAsync(string name, CancellationToken ct = default)
+        {
+            EnsureUsable();
+            return _context.CreateSavepointCoreAsync(_transaction!, name, ct);
+        }
+
+        /// <summary>
+        /// Rolls this nORM-managed transaction back to a previously created
+        /// savepoint without exposing the underlying provider transaction handle.
+        /// </summary>
+        /// <param name="name">Name of the savepoint to roll back to.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when rollback to the savepoint has finished.</returns>
+        public Task RollbackToSavepointAsync(string name, CancellationToken ct = default)
+        {
+            EnsureUsable();
+            return _context.RollbackToSavepointCoreAsync(_transaction!, name, ct);
+        }
+
+        /// <summary>
         /// Disposes the transaction and clears it from the owning <see cref="DbContext"/>.
         /// Interlocked.CompareExchange ensures only one concurrent caller proceeds.
         /// </summary>
@@ -137,6 +170,12 @@ namespace nORM.Core
         {
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
                 await DisposeTransactionAndClearAsync().ConfigureAwait(false);
+        }
+
+        private void EnsureUsable()
+        {
+            if (_transaction == null || Volatile.Read(ref _completed) != 0)
+                throw new NormUsageException("No active transaction.");
         }
 
         private void DisposeTransactionAndClear()

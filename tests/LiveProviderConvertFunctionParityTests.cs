@@ -69,12 +69,20 @@ public sealed class LiveProviderConvertFunctionParityTests
                     .ToListAsync())
                     .Select(r => r.Id).ToArray();
 
+                var capturedTargetType = typeof(int);
+                var changeTypeIds = (await ctx.Query<ConvertFuncLiveRow>()
+                    .Where(r => (int)Convert.ChangeType(r.NumText, capturedTargetType) >= 50)
+                    .OrderBy(r => r.Id)
+                    .ToListAsync())
+                    .Select(r => r.Id).ToArray();
+
                 Assert.Equal(new[] { 3 }, intIds);
                 Assert.Equal(new[] { 2 }, longIds);
                 Assert.Equal(new[] { 3 }, stringIds);
                 Assert.Equal(new[] { 2, 3 }, doubleIds);
                 Assert.Equal(new[] { 1, 4 }, decimalIds);
                 Assert.Equal(new[] { 1, 3 }, boolIds);
+                Assert.Equal(new[] { 3, 4 }, changeTypeIds);
             }
             finally
             {

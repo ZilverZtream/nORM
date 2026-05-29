@@ -116,6 +116,19 @@ public class LinqStringFunctionTranslationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Replace_with_captured_StringComparison_Ordinal_swaps_substring_case_sensitively()
+    {
+        var comparison = StringComparison.Ordinal;
+
+        var hits = await _ctx.Query<StrRow>()
+            .Where(r => r.Name.Replace("-", "_", comparison) == "delta_epsilon")
+            .ToListAsync();
+
+        Assert.Single(hits);
+        Assert.Equal(4, hits[0].Id);
+    }
+
+    [Fact]
     public async Task IndexOf_returns_zero_based_position()
     {
         // 'delta-epsilon'.IndexOf("epsilon") == 6
@@ -130,6 +143,17 @@ public class LinqStringFunctionTranslationTests : IAsyncLifetime
         var hits = await _ctx.Query<StrRow>().Where(r => r.Name.IndexOf("not-there") == -1).ToListAsync();
         // every row should match - none of them contain "not-there"
         Assert.Equal(5, hits.Count);
+    }
+
+    [Fact]
+    public async Task IndexOf_with_StringComparison_OrdinalIgnoreCase_returns_zero_based_position()
+    {
+        var hits = await _ctx.Query<StrRow>()
+            .Where(r => r.Name.IndexOf("EPSILON", StringComparison.OrdinalIgnoreCase) == 6)
+            .ToListAsync();
+
+        Assert.Single(hits);
+        Assert.Equal(4, hits[0].Id);
     }
 
     [Fact]

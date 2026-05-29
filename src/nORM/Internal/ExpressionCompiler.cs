@@ -314,10 +314,10 @@ namespace nORM.Internal
                 // Interceptors guard removed — the fast path now routes through
                 // ExecuteReaderWithInterception so interceptors are honoured.
                 if (cachedPlan != null &&
-                    ctx.Provider.PrefersSyncCompiledQueryExecution &&
+                    ctx.RawProvider.PrefersSyncCompiledQueryExecution &&
                     ctx.Options.RetryPolicy == null &&
                     ctx.Options.CacheProvider == null &&
-                    ctx.Connection.State == ConnectionState.Open &&
+                    ctx.RawConnection.State == ConnectionState.Open &&
                     !cachedPlan.IsScalar)
                 {
                     // Q1 fix: dequeue a prepared command from the per-context pool, or create new
@@ -414,7 +414,7 @@ namespace nORM.Internal
                     if (cachedPlan.PostReverse) Query.QueryExecutor.ReverseListInPlace(list);
                     if (cachedPlan.PostMaterializeTransform != null)
                     {
-                        var transformed = cachedPlan.PostMaterializeTransform(list);
+                        var transformed = cachedPlan.PostMaterializeTransform(ctx, list);
                         var rebuilt = new List<T>(transformed.Count);
                         foreach (var item in transformed) rebuilt.Add((T)item!);
                         list = rebuilt;
@@ -525,7 +525,9 @@ namespace nORM.Internal
 
         private static string BuildContextPlanKey(DbContext ctx)
         {
-            var tenantId = ctx.Options.TenantProvider?.GetCurrentTenantId();
+            var tenantId = ctx.Options.TenantProvider != null
+                ? ctx.GetRequiredTenantId("compiled query cache key")
+                : null;
             // Use GetFilterKey() instead of f.ToString().
             // f.ToString() is shape-only — same string regardless of captured closure value.
             // ExpressionFingerprint alone also misses closure values: it hashes the closure
@@ -533,19 +535,18 @@ namespace nORM.Internal
             // GetFilterKey() combines the shape fingerprint with a recursive extraction of all
             // closure-accessed field values so two lambdas with the same shape but different
             // captured values (e.g., tenantId=1 vs tenantId=2) produce distinct cache keys.
-            // Tenant segment: "TENANT:NULL:" when provider is set but returns null,
-            // vs empty string when no provider — prevents cross-tenant plan sharing.
+            // Tenant segment is empty only when no provider is configured. A configured
+            // provider must return a non-null value; tenant mode fails closed before
+            // generating or reusing a compiled plan.
             // X1: Include the runtime type in the key so objects of different types
             // that produce the same ToString() (e.g. int 1 vs string "1") yield
             // distinct cache keys and cannot cross-pollinate compiled plans.
             var tenantSegment = ctx.Options.TenantProvider != null
-                ? (tenantId == null
-                    ? "TENANT:NULL:"
-                    : string.Concat("TENANT:", tenantId.GetType().FullName, ":", tenantId, ":"))
+                ? string.Concat("TENANT:", tenantId!.GetType().FullName, ":", tenantId, ":")
                 : "";
 
             return string.Concat(
-                ctx.Provider.GetType().FullName, "|",
+                ctx.RawProvider.GetType().FullName, "|",
                 ctx.GetMappingHash().ToString(), "|",
                 tenantSegment, "|",
                 ctx.Options.GlobalFilters.Count > 0

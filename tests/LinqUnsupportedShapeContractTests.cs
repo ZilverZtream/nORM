@@ -101,16 +101,6 @@ public class LinqUnsupportedShapeContractTests : IAsyncLifetime
         Assert.Contains("SequenceEqual", ex.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Guid_NewGuid_in_query_throws_rather_than_generating_per_row_or_per_translation_value()
-    {
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-        {
-            await _ctx.Query<UnRow>().Where(r => r.Token == Guid.NewGuid()).ToListAsync();
-        });
-        Assert.Contains(nameof(Guid.NewGuid), ex.Message, StringComparison.Ordinal);
-    }
-
     [Table("UnRow")]
     public sealed class UnRow
     {

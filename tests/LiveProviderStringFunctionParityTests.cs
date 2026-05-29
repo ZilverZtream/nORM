@@ -52,6 +52,11 @@ public sealed class LiveProviderStringFunctionParityTests
                     .ToListAsync())
                     .Select(r => r.Id).ToArray();
 
+                var indexIgnoreCaseIds = (await ctx.Query<StringFuncLiveRow>()
+                    .Where(r => r.Name.IndexOf("EPSILON", StringComparison.OrdinalIgnoreCase) == 6)
+                    .ToListAsync())
+                    .Select(r => r.Id).ToArray();
+
                 var notFoundCount = (await ctx.Query<StringFuncLiveRow>()
                     .Where(r => r.Name.IndexOf("not-there") == -1)
                     .ToListAsync())
@@ -59,6 +64,12 @@ public sealed class LiveProviderStringFunctionParityTests
 
                 var concatIds = (await ctx.Query<StringFuncLiveRow>()
                     .Where(r => string.Concat(r.Code, "!") == "bravo!")
+                    .ToListAsync())
+                    .Select(r => r.Id).ToArray();
+
+                var replaceComparison = StringComparison.Ordinal;
+                var replaceComparisonIds = (await ctx.Query<StringFuncLiveRow>()
+                    .Where(r => r.Name.Replace("delta", "omega", replaceComparison) == "omega-epsilon")
                     .ToListAsync())
                     .Select(r => r.Id).ToArray();
 
@@ -79,14 +90,31 @@ public sealed class LiveProviderStringFunctionParityTests
                     .ToListAsync())
                     .Select(r => r.Id).ToArray();
 
+                var ignoreCase = true;
+                var compareIgnoreCaseIds = (await ctx.Query<StringFuncLiveRow>()
+                    .Where(r => string.Compare(r.Code, "DELTA", StringComparison.OrdinalIgnoreCase) == 0
+                        || string.Compare(r.Code, "BRAVO", ignoreCase) == 0)
+                    .OrderBy(r => r.Id)
+                    .ToListAsync())
+                    .Select(r => r.Id).ToArray();
+
+                var compareOrdinalCount = (await ctx.Query<StringFuncLiveRow>()
+                    .Where(r => string.CompareOrdinal(r.Code, "BRAVO") == 0)
+                    .ToListAsync())
+                    .Count;
+
                 Assert.Equal(new[] { 1 }, trimIds);
                 Assert.Equal(new[] { 4 }, replaceIds);
                 Assert.Equal(new[] { 4 }, indexIds);
+                Assert.Equal(new[] { 4 }, indexIgnoreCaseIds);
                 Assert.Equal(5, notFoundCount);
                 Assert.Equal(new[] { 2 }, concatIds);
+                Assert.Equal(new[] { 4 }, replaceComparisonIds);
                 Assert.Equal(new[] { 1, 2 }, compareLessIds);
                 Assert.Equal(new[] { 4 }, compareEqualIds);
                 Assert.Equal(new[] { 4, 5 }, compareToGreaterIds);
+                Assert.Equal(new[] { 2, 4 }, compareIgnoreCaseIds);
+                Assert.Equal(0, compareOrdinalCount);
             }
             finally
             {

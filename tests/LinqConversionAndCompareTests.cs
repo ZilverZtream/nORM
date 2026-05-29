@@ -66,6 +66,18 @@ public class LinqConversionAndCompareTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Convert_ChangeType_with_captured_Type_compares_as_requested_type()
+    {
+        var targetType = typeof(int);
+        var ids = (await _ctx.Query<CvRow>()
+            .Where(r => (int)Convert.ChangeType(r.NumText, targetType) >= 50)
+            .ToListAsync())
+            .Select(r => r.Id).OrderBy(i => i).ToArray();
+
+        Assert.Equal(new[] { 3, 4 }, ids);
+    }
+
+    [Fact]
     public async Task String_Compare_static_returns_zero_for_equal_strings()
     {
         var hits = await _ctx.Query<CvRow>()
@@ -84,6 +96,42 @@ public class LinqConversionAndCompareTests : IAsyncLifetime
             .Select(r => r.Id).OrderBy(i => i).ToArray();
         // alpha < bravo lexically; nothing else.
         Assert.Equal(new[] { 1 }, ids);
+    }
+
+    [Fact]
+    public async Task String_Compare_with_StringComparison_OrdinalIgnoreCase_matches_case_insensitively()
+    {
+        var comparison = StringComparison.OrdinalIgnoreCase;
+
+        var hits = await _ctx.Query<CvRow>()
+            .Where(r => string.Compare(r.Name, "BRAVO", comparison) == 0)
+            .ToListAsync();
+
+        Assert.Single(hits);
+        Assert.Equal(2, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task String_Compare_with_captured_ignoreCase_bool_matches_case_insensitively()
+    {
+        var ignoreCase = true;
+
+        var hits = await _ctx.Query<CvRow>()
+            .Where(r => string.Compare(r.Name, "DELTA", ignoreCase) == 0)
+            .ToListAsync();
+
+        Assert.Single(hits);
+        Assert.Equal(4, hits[0].Id);
+    }
+
+    [Fact]
+    public async Task String_CompareOrdinal_uses_case_sensitive_ordinal_semantics()
+    {
+        var hits = await _ctx.Query<CvRow>()
+            .Where(r => string.CompareOrdinal(r.Name, "BRAVO") == 0)
+            .ToListAsync();
+
+        Assert.Empty(hits);
     }
 
     [Fact]

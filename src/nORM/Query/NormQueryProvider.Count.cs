@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -38,7 +38,7 @@ namespace nORM.Query
         internal bool TryDirectCountAsync(Expression sourceExpression, CancellationToken ct, out Task<int> result)
         {
             result = default!;
-            if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
+            if (_ctx.Options.GlobalFilters.Count > 0)
                 return false;
 
             // Unwrap the source expression to find the root and optional Where predicate
@@ -76,17 +76,19 @@ namespace nORM.Query
                     if (!TryBuildCountWhereClause(predicate, map, ref parameters, out whereClause, populateParameters: true))
                         return false;
                 }
+                AppendTenantCountPredicate(map, ref parameters, ref whereClause);
                 var sql2 = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
                 bool needsParam = !ReferenceEquals(parameters, _emptyParams);
                 _countSqlCache[cacheKey] = (sql2, needsParam);
                 cached = (sql2, needsParam);
             }
-            else if (predicate != null && cached.NeedsParam)
+            else if (cached.NeedsParam)
             {
                 // Only re-extract parameter value when the predicate actually uses a parameter
                 var map = _ctx.GetMapping(elementType);
-                if (!TryBuildCountWhereClause(predicate, map, ref parameters, out _, populateParameters: true))
+                if (predicate != null && !TryBuildCountWhereClause(predicate, map, ref parameters, out _, populateParameters: true))
                     return false;
+                AddTenantCountParameter(map, ref parameters);
             }
             var sql = cached.Sql;
 
@@ -102,7 +104,7 @@ namespace nORM.Query
             sql = string.Empty;
             parameters = _emptyParams;
 
-            if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
+            if (_ctx.Options.GlobalFilters.Count > 0)
                 return false;
 
             if (expr is not MethodCallExpression rootCall || rootCall.Method.DeclaringType != typeof(Queryable))
@@ -134,12 +136,13 @@ namespace nORM.Query
             if (_countSqlCache.TryGetValue(countCacheKey, out var cached))
             {
                 sql = cached.Sql;
-                if (cached.NeedsParam && predicate != null)
+                if (cached.NeedsParam)
                 {
                     // Only call GetMapping when actually needed for parameter extraction
                     var map2 = _ctx.GetMapping(elementType);
-                    if (!TryBuildCountWhereClause(predicate, map2, ref parameters, out _, populateParameters: true))
+                    if (predicate != null && !TryBuildCountWhereClause(predicate, map2, ref parameters, out _, populateParameters: true))
                         return false;
+                    AddTenantCountParameter(map2, ref parameters);
                 }
                 return true;
             }
@@ -157,6 +160,8 @@ namespace nORM.Query
                     needsParam = !ReferenceEquals(parameters, _emptyParams);
                 }
 
+                AppendTenantCountPredicate(map, ref parameters, ref whereClause);
+                needsParam = !ReferenceEquals(parameters, _emptyParams);
                 sql = $"SELECT COUNT(*) FROM {map.EscTable}{whereClause}";
                 _countSqlCache[countCacheKey] = (sql, needsParam);
                 return true;
@@ -254,7 +259,7 @@ namespace nORM.Query
         /// NOTE on the <c>ref parameters</c> pattern: the <paramref name="parameters"/> argument is passed
         /// by-ref so that this method can replace the caller's <see cref="_emptyParams"/> sentinel with a
         /// freshly-allocated dictionary when the predicate requires a parameter binding. Callers must not
-        /// cache the dictionary reference across calls â€” each invocation may replace it. The <c>out whereClause</c>
+        /// cache the dictionary reference across calls — each invocation may replace it. The <c>out whereClause</c>
         /// is always set (to <see cref="string.Empty"/> on failure) so callers can safely ignore it when the
         /// method returns <c>false</c>.
         /// </para>
@@ -303,7 +308,7 @@ namespace nORM.Query
                     return true;
                 }
 
-                var paramName = _ctx.Provider.ParamPrefix + "p0";
+                var paramName = _ctx.RawProvider.ParamPrefix + "p0";
                 whereClause = $" WHERE {column.EscCol} = {paramName}";
 
                 if (populateParameters)
@@ -321,7 +326,33 @@ namespace nORM.Query
         }
 
         private string FormatCountBooleanPredicate(string expressionSql, bool expectedValue)
-            => $"{expressionSql} = {(expectedValue ? _ctx.Provider.BooleanTrueLiteral : _ctx.Provider.BooleanFalseLiteral)}";
+            => $"{expressionSql} = {(expectedValue ? _ctx.RawProvider.BooleanTrueLiteral : _ctx.RawProvider.BooleanFalseLiteral)}";
+
+        private void AppendTenantCountPredicate(TableMapping map, ref Dictionary<string, object> parameters, ref string whereClause)
+        {
+            if (_ctx.Options.TenantProvider == null)
+                return;
+
+            var tenantCol = _ctx.RequireTenantColumn(map, "count query");
+            var paramName = AddTenantCountParameter(map, ref parameters);
+            var tenantPredicate = $"{tenantCol.EscCol} = {paramName}";
+            whereClause = string.IsNullOrEmpty(whereClause)
+                ? " WHERE " + tenantPredicate
+                : whereClause + " AND " + tenantPredicate;
+        }
+
+        private string AddTenantCountParameter(TableMapping map, ref Dictionary<string, object> parameters)
+        {
+            if (_ctx.Options.TenantProvider == null)
+                return string.Empty;
+
+            var tenantCol = _ctx.RequireTenantColumn(map, "count query");
+            var paramName = _ctx.RawProvider.ParamPrefix + "__tenant";
+            if (ReferenceEquals(parameters, _emptyParams))
+                parameters = new Dictionary<string, object>(1);
+            parameters[paramName] = _ctx.GetRequiredTenantId(tenantCol, map.Type, "count query");
+            return paramName;
+        }
 
         private Task<TResult> ExecuteCountAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
@@ -334,7 +365,7 @@ namespace nORM.Query
 
         private Task<TResult> ExecuteCountFastAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
-            // Non-async entry point â€” avoids state machine when connection is already open.
+            // Non-async entry point — avoids state machine when connection is already open.
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCountFastSlowAsync<TResult>(ensureTask, sql, parameters, ct);
@@ -347,7 +378,7 @@ namespace nORM.Query
                 {
                     var c = ctx.CreateCommand();
                     c.CommandText = s;
-                    // Prepare() is optional â€” some providers throw NotSupportedException or InvalidOperationException.
+                    // Prepare() is optional — some providers throw NotSupportedException or InvalidOperationException.
                     try { c.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { }
                     return (c, new object());
                 }, _ctx);
@@ -355,7 +386,7 @@ namespace nORM.Query
                 lock (entry.Lock)
                 {
                     ct.ThrowIfCancellationRequested();
-                    // Rebind CurrentTransaction on every use â€” CreateCommand() only binds the
+                    // Rebind CurrentTransaction on every use — CreateCommand() only binds the
                     // transaction at creation time; reuse across transaction changes would run
                     // the count against a stale (or null) transaction binding.
                     entry.Cmd.Transaction = _ctx.CurrentTransaction;
@@ -374,7 +405,7 @@ namespace nORM.Query
 
             // For providers without true async I/O (SQLite), use sync ExecuteScalar directly
             // to avoid the ValueTask/Task wrapper overhead from ExecuteScalarAsync.
-            if (_ctx.Provider.PrefersSyncExecution)
+            if (_ctx.RawProvider.PrefersSyncExecution)
             {
                 ct.ThrowIfCancellationRequested();
                 var scalar = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);

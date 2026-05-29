@@ -28,12 +28,15 @@ public sealed class LiveProviderOfTypeParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
+        using (var setup = new DbContext(connection, provider, null, ownsConnection: false))
         {
-            await SetupAsync(ctx, kind);
+            await SetupAsync(setup, kind);
             try
             {
-                var dogs = await ctx.Query<Animal>()
+                var strictOptions = new nORM.Configuration.DbContextOptions().UseStrictProviderMobility();
+                using var strict = new DbContext(connection, provider, strictOptions, ownsConnection: false);
+
+                var dogs = await strict.Query<Animal>()
                     .OfType<Dog>()
                     .Where(d => d.GoodBoy)
                     .OrderBy(d => d.Id)
@@ -43,7 +46,7 @@ public sealed class LiveProviderOfTypeParityTests
                 Assert.Equal(2, dogs[0].Id);
                 Assert.True(dogs[0].GoodBoy);
 
-                var cats = await ctx.Query<Animal>()
+                var cats = await strict.Query<Animal>()
                     .OfType<Cat>()
                     .OrderBy(c => c.Id)
                     .ToListAsync();
@@ -54,7 +57,7 @@ public sealed class LiveProviderOfTypeParityTests
             }
             finally
             {
-                await TeardownAsync(ctx, kind);
+                await TeardownAsync(setup, kind);
             }
         }
     }

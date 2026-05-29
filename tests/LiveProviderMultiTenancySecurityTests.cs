@@ -31,6 +31,7 @@ namespace nORM.Tests;
 ///      context filter does not concatenate the tenant ID into SQL text.
 ///   5. INSERT via SaveChanges stamps the correct TenantId on the new row.
 ///   6. Norm.CompileQuery respects the current tenant context.
+///   7. ExecuteUpdate/ExecuteDelete include tenant predicates under live providers.
 ///
 /// Schema: LivTenRow (Id INT PK, TenantId VARCHAR, Payload VARCHAR).
 /// Explicit int keys — no identity column — so all four providers accept the
@@ -349,6 +350,71 @@ public class LiveProviderMultiTenancySecurityTests
                 var betaRows = await compiled(ctxBeta, "beta");
                 Assert.Single(betaRows);
                 Assert.Equal("cq-beta", betaRows[0].TenantId);
+            }
+            finally { await TeardownAsync(setup, kind); }
+        }
+    }
+
+    // -- 7: Generated ExecuteUpdate/ExecuteDelete keep tenant predicates under live providers --
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ExecuteUpdate_KnownCrossTenantId_AffectsZeroRows(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live {kind} not configured")) return;
+        var (cn, prov) = live!.Value;
+        await using (cn)
+        using (var setup = new DbContext(cn, prov))
+        {
+            await SetupAsync(setup, kind);
+            try
+            {
+                await SeedRawAsync(setup, 1, "tenant-A", "safe-A");
+                await SeedRawAsync(setup, 2, "tenant-B", "must-not-change");
+
+                using var ctxA = TenantContext(cn, prov, "tenant-A");
+                var affected = await ctxA.Query<LivTenRow>()
+                    .Where(r => r.Id == 2)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(r => r.Payload, "blocked"));
+
+                Assert.Equal(0, affected);
+                Assert.Equal("must-not-change", await ReadPayloadRawAsync(setup, 2));
+            }
+            finally { await TeardownAsync(setup, kind); }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ExecuteDelete_KnownCrossTenantId_AffectsZeroRows(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live {kind} not configured")) return;
+        var (cn, prov) = live!.Value;
+        await using (cn)
+        using (var setup = new DbContext(cn, prov))
+        {
+            await SetupAsync(setup, kind);
+            try
+            {
+                await SeedRawAsync(setup, 1, "tenant-A", "safe-A");
+                await SeedRawAsync(setup, 2, "tenant-B", "must-survive");
+
+                using var ctxA = TenantContext(cn, prov, "tenant-A");
+                var affected = await ctxA.Query<LivTenRow>()
+                    .Where(r => r.Id == 2)
+                    .ExecuteDeleteAsync();
+
+                Assert.Equal(0, affected);
+                Assert.Equal(2L, await CountRawAsync(setup));
+                Assert.Equal("must-survive", await ReadPayloadRawAsync(setup, 2));
             }
             finally { await TeardownAsync(setup, kind); }
         }

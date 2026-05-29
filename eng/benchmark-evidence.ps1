@@ -102,6 +102,14 @@ if ($csvFiles.Count -eq 0) {
     throw "No BenchmarkDotNet CSV reports found in $ResultsDirectory"
 }
 
+if ($Mode -in @('rc', 'full')) {
+    $fastReports = @($csvFiles | Where-Object { $_.Name -match 'FastNormBenchmarks' })
+    if ($fastReports.Count -gt 0) {
+        $names = ($fastReports | ForEach-Object Name) -join ', '
+        throw "FastNormBenchmarks reports are smoke-test artifacts and cannot be used as public release evidence: $names"
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $commit = (& git -C $root rev-parse HEAD).Trim()

@@ -1,7 +1,7 @@
 # LINQ Support Coverage
 
 This file anchors `docs/linq-support.md` to executable coverage. Every
-Supported, Constrained, or Preview matrix row must have at least one test file
+Supported, Constrained, Provider-bound compatibility, or Preview matrix row must have at least one test file
 listed here. Unsupported rows may be documented without a coverage row only when
 the matrix notes an explicit deterministic failure contract.
 
@@ -19,26 +19,32 @@ MySQL evidence before they are treated as release-green.
 | `Select` into anonymous types | `tests/LinqEnumAndConditionalTests.cs`, `tests/LinqGroupByProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
 | `Select` into DTO with positional record | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
 | `Select` into DTO with parameterized class constructor | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
-| `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs` |
+| `Select` into DTO with init-only / writable property setters (`new T { A = x.A }`) | `tests/LinqDtoProjectionTests.cs`, `tests/LiveProviderDtoProjectionParityTests.cs`, `tests/ProviderMobilityStrictCommonSurfaceTests.cs`, `tests/LiveProviderJoinSelectManyParityTests.cs` |
 | `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/LiveProviderClientEvaluationParityTests.cs` |
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
 | `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs` |
+| `TakeWhile` / `SkipWhile` | `tests/LinqTakeSkipWhileProviderMobileTests.cs`, `tests/LiveProviderTakeSkipWhileParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
+| `SequenceEqual` | `tests/LinqSequenceEqualProviderMobileTests.cs`, `tests/LiveProviderSequenceEqualParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
 | `Distinct` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGuidAndDistinctTests.cs` |
+| `DistinctBy` | `tests/DistinctByProviderShapeTests.cs`, `tests/LinqDistinctByImplementationTests.cs`, `tests/LinqDistinctByDecimalColumnTests.cs`, `tests/LiveProviderDistinctByParityTests.cs` |
 | `DefaultIfEmpty` standalone | `tests/LinqDefaultIfEmptyTests.cs`, `tests/LiveProviderDefaultIfEmptyParityTests.cs` |
 | `Count`, `LongCount`, `Any`, `All` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryExecutorCoverageTests.cs` |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | `tests/LinqNavigationAggregateTests.cs`, `tests/LinqCompiledQueryExpandedParityTests.cs`, `tests/LinqMultiHopNavAggregateInProjectionTests.cs`, `tests/LiveProviderNavigationAggregateParityTests.cs` |
 | `Sum`, `Average`, `Min`, `Max` | `tests/AggregateOperatorTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs`, `tests/LinqGroupMultiAggregateTests.cs` |
 | `GroupBy` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGroupByProjectionTests.cs`, `tests/LinqGroupMultiAggregateTests.cs`, `tests/LinqHavingTests.cs`, `tests/LinqCompositeGroupByTests.cs`, `tests/ComplexLinqOperatorTests.cs` (streaming IGrouping), `tests/LiveProviderGroupByParityTests.cs` |
-| Inner joins | `tests/CompiledJoinDiagnosticTest.cs`, `tests/CompiledQuerySqlShapeParityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
-| Group joins | `tests/GroupJoinTests.cs`, `tests/GroupJoinOrderByTests.cs`, `tests/GroupJoinCompiledMaterializerTests.cs`, `tests/LinqLeftJoinConditionalNullCheckTests.cs` (null-guard projections), `tests/LiveProviderAsyncEnumerableParityTests.cs` (streaming) |
+| Inner joins | `tests/CompiledJoinDiagnosticTest.cs`, `tests/CompiledQuerySqlShapeParityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/ProviderMobilityStrictCommonSurfaceTests.cs`, `tests/LiveProviderJoinSelectManyParityTests.cs` |
+| Group joins | `tests/GroupJoinTests.cs`, `tests/GroupJoinOrderByTests.cs`, `tests/GroupJoinCompiledMaterializerTests.cs`, `tests/LinqLeftJoinConditionalNullCheckTests.cs` (null-guard projections), `tests/ProviderMobilityStrictCommonSurfaceTests.cs`, `tests/LiveProviderJoinSelectManyParityTests.cs`, `tests/LiveProviderAsyncEnumerableParityTests.cs` (streaming) |
 | `SelectMany` | `tests/SelectManyTests.cs`, `tests/AdversarialTenantNavigationShapeTests.cs`, `tests/LinqCrossJoinTests.cs`, `tests/LinqLeftJoinTests.cs`, `tests/LinqCorrelatedSelectManyTests.cs` (correlated expansion), `tests/LiveProviderJoinSelectManyParityTests.cs` |
 | Set operations: `Union`, `Intersect`, `Except` | `tests/QueryTranslatorCrossProviderTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryTranslatorRecursionTests.cs`, `tests/LinqSetOperationProjectionTests.cs`, `tests/LinqSetOpCompositionTests.cs` |
+| Keyed set operators: `ExceptBy`, `IntersectBy`, `UnionBy` | `tests/DistinctByProviderShapeTests.cs`, `tests/LinqExceptByIntersectByUnionByImplementationTests.cs`, `tests/LinqKeyedSetOpsTranslatabilityTests.cs`, `tests/LiveProviderDistinctByParityTests.cs` |
 | `Include`, `ThenInclude` | `tests/IncludeProcessorCoverageTests.cs`, `tests/CompositeKeyIncludeTests.cs`, `tests/LinqIncludeCompositePkErrorTests.cs` (composite-PK dependent), `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqMultiLevelIncludeTests.cs`, `tests/LiveProviderIncludeParityTests.cs` |
 | `AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf` | `tests/QueryTranslatorCoverageTests.cs`, `tests/ConstructorBoundEntityTrackingTests.cs`, `tests/MiscCoverageTests.cs` |
 | Window functions: `WithRowNumber`, `WithRank`, `WithDenseRank`, `WithLag`, `WithLead` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryTranslatorCrossProviderTests.cs`, `tests/WindowFunctionParameterTests.cs`, `tests/LiveProviderJsonWindowParityTests.cs` |
 | `OfType<T>` / `Cast<T>` | `tests/LinqCastOfTypeTests.cs` (identity pass-through; TPH derived-type filtering via `TphOfTypeTests`), `tests/LiveProviderOfTypeParityTests.cs` (live TPH derived-type filtering), `tests/LinqUnsupportedShapeContractTests.cs` (unsupported shapes) |
-| Raw SQL composition | `tests/RawSqlNameBasedMaterializationTests.cs`, `tests/SourceGenMaterializerCorrectnesTests.cs`, `tests/TransactionIsolationTests.cs`, `tests/LiveProviderRawSqlParityTests.cs` |
+| Raw SQL composition | Provider-bound compatibility API rejected by strict provider mobility; covered by `tests/RawSqlNameBasedMaterializationTests.cs`, `tests/SourceGenMaterializerCorrectnesTests.cs`, `tests/TransactionIsolationTests.cs`, `tests/LiveProviderRawSqlParityTests.cs`, `tests/ProviderMobilityStrictModeTests.cs` |
+| Dynamic table query `DbContext.Query(string)` | Provider-bound compatibility API rejected by strict provider mobility; covered by `tests/DynamicTypeQueryTests.cs`, `tests/DynamicTypeCacheKeyTests.cs`, `tests/DynamicQueryRootConcurrencyTests.cs`, `tests/ProviderMobilityStrictModeTests.cs` |
+| Custom `[SqlFunction]` methods | Provider-bound compatibility API rejected by strict provider mobility unless nORM-owned; covered by `tests/ExpressionToSqlVisitorTests.cs`, `tests/LinqNormFunctionsLikeTests.cs`, `tests/ProviderMobilityStrictModeTests.cs` |
 | `AsAsyncEnumerable` | `tests/AsyncEnumerableTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/AsyncCancellationAuditTests.cs`, `tests/GroupJoinAsyncEnumerableTests.cs` (GroupJoin streaming), `tests/LiveProviderAsyncEnumerableParityTests.cs` |
 | `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs` |
 | `ExecuteDeleteAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs` |
@@ -59,9 +65,12 @@ MySQL evidence before they are treated as release-green.
 
 | Feature | Coverage |
 | --- | --- |
-| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
-| `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareTo` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqConversionAndCompareTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
+| `string` methods: `ToUpper`, `ToLower`, `Length`, `Trim`/`TrimStart`/`TrimEnd`, `Substring`, `Replace`, `IndexOf`, `Contains`, `StartsWith`, `EndsWith` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqProjectionStringIndexOfModeTests.cs`, `tests/LinqProjectionStringReplaceModeTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
+| `string` statics: `IsNullOrEmpty`, `IsNullOrWhiteSpace`, `Concat`, `Compare`, `CompareOrdinal`, `CompareTo` | `tests/LinqStringFunctionTranslationTests.cs`, `tests/LinqConversionAndCompareTests.cs`, `tests/LiveProviderStringFunctionParityTests.cs` |
 | `string.Format` / interpolated strings | `tests/LinqStringFormatTranslationTests.cs`, `tests/LinqProjectionStringFormatTests.cs`, `tests/LinqProjectionStringFormatColumnsTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/StringFormatSpecProviderShapeTests.cs`, `tests/StringFormatAlignmentProviderShapeTests.cs`, `tests/LiveProviderStringFormatParityTests.cs` |
+| `Regex.IsMatch` | `tests/RegexIsMatchProviderShapeTests.cs`, `tests/RegexOptionsCaseInsensitiveProviderShapeTests.cs`, `tests/LiveProviderRegexIsMatchParityTests.cs`, `tests/ProviderMobilityTranslationLayerTests.cs` |
+| `Regex.Replace` | `tests/RegexReplaceProviderShapeTests.cs`, `tests/RegexOptionsCaseInsensitiveProviderShapeTests.cs`, `tests/LiveProviderRegexIsMatchParityTests.cs`, `tests/ProviderMobilityTranslationLayerTests.cs` |
+| `Guid.NewGuid()` in queries | `tests/GuidNewGuidProviderShapeTests.cs`, `tests/LiveProviderStaticValuePredicateParityTests.cs` |
 | `Convert.ToInt32` / `ToInt64` / `ToString` / `ToBoolean` / `ToDouble` / `ToDecimal` / etc. | `tests/LinqConversionAndCompareTests.cs`, `tests/LiveProviderConvertFunctionParityTests.cs` |
 | `Math.Abs`, `Ceiling`, `Floor`, `Round`, `Sqrt`, `Pow`, `Exp`, `Log`, `Log10`, `Sign`, `Min`, `Max`, `Truncate` | `tests/LinqMathFunctionTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `DateTime` members: `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`, `DayOfYear`, `DayOfWeek`, `Date` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
@@ -73,7 +82,7 @@ MySQL evidence before they are treated as release-green.
 | `DateOnly.Year` / `Month` / `Day` / `DayOfYear` | `tests/LinqDateTimeMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `TimeOnly.Hour` / `Minute` / `Second` | `tests/LinqTimeOnlyMemberTranslationTests.cs`, `tests/LiveProviderValueFunctionParityTests.cs` |
 | `Nullable<T>.HasValue`, `Value`, `GetValueOrDefault()` / `GetValueOrDefault(fallback)` | `tests/LinqNullableMemberAccessTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderNullableBoolParityTests.cs` |
-| `Convert.ChangeType(col, typeof(T))` with `Type` constant | `tests/LinqConvertChangeTypeOnColumnTests.cs` |
+| `Convert.ChangeType(col, typeof(T))` or captured `Type` value | `tests/LinqConvertChangeTypeOnColumnTests.cs`, `tests/LinqConversionAndCompareTests.cs` |
 | `DateTimeOffset.LocalDateTime` accessor (projection / WHERE / OrderBy) | `tests/LinqDateTimeOffsetLocalDateTimeTests.cs`, `tests/LinqDateTimeOffsetLocalDateTimeInWhereTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | `DateTimeOffset` col `==` / `!=` DateTime literal | `tests/LinqDateTimeOffsetEqualsDateTimeLiteralTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |
 | `DateTimeOffset` - `DateTimeOffset` → `TimeSpan` (cross-column) | `tests/LinqDateTimeOffsetColumnSubtractionTests.cs`, `tests/LiveProviderRecentScvParityTests.cs` |

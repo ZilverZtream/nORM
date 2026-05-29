@@ -161,7 +161,8 @@ public class ProviderCoverageExtendedTests
         var sql = p.GetCreateTagSql("@tagName", "@ts");
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("datetime('now')", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1536,7 +1537,8 @@ public class ProviderCoverageExtendedTests
         var sql = p.GetCreateTagSql("@tagName", "@ts");
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("SYSUTCDATETIME()", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1836,7 +1838,8 @@ public class ProviderCoverageExtendedTests
         var sql = p.GetCreateTagSql("@tagName", "@ts");
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("UTC_TIMESTAMP(6)", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1938,7 +1941,8 @@ public class ProviderCoverageExtendedTests
         var sql = p.GetCreateTagSql("@tagName", "@ts");
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("now() at time zone 'utc'", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -2046,7 +2050,8 @@ public class ProviderCoverageExtendedTests
         var sql = p.GetCreateTagSql("@tagName", "@ts");
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
-        Assert.Contains("@ts", sql);
+        Assert.DoesNotContain("@ts", sql);
+        Assert.Contains("SYSUTCDATETIME()", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -37,18 +37,30 @@ namespace nORM.Versioning
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
+                if (context.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
                 {
-                    // Introspect live column types before generating history DDL so that
-                    // custom precision/length on main-table columns is mirrored in history table.
-                    var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
-                        .ConfigureAwait(false);
-                    var createHistoryTableSql = context.Provider.GenerateCreateHistoryTableSql(mapping, liveColumns);
-                    await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
-                }
+                    if (!context.RawProvider.SupportsProviderNativeTemporalTables)
+                        throw new NormUnsupportedFeatureException(
+                            $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.");
 
-                var createTriggersSql = context.Provider.GenerateTemporalTriggersSql(mapping);
-                await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);
+                    var bootstrapSql = context.RawProvider.GenerateProviderNativeTemporalBootstrapSql(mapping);
+                    await ExecuteDdlAsync(context, conn, bootstrapSql, ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
+                    {
+                        // Introspect live column types before generating history DDL so that
+                        // custom precision/length on main-table columns is mirrored in history table.
+                        var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
+                            .ConfigureAwait(false);
+                        var createHistoryTableSql = context.RawProvider.GenerateCreateHistoryTableSql(mapping, liveColumns);
+                        await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
+                    }
+
+                    var createTriggersSql = context.RawProvider.GenerateTemporalTriggersSql(mapping);
+                    await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);
+                }
             }
         }
 
@@ -56,15 +68,15 @@ namespace nORM.Versioning
         {
             // Use provider-specific DDL so that IF NOT EXISTS and column types
             // are correct for each database (SQL Server requires OBJECT_ID check + NVARCHAR/DATETIME2).
-            var sql = context.Provider.GetCreateTagsTableSql();
+            var sql = context.RawProvider.GetCreateTagsTableSql();
             await ExecuteDdlAsync(context, conn, sql, ct).ConfigureAwait(false);
         }
 
         private static async Task<bool> HistoryTableExistsAsync(DbContext context, DbConnection conn, TableMapping mapping, CancellationToken ct)
         {
-            var historyTable = context.Provider.Escape(mapping.TableName + "_History");
+            var historyTable = context.RawProvider.Escape(mapping.TableName + "_History");
             // Use provider-specific probe SQL (SQL Server needs TOP 1, not LIMIT 1).
-            var probeSql = context.Provider.GetHistoryTableExistsProbeSql(historyTable);
+            var probeSql = context.RawProvider.GetHistoryTableExistsProbeSql(historyTable);
             try
             {
                 var gate = CommandInterceptorExtensions.GetSerializedConnectionGate(conn, context);
@@ -82,7 +94,7 @@ namespace nORM.Versioning
                     gate?.Release();
                 }
             }
-            catch (DbException dbEx) when (context.Provider.IsObjectNotFoundError(dbEx))
+            catch (DbException dbEx) when (context.RawProvider.IsObjectNotFoundError(dbEx))
             {
                 // Only treat definitive "table not found" schema errors as absence.
                 // Permission denied, transient connection faults, and syntax errors are NOT "table absent"
@@ -97,12 +109,12 @@ namespace nORM.Versioning
         {
             var gate = CommandInterceptorExtensions.GetSerializedConnectionGate(conn, context);
             if (gate == null)
-                return await context.Provider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
+                return await context.RawProvider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
 
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                return await context.Provider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
+                return await context.RawProvider.IntrospectTableColumnsAsync(conn, tableName, ct).ConfigureAwait(false);
             }
             finally
             {

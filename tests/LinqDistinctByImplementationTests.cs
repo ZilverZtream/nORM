@@ -12,11 +12,9 @@ namespace nORM.Tests;
 
 /// <summary>
 /// Pins the DistinctBy implementation: one row per distinct key, full row
-/// preserved. SQL has no portable single-query form so v1 uses a
-/// post-materialize transform (compiled key selector runs in memory after
-/// the row scan). For large tables this is a known perf trade-off; a
-/// future ROW_NUMBER subquery emit can flip the same external contract
-/// from client-eval to server-eval transparently.
+/// preserved. nORM lowers this to ROW_NUMBER() OVER (PARTITION BY key)
+/// and filters rn = 1 so the dedupe runs in the provider, not after a
+/// full client-side materialization.
 ///
 /// LINQ semantics: keeps the FIRST row encountered per key (source order).
 /// The tests rely on the natural Id-ordered iteration for determinism.

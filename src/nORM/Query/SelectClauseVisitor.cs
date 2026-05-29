@@ -219,8 +219,7 @@ namespace nORM.Query
                 Visit(node.Expression);
                 var dtoSql = sb.ToString(dtoStart, sb.Length - dtoStart);
                 sb.Length = dtoStart;
-                var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-                sb.Append(_provider.GetDateTimeOffsetLocalDateTimeSql(dtoSql, localOffset));
+                sb.Append(DateTimeOffsetLocalTimeSql.Build(_provider, dtoSql));
                 return node;
             }
 
@@ -1720,7 +1719,7 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                // For DateTimeOffset operands, use UTC-epoch-millisecond
+                // For DateTimeOffset operands, use UTC-epoch-microsecond
                 // subtraction (sister of the equality lowering) to avoid the
                 // julianday-delta double-precision noise that turns FromSeconds(15)
                 // into 14.9999991s while still preserving practical sub-second
@@ -1729,11 +1728,7 @@ namespace nORM.Query
                 Type rt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
                 if (lt == typeof(DateTimeOffset) && rt == typeof(DateTimeOffset))
                 {
-                    sb.Append("((")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochMillisecondsSql(leftSql))
-                      .Append(" - ")
-                      .Append(_provider.GetDateTimeOffsetUtcEpochMillisecondsSql(rightSql))
-                      .Append(") / 1000.0)");
+                    sb.Append(_provider.GetDateTimeOffsetDifferenceSecondsSql(leftSql, rightSql));
                 }
                 else
                 {

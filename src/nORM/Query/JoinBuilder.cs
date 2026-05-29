@@ -392,7 +392,9 @@ namespace nORM.Query
     string? orderBy = null,
     bool distinct = false,
     string? outerFromOverride = null,
-    string? additionalOnConditions = null)
+    string? additionalOnConditions = null,
+    Func<Expression, string>? translateProjectionExpression = null,
+    Func<string, string>? escapeProjectionAlias = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -407,7 +409,19 @@ namespace nORM.Query
                 joinSql.Append("DISTINCT ");
             bool wroteAny = false;
 
-            if (projection?.Body is System.Linq.Expressions.NewExpression newExpr)
+            if (projection?.Body != null
+                && translateProjectionExpression != null
+                && escapeProjectionAlias != null
+                && TryAppendProjectionSelectList(
+                    joinSql,
+                    projection.Body,
+                    translateProjectionExpression,
+                    escapeProjectionAlias))
+            {
+                wroteAny = true;
+            }
+
+            if (!wroteAny && projection?.Body is System.Linq.Expressions.NewExpression newExpr)
             {
                 var needed = ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
                 if (needed.Count > 0)
@@ -459,6 +473,52 @@ namespace nORM.Query
                 joinSql.Append(" AND ").Append(additionalOnConditions);
             if (!string.IsNullOrEmpty(orderBy))
                 joinSql.Append(" ORDER BY ").Append(orderBy!);
+        }
+
+        private static bool TryAppendProjectionSelectList(
+            OptimizedSqlBuilder joinSql,
+            Expression projectionBody,
+            Func<Expression, string> translateProjectionExpression,
+            Func<string, string> escapeProjectionAlias)
+        {
+            if (projectionBody is MemberInitExpression memberInit)
+            {
+                var wroteAny = false;
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is not MemberAssignment assignment)
+                        continue;
+
+                    if (wroteAny)
+                        joinSql.Append(", ");
+                    joinSql.Append(translateProjectionExpression(assignment.Expression))
+                        .Append(" AS ")
+                        .Append(escapeProjectionAlias(assignment.Member.Name));
+                    wroteAny = true;
+                }
+
+                return wroteAny;
+            }
+
+            if (projectionBody is NewExpression newExpr)
+            {
+                if (newExpr.Arguments.Any(static arg => arg is ParameterExpression))
+                    return false;
+
+                for (int i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    if (i > 0)
+                        joinSql.Append(", ");
+                    var alias = newExpr.Members?[i].Name ?? $"Item{i + 1}";
+                    joinSql.Append(translateProjectionExpression(newExpr.Arguments[i]))
+                        .Append(" AS ")
+                        .Append(escapeProjectionAlias(alias));
+                }
+
+                return newExpr.Arguments.Count > 0;
+            }
+
+            return false;
         }
 
     }
