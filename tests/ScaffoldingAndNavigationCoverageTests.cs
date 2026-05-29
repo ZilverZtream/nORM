@@ -1195,6 +1195,33 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithInvalidContextName_GeneratesValidContextClass()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE ContextNameEntity (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "1-bad context");
+
+            var contextPath = Path.Combine(dir, "_1BadContext.cs");
+            Assert.True(File.Exists(contextPath));
+            var contextCode = File.ReadAllText(contextPath);
+            Assert.Contains("public class _1BadContext : DbContext", contextCode);
+            Assert.Contains("public _1BadContext(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null)", contextCode);
+            Assert.DoesNotContain("1-bad context", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithQuotedSqlIdentifiers_GeneratesEscapedSourceLiterals()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

@@ -70,7 +70,7 @@ namespace nORM.Scaffolding
                     $"Scaffold namespace '{namespaceName}' is not a valid C# namespace. " +
                     "Use a dot-separated namespace such as 'MyApp.Data'.");
             options ??= new ScaffoldOptions();
-            var safeContextName = EscapeCSharpIdentifier(contextName);
+            var safeContextName = EscapeCSharpIdentifier(ToPascalCase(contextName));
 
             var connectionWasOpen = connection.State == ConnectionState.Open;
             if (!connectionWasOpen)
@@ -119,7 +119,7 @@ namespace nORM.Scaffolding
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships, manyToManyJoins);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins);
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode, options).ConfigureAwait(false);
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
