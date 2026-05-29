@@ -339,7 +339,14 @@ namespace nORM.Scaffolding
                     SELECT SCHEMA_NAME(v.schema_id) AS ObjectSchema, v.name AS ObjectName, 'View' AS Kind, 'SQL Server view' AS Detail
                     FROM sys.views v
                     WHERE v.is_ms_shipped = 0
-                    ORDER BY SCHEMA_NAME(v.schema_id), v.name
+                    UNION ALL
+                    SELECT SCHEMA_NAME(p.schema_id), p.name, 'Routine', 'SQL Server stored procedure'
+                    FROM sys.procedures p
+                    WHERE p.is_ms_shipped = 0
+                    UNION ALL
+                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Sequence', 'SQL Server sequence'
+                    FROM sys.sequences s
+                    ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
 
@@ -349,7 +356,15 @@ namespace nORM.Scaffolding
                     SELECT table_schema AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'PostgreSQL view' AS Detail
                     FROM information_schema.views
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                    ORDER BY table_schema, table_name
+                    UNION ALL
+                    SELECT sequence_schema, sequence_name, 'Sequence', 'PostgreSQL sequence'
+                    FROM information_schema.sequences
+                    WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT routine_schema, routine_name, 'Routine', 'PostgreSQL routine'
+                    FROM information_schema.routines
+                    WHERE routine_schema NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
 
@@ -359,7 +374,11 @@ namespace nORM.Scaffolding
                     SELECT NULL AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'MySQL view' AS Detail
                     FROM information_schema.views
                     WHERE table_schema = DATABASE()
-                    ORDER BY table_name
+                    UNION ALL
+                    SELECT NULL, routine_name, 'Routine', CONCAT('MySQL ', routine_type)
+                    FROM information_schema.routines
+                    WHERE routine_schema = DATABASE()
+                    ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
 

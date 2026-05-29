@@ -76,11 +76,15 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
         Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
         Assert.Contains("views", doc, StringComparison.Ordinal);
-        Assert.Contains("skipped database objects", doc, StringComparison.Ordinal);
+        Assert.Contains("routines", doc, StringComparison.Ordinal);
+        Assert.Contains("sequences", doc, StringComparison.Ordinal);
+        Assert.Contains("skipped", doc, StringComparison.Ordinal);
         Assert.Contains("tables without primary keys", doc, StringComparison.Ordinal);
         Assert.Contains("temporal_type <> 0", source, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", source, StringComparison.Ordinal);
         Assert.Contains("MissingPrimaryKey", source, StringComparison.Ordinal);
+        Assert.Contains("'Routine'", source, StringComparison.Ordinal);
+        Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
     }
 
     [Fact]

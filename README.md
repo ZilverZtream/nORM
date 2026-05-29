@@ -273,7 +273,7 @@ into the model.
 
 Unsupported composite foreign keys, payload join tables, provider-specific
 defaults/computed columns/triggers, SQL Server provider-native temporal tables,
-tables without primary keys, and skipped views are reported in
+tables without primary keys, skipped views, routines, and sequences are reported in
 `nORM.ScaffoldWarnings.md` and
 `nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
 model code.
