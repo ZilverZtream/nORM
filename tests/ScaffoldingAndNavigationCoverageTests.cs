@@ -2037,6 +2037,43 @@ public class DatabaseScaffolderPrivateMethodTests
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNoOverwrite_PreflightsAllFilesBeforeWriting()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE AlphaNoOverwrite (Id INTEGER PRIMARY KEY);
+            CREATE TABLE BetaNoOverwrite (Id INTEGER PRIMARY KEY);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "BetaNoOverwrite.cs"), "// owned");
+
+            await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "NoOverwriteCtx",
+                    new ScaffoldOptions { OverwriteFiles = false }));
+
+            Assert.False(File.Exists(Path.Combine(dir, "AlphaNoOverwrite.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "NoOverwriteCtx.cs")));
+            Assert.Equal("// owned", File.ReadAllText(Path.Combine(dir, "BetaNoOverwrite.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
 }
 
 // ── NavigationContext tests ───────────────────────────────────────────────────

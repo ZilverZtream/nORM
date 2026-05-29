@@ -105,6 +105,7 @@ namespace nORM.Scaffolding
                     entityByTable,
                     columnPropertiesByTable,
                     memberNamesByTable);
+                var generatedFiles = new List<(string Path, string Content)>();
 
                 foreach (var table in tables)
                 {
@@ -126,16 +127,24 @@ namespace nORM.Scaffolding
                     computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
                     rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
                     var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns).ConfigureAwait(false);
-                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
+                    generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins);
-                await WriteGeneratedFileAsync(Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode, options).ConfigureAwait(false);
+                generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
-                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
-                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys), options).ConfigureAwait(false);
+                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
+                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys)));
+                }
+
+                EnsureNoOutputFileConflicts(generatedFiles.Select(file => file.Path), options);
+                foreach (var (path, content) in generatedFiles)
+                    await WriteGeneratedFileAsync(path, content).ConfigureAwait(false);
+
+                if (!string.IsNullOrWhiteSpace(diagnostics))
+                {
                     if (options.FailOnWarnings)
                         throw new NormConfigurationException(
                             "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
@@ -585,14 +594,23 @@ namespace nORM.Scaffolding
                 .ToArray();
         }
 
-        private static async Task WriteGeneratedFileAsync(string path, string content, ScaffoldOptions options)
+        private static void EnsureNoOutputFileConflicts(IEnumerable<string> paths, ScaffoldOptions options)
         {
-            if (!options.OverwriteFiles && File.Exists(path))
-            {
-                throw new NormConfigurationException(
-                    $"Scaffolding output file already exists: '{path}'. Enable overwrite or choose an empty output directory.");
-            }
+            if (options.OverwriteFiles)
+                return;
 
+            foreach (var path in paths)
+            {
+                if (File.Exists(path))
+                {
+                    throw new NormConfigurationException(
+                        $"Scaffolding output file already exists: '{path}'. Enable overwrite or choose an empty output directory.");
+                }
+            }
+        }
+
+        private static async Task WriteGeneratedFileAsync(string path, string content)
+        {
             await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
         }
 
