@@ -40,7 +40,9 @@ must be reviewed and edited like handwritten model code.
   configuration.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
-  indexes without converting them into per-column uniqueness.
+  indexes without converting them into per-column uniqueness. Provider-specific
+  filtered/partial and expression indexes are reported as diagnostics rather
+  than emitted as portable `[Index]` attributes.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   single-column foreign keys, no payload columns, and both references targeting
   single-column primary keys. The join table is emitted as fluent
@@ -71,8 +73,9 @@ must be reviewed and edited like handwritten model code.
   duplicate generated-name handling, table filtering, overwrite protection,
   nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
-  multiple indexes, plus composite-FK, many-to-many candidate, and
-  provider-owned schema diagnostics.
+  multiple indexes, plus role-based naming for duplicate relationships,
+  provider-specific partial/expression index diagnostics, composite-FK,
+  many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
@@ -98,6 +101,9 @@ must be reviewed and edited like handwritten model code.
   triggers, SQL Server provider-native temporal tables, keyless tables, views,
   routines, and sequences are discovered and reported in scaffold diagnostics,
   but not converted into complete provider-neutral model code.
+- Provider-specific filtered/partial indexes and expression indexes. These are
+  discovered and reported for review; v1 scaffolding emits provider-neutral
+  column indexes only.
 
 ## v1 Guidance
 

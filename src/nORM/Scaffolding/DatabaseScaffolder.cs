@@ -561,7 +561,7 @@ namespace nORM.Scaffolding
                     await using var listCommand = connection.CreateCommand();
                     listCommand.CommandText = SqlitePragma(provider, table.Schema, "index_list", table.Name);
                     await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                    var tableIndexes = new List<(string Name, bool IsUnique, string Origin)>();
+                    var tableIndexes = new List<(string Name, bool IsUnique, string Origin, bool IsPartial)>();
                     while (await listReader.ReadAsync().ConfigureAwait(false))
                     {
                         var name = Convert.ToString(listReader["name"]);
@@ -571,20 +571,36 @@ namespace nORM.Scaffolding
                         tableIndexes.Add((
                             name,
                             Convert.ToInt32(listReader["unique"], System.Globalization.CultureInfo.InvariantCulture) != 0,
-                            Convert.ToString(listReader["origin"]) ?? string.Empty));
+                            Convert.ToString(listReader["origin"]) ?? string.Empty,
+                            ReaderHasColumn(listReader, "partial")
+                                && Convert.ToInt32(listReader["partial"], System.Globalization.CultureInfo.InvariantCulture) != 0));
                     }
 
-                    foreach (var (name, isUnique, origin) in tableIndexes)
+                    foreach (var (name, isUnique, origin, isPartial) in tableIndexes)
                     {
-                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase) || isPartial)
                             continue;
 
                         await using var infoCommand = connection.CreateCommand();
-                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_info", name);
+                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", name);
                         await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
                         var columns = new List<(int Ordinal, string Name)>();
+                        var hasUnsupportedKeyPart = false;
                         while (await infoReader.ReadAsync().ConfigureAwait(false))
                         {
+                            if (ReaderHasColumn(infoReader, "key")
+                                && Convert.ToInt32(infoReader["key"], System.Globalization.CultureInfo.InvariantCulture) == 0)
+                            {
+                                continue;
+                            }
+
+                            if (ReaderHasColumn(infoReader, "cid")
+                                && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
+                            {
+                                hasUnsupportedKeyPart = true;
+                                continue;
+                            }
+
                             var columnName = Convert.ToString(infoReader["name"]);
                             if (!string.IsNullOrWhiteSpace(columnName))
                             {
@@ -593,6 +609,9 @@ namespace nORM.Scaffolding
                                     columnName));
                             }
                         }
+
+                        if (hasUnsupportedKeyPart)
+                            continue;
 
                         foreach (var column in columns.OrderBy(static c => c.Ordinal))
                             indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal));
@@ -902,6 +921,57 @@ namespace nORM.Scaffolding
                     }
                 }
 
+                foreach (var table in tables)
+                {
+                    await using var listCommand = connection.CreateCommand();
+                    listCommand.CommandText = SqlitePragma(provider, table.Schema, "index_list", table.Name);
+                    await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                    var indexRows = new List<(string Name, bool IsPartial, string Origin)>();
+                    while (await listReader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var indexName = Convert.ToString(listReader["name"]);
+                        if (string.IsNullOrWhiteSpace(indexName))
+                            continue;
+
+                        indexRows.Add((
+                            indexName,
+                            ReaderHasColumn(listReader, "partial")
+                                && Convert.ToInt32(listReader["partial"], System.Globalization.CultureInfo.InvariantCulture) != 0,
+                            Convert.ToString(listReader["origin"]) ?? string.Empty));
+                    }
+
+                    foreach (var (indexName, isPartial, origin) in indexRows)
+                    {
+                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        if (isPartial)
+                        {
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "PartialIndex", indexName, "SQLite partial index"));
+                            continue;
+                        }
+
+                        await using var infoCommand = connection.CreateCommand();
+                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", indexName);
+                        await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                        while (await infoReader.ReadAsync().ConfigureAwait(false))
+                        {
+                            if (ReaderHasColumn(infoReader, "key")
+                                && Convert.ToInt32(infoReader["key"], System.Globalization.CultureInfo.InvariantCulture) == 0)
+                            {
+                                continue;
+                            }
+
+                            if (ReaderHasColumn(infoReader, "cid")
+                                && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
+                            {
+                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, "SQLite expression index"));
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 return features;
             }
 
@@ -1139,6 +1209,17 @@ namespace nORM.Scaffolding
                 .Replace("<", "&lt;")
                 .Replace(">", "&gt;");
 
+        private static bool ReaderHasColumn(DbDataReader reader, string name)
+        {
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
         private static string SuggestedActionForCompositeForeignKey()
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
@@ -1151,6 +1232,8 @@ namespace nORM.Scaffolding
                 "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
                 "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
+                "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
+                "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."

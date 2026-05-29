@@ -572,10 +572,10 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "1 Bad/Ctx");
 
-            var contextFile = Path.Combine(dir, "_1_Bad_Ctx.cs");
+            var contextFile = Path.Combine(dir, "_1BadCtx.cs");
             Assert.True(File.Exists(contextFile));
             var contextCode = File.ReadAllText(contextFile);
-            Assert.Contains("public class _1_Bad_Ctx : DbContext", contextCode);
+            Assert.Contains("public class _1BadCtx : DbContext", contextCode);
         }
         finally
         {
@@ -900,6 +900,53 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Index(\"IX_IndexedOrder_Tenant\")]", entityCode);
             Assert.Contains("[Index(\"IX_IndexedOrder_Tenant_OrderNo\", IsUnique = true, Order = 0)]", entityCode);
             Assert.Contains("[Index(\"IX_IndexedOrder_Tenant_OrderNo\", IsUnique = true, Order = 1)]", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSqlitePartialAndExpressionIndexes_EmitsDiagnosticsInsteadOfPortableIndexes()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IndexedProviderSpecific (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                Active INTEGER NOT NULL
+            );
+            CREATE INDEX IX_IndexedProviderSpecific_Name_Active ON IndexedProviderSpecific(Name) WHERE Active = 1;
+            CREATE INDEX IX_IndexedProviderSpecific_LowerName ON IndexedProviderSpecific(lower(Name));
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ProviderIndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedProviderSpecific.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_Name_Active\")]", entityCode);
+            Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_LowerName\")]", entityCode);
+            Assert.Contains("PartialIndex", warnings);
+            Assert.Contains("ExpressionIndex", warnings);
+            Assert.Contains("IX_IndexedProviderSpecific_Name_Active", warnings);
+            Assert.Contains("IX_IndexedProviderSpecific_LowerName", warnings);
+
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "PartialIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedProviderSpecific_Name_Active");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedProviderSpecific_LowerName");
         }
         finally
         {
