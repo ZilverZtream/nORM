@@ -126,6 +126,7 @@ public class CliIntegrationTests
             Assert.Contains("Scaffolding produced warnings", result.Stderr + result.Stdout, StringComparison.Ordinal);
             var warningFile = Path.Combine(output, "nORM.ScaffoldWarnings.md");
             Assert.True(File.Exists(warningFile));
+            Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("Default", File.ReadAllText(warningFile), StringComparison.Ordinal);
         }
         finally

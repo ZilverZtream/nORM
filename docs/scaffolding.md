@@ -40,13 +40,13 @@ must be reviewed and edited like handwritten model code.
   CLI `--no-overwrite`.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
-  `nORM.ScaffoldWarnings.md`.
-- Deterministic `nORM.ScaffoldWarnings.md` diagnostics for discovered database
-  features that are not converted into runnable model code. Composite foreign
-  keys are listed there instead of being silently ignored or converted into
-  fake single-column navigations; defaults, computed/generated columns, and
-  triggers are inventoried for review; likely many-to-many join tables are
-  flagged when they are scaffolded as normal entities.
+  `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
+- Deterministic Markdown and JSON diagnostics for discovered database features
+  that are not converted into runnable model code. Composite foreign keys are
+  listed there instead of being silently ignored or converted into fake
+  single-column navigations; defaults, computed/generated columns, and triggers
+  are inventoried for review; likely many-to-many join tables are flagged when
+  they are scaffolded as normal entities.
 
 ## Evidence
 

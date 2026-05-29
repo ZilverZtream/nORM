@@ -11,6 +11,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -706,6 +707,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var dependentCode = File.ReadAllText(Path.Combine(dir, "TenantOrderLine.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeFkCtx.cs"));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.DoesNotContain("List<TenantOrderLine>", principalCode);
             Assert.DoesNotContain("public TenantOrder?", dependentCode);
@@ -715,6 +717,11 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("TenantId, OrderId", warnings);
             Assert.Contains("TenantOrderLine", warnings);
             Assert.Contains("TenantOrder", warnings);
+            var compositeForeignKeys = warningJson.RootElement.GetProperty("compositeForeignKeys");
+            Assert.Equal("TenantOrderLine", compositeForeignKeys[0].GetProperty("dependentTable").GetString());
+            Assert.Equal("TenantOrder", compositeForeignKeys[0].GetProperty("principalTable").GetString());
+            Assert.Equal("TenantId", compositeForeignKeys[0].GetProperty("dependentColumns")[0].GetString());
+            Assert.Equal("OrderId", compositeForeignKeys[0].GetProperty("dependentColumns")[1].GetString());
         }
         finally
         {
@@ -744,6 +751,7 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FeatureOwnedCtx");
 
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.Contains("Default", warnings);
@@ -752,6 +760,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("NameLength", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("name").GetString() == "Name");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
         }
         finally
         {
@@ -788,6 +800,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Scaffolding produced warnings", ex.Message);
             Assert.True(File.Exists(Path.Combine(dir, "WarningOwned.cs")));
             Assert.True(File.Exists(Path.Combine(dir, "WarningOwnedCtx.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             Assert.Contains("Default", warnings);
             Assert.Contains("Status", warnings);
@@ -824,10 +837,15 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinCtx");
 
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("Possible Many-To-Many Join Tables", warnings);
             Assert.Contains("AuthorBook", warnings);
             Assert.Contains("Author", warnings);
             Assert.Contains("Book", warnings);
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
+            Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Author");
+            Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Book");
         }
         finally
         {

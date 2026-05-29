@@ -40,7 +40,8 @@ identifier cleanup, de-duplicated generated names, `INormQueryable<T>` context
 properties, single-column FK navigations, and single-column/composite index
 metadata, including columns that participate in multiple indexes. It is a
 bounded bootstrap tool, not a database-first completeness claim; unsupported
-composite foreign keys are reported in `nORM.ScaffoldWarnings.md`, while
+composite foreign keys are reported in `nORM.ScaffoldWarnings.md` and
+`nORM.ScaffoldWarnings.json`, while
 composite FK navigation generation, owned-type, inheritance, and
 provider-specific computed/default/trigger inference remain explicit
 post-processing. Use `--fail-on-warnings` in CI to reject lossy scaffolds after

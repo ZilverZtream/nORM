@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Configuration;
@@ -105,6 +106,7 @@ namespace nORM.Scaffolding
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
+                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures), options).ConfigureAwait(false);
                     if (options.FailOnWarnings)
                         throw new NormConfigurationException(
                             "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
@@ -865,6 +867,74 @@ namespace nORM.Scaffolding
 
         private static string EscapeMarkdown(string value)
             => value.Replace("\\", "\\\\").Replace("|", "\\|");
+
+        private static string ScaffoldDiagnosticsJson(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures)
+        {
+            var compositeForeignKeys = foreignKeys
+                .Where(fk => fk.ColumnCount > 1)
+                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
+                .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
+                .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
+                .Select(g =>
+                {
+                    var rows = g.ToArray();
+                    var first = rows[0];
+                    return new
+                    {
+                        constraint = first.ConstraintName,
+                        dependentTable = TableKey(first.DependentSchema, first.DependentTable),
+                        dependentColumns = rows.Select(r => r.DependentColumn).ToArray(),
+                        principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable),
+                        principalColumns = rows.Select(r => r.PrincipalColumn).ToArray()
+                    };
+                })
+                .ToArray();
+
+            var possibleJoinTables = foreignKeys
+                .Where(fk => fk.ColumnCount == 1)
+                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new
+                {
+                    TableKey = g.Key,
+                    PrincipalTables = g.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+                    ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
+                })
+                .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .OrderBy(g => g.TableKey, StringComparer.Ordinal)
+                .Select(g => new
+                {
+                    table = g.TableKey,
+                    principalTables = g.PrincipalTables,
+                    constraints = g.ConstraintNames
+                })
+                .ToArray();
+
+            var providerOwnedSchemaFeatures = unsupportedFeatures
+                .OrderBy(f => f.TableKey, StringComparer.Ordinal)
+                .ThenBy(f => f.Kind, StringComparer.Ordinal)
+                .ThenBy(f => f.Name, StringComparer.Ordinal)
+                .Select(f => new
+                {
+                    kind = f.Kind,
+                    table = f.TableKey,
+                    name = f.Name,
+                    detail = f.Detail
+                })
+                .ToArray();
+
+            return JsonSerializer.Serialize(
+                new
+                {
+                    version = 1,
+                    compositeForeignKeys,
+                    possibleManyToManyJoinTables = possibleJoinTables,
+                    providerOwnedSchemaFeatures
+                },
+                new JsonSerializerOptions { WriteIndented = true });
+        }
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
