@@ -58,7 +58,12 @@ function Convert-MeanToNanoseconds {
         return [double]::PositiveInfinity
     }
 
-    $normalized = $Mean.Trim() -replace ',', '.'
+    # BenchmarkDotNet formats means with InvariantCulture: ',' is the thousands
+    # separator (so "1,692.1" means 1692.1, not 1.6921) and '.' is the decimal
+    # point. Strip the separators rather than turning them into extra decimals.
+    # Also normalize both micro code points - MICRO SIGN (U+00B5) and GREEK
+    # SMALL LETTER MU (U+03BC) - to 'u' so the unit match below is encoding-proof.
+    $normalized = ($Mean.Trim() -replace ',', '') -replace "[$([char]0x00B5)$([char]0x03BC)]", 'u'
     if ($normalized -match '^\s*([0-9.]+)\s*(ns|us|µs|ms|s)\s*$') {
         $value = [double]::Parse($matches[1], [Globalization.CultureInfo]::InvariantCulture)
         switch ($matches[2]) {
