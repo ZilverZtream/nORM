@@ -140,7 +140,7 @@ M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility():nORM.Configura
 M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy):nORM.Configuration.DbContextOptions
 M:nORM.Configuration.DbContextOptions.Validate():System.Void
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasConversion``1(nORM.Mapping.ValueConverter{`1,`0}):nORM.Configuration.EntityTypeBuilder{`0}
-M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0,`1}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithOne(System.Linq.Expressions.Expression{System.Func{`1,`0}}):nORM.Configuration.EntityTypeBuilder{`0,`1}

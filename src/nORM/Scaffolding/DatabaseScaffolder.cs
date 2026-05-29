@@ -95,6 +95,7 @@ namespace nORM.Scaffolding
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
+                AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
@@ -781,7 +782,7 @@ namespace nORM.Scaffolding
                     cmd.CommandText = SqlitePragma(provider, table.Schema, "foreign_key_list", table.Name);
                     await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
 
-                    var rows = new List<(long Id, long Seq, string PrincipalTable, string DependentColumn, string PrincipalColumn)>();
+                    var rows = new List<(long Id, long Seq, string PrincipalTable, string DependentColumn, string PrincipalColumn, string OnUpdate, string OnDelete)>();
                     while (await reader.ReadAsync().ConfigureAwait(false))
                     {
                         rows.Add((
@@ -789,7 +790,9 @@ namespace nORM.Scaffolding
                             Convert.ToInt64(reader["seq"]),
                             Convert.ToString(reader["table"]) ?? string.Empty,
                             Convert.ToString(reader["from"]) ?? string.Empty,
-                            Convert.ToString(reader["to"]) ?? string.Empty));
+                            Convert.ToString(reader["to"]) ?? string.Empty,
+                            Convert.ToString(reader["on_update"]) ?? string.Empty,
+                            Convert.ToString(reader["on_delete"]) ?? string.Empty));
                     }
 
                     foreach (var group in rows.GroupBy(r => r.Id))
@@ -812,7 +815,9 @@ namespace nORM.Scaffolding
                                 PrincipalTable: row.PrincipalTable,
                                 PrincipalColumn: row.PrincipalColumn,
                                 ConstraintName: "sqlite_fk_" + row.Id,
-                                ColumnCount: groupRows.Length));
+                                ColumnCount: groupRows.Length,
+                                OnDelete: NormalizeReferentialAction(row.OnDelete),
+                                OnUpdate: NormalizeReferentialAction(row.OnUpdate)));
                         }
                     }
                 }
@@ -831,7 +836,9 @@ namespace nORM.Scaffolding
                         principal.name AS PrincipalTable,
                         principal_col.name AS PrincipalColumn,
                         fk.name AS ConstraintName,
-                        COUNT(*) OVER (PARTITION BY fk.object_id) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY fk.object_id) AS ColumnCount,
+                        fk.delete_referential_action_desc AS OnDelete,
+                        fk.update_referential_action_desc AS OnUpdate
                     FROM sys.foreign_keys fk
                     INNER JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
                     INNER JOIN sys.tables dep ON dep.object_id = fk.parent_object_id
@@ -854,7 +861,21 @@ namespace nORM.Scaffolding
                         principal.relname AS PrincipalTable,
                         principal_att.attname AS PrincipalColumn,
                         con.conname AS ConstraintName,
-                        array_length(con.conkey, 1) AS ColumnCount
+                        array_length(con.conkey, 1) AS ColumnCount,
+                        CASE con.confdeltype
+                            WHEN 'c' THEN 'CASCADE'
+                            WHEN 'n' THEN 'SET NULL'
+                            WHEN 'd' THEN 'SET DEFAULT'
+                            WHEN 'r' THEN 'RESTRICT'
+                            ELSE 'NO ACTION'
+                        END AS OnDelete,
+                        CASE con.confupdtype
+                            WHEN 'c' THEN 'CASCADE'
+                            WHEN 'n' THEN 'SET NULL'
+                            WHEN 'd' THEN 'SET DEFAULT'
+                            WHEN 'r' THEN 'RESTRICT'
+                            ELSE 'NO ACTION'
+                        END AS OnUpdate
                     FROM pg_constraint con
                     INNER JOIN pg_class dep ON dep.oid = con.conrelid
                     INNER JOIN pg_namespace dep_ns ON dep_ns.oid = dep.relnamespace
@@ -880,8 +901,14 @@ namespace nORM.Scaffolding
                         kcu.referenced_table_name AS PrincipalTable,
                         kcu.referenced_column_name AS PrincipalColumn,
                         kcu.constraint_name AS ConstraintName,
-                        COUNT(*) OVER (PARTITION BY kcu.constraint_schema, kcu.table_name, kcu.constraint_name) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY kcu.constraint_schema, kcu.table_name, kcu.constraint_name) AS ColumnCount,
+                        rc.delete_rule AS OnDelete,
+                        rc.update_rule AS OnUpdate
                     FROM information_schema.key_column_usage kcu
+                    INNER JOIN information_schema.referential_constraints rc
+                        ON rc.constraint_schema = kcu.constraint_schema
+                       AND rc.constraint_name = kcu.constraint_name
+                       AND rc.table_name = kcu.table_name
                     WHERE kcu.table_schema = DATABASE()
                       AND kcu.referenced_table_name IS NOT NULL
                     ORDER BY kcu.table_schema, kcu.table_name, kcu.constraint_name, kcu.ordinal_position
@@ -919,10 +946,20 @@ namespace nORM.Scaffolding
                     principalTable,
                     principalColumn,
                     Convert.ToString(reader["ConstraintName"]) ?? string.Empty,
-                    Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture)));
+                    Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture),
+                    ReaderHasColumn(reader, "OnDelete") ? NormalizeReferentialAction(Convert.ToString(reader["OnDelete"])) : "NO ACTION",
+                    ReaderHasColumn(reader, "OnUpdate") ? NormalizeReferentialAction(Convert.ToString(reader["OnUpdate"])) : "NO ACTION"));
             }
 
             return foreignKeys;
+        }
+
+        private static string NormalizeReferentialAction(string? action)
+        {
+            if (string.IsNullOrWhiteSpace(action))
+                return "NO ACTION";
+
+            return action.Replace('_', ' ').Trim().ToUpperInvariant();
         }
 
         private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
@@ -1335,6 +1372,37 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static void AddReferentialActionDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys)
+        {
+            foreach (var group in foreignKeys.GroupBy(
+                fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}",
+                StringComparer.OrdinalIgnoreCase))
+            {
+                var fk = group.First();
+                var onDelete = NormalizeReferentialAction(fk.OnDelete);
+                var onUpdate = NormalizeReferentialAction(fk.OnUpdate);
+                if (string.Equals(onDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                features.Add(new ScaffoldUnsupportedFeature(
+                    TableKey(fk.DependentSchema, fk.DependentTable),
+                    "ReferentialAction",
+                    fk.ConstraintName,
+                    $"ON DELETE {onDelete}; ON UPDATE {onUpdate}"));
+            }
+        }
+
         private static bool ContainsCheckConstraint(string? createTableSql)
             => !string.IsNullOrWhiteSpace(createTableSql)
                && System.Text.RegularExpressions.Regex.IsMatch(
@@ -1512,6 +1580,7 @@ namespace nORM.Scaffolding
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
+                "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
@@ -1799,7 +1868,8 @@ namespace nORM.Scaffolding
                     foreignKeyProperty,
                     principalKeyProperty,
                     referenceName,
-                    collectionName));
+                    collectionName,
+                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)));
             }
 
             return relationships;
@@ -2023,7 +2093,8 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"            mb.Entity<{principal}>()");
                         sb.AppendLine($"                .HasMany(p => p.{collection})");
                         sb.AppendLine($"                .WithOne(d => d.{reference})");
-                        sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey});");
+                        var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
+                        sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey}{cascadeSuffix});");
                     }
                     foreach (var join in manyToManyJoins.OrderBy(j => j.LeftEntityName, StringComparer.Ordinal).ThenBy(j => j.RightEntityName, StringComparer.Ordinal))
                     {
@@ -2388,7 +2459,9 @@ namespace nORM.Scaffolding
             string PrincipalTable,
             string PrincipalColumn,
             string ConstraintName,
-            int ColumnCount);
+            int ColumnCount,
+            string OnDelete = "NO ACTION",
+            string OnUpdate = "NO ACTION");
 
         private readonly record struct ScaffoldIndex(
             string TableKey,
@@ -2406,7 +2479,8 @@ namespace nORM.Scaffolding
             string ForeignKeyPropertyName,
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
-            string CollectionNavigationName);
+            string CollectionNavigationName,
+            bool CascadeDelete);
 
         private readonly record struct ScaffoldManyToManyJoin(
             string JoinTableKey,

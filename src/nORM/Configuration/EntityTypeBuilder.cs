@@ -618,12 +618,14 @@ namespace nORM.Configuration
                 /// </summary>
                 /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
                 /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="cascadeDelete">Whether nORM should cascade deletes through the tracked object graph.</param>
                 /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
                 /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
                 /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
                 public EntityTypeBuilder<TEntity> HasForeignKey(
                     Expression<Func<TDependent, object>> foreignKeyExpression,
-                    Expression<Func<TEntity, object>>? principalKeyExpression = null)
+                    Expression<Func<TEntity, object>>? principalKeyExpression = null,
+                    bool cascadeDelete = true)
                 {
                     ArgumentNullException.ThrowIfNull(foreignKeyExpression);
                     var fkProp = _parent.GetProperty(foreignKeyExpression);
@@ -640,7 +642,7 @@ namespace nORM.Configuration
                     {
                         throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key must be specified for relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name}"));
                     }
-                    _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp));
+                    _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp, cascadeDelete));
                     return _parent;
                 }
             }

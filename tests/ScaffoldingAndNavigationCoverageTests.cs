@@ -823,7 +823,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public Author? Author { get; set; }", bookCode);
             Assert.Contains(".HasMany(p => p.Books)", contextCode);
             Assert.Contains(".WithOne(d => d.Author)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
             Assert.Contains("configure?.Invoke(mb);", contextCode);
             Assert.Contains("var configuredOptions = options?.Clone() ?? new DbContextOptions();", contextCode);
             Assert.DoesNotContain("options.OnModelCreating =", contextCode);
@@ -874,10 +874,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Address? Address { get; set; }", shipmentCode);
             Assert.Contains(".HasMany(p => p.ShipmentsByBillingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.BillingAddress)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.BillingAddressId, p => p.Id);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BillingAddressId, p => p.Id, cascadeDelete: false);", contextCode);
             Assert.Contains(".HasMany(p => p.ShipmentsByShippingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.ShippingAddress)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id, cascadeDelete: false);", contextCode);
         }
         finally
         {
@@ -1214,6 +1214,51 @@ public class DatabaseScaffolderPrivateMethodTests
                 var warnings = File.ReadAllText(warningPath);
                 Assert.DoesNotContain("CheckConstraint", warnings);
             }
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithForeignKeyReferentialActions_PreservesCascadeDeleteFlag()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Parent (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE CascadeChild (
+                Id INTEGER PRIMARY KEY,
+                ParentId INTEGER NOT NULL,
+                CONSTRAINT FK_Cascade_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id) ON DELETE CASCADE
+            );
+            CREATE TABLE RestrictChild (
+                Id INTEGER PRIMARY KEY,
+                ParentId INTEGER NOT NULL,
+                CONSTRAINT FK_Restrict_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id) ON DELETE RESTRICT
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FkActionCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FkActionCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains("ReferentialAction", warnings);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ReferentialAction" &&
+                item.GetProperty("detail").GetString()!.Contains("RESTRICT", StringComparison.Ordinal));
         }
         finally
         {

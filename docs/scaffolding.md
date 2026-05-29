@@ -47,7 +47,9 @@ must be reviewed and edited like handwritten model code.
   exposes the constraint. Generated entities include reference/collection
   navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires
   them through `OnModelCreating` while preserving caller-supplied model
-  configuration.
+  configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
+  cascade behavior; non-cascade delete actions are generated with
+  `cascadeDelete: false`.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
@@ -77,7 +79,7 @@ must be reviewed and edited like handwritten model code.
   listed there instead of being silently ignored or converted into fake
   single-column navigations; defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
-  decimal precision/scale, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
+  decimal precision/scale, non-default FK referential actions, and triggers are inventoried for review; SQL Server provider-native temporal tables and tables without primary keys are reported as provider-owned
   schema; views, routines, and sequences are discovered and reported as skipped
   database objects; likely many-to-many join tables are flagged when they are
   scaffolded as normal entities.
@@ -111,6 +113,9 @@ must be reviewed and edited like handwritten model code.
 - Composite foreign key relationship navigation generation. Composite FK
   constraints are discovered and reported in scaffold diagnostics.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
+- Full FK referential-action modeling beyond tracked-graph cascade on/off.
+  Non-cascade delete actions and update actions are discovered and reported in
+  scaffold diagnostics; provider DDL remains the source of truth.
 - Owned types and inheritance inference.
 - Payload join-table modeling and many-to-many joins whose foreign keys do not
   target single-column primary keys. These are discovered and reported in

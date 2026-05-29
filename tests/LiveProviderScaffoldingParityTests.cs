@@ -74,7 +74,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", labelCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);
-                Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
+                Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
                 Assert.Contains(".HasMany<ScaffoldLiveLabel>(p => p.ScaffoldLiveLabels)", contextCode);
                 Assert.Contains(".WithMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains($".UsingTable(\"", contextCode);
