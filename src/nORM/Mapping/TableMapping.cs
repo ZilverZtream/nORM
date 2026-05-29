@@ -109,7 +109,8 @@ namespace nORM.Mapping
             }
             else
             {
-                var tableName = fluentConfig?.TableName ?? t.GetCustomAttribute<TableAttribute>()?.Name ?? t.Name;
+                var tableAttr = t.GetCustomAttribute<TableAttribute>();
+                var tableName = fluentConfig?.TableName ?? GetTableName(t, tableAttr);
                 EscTable = p.Escape(tableName);
                 TableName = tableName;
             }
@@ -417,6 +418,16 @@ namespace nORM.Mapping
         /// <param name="ForeignKey">The foreign key column on the dependent entity referencing the principal key.</param>
         /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade to dependents.</param>
         public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true);
+
+        private static string GetTableName(Type type, TableAttribute? tableAttribute)
+        {
+            if (tableAttribute is null)
+                return type.Name;
+
+            return string.IsNullOrWhiteSpace(tableAttribute.Schema)
+                ? tableAttribute.Name
+                : tableAttribute.Schema + "." + tableAttribute.Name;
+        }
     }
 
     /// <summary>

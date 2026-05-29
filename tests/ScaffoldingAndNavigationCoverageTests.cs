@@ -48,6 +48,15 @@ public class SanChild
 
 // ── Entity types for ThenInclude tests ────────────────────────────────────────
 
+[Table("SchemaWidget", Schema = "main")]
+[Xunit.Trait("Category", "Fast")]
+public class SanSchemaWidget
+{
+    [Key]
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
 [Table("SAN_TIParent")]
 [Xunit.Trait("Category", "Fast")]
 public class SanTIParent
@@ -553,6 +562,30 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task TableAttributeSchema_IsIncludedInRuntimeTableMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE "main"."SchemaWidget" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                INSERT INTO "main"."SchemaWidget" (Id, Name) VALUES (1, 'schema-ok');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var mapping = ctx.GetMapping(typeof(SanSchemaWidget));
+        Assert.Equal("main.SchemaWidget", mapping.TableName);
+        Assert.Equal("\"main\".\"SchemaWidget\"", mapping.EscTable);
+
+        var rows = await ctx.Query<SanSchemaWidget>().ToListAsync();
+        var row = Assert.Single(rows);
+        Assert.Equal("schema-ok", row.Name);
     }
 
     [Fact]
