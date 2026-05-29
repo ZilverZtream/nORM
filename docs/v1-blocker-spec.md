@@ -662,6 +662,22 @@ Acceptance gate:
 - Runtime API, CLI help, README, generated API docs, and tests all state one
   coherent scaffolding contract.
 
+Resolution note:
+
+- Current v1 scaffolding is a bounded stable tooling surface, not preview.
+  `docs/scaffolding.md`, `README.md`, and `src/dotnet-norm/README.md` define
+  the same contract: base-table entity scaffolding, schema preservation for SQL
+  Server/PostgreSQL/SQLite attached databases, MySQL catalog-portable metadata,
+  nullable-safe generated code, single-column FK navigations, pure many-to-many
+  join mappings, index metadata, warning reports, and `--fail-on-warnings`.
+- Unsupported or non-entity database shapes are reported instead of silently
+  modeled: composite FKs, payload join tables, provider defaults/computed
+  columns/triggers, SQL Server provider-native temporal tables, keyless tables,
+  views, routines, and sequences.
+- Evidence lives in `ScaffoldingAndNavigationCoverageTests`,
+  `ScaffoldingContractDocTests`, `LiveProviderScaffoldingParityTests`,
+  CLI integration scaffolding tests, and package consumer compile tests.
+
 ### 35. Stabilize Temporal Versioning Side Effects
 
 Problem: Temporal versioning creates provider-specific schema objects during
