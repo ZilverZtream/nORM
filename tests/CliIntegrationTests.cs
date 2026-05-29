@@ -97,6 +97,19 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_help_describes_bounded_contract_and_warning_reports()
+    {
+        var root = FindRepositoryRoot();
+
+        var result = RunCli("scaffold --help", root);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("bounded v1 nORM model", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("nORM.ScaffoldWarnings.md/json", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--fail-on-warnings", result.Stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Scaffold_fail_on_warnings_returns_nonzero_after_writing_report()
     {
         var root = FindRepositoryRoot();
