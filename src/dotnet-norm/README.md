@@ -35,14 +35,17 @@ norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.
 ```
 
 The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
-`[Key]`/identity/`[Required]`/`[MaxLength]` metadata, deterministic C#
-identifier cleanup, de-duplicated generated names, `IQueryable<T>` context
-properties backed by nORM's query provider, single-column FK navigations, pure
-many-to-many join mappings, and single-column/composite index metadata,
-including columns that participate in multiple indexes. SQL Server and
-PostgreSQL schemas are preserved, SQLite attached database schemas are
+`[Key]`/identity/computed/`[Timestamp]`/`[Required]`/`[MaxLength]` metadata,
+deterministic C# identifier cleanup, de-duplicated generated names,
+`IQueryable<T>` context properties backed by nORM's query provider,
+single-column FK navigations with cascade/non-cascade delete behavior
+preserved, pure many-to-many join mappings, and single-column/composite index
+metadata, including columns that participate in multiple indexes. SQL Server
+and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL uses the current database for discovery without emitting
-the database/catalog name as a model schema.
+the database/catalog name as a model schema. `--no-overwrite` preflights all
+target files before writing, so a collision does not leave a half-generated
+model.
 
 `--tables` accepts bare table names and schema-qualified names. Literal dotted
 table names are supported, but if a literal dotted table name collides with the
@@ -51,14 +54,17 @@ error because the v1 filter syntax cannot disambiguate those objects safely.
 
 It is a bounded bootstrap tool, not a database-first completeness claim.
 Unsupported composite foreign keys, payload join tables, provider-specific
-defaults/computed columns/triggers, SQL Server provider-native temporal tables,
-tables without primary keys, skipped views, routines, and sequences are reported in
+defaults, computed column expressions, check constraints, collations, provider
+column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
+non-default identity seed/increment, non-default FK referential actions,
+triggers, SQL Server provider-native temporal tables, tables without primary
+keys, SQLite virtual tables/shadow tables, skipped views, routines, sequences,
+synonyms, materialized views, and events are reported in
 `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`. Composite FK
-navigation generation, payload
-join-table modeling, owned-type inference, inheritance inference, view entity
-generation, and provider-specific schema semantics remain explicit
-post-processing. Use `--fail-on-warnings` in CI to reject lossy scaffolds after
-the warning report is written.
+navigation generation, payload join-table modeling, owned-type inference,
+inheritance inference, view entity generation, and provider-specific schema
+semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
+reject lossy scaffolds after the warning report is written.
 
 ## Provider Mobility Certification
 
