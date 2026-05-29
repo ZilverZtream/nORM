@@ -4490,8 +4490,9 @@ public class DatabaseScaffolderCoverageTests
     {
         var code = ScaffoldContext("MyApp", "MyDbContext", new[] { "Product", "Order" });
         Assert.Contains("public class MyDbContext : DbContext", code);
-        Assert.Contains("INormQueryable<Product>", code);
-        Assert.Contains("INormQueryable<Order>", code);
+        Assert.Contains("using System.Linq;", code);
+        Assert.Contains("IQueryable<Product>", code);
+        Assert.Contains("IQueryable<Order>", code);
         Assert.Contains("namespace MyApp", code);
     }
 
@@ -4500,7 +4501,7 @@ public class DatabaseScaffolderCoverageTests
     {
         var code = ScaffoldContext("Test", "Ctx", Array.Empty<string>());
         Assert.Contains("public class Ctx : DbContext", code);
-        Assert.DoesNotContain("INormQueryable<", code);
+        Assert.DoesNotContain("IQueryable<", code);
     }
 
     [Fact]
@@ -6198,8 +6199,8 @@ public class DatabaseScaffolderIntegrationTests
             await DatabaseScaffolder.ScaffoldAsync(fakeConn, new SqliteProvider(), outputDir, "MultiNs", "MultiCtx");
 
             var ctxCode = await File.ReadAllTextAsync(Path.Combine(outputDir, "MultiCtx.cs"));
-            Assert.Contains("INormQueryable<Products>", ctxCode);
-            Assert.Contains("INormQueryable<Orders>", ctxCode);
+            Assert.Contains("IQueryable<Products>", ctxCode);
+            Assert.Contains("IQueryable<Orders>", ctxCode);
 
             Assert.True(File.Exists(Path.Combine(outputDir, "Products.cs")));
             Assert.True(File.Exists(Path.Combine(outputDir, "Orders.cs")));
