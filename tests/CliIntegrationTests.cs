@@ -97,6 +97,45 @@ public class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_fail_on_warnings_returns_nonzero_after_writing_report()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_warn_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_warn_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE WarningRow (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Status TEXT NOT NULL DEFAULT 'new'
+                    );
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --fail-on-warnings",
+                root);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Contains("Scaffolding produced warnings", result.Stderr + result.Stdout, StringComparison.Ordinal);
+            var warningFile = Path.Combine(output, "nORM.ScaffoldWarnings.md");
+            Assert.True(File.Exists(warningFile));
+            Assert.Contains("Default", File.ReadAllText(warningFile), StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Migrations_add_generates_compilable_literals_for_special_sql_text()
     {
         var root = FindRepositoryRoot();
