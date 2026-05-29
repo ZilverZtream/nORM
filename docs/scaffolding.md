@@ -34,6 +34,17 @@ must be reviewed and edited like handwritten model code.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`.
 
+## Evidence
+
+- `ScaffoldingAndNavigationCoverageTests` covers identifier normalization,
+  duplicate generated-name handling, table filtering, overwrite protection,
+  nullable initialization, and SQLite FK navigation generation.
+- `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
+  duplicate generated property handling.
+- `LiveProviderScaffoldingParityTests` covers single-column FK relationship
+  scaffolding against SQLite and any configured SQL Server, PostgreSQL, and
+  MySQL live providers.
+
 ## Not Yet Stable
 
 - Composite foreign key relationship generation.
