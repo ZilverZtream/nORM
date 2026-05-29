@@ -1213,7 +1213,10 @@ namespace nORM.Scaffolding
 
         private static bool ContainsCheckConstraint(string? createTableSql)
             => !string.IsNullOrWhiteSpace(createTableSql)
-               && createTableSql.IndexOf("CHECK", StringComparison.OrdinalIgnoreCase) >= 0;
+               && System.Text.RegularExpressions.Regex.IsMatch(
+                   createTableSql,
+                   @"\bCHECK\s*\(",
+                   System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,

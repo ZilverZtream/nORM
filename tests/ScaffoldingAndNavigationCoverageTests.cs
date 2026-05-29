@@ -1134,6 +1134,38 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCheckInIdentifierName_DoesNotEmitCheckConstraintDiagnostic()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Checkpoint (
+                Id INTEGER PRIMARY KEY,
+                CheckName TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CheckpointCtx");
+
+            var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+            if (File.Exists(warningPath))
+            {
+                var warnings = File.ReadAllText(warningPath);
+                Assert.DoesNotContain("CheckConstraint", warnings);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithKeylessTable_EmitsMissingPrimaryKeyDiagnostic()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
