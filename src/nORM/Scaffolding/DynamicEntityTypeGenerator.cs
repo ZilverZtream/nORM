@@ -25,7 +25,7 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, bool IsComputed, int? MaxLength);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, bool IsComputed, bool IsRowVersion, int? MaxLength);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -180,8 +180,15 @@ namespace nORM.Scaffolding
                         propertyBuilder.SetCustomAttribute(keyAttr);
                     }
 
-                    // Add database-generated attribute for identity/computed columns.
-                    if (col.IsAuto || col.IsComputed)
+                    if (col.IsRowVersion)
+                    {
+                        var timestampAttrCtor = typeof(TimestampAttribute).GetConstructor(Type.EmptyTypes)!;
+                        var timestampAttr = new CustomAttributeBuilder(timestampAttrCtor, Array.Empty<object>());
+                        propertyBuilder.SetCustomAttribute(timestampAttr);
+                    }
+
+                    // Add database-generated attribute for identity/computed/rowversion columns.
+                    if (col.IsAuto || col.IsComputed || col.IsRowVersion)
                     {
                         var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
                         var option = col.IsAuto ? DatabaseGeneratedOption.Identity : DatabaseGeneratedOption.Computed;
@@ -278,6 +285,7 @@ namespace nORM.Scaffolding
                 AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
                 AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
                 AppendDescriptorPart(sb, column.IsComputed ? "CMP" : "NCMP");
+                AppendDescriptorPart(sb, column.IsRowVersion ? "RV" : "NRV");
                 AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
             }
 
@@ -304,6 +312,7 @@ namespace nORM.Scaffolding
             var existingPropertyNames = CreateReservedMemberNameSet();
             var sqliteComputedColumns = GetSqliteComputedColumns(connection, schemaName, tableName);
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
+            var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
@@ -321,6 +330,7 @@ namespace nORM.Scaffolding
                     || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
                     || sqliteComputedColumns.Contains(colName);
+                var isRowVersion = rowVersionColumns.Contains(colName);
 
                 int? maxLength = null;
                 if (clrType == typeof(string) && schema.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
@@ -329,7 +339,7 @@ namespace nORM.Scaffolding
                         maxLength = size;
                 }
 
-                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, isComputed, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, isComputed, isRowVersion, maxLength);
             }
         }
 
@@ -434,6 +444,24 @@ namespace nORM.Scaffolding
             }
 
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
+        {
+            var connectionName = connection.GetType().Name;
+            if (!connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            return QueryColumnNameSet(connection, """
+                SELECT c.name AS ColumnName
+                FROM sys.columns c
+                INNER JOIN sys.tables t ON t.object_id = c.object_id
+                INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                WHERE t.name = @tableName
+                  AND (@schemaName IS NULL OR s.name = @schemaName)
+                  AND ty.name IN ('timestamp', 'rowversion')
+                """, schemaName, tableName);
         }
 
         private static IReadOnlySet<string> QueryColumnNameSet(DbConnection connection, string sql, string? schemaName, string tableName)

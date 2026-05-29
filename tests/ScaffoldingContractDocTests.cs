@@ -154,6 +154,20 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_and_source_pin_dynamic_rowversion_metadata()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs");
+
+        Assert.Contains("computed/identity/rowversion metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("IsRowVersion", source, StringComparison.Ordinal);
+        Assert.Contains("GetRowVersionColumns", source, StringComparison.Ordinal);
+        Assert.Contains("TimestampAttribute", source, StringComparison.Ordinal);
+        Assert.Contains("'timestamp', 'rowversion'", source, StringComparison.Ordinal);
+        Assert.Contains("RV", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_pins_inverse_many_to_many_scaffolding()
     {
         var doc = ReadDoc();
