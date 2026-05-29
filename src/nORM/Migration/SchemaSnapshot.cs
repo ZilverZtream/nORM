@@ -97,6 +97,8 @@ namespace nORM.Migration
         public bool IsUnique { get; set; }
         /// <summary>Non-null means the column is covered by a named index.</summary>
         public string? IndexName { get; set; }
+        /// <summary>Zero-based order of this column within a named composite index.</summary>
+        public int? IndexOrder { get; set; }
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
@@ -217,6 +219,7 @@ namespace nORM.Migration
                         IsPrimaryKey = isPk,
                         IsUnique = (isPk && pkNames.Count == 1) || indexAttr?.IsUnique == true,
                         IndexName = isPk ? "PK_" + table.Name : indexAttr?.Name,
+                        IndexOrder = indexAttr is null ? null : indexAttr.Order,
                         // Treat both Identity and Computed as server-managed columns for snapshot
                         // purposes: both are excluded from INSERT/UPDATE, and both require the
                         // migration generator to omit a NOT NULL constraint without a DEFAULT.
@@ -339,6 +342,7 @@ namespace nORM.Migration
                         // emit per-column UNIQUE constraints.
                         IsUnique     = col.IsKey && pkCount == 1,
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
+                        IndexOrder   = null,
                         IsIdentity   = col.IsDbGenerated,
                     });
                 }
@@ -741,8 +745,8 @@ namespace nORM.Migration
         /// </summary>
         private static Dictionary<string, (bool IsUnique, string[] ColumnNames)> BuildIndexMap(TableSchema table)
         {
-            // Use a List<string> intermediary to avoid O(n^2) Append().ToArray() per column
-            var intermediate = new Dictionary<string, (bool IsUnique, List<string> Columns)>(StringComparer.OrdinalIgnoreCase);
+            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name)> Columns)>(StringComparer.OrdinalIgnoreCase);
+            var sequence = 0;
             foreach (var col in table.Columns)
             {
                 // Include columns that have an explicit IndexName, or are unique/PK (implicit constraint).
@@ -758,15 +762,22 @@ namespace nORM.Migration
                         continue;
                 }
                 if (!intermediate.TryGetValue(indexKey, out var entry))
-                    entry = (col.IsUnique || col.IsPrimaryKey, new List<string>());
+                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name)>());
                 entry.IsUnique = entry.IsUnique || col.IsUnique || col.IsPrimaryKey;
-                entry.Columns.Add(col.Name);
+                entry.Columns.Add((col.IndexOrder, sequence++, col.Name));
                 intermediate[indexKey] = entry;
             }
 
             var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
             foreach (var (key, (isUnique, columns)) in intermediate)
-                map[key] = (isUnique, columns.ToArray());
+            {
+                var orderedColumns = columns
+                    .OrderBy(static column => column.Order ?? int.MaxValue)
+                    .ThenBy(static column => column.Sequence)
+                    .Select(static column => column.Name)
+                    .ToArray();
+                map[key] = (isUnique, orderedColumns);
+            }
             return map;
         }
     }

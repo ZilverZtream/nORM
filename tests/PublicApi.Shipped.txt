@@ -992,6 +992,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
 P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
 P:nORM.Configuration.IndexAttribute.Name:System.String
+P:nORM.Configuration.IndexAttribute.Order:System.Int32
 P:nORM.Configuration.ManyToManyConfiguration.JoinTableName:System.String
 P:nORM.Configuration.ManyToManyConfiguration.LeftFkColumn:System.String
 P:nORM.Configuration.ManyToManyConfiguration.NavPropertyName:System.String
@@ -1171,6 +1172,7 @@ P:nORM.Mapping.ValueConverter{`0,`1}.ProviderType:System.Type
 P:nORM.Migration.ColumnSchema.ClrType:System.String
 P:nORM.Migration.ColumnSchema.DefaultValue:System.String
 P:nORM.Migration.ColumnSchema.IndexName:System.String
+P:nORM.Migration.ColumnSchema.IndexOrder:System.Nullable{System.Int32}
 P:nORM.Migration.ColumnSchema.IsIdentity:System.Boolean
 P:nORM.Migration.ColumnSchema.IsNullable:System.Boolean
 P:nORM.Migration.ColumnSchema.IsPrimaryKey:System.Boolean

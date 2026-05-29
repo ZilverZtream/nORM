@@ -37,10 +37,10 @@ norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.
 The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 `[Key]`/identity/`[Required]`/`[MaxLength]` metadata, deterministic C#
 identifier cleanup, de-duplicated generated names, `INormQueryable<T>` context
-properties, single-column FK navigations, and single-column index metadata. It
-is a bounded bootstrap tool, not a database-first completeness claim; composite
-FK/index, owned-type, inheritance, and provider-specific computed/default/trigger
-inference remain explicit post-processing.
+properties, single-column FK navigations, and single-column/composite index
+metadata. It is a bounded bootstrap tool, not a database-first completeness
+claim; composite FK, owned-type, inheritance, and provider-specific
+computed/default/trigger inference remain explicit post-processing.
 
 ## Provider Mobility Certification
 

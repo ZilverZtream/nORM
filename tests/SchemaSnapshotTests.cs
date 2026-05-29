@@ -41,6 +41,16 @@ public class SchemaSnapshotTests
         public string Code { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotCompositeIndexedEntity")]
+    private class SnapshotCompositeIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("IX_SnapshotComposite_Tenant_Code", IsUnique = true, Order = 1)]
+        public string Code { get; set; } = string.Empty;
+        [Index("IX_SnapshotComposite_Tenant_Code", IsUnique = true, Order = 0)]
+        public int TenantId { get; set; }
+    }
+
  // Helper: build a single-type snapshot using the assembly of the test type
     private static SchemaSnapshot BuildFor(params System.Type[] types)
     {
@@ -123,6 +133,34 @@ public class SchemaSnapshotTests
 
         Assert.Equal("IX_SnapshotIndexedEntity_Code", code.IndexName);
         Assert.True(code.IsUnique);
+    }
+
+    [Fact]
+    public void SchemaDiffer_UsesIndexAttributeOrderForCompositeIndexes()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotCompositeIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotCompositeIndexedEntity");
+        var oldSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = table.Name,
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_" + table.Name },
+                        new ColumnSchema { Name = "TenantId", ClrType = typeof(int).FullName!, IsNullable = false },
+                        new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false }
+                    }
+                }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, snapshot);
+        var added = Assert.Single(diff.AddedIndexes, x => x.IndexName == "IX_SnapshotComposite_Tenant_Code");
+        Assert.True(added.IsUnique);
+        Assert.Equal(new[] { "TenantId", "Code" }, added.ColumnNames);
     }
 
     [Fact]

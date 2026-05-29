@@ -47,7 +47,8 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", authorCode);
                 Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
-                Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Title\")]", bookCode);
+                Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Author_Title\", Order = 0)]", bookCode);
+                Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Author_Title\", Order = 1)]", bookCode);
                 Assert.Contains("public ScaffoldLiveAuthor? ScaffoldLiveAuthor { get; set; }", bookCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);
@@ -78,7 +79,7 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection,
             $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {authorId} {IntType(kind)} NOT NULL, {title} {TextType(kind, 80)} NOT NULL, " +
             $"CONSTRAINT {provider.Escape(FkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}))");
-        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveBook_Title")} ON {book} ({title})");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveBook_Author_Title")} ON {book} ({authorId}, {title})");
     }
 
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)

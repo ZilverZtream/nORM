@@ -202,7 +202,8 @@ namespace nORM.Scaffolding
                     {
                         var safeIndexName = index.Value.IndexName.Replace("\\", "\\\\").Replace("\"", "\\\"");
                         var uniqueSuffix = index.Value.IsUnique ? ", IsUnique = true" : string.Empty;
-                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix})]");
+                        var orderSuffix = index.Value.ColumnCount > 1 ? $", Order = {index.Value.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
+                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
                     }
                     sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");
                     var initializer = !clrType.IsValueType && !allowNull ? " = default!;" : string.Empty;
@@ -349,16 +350,20 @@ namespace nORM.Scaffolding
                         await using var infoCommand = connection.CreateCommand();
                         infoCommand.CommandText = $"PRAGMA index_info({provider.Escape(name)})";
                         await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                        var columns = new List<string>();
+                        var columns = new List<(int Ordinal, string Name)>();
                         while (await infoReader.ReadAsync().ConfigureAwait(false))
                         {
                             var columnName = Convert.ToString(infoReader["name"]);
                             if (!string.IsNullOrWhiteSpace(columnName))
-                                columns.Add(columnName);
+                            {
+                                columns.Add((
+                                    Convert.ToInt32(infoReader["seqno"], System.Globalization.CultureInfo.InvariantCulture),
+                                    columnName));
+                            }
                         }
 
-                        if (columns.Count == 1)
-                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), columns[0], name, isUnique, 1));
+                        foreach (var column in columns.OrderBy(static c => c.Ordinal))
+                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal));
                     }
                 }
 
@@ -374,7 +379,8 @@ namespace nORM.Scaffolding
                         c.name AS ColumnName,
                         i.name AS IndexName,
                         i.is_unique AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
+                        ic.key_ordinal - 1 AS Ordinal
                     FROM sys.indexes i
                     INNER JOIN sys.tables t ON t.object_id = i.object_id
                     INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
@@ -396,7 +402,8 @@ namespace nORM.Scaffolding
                         att.attname AS ColumnName,
                         idx.relname AS IndexName,
                         ix.indisunique AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY ix.indexrelid) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY ix.indexrelid) AS ColumnCount,
+                        key.ord - 1 AS Ordinal
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -418,7 +425,8 @@ namespace nORM.Scaffolding
                         s.column_name AS ColumnName,
                         s.index_name AS IndexName,
                         CASE WHEN s.non_unique = 0 THEN 1 ELSE 0 END AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount
+                        COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount,
+                        s.seq_in_index - 1 AS Ordinal
                     FROM information_schema.statistics s
                     WHERE s.table_schema = DATABASE()
                       AND s.index_name <> 'PRIMARY'
@@ -448,15 +456,13 @@ namespace nORM.Scaffolding
                 }
 
                 var columnCount = Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture);
-                if (columnCount != 1)
-                    continue;
-
                 indexes.Add(new ScaffoldIndex(
                     TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), tableName),
                     columnName,
                     indexName,
                     Convert.ToBoolean(reader["IsUnique"], System.Globalization.CultureInfo.InvariantCulture),
-                    columnCount));
+                    columnCount,
+                    Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture)));
             }
 
             return indexes;
@@ -1131,7 +1137,8 @@ namespace nORM.Scaffolding
             string ColumnName,
             string IndexName,
             bool IsUnique,
-            int ColumnCount);
+            int ColumnCount,
+            int Ordinal);
 
         private readonly record struct ScaffoldRelationship(
             string DependentTableKey,
