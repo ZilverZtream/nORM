@@ -183,9 +183,9 @@ namespace nORM.Scaffolding
                 sb.AppendLine($"namespace {namespaceName};");
                 sb.AppendLine();
                 // Class-level [Table] with schema (if available); escape quotes to prevent code injection
-                var safeTableName = tableName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var safeTableName = EscapeStringLiteral(tableName);
                 var tableAttr = schemaName is not null
-                    ? $"[Table(\"{safeTableName}\", Schema = \"{schemaName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]"
+                    ? $"[Table(\"{safeTableName}\", Schema = \"{EscapeStringLiteral(schemaName)}\")]"
                     : $"[Table(\"{safeTableName}\")]";
                 sb.AppendLine(tableAttr);
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(entityName)}");
@@ -220,7 +220,7 @@ namespace nORM.Scaffolding
                     }
 
                     sb.AppendLine("    /// <summary>");
-                    sb.AppendLine($"    /// Maps to column {colName}");
+                    sb.AppendLine($"    /// Maps to column {EscapeXmlDocumentation(colName)}");
                     sb.AppendLine("    /// </summary>");
                     if (isKey)
                         sb.AppendLine("    [Key]");
@@ -237,12 +237,12 @@ namespace nORM.Scaffolding
                     {
                         if (index.IndexName.Length == 0)
                             continue;
-                        var safeIndexName = index.IndexName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var safeIndexName = EscapeStringLiteral(index.IndexName);
                         var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
                         var orderSuffix = index.ColumnCount > 1 ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
                         sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
                     }
-                    sb.AppendLine($"    [Column(\"{colName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\")]");
+                    sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
                     var initializer = !clrType.IsValueType && !allowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
                     sb.AppendLine();
@@ -1039,15 +1039,15 @@ namespace nORM.Scaffolding
                     sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
-                    sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- |");
+                    sb.AppendLine("| Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- | --- |");
                     foreach (var group in compositeForeignKeys)
                     {
                         var rows = group.ToArray();
                         var first = rows[0];
                         var dependent = TableKey(first.DependentSchema, first.DependentTable);
                         var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
-                        sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} |");
+                        sb.AppendLine($"| {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} | {EscapeMarkdown(SuggestedActionForCompositeForeignKey())} |");
                     }
                 }
 
@@ -1058,10 +1058,10 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("These tables have two single-column foreign key constraints. They are scaffolded as normal entities; review them if you want nORM fluent many-to-many mapping instead.");
                     sb.AppendLine();
-                    sb.AppendLine("| Table | Principal Tables | Constraints |");
-                    sb.AppendLine("| --- | --- | --- |");
+                    sb.AppendLine("| Table | Principal Tables | Constraints | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- |");
                     foreach (var table in possibleJoinTables)
-                        sb.AppendLine($"| {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} |");
+                        sb.AppendLine($"| {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} | {EscapeMarkdown(SuggestedActionForPossibleJoinTable())} |");
                 }
 
                 if (unsupportedFeatures.Count > 0)
@@ -1071,14 +1071,14 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("Defaults, computed/generated columns, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
-                    sb.AppendLine("| Kind | Table | Object | Detail |");
-                    sb.AppendLine("| --- | --- | --- | --- |");
+                    sb.AppendLine("| Kind | Table | Object | Detail | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- | --- |");
                     foreach (var feature in unsupportedFeatures
                         .OrderBy(f => f.TableKey, StringComparer.Ordinal)
                         .ThenBy(f => f.Kind, StringComparer.Ordinal)
                         .ThenBy(f => f.Name, StringComparer.Ordinal))
                     {
-                        sb.AppendLine($"| {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} |");
+                        sb.AppendLine($"| {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} | {EscapeMarkdown(SuggestedActionForUnsupportedFeature(feature.Kind))} |");
                     }
                 }
 
@@ -1089,13 +1089,13 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("Views, routines, and sequences are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
                     sb.AppendLine();
-                    sb.AppendLine("| Kind | Name | Detail |");
-                    sb.AppendLine("| --- | --- | --- |");
+                    sb.AppendLine("| Kind | Name | Detail | Suggested Action |");
+                    sb.AppendLine("| --- | --- | --- | --- |");
                     foreach (var obj in skippedObjects
                         .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
                         .ThenBy(o => o.Kind, StringComparer.Ordinal))
                     {
-                        sb.AppendLine($"| {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} |");
+                        sb.AppendLine($"| {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} | {EscapeMarkdown(SuggestedActionForSkippedObject(obj.Kind))} |");
                     }
                 }
 
@@ -1113,6 +1113,38 @@ namespace nORM.Scaffolding
 
         private static string EscapeStringLiteral(string value)
             => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        private static string EscapeXmlDocumentation(string value)
+            => value
+                .Replace("&", "&amp;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;");
+
+        private static string SuggestedActionForCompositeForeignKey()
+            => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
+
+        private static string SuggestedActionForPossibleJoinTable()
+            => "If this is a pure join table, replace the scaffolded entity with an explicit UsingTable mapping; keep it as an entity if it carries payload or domain behavior.";
+
+        private static string SuggestedActionForUnsupportedFeature(string kind)
+            => kind switch
+            {
+                "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
+                "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
+                "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
+                "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
+                "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
+                _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."
+            };
+
+        private static string SuggestedActionForSkippedObject(string kind)
+            => kind switch
+            {
+                "View" => "Map a supported table-backed model or hand-write a read-only query surface for the view; v1 scaffolding emits base-table entities only.",
+                "Routine" => "Keep routine calls behind explicit raw SQL/stored-procedure code and document the provider-bound contract.",
+                "Sequence" => "Configure generated-key behavior explicitly or keep sequence DDL in provider migrations.",
+                _ => "Keep this database object in provider migrations or hand-written integration code."
+            };
 
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -1136,7 +1168,8 @@ namespace nORM.Scaffolding
                         dependentTable = TableKey(first.DependentSchema, first.DependentTable),
                         dependentColumns = rows.Select(r => r.DependentColumn).ToArray(),
                         principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable),
-                        principalColumns = rows.Select(r => r.PrincipalColumn).ToArray()
+                        principalColumns = rows.Select(r => r.PrincipalColumn).ToArray(),
+                        suggestedAction = SuggestedActionForCompositeForeignKey()
                     };
                 })
                 .ToArray();
@@ -1157,7 +1190,8 @@ namespace nORM.Scaffolding
                 {
                     table = g.TableKey,
                     principalTables = g.PrincipalTables,
-                    constraints = g.ConstraintNames
+                    constraints = g.ConstraintNames,
+                    suggestedAction = SuggestedActionForPossibleJoinTable()
                 })
                 .ToArray();
 
@@ -1170,7 +1204,8 @@ namespace nORM.Scaffolding
                     kind = f.Kind,
                     table = f.TableKey,
                     name = f.Name,
-                    detail = f.Detail
+                    detail = f.Detail,
+                    suggestedAction = SuggestedActionForUnsupportedFeature(f.Kind)
                 })
                 .ToArray();
 
@@ -1181,7 +1216,8 @@ namespace nORM.Scaffolding
                 {
                     kind = o.Kind,
                     name = TableKey(o.Schema, o.Name),
-                    detail = o.Detail
+                    detail = o.Detail,
+                    suggestedAction = SuggestedActionForSkippedObject(o.Kind)
                 })
                 .ToArray();
 

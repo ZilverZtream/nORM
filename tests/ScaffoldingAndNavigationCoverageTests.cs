@@ -950,8 +950,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default" && item.GetProperty("name").GetString() == "Name");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
+            Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
+            Assert.All(skippedObjects.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
         }
         finally
         {
@@ -983,7 +985,8 @@ public class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
-                item.GetProperty("table").GetString() == "KeylessImport");
+                item.GetProperty("table").GetString() == "KeylessImport" &&
+                item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
@@ -1108,6 +1111,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Author");
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Book");
+            Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -1183,6 +1187,38 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public string? Class", entityCode);
             Assert.DoesNotContain("@1st-name", entityCode);
             Assert.DoesNotContain("Has space", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithQuotedSqlIdentifiers_GeneratesEscapedSourceLiterals()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE "Quoted""Back\Table" (
+                "Id" INTEGER PRIMARY KEY,
+                "bad""col\name<&>" TEXT NOT NULL
+            );
+            CREATE INDEX "IX""Back\Name" ON "Quoted""Back\Table" ("bad""col\name<&>");
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "QuotedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "QuotedBackTable.cs"));
+            Assert.Contains("[Table(\"Quoted\\\"Back\\\\Table\")]", entityCode);
+            Assert.Contains("[Column(\"bad\\\"col\\\\name<&>\")]", entityCode);
+            Assert.Contains("[Index(\"IX\\\"Back\\\\Name\")]", entityCode);
+            Assert.Contains("Maps to column bad\"col\\name&lt;&amp;&gt;", entityCode);
         }
         finally
         {

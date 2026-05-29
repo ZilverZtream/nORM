@@ -124,6 +124,12 @@ these top-level fields:
 - `providerOwnedSchemaFeatures`
 - `skippedDatabaseObjects`
 
+Each warning row includes a `suggestedAction` value. The action is intentionally
+specific enough for CI/reporting tools to show the next manual step: add
+explicit model configuration, keep provider-owned DDL in migrations, replace a
+pure join entity with `UsingTable`, add a primary key, or hand-write a
+provider-bound routine/view path.
+
 The report is additive: new fields may be added in later versions, but v1 tools
 should tolerate unknown fields and should not treat an empty diagnostics file as
 provider-mobility evidence.

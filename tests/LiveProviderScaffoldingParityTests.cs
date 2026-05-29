@@ -24,6 +24,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string CompositeParentTable = "ScaffoldLiveCompositeParent";
     private const string CompositeChildTable = "ScaffoldLiveCompositeChild";
     private const string CompositeFkName = "FK_ScaffoldLiveCompositeChild_Parent";
+    private const string WarningTable = "ScaffoldLiveWarning";
+    private const string KeylessTable = "ScaffoldLiveKeyless";
+    private const string WarningView = "ScaffoldLiveWarningView";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -134,6 +137,103 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_reports_provider_owned_and_keyless_diagnostics_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupWarningDiagnosticsAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_warnings_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldWarningContext",
+                    new ScaffoldOptions { Tables = new[] { WarningTable, KeylessTable }, OverwriteFiles = false });
+
+                var warnings = await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+                Assert.Contains("Provider-Owned Schema Features", warnings, StringComparison.Ordinal);
+                Assert.Contains("Default", warnings, StringComparison.Ordinal);
+                Assert.Contains("MissingPrimaryKey", warnings, StringComparison.Ordinal);
+
+                var providerOwned = warningJson.RootElement
+                    .GetProperty("providerOwnedSchemaFeatures")
+                    .EnumerateArray()
+                    .ToArray();
+
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "Default" &&
+                    item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
+                    item.GetProperty("name").GetString() == "Status" &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("default", StringComparison.OrdinalIgnoreCase));
+
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                    item.GetProperty("table").GetString()!.Split('.').Last() == KeylessTable &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownWarningDiagnosticsAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_view_filter_fails_with_skipped_object_diagnostic_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSkippedViewAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_view_filter_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var ex = await Assert.ThrowsAsync<nORM.Core.NormConfigurationException>(() =>
+                    DatabaseScaffolder.ScaffoldAsync(
+                        connection,
+                        provider,
+                        dir,
+                        "LiveScaffold",
+                        "LiveScaffoldViewContext",
+                        new ScaffoldOptions { Tables = new[] { WarningView }, OverwriteFiles = false }));
+
+                Assert.Contains("matched database object", ex.Message, StringComparison.Ordinal);
+                Assert.Contains("View", ex.Message, StringComparison.Ordinal);
+                Assert.Contains(WarningView, ex.Message, StringComparison.Ordinal);
+                Assert.Contains("does not emit as entity classes", ex.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSkippedViewAsync(connection, provider, kind);
+            }
+        }
+    }
+
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
@@ -184,6 +284,42 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(CompositeFkName)} FOREIGN KEY ({tenantId}, {orderNo}) REFERENCES {parent} ({tenantId}, {orderNo}))");
     }
 
+    private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
+        await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+
+        var warning = provider.Escape(WarningTable);
+        var keyless = provider.Escape(KeylessTable);
+        var id = provider.Escape("Id");
+        var status = provider.Escape("Status");
+        var externalId = provider.Escape("ExternalId");
+        var payload = provider.Escape("Payload");
+        var defaultClause = kind == ProviderKind.SqlServer
+            ? $"CONSTRAINT {provider.Escape("DF_ScaffoldLiveWarning_Status")} DEFAULT ('new')"
+            : "DEFAULT 'new'";
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {warning} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {status} {TextType(kind, 32)} NOT NULL {defaultClause})");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {keyless} ({externalId} {TextType(kind, 40)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL)");
+    }
+
+    private static async Task SetupSkippedViewAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropView(kind, WarningView, provider.Escape(WarningView)));
+        await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+
+        var warning = provider.Escape(WarningTable);
+        var view = provider.Escape(WarningView);
+        var id = provider.Escape("Id");
+        var status = provider.Escape("Status");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {warning} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {status} {TextType(kind, 32)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE VIEW {view} AS SELECT {id}, {status} FROM {warning}");
+    }
+
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try
@@ -212,6 +348,32 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task TeardownWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
+            await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSkippedViewAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropView(kind, WarningView, provider.Escape(WarningView)));
+            await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
     private static async Task ExecuteAsync(DbConnection connection, string sql)
     {
         await using var cmd = connection.CreateCommand();
@@ -222,6 +384,10 @@ public sealed class LiveProviderScaffoldingParityTests
     private static string DropTable(ProviderKind kind, string rawName, string escapedName) => kind == ProviderKind.SqlServer
         ? $"IF OBJECT_ID(N'{rawName}', N'U') IS NOT NULL DROP TABLE {escapedName}"
         : $"DROP TABLE IF EXISTS {escapedName}";
+
+    private static string DropView(ProviderKind kind, string rawName, string escapedName) => kind == ProviderKind.SqlServer
+        ? $"IF OBJECT_ID(N'{rawName}', N'V') IS NOT NULL DROP VIEW {escapedName}"
+        : $"DROP VIEW IF EXISTS {escapedName}";
 
     private static string IntType(ProviderKind kind) => kind == ProviderKind.Sqlite ? "INTEGER" : "INT";
 
