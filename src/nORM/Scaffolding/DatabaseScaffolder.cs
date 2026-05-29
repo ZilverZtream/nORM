@@ -86,17 +86,19 @@ namespace nORM.Scaffolding
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable);
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
                     entityByTable,
-                    columnPropertiesByTable);
+                    columnPropertiesByTable,
+                    memberNamesByTable);
 
                 foreach (var table in tables)
                 {
@@ -1413,10 +1415,10 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable)
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
+            Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var existingCollectionNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var joins = new List<ScaffoldManyToManyJoin>();
 
             foreach (var group in foreignKeys
@@ -1460,19 +1462,9 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                if (!existingCollectionNames.TryGetValue(leftTableKey, out var existingNames))
-                {
-                    existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    existingCollectionNames[leftTableKey] = existingNames;
-                }
-
+                var existingNames = GetOrCreateMemberNames(memberNamesByTable, leftTableKey);
                 var leftCollectionName = MakeUnique(Pluralize(rightEntity), existingNames);
-                if (!existingCollectionNames.TryGetValue(rightTableKey, out var existingInverseNames))
-                {
-                    existingInverseNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    existingCollectionNames[rightTableKey] = existingInverseNames;
-                }
-
+                var existingInverseNames = GetOrCreateMemberNames(memberNamesByTable, rightTableKey);
                 var rightCollectionName = MakeUnique(Pluralize(leftEntity), existingInverseNames);
                 joins.Add(new ScaffoldManyToManyJoin(
                     joinTableKey,
@@ -1543,11 +1535,10 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, string> entityByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var relationships = new List<ScaffoldRelationship>();
-            var referenceNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            var collectionNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var relationshipPairCounts = foreignKeys
                 .Where(fk => fk.ColumnCount == 1)
                 .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable) + "\u001f" + TableKey(fk.PrincipalSchema, fk.PrincipalTable), StringComparer.OrdinalIgnoreCase)
@@ -1570,33 +1561,27 @@ namespace nORM.Scaffolding
                     out var relationshipPairCount)
                     && relationshipPairCount > 1;
 
+                var dependentMemberNames = GetOrCreateMemberNames(memberNamesByTable, dependentKey);
                 var referenceBase = principalEntity;
                 if (hasMultipleRelationshipsToSamePrincipal
-                    || referenceNames.TryGetValue(dependentKey, out var existingReferences)
-                    && existingReferences.Contains(referenceBase))
+                    || dependentMemberNames.Contains(referenceBase))
                 {
                     referenceBase = TrimIdSuffix(foreignKeyProperty);
                     if (string.IsNullOrWhiteSpace(referenceBase))
                         referenceBase = principalEntity + "Navigation";
                 }
 
-                referenceNames.TryGetValue(dependentKey, out existingReferences);
-                existingReferences ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                referenceNames[dependentKey] = existingReferences;
-                var referenceName = MakeUnique(referenceBase, existingReferences);
+                var referenceName = MakeUnique(referenceBase, dependentMemberNames);
 
+                var principalMemberNames = GetOrCreateMemberNames(memberNamesByTable, principalKey);
                 var collectionBase = Pluralize(dependentEntity);
                 if (hasMultipleRelationshipsToSamePrincipal
-                    || collectionNames.TryGetValue(principalKey, out var existingCollections)
-                    && existingCollections.Contains(collectionBase))
+                    || principalMemberNames.Contains(collectionBase))
                 {
                     collectionBase = Pluralize(dependentEntity) + "By" + foreignKeyProperty;
                 }
 
-                collectionNames.TryGetValue(principalKey, out existingCollections);
-                existingCollections ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                collectionNames[principalKey] = existingCollections;
-                var collectionName = MakeUnique(collectionBase, existingCollections);
+                var collectionName = MakeUnique(collectionBase, principalMemberNames);
 
                 relationships.Add(new ScaffoldRelationship(
                     dependentKey,
@@ -1650,6 +1635,29 @@ namespace nORM.Scaffolding
             }
 
             return result;
+        }
+
+        private static Dictionary<string, HashSet<string>> BuildMemberNameMap(
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (tableKey, columns) in columnPropertiesByTable)
+                result[tableKey] = new HashSet<string>(columns.Values, StringComparer.OrdinalIgnoreCase);
+
+            return result;
+        }
+
+        private static HashSet<string> GetOrCreateMemberNames(
+            Dictionary<string, HashSet<string>> memberNamesByTable,
+            string tableKey)
+        {
+            if (!memberNamesByTable.TryGetValue(tableKey, out var names))
+            {
+                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                memberNamesByTable[tableKey] = names;
+            }
+
+            return names;
         }
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetPrimaryKeyColumnNamesAsync(

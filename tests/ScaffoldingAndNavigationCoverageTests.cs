@@ -842,6 +842,49 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WhenNavigationNameCollidesWithScalarProperty_MakesNavigationUnique()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Books TEXT NOT NULL
+            );
+            CREATE TABLE Book (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AuthorId INTEGER NOT NULL,
+                Author TEXT NOT NULL,
+                CONSTRAINT FK_Book_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CollisionNavCtx");
+
+            var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CollisionNavCtx.cs"));
+
+            Assert.Contains("public string Books { get; set; } = default!;", authorCode);
+            Assert.Contains("public List<Book> BooksByAuthorId { get; set; } = new();", authorCode);
+            Assert.Contains("public string Author { get; set; } = default!;", bookCode);
+            Assert.Contains("public Author? Author2 { get; set; }", bookCode);
+            Assert.Contains(".HasMany(p => p.BooksByAuthorId)", contextCode);
+            Assert.Contains(".WithOne(d => d.Author2)", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSingleColumnIndexes_GeneratesIndexAttributes()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
