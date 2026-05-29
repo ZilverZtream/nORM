@@ -397,6 +397,7 @@ namespace nORM.Mapping
 
                 ManyToManyJoins.Add(new JoinTableMapping(
                     m2m.JoinTableName,
+                    m2m.JoinTableSchema,
                     m2m.LeftFkColumn,
                     m2m.RightFkColumn,
                     Type,

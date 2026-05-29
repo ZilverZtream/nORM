@@ -268,7 +268,8 @@ preflighted overwrite protection, nullable-safe output, provider
 metadata-backed identity columns, computed/generated column metadata, SQL
 Server rowversion/timestamp metadata, single-column FK
 navigation generation with cascade/non-cascade delete behavior, pure
-many-to-many join mapping, and single-column/composite index metadata are
+many-to-many join mapping including schema-qualified join tables, and
+single-column/composite index metadata are
 supported, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name

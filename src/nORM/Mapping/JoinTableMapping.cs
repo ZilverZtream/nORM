@@ -17,6 +17,9 @@ namespace nORM.Mapping
         /// <summary>Plain join table name.</summary>
         public string TableName { get; }
 
+        /// <summary>Optional schema containing the join table.</summary>
+        public string? SchemaName { get; }
+
         /// <summary>Escaped join table name for use in SQL statements.</summary>
         public string EscTableName { get; }
 
@@ -64,6 +67,7 @@ namespace nORM.Mapping
 
         internal JoinTableMapping(
             string tableName,
+            string? schemaName,
             string leftFkColumn,
             string rightFkColumn,
             Type leftType,
@@ -77,7 +81,8 @@ namespace nORM.Mapping
             DatabaseProvider provider)
         {
             TableName = tableName;
-            EscTableName = provider.Escape(tableName);
+            SchemaName = schemaName;
+            EscTableName = IdentifierEscaping.EscapeTable(provider, tableName, schemaName);
             LeftFkColumn = leftFkColumn;
             RightFkColumn = rightFkColumn;
             EscLeftFkColumn = IdentifierEscaping.EscapeSingle(provider, leftFkColumn);

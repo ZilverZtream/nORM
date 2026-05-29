@@ -152,6 +152,8 @@ public class ScaffoldingContractDocTests
 
         Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
         Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
+        Assert.Contains("schema-aware `UsingTable`", doc, StringComparison.Ordinal);
+        Assert.Contains("JoinTableSchema", source, StringComparison.Ordinal);
         Assert.Contains(".WithMany(p => p.", source, StringComparison.Ordinal);
     }
 

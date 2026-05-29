@@ -1509,6 +1509,44 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSchemaPureJoinTable_PreservesUsingTableSchema()
+    {
+        var auxFile = Path.Combine(Path.GetTempPath(), "san_scaffold_aux_" + Guid.NewGuid().ToString("N") + ".db");
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = $"""
+            ATTACH DATABASE '{auxFile.Replace("'", "''")}' AS aux;
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE aux.Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE aux.Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE aux.AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SchemaJoinCtx");
+
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SchemaJoinCtx.cs"));
+            Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorId\", \"BookId\", schema: \"aux\");", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            if (File.Exists(auxFile)) File.Delete(auxFile);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPayloadJoinTable_EmitsManyToManyDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

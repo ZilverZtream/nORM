@@ -39,7 +39,8 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 deterministic C# identifier cleanup, de-duplicated generated names,
 `IQueryable<T>` context properties backed by nORM's query provider,
 single-column FK navigations with cascade/non-cascade delete behavior
-preserved, pure many-to-many join mappings, and single-column/composite index
+preserved, pure many-to-many join mappings including schema-qualified join
+tables, and single-column/composite index
 metadata, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL uses the current database for discovery without emitting

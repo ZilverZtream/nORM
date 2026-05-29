@@ -1877,7 +1877,8 @@ namespace nORM.Scaffolding
                     joinTableKey,
                     leftTableKey,
                     rightTableKey,
-                    joinTableKey,
+                    left.DependentTable,
+                    left.DependentSchema,
                     leftEntity,
                     rightEntity,
                     left.DependentColumn,
@@ -2379,12 +2380,16 @@ namespace nORM.Scaffolding
                         var collection = EscapeCSharpIdentifier(join.LeftCollectionNavigationName);
                         var inverseCollection = EscapeCSharpIdentifier(join.RightCollectionNavigationName);
                         var joinTable = EscapeStringLiteral(join.JoinTableName);
+                        var joinSchema = join.JoinTableSchema is null ? null : EscapeStringLiteral(join.JoinTableSchema);
                         var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
                         var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
                         sb.AppendLine($"            mb.Entity<{left}>()");
                         sb.AppendLine($"                .HasMany<{right}>(p => p.{collection})");
                         sb.AppendLine($"                .WithMany(p => p.{inverseCollection})");
-                        sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
+                        if (joinSchema is null)
+                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
+                        else
+                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\", schema: \"{joinSchema}\");");
                     }
                     sb.AppendLine("        };");
                     sb.AppendLine("        return configuredOptions;");
@@ -2763,6 +2768,7 @@ namespace nORM.Scaffolding
             string LeftTableKey,
             string RightTableKey,
             string JoinTableName,
+            string? JoinTableSchema,
             string LeftEntityName,
             string RightEntityName,
             string LeftForeignKeyColumn,

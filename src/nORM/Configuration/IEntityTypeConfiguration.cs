@@ -116,5 +116,9 @@ namespace nORM.Configuration
         string JoinTableName,
         string LeftFkColumn,
         string RightFkColumn,
-        string? RelatedNavPropertyName = null);
+        string? RelatedNavPropertyName = null)
+    {
+        /// <summary>Optional schema containing the join table.</summary>
+        public string? JoinTableSchema { get; init; }
+    }
 }

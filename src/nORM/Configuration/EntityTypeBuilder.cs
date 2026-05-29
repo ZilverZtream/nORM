@@ -573,6 +573,21 @@ namespace nORM.Configuration
                 /// and <paramref name="rightFk"/> are the same column name.
                 /// </exception>
                 public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk)
+                    => UsingTable(joinTable, leftFk, rightFk, schema: null);
+
+                /// <summary>
+                /// Specifies the schema-qualified join table, left FK column (this entity's PK) and right FK column (related entity's PK).
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFk">Column referencing this entity's PK.</param>
+                /// <param name="rightFk">Column referencing the related entity's PK.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                /// <exception cref="ArgumentException">
+                /// Thrown when any required parameter is null or whitespace, when <paramref name="schema"/>
+                /// is whitespace, or when <paramref name="leftFk"/> and <paramref name="rightFk"/> are the same column name.
+                /// </exception>
+                public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk, string? schema)
                 {
                     if (string.IsNullOrWhiteSpace(joinTable))
                         throw new ArgumentException("Join table name cannot be null or whitespace.", nameof(joinTable));
@@ -580,6 +595,8 @@ namespace nORM.Configuration
                         throw new ArgumentException("Left FK column name cannot be null or whitespace.", nameof(leftFk));
                     if (string.IsNullOrWhiteSpace(rightFk))
                         throw new ArgumentException("Right FK column name cannot be null or whitespace.", nameof(rightFk));
+                    if (schema is not null && string.IsNullOrWhiteSpace(schema))
+                        throw new ArgumentException("Join table schema cannot be whitespace.", nameof(schema));
                     if (string.Equals(leftFk, rightFk, StringComparison.OrdinalIgnoreCase))
                         throw new ArgumentException(
                             $"The left FK column and right FK column in a many-to-many join table must be different. " +
@@ -591,7 +608,10 @@ namespace nORM.Configuration
                         joinTable,
                         leftFk,
                         rightFk,
-                        _inverseNavName));
+                        _inverseNavName)
+                    {
+                        JoinTableSchema = schema
+                    });
                     return _parent;
                 }
             }

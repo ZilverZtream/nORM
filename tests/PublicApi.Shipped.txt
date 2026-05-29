@@ -142,6 +142,7 @@ M:nORM.Configuration.DbContextOptions.Validate():System.Void
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasConversion``1(nORM.Mapping.ValueConverter{`1,`0}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.String,System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0,`1}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithOne(System.Linq.Expressions.Expression{System.Func{`1,`0}}):nORM.Configuration.EntityTypeBuilder{`0,`1}
 M:nORM.Configuration.EntityTypeBuilder{`0}.#ctor()
@@ -996,6 +997,7 @@ P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
 P:nORM.Configuration.IndexAttribute.Name:System.String
 P:nORM.Configuration.IndexAttribute.Order:System.Int32
 P:nORM.Configuration.ManyToManyConfiguration.JoinTableName:System.String
+P:nORM.Configuration.ManyToManyConfiguration.JoinTableSchema:System.String
 P:nORM.Configuration.ManyToManyConfiguration.LeftFkColumn:System.String
 P:nORM.Configuration.ManyToManyConfiguration.NavPropertyName:System.String
 P:nORM.Configuration.ManyToManyConfiguration.RelatedNavPropertyName:System.String
@@ -1133,6 +1135,7 @@ P:nORM.Mapping.JoinTableMapping.RightFkColumn:System.String
 P:nORM.Mapping.JoinTableMapping.RightNavPropertyName:System.String
 P:nORM.Mapping.JoinTableMapping.RightPkGetter:System.Func{System.Object,System.Object}
 P:nORM.Mapping.JoinTableMapping.RightType:System.Type
+P:nORM.Mapping.JoinTableMapping.SchemaName:System.String
 P:nORM.Mapping.JoinTableMapping.TableName:System.String
 P:nORM.Mapping.OwnedCollectionMapping.CollectionGetter:System.Func{System.Object,System.Object}
 P:nORM.Mapping.OwnedCollectionMapping.CollectionSetter:System.Action{System.Object,System.Object}
