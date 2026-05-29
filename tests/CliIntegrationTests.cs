@@ -213,6 +213,17 @@ public class CliIntegrationTests
                         CONSTRAINT FK_BookLabel_Book FOREIGN KEY (BookId) REFERENCES Book(Id),
                         CONSTRAINT FK_BookLabel_Label FOREIGN KEY (LabelId) REFERENCES Label(Id)
                     );
+                    CREATE TABLE Address (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Line1 TEXT NOT NULL
+                    );
+                    CREATE TABLE Shipment (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        BillingAddressId INTEGER NOT NULL,
+                        ShippingAddressId INTEGER NOT NULL,
+                        CONSTRAINT FK_Shipment_BillingAddress FOREIGN KEY (BillingAddressId) REFERENCES Address(Id),
+                        CONSTRAINT FK_Shipment_ShippingAddress FOREIGN KEY (ShippingAddressId) REFERENCES Address(Id)
+                    );
                     CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
                     CREATE INDEX "IX_Author_Bad""Col" ON Author("bad""col\name<&>");
                     """;
