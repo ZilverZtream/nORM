@@ -481,7 +481,7 @@ namespace nORM.Mapping
             TableName = tableName;
             EscTable = provider.Escape(tableName);
             ForeignKeyColumn = foreignKeyColumn;
-            EscForeignKeyColumn = provider.Escape(foreignKeyColumn);
+            EscForeignKeyColumn = IdentifierEscaping.EscapeSingle(provider, foreignKeyColumn);
             Columns = columns;
             KeyColumns = keyColumns;
 

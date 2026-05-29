@@ -142,6 +142,28 @@ public class ManyToManyTests
     }
 
     [Fact]
+    public void M2M1_JoinTableMapping_LiteralDottedFkColumns_AreEscapedAsSingleIdentifiers()
+    {
+        using var cn = CreateArticleLabelDb();
+        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Article>()
+                  .HasMany<Label>(a => a.Labels)
+                  .WithMany()
+                  .UsingTable("ArticleLabel", "Article.Id", "Label.Id");
+            }
+        });
+
+        var map = ctx.GetMapping(typeof(Article));
+        var jtm = map.ManyToManyJoins[0];
+
+        Assert.Equal("\"Article.Id\"", jtm.EscLeftFkColumn);
+        Assert.Equal("\"Label.Id\"", jtm.EscRightFkColumn);
+    }
+
+    [Fact]
     public void M2M1_WithMany_InverseNavPropertyName_Captured()
     {
         // Test with a context that uses WithMany(inverse) overload

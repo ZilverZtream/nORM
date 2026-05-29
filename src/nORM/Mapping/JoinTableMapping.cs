@@ -80,8 +80,8 @@ namespace nORM.Mapping
             EscTableName = provider.Escape(tableName);
             LeftFkColumn = leftFkColumn;
             RightFkColumn = rightFkColumn;
-            EscLeftFkColumn = provider.Escape(leftFkColumn);
-            EscRightFkColumn = provider.Escape(rightFkColumn);
+            EscLeftFkColumn = IdentifierEscaping.EscapeSingle(provider, leftFkColumn);
+            EscRightFkColumn = IdentifierEscaping.EscapeSingle(provider, rightFkColumn);
             LeftType = leftType;
             RightType = rightType;
             LeftNavPropertyName = leftNavPropertyName;
