@@ -79,8 +79,10 @@ namespace nORM.Scaffolding
             try
             {
                 Directory.CreateDirectory(outputDirectory);
-                var tables = FilterTables(await GetTablesAsync(connection, provider).ConfigureAwait(false), options);
-                var skippedObjects = FilterSkippedObjects(await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false), options);
+                var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
+                var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
+                var tables = FilterTables(discoveredTables, discoveredSkippedObjects, options);
+                var skippedObjects = FilterSkippedObjects(discoveredSkippedObjects, options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
@@ -420,7 +422,10 @@ namespace nORM.Scaffolding
             return $"PRAGMA {prefix}{pragmaName}({provider.Escape(argument)})";
         }
 
-        private static IReadOnlyList<ScaffoldTable> FilterTables(IReadOnlyList<ScaffoldTable> tables, ScaffoldOptions options)
+        private static IReadOnlyList<ScaffoldTable> FilterTables(
+            IReadOnlyList<ScaffoldTable> tables,
+            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
+            ScaffoldOptions options)
         {
             if (options.Tables.Count == 0)
                 return tables;
@@ -444,6 +449,20 @@ namespace nORM.Scaffolding
 
             if (missing.Length > 0)
             {
+                var skippedMatches = skippedObjects
+                    .Where(obj => missing.Any(request => MatchesSkippedObjectFilter(obj, request)))
+                    .Select(obj => $"{obj.Kind} {TableKey(obj.Schema, obj.Name)}")
+                    .OrderBy(value => value, StringComparer.Ordinal)
+                    .ToArray();
+
+                if (skippedMatches.Length > 0)
+                {
+                    throw new NormConfigurationException(
+                        "Scaffolding table filter matched database object(s) that v1 scaffolding does not emit as entity classes: " +
+                        string.Join(", ", skippedMatches) +
+                        ". Scaffold base tables or create a provider-neutral entity manually.");
+                }
+
                 throw new NormConfigurationException(
                     "Scaffolding table filter did not match discovered table(s): " +
                     string.Join(", ", missing));

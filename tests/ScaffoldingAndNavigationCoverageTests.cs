@@ -1294,6 +1294,40 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithViewTableFilter_ThrowsSkippedObjectDiagnostic()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Existing (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE VIEW ExistingView AS SELECT Id, Name FROM Existing;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "FilteredCtx",
+                    new ScaffoldOptions { Tables = new[] { "ExistingView" } }));
+
+            Assert.Contains("matched database object", ex.Message);
+            Assert.Contains("View ExistingView", ex.Message);
+            Assert.Contains("does not emit as entity classes", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithNoOverwrite_RefusesExistingFiles()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
