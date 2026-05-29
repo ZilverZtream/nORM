@@ -33,7 +33,7 @@ var nsOpt = new Option<string>("--namespace") { Description = "Namespace for gen
 var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
 var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names." };
 var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
-var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md." };
+var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md/json." };
 scaffold.Add(connOpt);
 scaffold.Add(providerOpt);
 scaffold.Add(outputOpt);

@@ -63,8 +63,8 @@ must be reviewed and edited like handwritten model code.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures and
   duplicate generated property handling.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
-  scaffolding against SQLite and any configured SQL Server, PostgreSQL, and
-  MySQL live providers.
+  scaffolding and composite-FK diagnostic shape against SQLite and any
+  configured SQL Server, PostgreSQL, and MySQL live providers.
 
 ## Not Yet Stable
 
