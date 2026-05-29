@@ -38,7 +38,9 @@ must be reviewed and edited like handwritten model code.
   different database identifiers normalize to the same C# identifier.
 - The requested namespace is validated before files are written, and the
   generated context file name follows the escaped context class name rather
-  than the raw CLI/API input.
+  than the raw CLI/API input. If that context name collides with an entity
+  class, scaffolding uses a unique context class/file name instead of
+  overwriting the entity file.
 - Single-column foreign key relationship generation when provider metadata
   exposes the constraint. Generated entities include reference/collection
   navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires

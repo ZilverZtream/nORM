@@ -584,6 +584,34 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_ContextNameCollidingWithEntityName_UsesUniqueContextFile()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE Widget (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "Widget");
+
+            Assert.True(File.Exists(Path.Combine(dir, "Widget.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "WidgetContext.cs")));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "Widget.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "WidgetContext.cs"));
+
+            Assert.Contains("public class Widget", entityCode);
+            Assert.Contains("public class WidgetContext : DbContext", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TableAttributeSchema_IsIncludedInRuntimeTableMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

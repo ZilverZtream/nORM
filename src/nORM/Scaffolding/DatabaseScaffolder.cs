@@ -87,6 +87,7 @@ namespace nORM.Scaffolding
                 var skippedObjects = FilterSkippedObjects(discoveredSkippedObjects, options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
+                safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
@@ -2122,6 +2123,18 @@ namespace nORM.Scaffolding
 
             existingNames.Add(unique);
             return unique;
+        }
+
+        private static string MakeUniqueContextName(string contextName, IEnumerable<string> entityNames)
+        {
+            var existingNames = new HashSet<string>(entityNames, StringComparer.OrdinalIgnoreCase);
+            if (!existingNames.Contains(contextName))
+                return contextName;
+
+            var preferred = contextName.EndsWith("Context", StringComparison.Ordinal)
+                ? contextName
+                : contextName + "Context";
+            return MakeUnique(preferred, existingNames);
         }
 
         private static string Pluralize(string name)
