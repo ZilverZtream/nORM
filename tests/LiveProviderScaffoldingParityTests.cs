@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
@@ -34,6 +35,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
+    private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -343,6 +345,40 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Dynamic_scaffolding_marks_generated_columns_as_computed_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await ExecuteAsync(connection, DropTable(kind, DynamicComputedTable, provider.Escape(DynamicComputedTable)));
+            try
+            {
+                await ExecuteAsync(connection, GeneratedColumnTableSql(kind, provider));
+
+                var type = new DynamicEntityTypeGenerator().GenerateEntityType(connection, DynamicComputedTable);
+                var generated = type.GetProperty("NameLength")!
+                    .GetCustomAttributes(typeof(DatabaseGeneratedAttribute), inherit: false)
+                    .Cast<DatabaseGeneratedAttribute>()
+                    .SingleOrDefault();
+
+                Assert.NotNull(generated);
+                Assert.Equal(DatabaseGeneratedOption.Computed, generated.DatabaseGeneratedOption);
+            }
+            finally
+            {
+                await ExecuteAsync(connection, DropTable(kind, DynamicComputedTable, provider.Escape(DynamicComputedTable)));
+            }
+        }
+    }
+
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
@@ -594,4 +630,19 @@ public sealed class LiveProviderScaffoldingParityTests
         : kind == ProviderKind.Sqlite
             ? "TEXT"
             : $"VARCHAR({length})";
+
+    private static string GeneratedColumnTableSql(ProviderKind kind, DatabaseProvider provider)
+    {
+        var table = provider.Escape(DynamicComputedTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var nameLength = provider.Escape("NameLength");
+        return kind switch
+        {
+            ProviderKind.SqlServer => $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {name} NVARCHAR(40) NOT NULL, {nameLength} AS LEN({name}))",
+            ProviderKind.Postgres => $"CREATE TABLE {table} ({id} integer NOT NULL PRIMARY KEY, {name} varchar(40) NOT NULL, {nameLength} integer GENERATED ALWAYS AS (length({name})) STORED)",
+            ProviderKind.MySql => $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {name} VARCHAR(40) NOT NULL, {nameLength} INT GENERATED ALWAYS AS (CHAR_LENGTH({name})) STORED)",
+            _ => $"CREATE TABLE {table} ({id} INTEGER PRIMARY KEY, {name} TEXT NOT NULL, {nameLength} INTEGER GENERATED ALWAYS AS (length({name})) VIRTUAL)"
+        };
+    }
 }

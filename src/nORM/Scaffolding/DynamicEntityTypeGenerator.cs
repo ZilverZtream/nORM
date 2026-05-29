@@ -310,7 +310,7 @@ namespace nORM.Scaffolding
             if (schema is null)
                 yield break;
             var existingPropertyNames = CreateReservedMemberNameSet();
-            var sqliteComputedColumns = GetSqliteComputedColumns(connection, schemaName, tableName);
+            var computedColumns = GetComputedColumns(connection, schemaName, tableName);
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             foreach (DataRow row in schema.Rows)
@@ -329,7 +329,7 @@ namespace nORM.Scaffolding
                 var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
                     || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
-                    || sqliteComputedColumns.Contains(colName);
+                    || computedColumns.Contains(colName);
                 var isRowVersion = rowVersionColumns.Contains(colName);
 
                 int? maxLength = null;
@@ -343,33 +343,73 @@ namespace nORM.Scaffolding
             }
         }
 
-        private static IReadOnlySet<string> GetSqliteComputedColumns(DbConnection connection, string? schemaName, string tableName)
+        private static IReadOnlySet<string> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var connectionName = connection.GetType().Name;
 
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
-                ? string.Empty
-                : EscapeIdentifier(connection, schemaName!) + ".";
-            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
             {
-                if (!ReaderHasColumn(reader, "hidden")
-                    || !ReaderHasColumn(reader, "name")
-                    || Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture) is not (2 or 3))
+                var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using var cmd = connection.CreateCommand();
+                var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                    ? string.Empty
+                    : EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
                 {
-                    continue;
+                    if (!ReaderHasColumn(reader, "hidden")
+                        || !ReaderHasColumn(reader, "name")
+                        || Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture) is not (2 or 3))
+                    {
+                        continue;
+                    }
+
+                    var name = Convert.ToString(reader["name"]);
+                    if (!string.IsNullOrWhiteSpace(name))
+                        result.Add(name);
                 }
 
-                var name = Convert.ToString(reader["name"]);
-                if (!string.IsNullOrWhiteSpace(name))
-                    result.Add(name);
+                return result;
             }
 
-            return result;
+            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT c.name AS ColumnName
+                    FROM sys.computed_columns cc
+                    INNER JOIN sys.columns c ON c.object_id = cc.object_id AND c.column_id = cc.column_id
+                    INNER JOIN sys.tables t ON t.object_id = cc.object_id
+                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                    WHERE t.name = @tableName
+                      AND (@schemaName IS NULL OR s.name = @schemaName)
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_name = @tableName
+                      AND (@schemaName IS NULL OR table_schema = @schemaName)
+                      AND is_generated <> 'NEVER'
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnNameSet(connection, """
+                    SELECT column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = @tableName
+                      AND generation_expression IS NOT NULL
+                      AND generation_expression <> ''
+                    """, schemaName, tableName);
+            }
+
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)

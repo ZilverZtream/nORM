@@ -170,6 +170,10 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs");
 
         Assert.Contains("computed/identity/rowversion metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("GetComputedColumns", source, StringComparison.Ordinal);
+        Assert.Contains("sys.computed_columns", source, StringComparison.Ordinal);
+        Assert.Contains("is_generated <> 'NEVER'", source, StringComparison.Ordinal);
+        Assert.Contains("generation_expression IS NOT NULL", source, StringComparison.Ordinal);
         Assert.Contains("IsRowVersion", source, StringComparison.Ordinal);
         Assert.Contains("GetRowVersionColumns", source, StringComparison.Ordinal);
         Assert.Contains("TimestampAttribute", source, StringComparison.Ordinal);
