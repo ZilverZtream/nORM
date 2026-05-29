@@ -668,12 +668,19 @@ Resolution note:
   `docs/scaffolding.md`, `README.md`, and `src/dotnet-norm/README.md` define
   the same contract: base-table entity scaffolding, schema preservation for SQL
   Server/PostgreSQL/SQLite attached databases, MySQL catalog-portable metadata,
-  nullable-safe generated code, single-column FK navigations, pure many-to-many
-  join mappings, index metadata, warning reports, and `--fail-on-warnings`.
+  nullable-safe generated code, provider metadata-backed identity columns,
+  computed/generated and rowversion metadata, single-column FK navigations
+  only when the FK targets the generated principal primary key,
+  cascade/non-cascade delete preservation, pure many-to-many join mappings
+  including schema-qualified join tables, index metadata, warning reports, and
+  `--fail-on-warnings`.
 - Unsupported or non-entity database shapes are reported instead of silently
-  modeled: composite FKs, payload join tables, provider defaults/computed
-  columns/triggers, SQL Server provider-native temporal tables, keyless tables,
-  views, routines, and sequences.
+  modeled: composite FKs, payload join tables, alternate-key/keyless-principal
+  relationships, provider defaults/computed expressions/check constraints/
+  collations/provider column types/precision, non-default identity settings,
+  non-default FK referential actions, triggers, SQL Server provider-native
+  temporal tables, keyless tables, SQLite virtual tables and shadow tables,
+  views, routines, sequences, synonyms, materialized views, and events.
 - Evidence lives in `ScaffoldingAndNavigationCoverageTests`,
   `ScaffoldingContractDocTests`, `LiveProviderScaffoldingParityTests`,
   CLI integration scaffolding tests, and package consumer compile tests.
