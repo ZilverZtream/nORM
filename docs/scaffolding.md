@@ -38,6 +38,10 @@ must be reviewed and edited like handwritten model code.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness.
+- Pure many-to-many join table generation for the safe v1 subset: exactly two
+  single-column foreign keys, no payload columns, and both references targeting
+  single-column primary keys. The join table is emitted as fluent
+  `HasMany().WithMany().UsingTable(...)` configuration instead of a join entity.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
@@ -71,9 +75,10 @@ must be reviewed and edited like handwritten model code.
 - Composite foreign key relationship navigation generation. Composite FK
   constraints are discovered and reported in scaffold diagnostics.
 - Composite-key and alternate-key modeling beyond provider schema metadata.
-- Owned types, many-to-many join-table modeling, and inheritance inference.
-  Likely join tables are discovered and reported in scaffold diagnostics, but
-  not converted into fluent many-to-many mappings.
+- Owned types and inheritance inference.
+- Payload join-table modeling and many-to-many joins whose foreign keys do not
+  target single-column primary keys. These are discovered and reported in
+  scaffold diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, triggers, and
   temporal tables. Defaults, computed/generated columns, and triggers are
   discovered and reported in scaffold diagnostics, but not converted into

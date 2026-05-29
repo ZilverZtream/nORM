@@ -16,7 +16,11 @@ public sealed class LiveProviderScaffoldingParityTests
 {
     private const string AuthorTable = "ScaffoldLiveAuthor";
     private const string BookTable = "ScaffoldLiveBook";
+    private const string LabelTable = "ScaffoldLiveLabel";
+    private const string BookLabelTable = "ScaffoldLiveBookLabel";
     private const string FkName = "FK_ScaffoldLiveBook_Author";
+    private const string BookLabelBookFkName = "FK_ScaffoldLiveBookLabel_Book";
+    private const string BookLabelLabelFkName = "FK_ScaffoldLiveBookLabel_Label";
     private const string CompositeParentTable = "ScaffoldLiveCompositeParent";
     private const string CompositeChildTable = "ScaffoldLiveCompositeChild";
     private const string CompositeFkName = "FK_ScaffoldLiveCompositeChild_Parent";
@@ -44,20 +48,24 @@ public sealed class LiveProviderScaffoldingParityTests
                     dir,
                     "LiveScaffold",
                     "LiveScaffoldContext",
-                    new ScaffoldOptions { Tables = new[] { AuthorTable, BookTable }, OverwriteFiles = false });
+                    new ScaffoldOptions { Tables = new[] { AuthorTable, BookTable, LabelTable, BookLabelTable }, OverwriteFiles = false });
 
                 var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, AuthorTable + ".cs"));
                 var bookCode = await File.ReadAllTextAsync(Path.Combine(dir, BookTable + ".cs"));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldContext.cs"));
 
+                Assert.False(File.Exists(Path.Combine(dir, BookLabelTable + ".cs")));
                 Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", authorCode);
                 Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
                 Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Author_Title\", Order = 0)]", bookCode);
                 Assert.Contains("[Index(\"IX_ScaffoldLiveBook_Author_Title\", Order = 1)]", bookCode);
                 Assert.Contains("public ScaffoldLiveAuthor? ScaffoldLiveAuthor { get; set; }", bookCode);
+                Assert.Contains("public List<ScaffoldLiveLabel> ScaffoldLiveLabels { get; set; } = new();", bookCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);
                 Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id);", contextCode);
+                Assert.Contains(".HasMany<ScaffoldLiveLabel>(p => p.ScaffoldLiveLabels)", contextCode);
+                Assert.Contains($".UsingTable(\"{BookLabelTable}\", \"BookId\", \"LabelId\");", contextCode);
             }
             finally
             {
@@ -126,20 +134,31 @@ public sealed class LiveProviderScaffoldingParityTests
 
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
+        await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
         await ExecuteAsync(connection, DropTable(kind, BookTable, provider.Escape(BookTable)));
+        await ExecuteAsync(connection, DropTable(kind, LabelTable, provider.Escape(LabelTable)));
         await ExecuteAsync(connection, DropTable(kind, AuthorTable, provider.Escape(AuthorTable)));
 
         var id = provider.Escape("Id");
         var name = provider.Escape("Name");
         var title = provider.Escape("Title");
         var authorId = provider.Escape("Author_Id");
+        var bookId = provider.Escape("BookId");
+        var labelId = provider.Escape("LabelId");
         var author = provider.Escape(AuthorTable);
         var book = provider.Escape(BookTable);
+        var label = provider.Escape(LabelTable);
+        var bookLabel = provider.Escape(BookLabelTable);
 
         await ExecuteAsync(connection, $"CREATE TABLE {author} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 40)} NOT NULL)");
         await ExecuteAsync(connection,
             $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {authorId} {IntType(kind)} NOT NULL, {title} {TextType(kind, 80)} NOT NULL, " +
             $"CONSTRAINT {provider.Escape(FkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}))");
+        await ExecuteAsync(connection, $"CREATE TABLE {label} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 40)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {bookLabel} ({bookId} {IntType(kind)} NOT NULL, {labelId} {IntType(kind)} NOT NULL, PRIMARY KEY ({bookId}, {labelId}), " +
+            $"CONSTRAINT {provider.Escape(BookLabelBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}), " +
+            $"CONSTRAINT {provider.Escape(BookLabelLabelFkName)} FOREIGN KEY ({labelId}) REFERENCES {label} ({id}))");
         await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveBook_Author_Title")} ON {book} ({authorId}, {title})");
     }
 
@@ -167,7 +186,9 @@ public sealed class LiveProviderScaffoldingParityTests
     {
         try
         {
+            await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
             await ExecuteAsync(connection, DropTable(kind, BookTable, provider.Escape(BookTable)));
+            await ExecuteAsync(connection, DropTable(kind, LabelTable, provider.Escape(LabelTable)));
             await ExecuteAsync(connection, DropTable(kind, AuthorTable, provider.Escape(AuthorTable)));
         }
         catch

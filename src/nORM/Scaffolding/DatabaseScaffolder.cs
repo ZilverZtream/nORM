@@ -83,10 +83,16 @@ namespace nORM.Scaffolding
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false);
-                var relationships = BuildRelationships(foreignKeys, entityByTable, columnPropertiesByTable);
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable);
+                var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var relationships = BuildRelationships(
+                    foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
+                    entityByTable,
+                    columnPropertiesByTable);
 
                 foreach (var table in tables)
                 {
@@ -94,24 +100,28 @@ namespace nORM.Scaffolding
                     var schemaName = table.Schema;
 
                     var tableKey = TableKey(schemaName, tableName);
+                    if (manyToManyJoinTableKeys.Contains(tableKey))
+                        continue;
+
                     var entityName = entityByTable[tableKey];
                     entityNames.Add(entityName);
 
                     var references = relationships.Where(r => string.Equals(r.DependentTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     var collections = relationships.Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    var manyToManyCollections = manyToManyJoins.Where(r => string.Equals(r.LeftTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
                     columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections).ConfigureAwait(false);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections).ConfigureAwait(false);
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, entityName + ".cs"), entityCode, options).ConfigureAwait(false);
                 }
 
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, contextName, entityNames, relationships, manyToManyJoins);
                 await WriteGeneratedFileAsync(Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode, options).ConfigureAwait(false);
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics, options).ConfigureAwait(false);
-                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures), options).ConfigureAwait(false);
+                    await WriteGeneratedFileAsync(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, manyToManyJoinTableKeys), options).ConfigureAwait(false);
                     if (options.FailOnWarnings)
                         throw new NormConfigurationException(
                             "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
@@ -139,6 +149,7 @@ namespace nORM.Scaffolding
         /// <param name="indexes">Index metadata for this entity's table.</param>
         /// <param name="references">Reference navigations from this entity to principal entities.</param>
         /// <param name="collections">Collection navigations from this entity to dependent entities.</param>
+        /// <param name="manyToManyCollections">Many-to-many collection navigations from this entity through pure join tables.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -150,7 +161,8 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string>? columnPropertyNames = null,
             IReadOnlyList<ScaffoldIndex>? indexes = null,
             IReadOnlyList<ScaffoldRelationship>? references = null,
-            IReadOnlyList<ScaffoldRelationship>? collections = null)
+            IReadOnlyList<ScaffoldRelationship>? collections = null,
+            IReadOnlyList<ScaffoldManyToManyJoin>? manyToManyCollections = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -242,6 +254,12 @@ namespace nORM.Scaffolding
                 foreach (var collection in collections ?? Array.Empty<ScaffoldRelationship>())
                 {
                     sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.DependentEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
+                    sb.AppendLine();
+                }
+
+                foreach (var collection in manyToManyCollections ?? Array.Empty<ScaffoldManyToManyJoin>())
+                {
+                    sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.RightEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
                     sb.AppendLine();
                 }
 
@@ -776,7 +794,8 @@ namespace nORM.Scaffolding
 
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
-            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures)
+            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
@@ -795,6 +814,7 @@ namespace nORM.Scaffolding
                     ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
                 })
                 .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .ToArray();
 
@@ -872,9 +892,13 @@ namespace nORM.Scaffolding
         private static string EscapeMarkdown(string value)
             => value.Replace("\\", "\\\\").Replace("|", "\\|");
 
+        private static string EscapeStringLiteral(string value)
+            => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
-            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures)
+            IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
@@ -907,6 +931,7 @@ namespace nORM.Scaffolding
                     ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
                 })
                 .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .Select(g => new
                 {
@@ -938,6 +963,89 @@ namespace nORM.Scaffolding
                     providerOwnedSchemaFeatures
                 },
                 new JsonSerializerOptions { WriteIndented = true });
+        }
+
+        private static IReadOnlyList<ScaffoldManyToManyJoin> BuildManyToManyJoins(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldTable> tables,
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable)
+        {
+            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var existingCollectionNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var joins = new List<ScaffoldManyToManyJoin>();
+
+            foreach (var group in foreignKeys
+                .Where(fk => fk.ColumnCount == 1)
+                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase))
+            {
+                var joinTableKey = group.Key;
+                if (!tableKeys.Contains(joinTableKey))
+                    continue;
+
+                var fkRows = group
+                    .GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .OrderBy(fk => fk.DependentColumn, StringComparer.Ordinal)
+                    .ToArray();
+
+                if (fkRows.Length != 2)
+                    continue;
+
+                if (!columnPropertiesByTable.TryGetValue(joinTableKey, out var joinColumns))
+                    continue;
+
+                var fkColumnNames = fkRows.Select(fk => fk.DependentColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (joinColumns.Count != 2 || joinColumns.Keys.Any(column => !fkColumnNames.Contains(column)))
+                    continue;
+
+                var left = fkRows[0];
+                var right = fkRows[1];
+                var leftTableKey = TableKey(left.PrincipalSchema, left.PrincipalTable);
+                var rightTableKey = TableKey(right.PrincipalSchema, right.PrincipalTable);
+                if (!entityByTable.TryGetValue(leftTableKey, out var leftEntity)
+                    || !entityByTable.TryGetValue(rightTableKey, out var rightEntity))
+                {
+                    continue;
+                }
+
+                if (!HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, leftTableKey, left.PrincipalColumn)
+                    || !HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, rightTableKey, right.PrincipalColumn))
+                {
+                    continue;
+                }
+
+                if (!existingCollectionNames.TryGetValue(leftTableKey, out var existingNames))
+                {
+                    existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    existingCollectionNames[leftTableKey] = existingNames;
+                }
+
+                var collectionName = MakeUnique(Pluralize(rightEntity), existingNames);
+                joins.Add(new ScaffoldManyToManyJoin(
+                    joinTableKey,
+                    leftTableKey,
+                    rightTableKey,
+                    joinTableKey.Contains('.') ? GetUnqualifiedName(joinTableKey) : joinTableKey,
+                    leftEntity,
+                    rightEntity,
+                    left.DependentColumn,
+                    right.DependentColumn,
+                    collectionName));
+            }
+
+            return joins;
+        }
+
+        private static bool HasSinglePrimaryKeyColumn(
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
+            string tableKey,
+            string columnName)
+        {
+            return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
+                   && keyColumns.Count == 1
+                   && keyColumns.Contains(columnName);
         }
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
@@ -1040,6 +1148,31 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetPrimaryKeyColumnNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var result = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var table in tables)
+            {
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
+                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
+                var schema = reader.GetSchemaTable()!;
+                var keyColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (DataRow row in schema.Rows)
+                {
+                    if (row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool isKey && isKey)
+                        keyColumns.Add(row["ColumnName"]!.ToString()!);
+                }
+
+                result[TableKey(table.Schema, table.Name)] = keyColumns;
+            }
+
+            return result;
+        }
+
         private static string GetColumnPropertyName(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             string tableKey,
@@ -1095,13 +1228,14 @@ namespace nORM.Scaffolding
         }
 
         private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
-            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>());
+            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>(), Array.Empty<ScaffoldManyToManyJoin>());
 
         private static string ScaffoldContextWithRelationships(
             string namespaceName,
             string contextName,
             IEnumerable<string> entities,
-            IReadOnlyList<ScaffoldRelationship> relationships)
+            IReadOnlyList<ScaffoldRelationship> relationships,
+            IReadOnlyList<ScaffoldManyToManyJoin> manyToManyJoins)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -1110,7 +1244,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("#nullable enable");
                 sb.AppendLine("using System.Data.Common;");
                 sb.AppendLine("using System.Linq;");
-                if (relationships.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0)
                     sb.AppendLine("using System;");
                 sb.AppendLine("using nORM.Core;");
                 sb.AppendLine("using nORM.Configuration;");
@@ -1120,7 +1254,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -1137,7 +1271,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    public IQueryable<{safeEntity}> {queryProperty} => this.Query<{safeEntity}>();");
                 }
 
-                if (relationships.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -1159,6 +1293,19 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"                .HasMany(p => p.{collection})");
                         sb.AppendLine($"                .WithOne(d => d.{reference})");
                         sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey});");
+                    }
+                    foreach (var join in manyToManyJoins.OrderBy(j => j.LeftEntityName, StringComparer.Ordinal).ThenBy(j => j.RightEntityName, StringComparer.Ordinal))
+                    {
+                        var left = EscapeCSharpIdentifier(join.LeftEntityName);
+                        var right = EscapeCSharpIdentifier(join.RightEntityName);
+                        var collection = EscapeCSharpIdentifier(join.CollectionNavigationName);
+                        var joinTable = EscapeStringLiteral(join.JoinTableName);
+                        var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
+                        var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
+                        sb.AppendLine($"            mb.Entity<{left}>()");
+                        sb.AppendLine($"                .HasMany<{right}>(p => p.{collection})");
+                        sb.AppendLine("                .WithMany()");
+                        sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
                     }
                     sb.AppendLine("        };");
                     sb.AppendLine("        return configuredOptions;");
@@ -1498,6 +1645,17 @@ namespace nORM.Scaffolding
             string ForeignKeyPropertyName,
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
+            string CollectionNavigationName);
+
+        private readonly record struct ScaffoldManyToManyJoin(
+            string JoinTableKey,
+            string LeftTableKey,
+            string RightTableKey,
+            string JoinTableName,
+            string LeftEntityName,
+            string RightEntityName,
+            string LeftForeignKeyColumn,
+            string RightForeignKeyColumn,
             string CollectionNavigationName);
 
         private readonly record struct ScaffoldUnsupportedFeature(

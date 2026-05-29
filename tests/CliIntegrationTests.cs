@@ -161,6 +161,17 @@ public class CliIntegrationTests
                         Title TEXT NOT NULL,
                         CONSTRAINT FK_Book_Author FOREIGN KEY (Author_Id) REFERENCES Author(Id)
                     );
+                    CREATE TABLE Label (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL
+                    );
+                    CREATE TABLE BookLabel (
+                        BookId INTEGER NOT NULL,
+                        LabelId INTEGER NOT NULL,
+                        PRIMARY KEY (BookId, LabelId),
+                        CONSTRAINT FK_BookLabel_Book FOREIGN KEY (BookId) REFERENCES Book(Id),
+                        CONSTRAINT FK_BookLabel_Label FOREIGN KEY (LabelId) REFERENCES Label(Id)
+                    );
                     CREATE INDEX IX_Book_Author_Title ON Book(Author_Id, Title);
                     """;
                 cmd.ExecuteNonQuery();
