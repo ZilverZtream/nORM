@@ -1028,7 +1028,7 @@ namespace nORM.Scaffolding
                     joinTableKey,
                     leftTableKey,
                     rightTableKey,
-                    joinTableKey.Contains('.') ? GetUnqualifiedName(joinTableKey) : joinTableKey,
+                    joinTableKey,
                     leftEntity,
                     rightEntity,
                     left.DependentColumn,
