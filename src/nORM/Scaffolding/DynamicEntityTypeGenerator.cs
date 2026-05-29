@@ -24,7 +24,7 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool IsKey, bool IsAuto, int? MaxLength);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, int? MaxLength);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -257,10 +257,10 @@ namespace nORM.Scaffolding
             {
                 var (schemaName, bareTable) = SplitSchema(tableName);
                 var columns = GetTableSchema(connection, schemaName, bareTable).ToList();
-                // Include IsNullable and IsPrimaryKey in descriptor so different nullability/key
+                // Include database nullability and primary-key status in descriptor so different nullability/key
                 // configs produce different signatures.
                 var descriptor = string.Join(",", columns.Select(c =>
-                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(IsNullableType(c.PropertyType) ? "N" : "NN")}"));
+                    $"{c.ColumnName}:{c.PropertyType.FullName}:{(c.IsKey ? "PK" : "C")}:{(c.AllowsNull ? "N" : "NN")}"));
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
                 return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
             }
@@ -303,7 +303,7 @@ namespace nORM.Scaffolding
                         maxLength = size;
                 }
 
-                yield return new ColumnInfo(colName, propName, propertyType, isKey, isAuto, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, maxLength);
             }
         }
 
@@ -361,9 +361,6 @@ namespace nORM.Scaffolding
 
             return type;
         }
-
-        private static bool IsNullableType(Type t) =>
-            !t.IsValueType || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
 
         private static string ToPascalCase(string name)
         {

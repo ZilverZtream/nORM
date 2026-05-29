@@ -114,6 +114,26 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void DifferentNullability_DifferentSignature_ForReferenceTypes()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE T4b (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = "CREATE TABLE T4b (Id INTEGER PRIMARY KEY, Name TEXT)";
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var sig1 = gen.ComputeSchemaSignature(cn, "T4b");
+        var sig2 = gen.ComputeSchemaSignature(cn2, "T4b");
+
+        Assert.NotEqual(sig1, sig2);
+    }
+
+    [Fact]
     public void AddedColumn_DifferentSignature()
     {
         using var cn = OpenMemory();
