@@ -868,6 +868,46 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithPostgresFunction_EmitsSelectInvocationWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate_risk",
+            "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=customer_id:IN:integer; dataType=integer");
+
+        Assert.Contains("Executes provider-bound function `public.calculate_risk`", code);
+        Assert.Contains("public int? customer_id { get; init; }", code);
+        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithPostgresTableFunction_EmitsSelectStarInvocationWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "customer_orders",
+            "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=customer_id:IN:integer; dataType=record");
+
+        Assert.Contains("Executes provider-bound function `public.customer_orders`", code);
+        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
+        Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithMySqlFunction_EmitsSelectInvocationWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            null,
+            "calculate_risk",
+            "MySQL FUNCTION; parameters=1; outputParameters=0; parameterModes=customer_id:IN:int; dataType=int");
+
+        Assert.Contains("Executes provider-bound FUNCTION `calculate_risk`", code);
+        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithSqlServerSequence_EmitsNextValueWrapper()
     {
         var code = InvokeScaffoldContextWithSequence(

@@ -286,8 +286,9 @@ DDL.
 SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
 SQL Server/MySQL expression-index shapes are kept on the safer generated-column
 path.
-Opt-in routine stubs include SQL Server scalar and table-valued functions as
-provider-bound `SELECT` wrappers instead of stored-procedure calls.
+Opt-in routine stubs include SQL Server scalar/table-valued functions plus
+PostgreSQL and MySQL functions as provider-bound `SELECT` wrappers instead of
+stored-procedure calls.
 Opt-in sequence stubs generate provider-bound next-value wrappers for SQL Server
 and PostgreSQL standalone sequences.
 SQL Server

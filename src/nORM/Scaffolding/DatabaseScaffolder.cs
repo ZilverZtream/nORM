@@ -674,6 +674,12 @@ namespace nORM.Scaffolding
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
                            ), '') ||
+                           '; callShape=' ||
+                           CASE
+                               WHEN UPPER(r.routine_type) = 'FUNCTION' AND LOWER(COALESCE(r.data_type, '')) IN ('record', 'table') THEN 'table-valued-function'
+                               WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
+                               ELSE ''
+                           END ||
                            '; dataType=' || COALESCE(r.data_type, '')
                     FROM information_schema.routines r
                     WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
@@ -712,6 +718,11 @@ namespace nORM.Scaffolding
                                             FROM information_schema.parameters p
                                             WHERE p.specific_schema = r.routine_schema
                                               AND p.specific_name = r.specific_name), ''),
+                                  '; callShape=',
+                                  CASE
+                                      WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
+                                      ELSE ''
+                                  END,
                                   '; dataType=', COALESCE(r.data_type, ''))
                     FROM information_schema.routines r
                     WHERE r.routine_schema = DATABASE()
@@ -2618,24 +2629,48 @@ namespace nORM.Scaffolding
                     values[pair[0].Trim()] = pair[1].Trim();
             }
 
+            var provider = ParseRoutineProvider(segments.Length > 0 ? segments[0] : string.Empty);
+            var routineType = ParseRoutineType(segments.Length > 0 ? segments[0] : string.Empty);
+            values.TryGetValue("dataType", out var dataType);
             var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["provider"] = ParseRoutineProvider(segments.Length > 0 ? segments[0] : string.Empty),
-                ["routineType"] = ParseRoutineType(segments.Length > 0 ? segments[0] : string.Empty),
+                ["provider"] = provider,
+                ["routineType"] = routineType,
                 ["parameterCount"] = ParseNullableInt(values.TryGetValue("parameters", out var parameterCount) ? parameterCount : null),
                 ["outputParameterCount"] = ParseNullableInt(values.TryGetValue("outputParameters", out var outputParameterCount) ? outputParameterCount : null)
             };
 
-            if (values.TryGetValue("dataType", out var dataType) && !string.IsNullOrWhiteSpace(dataType))
+            if (!string.IsNullOrWhiteSpace(dataType))
                 metadata["dataType"] = dataType;
 
             if (values.TryGetValue("callShape", out var callShape) && !string.IsNullOrWhiteSpace(callShape))
                 metadata["callShape"] = callShape;
+            else
+            {
+                var inferredCallShape = InferRoutineCallShape(provider, routineType, dataType);
+                if (!string.IsNullOrWhiteSpace(inferredCallShape))
+                    metadata["callShape"] = inferredCallShape;
+            }
 
             if (values.TryGetValue("parameterModes", out var parameterModes))
                 metadata["parameters"] = ParseRoutineParameters(parameterModes);
 
             return metadata;
+        }
+
+        private static string InferRoutineCallShape(string provider, string routineType, string? dataType)
+        {
+            if (!routineType.Contains("function", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            if (provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(dataType, "record", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(dataType, "table", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "table-valued-function";
+            }
+
+            return "scalar-function";
         }
 
         private static string ParseRoutineProvider(string header)

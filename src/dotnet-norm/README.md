@@ -93,8 +93,9 @@ provider-bound work.
 Use `--emit-sequence-stubs` to generate provider-bound next-value wrappers for
 SQL Server and PostgreSQL standalone sequences; sequence DDL and allocation
 semantics remain provider-owned.
-With `--emit-routine-stubs`, SQL Server scalar and table-valued functions are
-emitted as provider-bound `SELECT` wrappers instead of stored-procedure calls.
+With `--emit-routine-stubs`, SQL Server scalar/table-valued functions plus
+PostgreSQL and MySQL functions are emitted as provider-bound `SELECT` wrappers
+instead of stored-procedure calls.
 When warnings are present, the CLI prints a compact summary with stable
 diagnostic codes and categories, for example `SCF100=1` and
 `schema-feature=1`, so CI logs can route scaffold follow-up without parsing the
