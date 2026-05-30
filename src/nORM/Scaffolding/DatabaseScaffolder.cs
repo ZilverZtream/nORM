@@ -158,6 +158,7 @@ namespace nORM.Scaffolding
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
                     && TryParseDecimalPrecision(feature.Detail, out _, out _));
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
+                var providerNativeTemporalHistoryTableKeys = BuildProviderNativeTemporalHistoryTableKeys(unsupportedFeatures);
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
@@ -201,6 +202,7 @@ namespace nORM.Scaffolding
                     sqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
                     providerSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
                     var isReadOnlyEntity = queryArtifactTableKeys.Contains(tableKey)
+                        || providerNativeTemporalHistoryTableKeys.Contains(tableKey)
                         || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
                         || primaryKeyColumns.Count == 0;
                     var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
@@ -3888,6 +3890,22 @@ namespace nORM.Scaffolding
                 pair => pair.Key,
                 pair => (IReadOnlySet<string>)pair.Value,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static HashSet<string> BuildProviderNativeTemporalHistoryTableKeys(
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in features)
+            {
+                if (string.Equals(feature.Kind, "TemporalTable", StringComparison.OrdinalIgnoreCase)
+                    && feature.Detail.Contains("history table", StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(feature.TableKey);
+                }
+            }
+
+            return result;
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildFeatureDetailMap(

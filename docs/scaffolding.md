@@ -272,7 +272,9 @@ must be reviewed and edited like handwritten model code.
   relationships that do not target the generated principal primary key or an
   exact ordered unfiltered unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
-  are reported as provider-owned schema; tables without primary keys are emitted
+  are reported as provider-owned schema, and provider-native temporal history
+  tables are emitted as `[ReadOnlyEntity]` so generated write paths fail closed;
+  tables without primary keys are emitted
   as read-only generated types and still reported so reviewers know writes and
   navigations require a real key; views,
   PostgreSQL materialized views, SQLite virtual tables, routines, sequences,

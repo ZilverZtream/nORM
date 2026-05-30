@@ -44,6 +44,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
     private const string ProviderPrefixIndex = "IX_ScaffoldLiveProviderIndex_Prefix";
+    private const string SqlServerTemporalBaseTable = "ScaffoldLiveTemporalOrder";
+    private const string SqlServerTemporalHistoryTable = "ScaffoldLiveTemporalOrderHistory";
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
@@ -699,6 +701,58 @@ public sealed class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_reports_sqlserver_native_temporal_tables_and_marks_history_read_only()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerNativeTemporalTableAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_temporal_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerTemporalContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { "dbo." + SqlServerTemporalBaseTable, "dbo." + SqlServerTemporalHistoryTable },
+                        OverwriteFiles = false
+                    });
+
+                var baseCode = await File.ReadAllTextAsync(Path.Combine(dir, SqlServerTemporalBaseTable + ".cs"));
+                var historyCode = await File.ReadAllTextAsync(Path.Combine(dir, SqlServerTemporalHistoryTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain("[ReadOnlyEntity]", baseCode, StringComparison.Ordinal);
+                Assert.Contains("[ReadOnlyEntity]", historyCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "TemporalTable" &&
+                    item.GetProperty("table").GetString() == "dbo." + SqlServerTemporalBaseTable &&
+                    item.GetProperty("code").GetString() == "SCF115");
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "TemporalTable" &&
+                    item.GetProperty("table").GetString() == "dbo." + SqlServerTemporalHistoryTable &&
+                    item.GetProperty("detail").GetString()!.Contains("history table", StringComparison.OrdinalIgnoreCase));
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerNativeTemporalTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
@@ -1004,6 +1058,63 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({id} {IntType(ProviderKind.MySql)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.MySql, 80)} NOT NULL)");
         await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPrefixIndex)} ON {table} ({name}(8))");
     }
+
+    private static async Task SetupSqlServerNativeTemporalTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerNativeTemporalTableAsync(connection, provider);
+
+        var table = SqlServerQualified(provider, SqlServerTemporalBaseTable);
+        var history = SqlServerQualified(provider, SqlServerTemporalHistoryTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var validFrom = provider.Escape("ValidFrom");
+        var validTo = provider.Escape("ValidTo");
+
+        await ExecuteAsync(connection, $$"""
+            CREATE TABLE {{table}} (
+                {{id}} INT NOT NULL PRIMARY KEY,
+                {{name}} NVARCHAR(80) NOT NULL,
+                {{validFrom}} DATETIME2 GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
+                {{validTo}} DATETIME2 GENERATED ALWAYS AS ROW END HIDDEN NOT NULL,
+                PERIOD FOR SYSTEM_TIME ({{validFrom}}, {{validTo}})
+            ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = {{history}}))
+            """);
+    }
+
+    private static async Task TeardownSqlServerNativeTemporalTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            var table = SqlServerQualified(provider, SqlServerTemporalBaseTable);
+            var history = SqlServerQualified(provider, SqlServerTemporalHistoryTable);
+            await ExecuteAsync(connection, $$"""
+                IF OBJECT_ID(N'dbo.{{SqlServerTemporalBaseTable}}', N'U') IS NOT NULL
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM sys.tables
+                        WHERE object_id = OBJECT_ID(N'dbo.{{SqlServerTemporalBaseTable}}')
+                          AND temporal_type = 2
+                    )
+                    BEGIN
+                        ALTER TABLE {{table}} SET (SYSTEM_VERSIONING = OFF);
+                    END;
+
+                    DROP TABLE {{table}};
+                END;
+
+                IF OBJECT_ID(N'dbo.{{SqlServerTemporalHistoryTable}}', N'U') IS NOT NULL
+                    DROP TABLE {{history}};
+                """);
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static string SqlServerQualified(DatabaseProvider provider, string tableName)
+        => provider.Escape("dbo") + "." + provider.Escape(tableName);
 
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
