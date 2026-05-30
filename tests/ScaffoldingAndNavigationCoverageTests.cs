@@ -8,9 +8,11 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -2172,6 +2174,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Table(\"DuplicateName\", Schema = \"auxb\")]", auxbCode);
             Assert.Contains("IQueryable<AuxaDuplicateName> AuxaDuplicateNames", contextCode);
             Assert.Contains("IQueryable<AuxbDuplicateName> AuxbDuplicateNames", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {
@@ -2369,6 +2372,53 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    private static void AssertScaffoldOutputBuildsAsConsumerProject(string outputDirectory)
+    {
+        var root = FindRepositoryRoot();
+        File.WriteAllText(Path.Combine(outputDirectory, "ScaffoldedConsumer.csproj"), $$"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <Nullable>enable</Nullable>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+              </ItemGroup>
+            </Project>
+            """, Encoding.UTF8);
+
+        var psi = new ProcessStartInfo("dotnet", "build -c Release --nologo")
+        {
+            WorkingDirectory = outputDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start dotnet build.");
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.True(process.ExitCode == 0,
+            $"Scaffolded output failed to build with exit code {process.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{stderr}");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (File.Exists(Path.Combine(dir, "nORM.sln")))
+                return dir;
+
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root from " + AppContext.BaseDirectory);
     }
 }
 
@@ -2965,4 +3015,5 @@ public class NormIncludableQueryableTests
         // The expression tree for Include wraps a MethodCallExpression
         Assert.Equal(System.Linq.Expressions.ExpressionType.Call, expr.NodeType);
     }
+
 }
