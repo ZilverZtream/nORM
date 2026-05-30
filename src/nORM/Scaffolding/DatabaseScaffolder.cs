@@ -4626,6 +4626,17 @@ namespace nORM.Scaffolding
             IReadOnlyList<RoutineStubParameter> inputParameters,
             bool scalar)
         {
+            sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+            sb.AppendLine("    {");
+            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+            if (scalar)
+                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
+            else
+                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
+            sb.AppendLine("    }");
+
             if (scalar && scalarValueType != null)
             {
                 sb.AppendLine();
@@ -4644,19 +4655,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
                 sb.AppendLine("        return rows.Count == 0 ? default : rows[0].Value;");
                 sb.AppendLine("    }");
-                sb.AppendLine();
             }
-
-            sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-            sb.AppendLine("    {");
-            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
-            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
-            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-            if (scalar)
-                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
-            else
-                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
-            sb.AppendLine("    }");
 
             if (streamMethod is null)
                 return;

@@ -948,6 +948,12 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
         Assert.Contains("QueryUnchangedAsync<TResult>", code);
         Assert.DoesNotContain("WithOutputAsync", code);
+        Assert.True(
+            code.IndexOf("Executes provider-bound scalar function `dbo.CalculateRisk`", StringComparison.Ordinal) <
+            code.IndexOf("public Task<List<TResult>> CalculateRiskAsync<TResult>", StringComparison.Ordinal));
+        Assert.True(
+            code.IndexOf("public Task<List<TResult>> CalculateRiskAsync<TResult>", StringComparison.Ordinal) <
+            code.IndexOf("private sealed class CalculateRiskValueResult<TValue>", StringComparison.Ordinal));
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_scalar_fn_" + Guid.NewGuid().ToString("N"));
         try
