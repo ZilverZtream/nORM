@@ -43,6 +43,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
+    private const string ProviderPrefixIndex = "IX_ScaffoldLiveProviderIndex_Prefix";
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
@@ -657,6 +658,47 @@ public sealed class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_reports_mysql_prefix_index_without_emitting_normal_index()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlPrefixIndexAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_prefix_index_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlPrefixIndexContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderPrefixIndex, entityCode, StringComparison.Ordinal);
+                var prefix = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "PrefixIndex" &&
+                    item.GetProperty("name").GetString() == ProviderPrefixIndex);
+                Assert.Equal("SCF117", prefix.GetProperty("code").GetString());
+                Assert.Equal("index", prefix.GetProperty("category").GetString());
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.MySql);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
@@ -949,6 +991,18 @@ public sealed class LiveProviderScaffoldingParityTests
 
         if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
             await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderIncludedIndex)} ON {table} ({name}) INCLUDE ({includedValue})");
+    }
+
+    private static async Task SetupMySqlPrefixIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.MySql, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.MySql)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.MySql, 80)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPrefixIndex)} ON {table} ({name}(8))");
     }
 
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
