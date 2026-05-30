@@ -60,6 +60,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
     private const string WarningView = "ScaffoldLiveWarningView";
+    private const string FeatureOwnedTable = "ScaffoldLiveFeatureOwned";
+    private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
@@ -965,6 +967,65 @@ public sealed class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_promotes_check_and_computed_metadata_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupFeatureOwnedMetadataAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_feature_owned_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldFeatureOwnedContext",
+                    new ScaffoldOptions { Tables = new[] { FeatureOwnedTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, FeatureOwnedTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldFeatureOwnedContext.cs"));
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+                Assert.Contains("public string Name { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains("NameLength { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains(".HasCheckConstraint(", contextCode, StringComparison.Ordinal);
+                Assert.Contains(FeatureOwnedCheckName, contextCode, StringComparison.Ordinal);
+                Assert.Contains("HasComputedColumnSql(", contextCode, StringComparison.Ordinal);
+
+                if (File.Exists(warningJsonPath))
+                {
+                    using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
+                    var providerOwned = warningJson.RootElement
+                        .GetProperty("providerOwnedSchemaFeatures")
+                        .EnumerateArray()
+                        .ToArray();
+
+                    Assert.DoesNotContain(providerOwned, item =>
+                        item.GetProperty("table").GetString()!.Split('.').Last() == FeatureOwnedTable &&
+                        item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed");
+                }
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownFeatureOwnedMetadataAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_view_filter_fails_with_skipped_object_diagnostic_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -1710,6 +1771,44 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {warning} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {status} {TextType(kind, 32)} NOT NULL {defaultClause})");
         await ExecuteAsync(connection,
             $"CREATE TABLE {keyless} ({externalId} {TextType(kind, 40)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL)");
+    }
+
+    private static async Task SetupFeatureOwnedMetadataAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownFeatureOwnedMetadataAsync(connection, provider, kind);
+
+        var table = provider.Escape(FeatureOwnedTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var nameLength = provider.Escape("NameLength");
+        var checkName = provider.Escape(FeatureOwnedCheckName);
+
+        var createSql = kind switch
+        {
+            ProviderKind.SqlServer =>
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} AS (LEN({name})) PERSISTED, CONSTRAINT {checkName} CHECK (LEN({name}) > 0))",
+            ProviderKind.Postgres =>
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} integer GENERATED ALWAYS AS (char_length({name})) STORED, CONSTRAINT {checkName} CHECK (char_length({name}) > 0))",
+            ProviderKind.MySql =>
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} INT GENERATED ALWAYS AS (CHAR_LENGTH({name})) STORED, CONSTRAINT {checkName} CHECK (CHAR_LENGTH({name}) > 0))",
+            ProviderKind.Sqlite =>
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} INTEGER GENERATED ALWAYS AS (length({name})) VIRTUAL, CONSTRAINT {checkName} CHECK (length({name}) > 0))",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
+        };
+
+        await ExecuteAsync(connection, createSql);
+    }
+
+    private static async Task TeardownFeatureOwnedMetadataAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, FeatureOwnedTable, provider.Escape(FeatureOwnedTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
     }
 
     private static async Task SetupSkippedViewAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)

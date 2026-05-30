@@ -2131,31 +2131,43 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(createTableSql))
                 return result;
 
-            var regex = new System.Text.RegularExpressions.Regex(
-                @"(?:""(?<name>[^""]+)""|\[(?<name>[^\]]+)\]|`(?<name>[^`]+)`|(?<name>[A-Za-z_][A-Za-z0-9_]*))(?:(?!,).)*?\bGENERATED\s+ALWAYS\s+AS\s*\(",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.Singleline);
+            var bodyOpen = createTableSql.IndexOf('(');
+            if (bodyOpen < 0)
+                return result;
 
-            foreach (System.Text.RegularExpressions.Match match in regex.Matches(createTableSql))
+            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
+            if (bodyClose <= bodyOpen)
+                return result;
+
+            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
             {
-                if (!match.Groups["name"].Success)
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
                     continue;
 
-                var openIndex = createTableSql.IndexOf('(', match.Index + match.Length - 1);
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
+                    continue;
+
+                var generatedIndex = CultureInfo.InvariantCulture.CompareInfo.IndexOf(
+                    trimmed,
+                    "GENERATED",
+                    CompareOptions.IgnoreCase);
+                if (generatedIndex < 0)
+                    continue;
+
+                var openIndex = trimmed.IndexOf('(', generatedIndex);
                 if (openIndex < 0)
                     continue;
 
-                var closeIndex = FindMatchingParenthesis(createTableSql, openIndex);
+                var closeIndex = FindMatchingParenthesis(trimmed, openIndex);
                 if (closeIndex <= openIndex)
                     continue;
 
-                var suffixEnd = createTableSql.IndexOf(',', closeIndex + 1);
-                if (suffixEnd < 0)
-                    suffixEnd = createTableSql.Length;
-                var suffix = createTableSql.Substring(closeIndex + 1, suffixEnd - closeIndex - 1);
+                var suffix = trimmed.Substring(closeIndex + 1);
                 var stored = suffix.Contains("STORED", StringComparison.OrdinalIgnoreCase);
-                var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                var sql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
                 if (!string.IsNullOrWhiteSpace(sql))
-                    result[match.Groups["name"].Value] = (sql, stored);
+                    result[columnName] = (sql, stored);
             }
 
             return result;
