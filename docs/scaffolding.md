@@ -336,7 +336,8 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL materialized-view query artifacts, SQL Server
   provider-native temporal history read-only scaffolds, SQL Server
   table-valued-parameter routine stubs, PostgreSQL array/UUID and MySQL
-  unsigned routine parameter stubs, PostgreSQL UUID/array column scaffolds,
+  unsigned routine parameter stubs, PostgreSQL overloaded function wrappers
+  with deterministic generated names, PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts, and live
   alternate-key/self-referencing/schema-qualified many-to-many junction-table
   mappings, including filtered-unique surrogate join tables that must remain

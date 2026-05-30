@@ -4637,7 +4637,8 @@ namespace nORM.Scaffolding
         {
             foreach (var routine in routineStubs
                 .OrderBy(r => r.Schema ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(r => r.Name, StringComparer.Ordinal))
+                .ThenBy(r => r.Name, StringComparer.Ordinal)
+                .ThenBy(r => r.Detail, StringComparer.Ordinal))
             {
                 var metadata = BuildSkippedObjectMetadata(routine);
                 var routineType = Convert.ToString(metadata.TryGetValue("routineType", out var type) ? type : null) ?? "routine";
