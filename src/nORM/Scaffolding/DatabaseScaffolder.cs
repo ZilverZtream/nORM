@@ -5023,6 +5023,7 @@ namespace nORM.Scaffolding
                 "datetime" or "datetime2" or "smalldatetime" or "timestamp" => "DateTime?",
                 "datetimeoffset" or "timestamptz" => "DateTimeOffset?",
                 "uniqueidentifier" or "uuid" => "Guid?",
+                "table type" => "DbParameter?",
                 "sysname" => "string?",
                 "bpchar" => "string?",
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
@@ -5086,7 +5087,7 @@ namespace nORM.Scaffolding
             var paren = normalized.IndexOf('(');
             var baseType = paren >= 0 ? normalized[..paren].Trim() : normalized;
 
-            if (paren >= 0 && (baseType == "array" || baseType == "user-defined"))
+            if (paren >= 0 && (baseType == "array" || baseType == "user-defined" || baseType == "table type"))
             {
                 var close = normalized.IndexOf(')', paren + 1);
                 if (close > paren)
@@ -5096,6 +5097,9 @@ namespace nORM.Scaffolding
                     {
                         if (baseType == "array")
                             return "array (" + inner + ")";
+
+                        if (baseType == "table type")
+                            return "table type";
 
                         var userDefined = inner.TrimStart('_');
                         if (userDefined is "citext" or "json" or "jsonb" or "xml")

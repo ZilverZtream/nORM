@@ -175,8 +175,8 @@ must be reviewed and edited like handwritten model code.
   routine parameters preserve common array metadata (`int[]?`, `string[]?`,
   `Guid[]?`, temporal arrays, etc.) and known user-defined textual types such
   as `citext`. SQL Server scalar alias types are mapped through their base
-  system type; SQL Server table-valued parameters remain `object?` because they
-  require reviewed provider-specific structured-parameter binding. MySQL
+  system type; SQL Server table-valued parameters scaffold as `DbParameter?`
+  so callers pass reviewed provider-specific structured parameters. MySQL
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
   `ushort?`, `byte?`) when the provider exposes the modifier. Function
   wrappers whose provider parameter names cannot safely become C# DTO

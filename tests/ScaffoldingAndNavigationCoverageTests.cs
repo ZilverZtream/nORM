@@ -910,7 +910,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
         Assert.Contains("public string? email { get; init; }", code);
         Assert.Contains("public string? login { get; init; }", code);
-        Assert.Contains("public object? items { get; init; }", code);
+        Assert.Contains("public DbParameter? items { get; init; }", code);
         Assert.Contains("Parameters discovered at scaffold time: @email IN nvarchar(320), @login IN sysname, @items IN table type (dbo.LineItemList)", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_sqlserver_alias_routine_" + Guid.NewGuid().ToString("N"));
