@@ -95,6 +95,9 @@ must be reviewed and edited like handwritten model code.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
+- Table discovery and generated output are ordered deterministically so repeated
+  scaffolds of the same schema produce reviewable diffs instead of provider
+  metadata-order churn.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys are
   listed there instead of being silently ignored or converted into fake
@@ -114,7 +117,7 @@ must be reviewed and edited like handwritten model code.
 
 - `ScaffoldingAndNavigationCoverageTests` covers identifier normalization,
   duplicate generated-name handling, table filtering, overwrite protection,
-  nullable initialization, SQLite FK navigation generation, and SQLite
+  deterministic repeated output, nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
   FK cascade/non-cascade preservation, computed/generated column write
