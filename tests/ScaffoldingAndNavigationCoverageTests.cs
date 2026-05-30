@@ -1911,6 +1911,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Author");
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Book");
+            Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "payload-columns");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("composite primary key", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
@@ -1971,6 +1972,8 @@ public class DatabaseScaffolderPrivateMethodTests
             var join = Assert.Single(joinTables.EnumerateArray());
             Assert.Equal("StudentCourse", join.GetProperty("table").GetString());
             Assert.Equal(2, join.GetProperty("constraints").GetArrayLength());
+            Assert.Contains(join.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "composite-foreign-key");
+            Assert.Contains(join.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "principal-key-not-single-column-primary-key");
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -2013,6 +2016,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("MissingPrimaryKey", warnings);
             var summary = warningJson.RootElement.GetProperty("summary");
             Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("possibleManyToManyJoinTables").GetInt32());
+            var keylessJoin = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables")[0];
+            Assert.Contains(keylessJoin.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "missing-primary-key");
             Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "AuthorBook");
@@ -2058,6 +2063,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Possible Many-To-Many Join Tables", warnings);
             var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
             Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
+            Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "nullable-foreign-key");
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
@@ -2099,6 +2105,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
             Assert.Equal("PersonFriend", joinTables[0].GetProperty("table").GetString());
             Assert.Single(joinTables[0].GetProperty("principalTables").EnumerateArray());
+            Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "nullable-foreign-key");
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }

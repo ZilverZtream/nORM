@@ -151,6 +151,10 @@ public class ScaffoldingContractDocTests
         Assert.Contains("severity", doc, StringComparison.Ordinal);
         Assert.Contains("category", doc, StringComparison.Ordinal);
         Assert.Contains("metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("reasons", doc, StringComparison.Ordinal);
+        Assert.Contains("payload-columns", doc, StringComparison.Ordinal);
+        Assert.Contains("nullable-foreign-key", doc, StringComparison.Ordinal);
+        Assert.Contains("primary-key-not-exact-bridge-columns", doc, StringComparison.Ordinal);
         Assert.Contains("parameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("outputParameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("routineType", doc, StringComparison.Ordinal);
@@ -161,6 +165,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("severity =", source, StringComparison.Ordinal);
         Assert.Contains("category =", source, StringComparison.Ordinal);
         Assert.Contains("metadata = BuildSkippedObjectMetadata", source, StringComparison.Ordinal);
+        Assert.Contains("reasons = g.Reasons", source, StringComparison.Ordinal);
+        Assert.Contains("BuildPossibleJoinTableReasons", source, StringComparison.Ordinal);
         Assert.Contains("totalWarnings =", source, StringComparison.Ordinal);
         Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);

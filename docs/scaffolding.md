@@ -261,6 +261,11 @@ Each row also includes stable diagnostic metadata:
   `parameterCount`, `outputParameterCount`, optional routine `dataType`, and
   ordered `parameters` entries with `name`, `mode`, and provider `dataType`
   when the database exposes it.
+- `reasons`: present on `SCF002` possible many-to-many rows. Values explain
+  why the bridge was not emitted as `UsingTable`, for example
+  `payload-columns`, `nullable-foreign-key`, `composite-foreign-key`,
+  `missing-primary-key`, `primary-key-not-exact-bridge-columns`, or
+  `principal-key-not-single-column-primary-key`.
 
 Use `code` and `category` for CI baselines, owner routing, and remediation
 dashboards. Use routine `metadata` for stored procedure/function migration
