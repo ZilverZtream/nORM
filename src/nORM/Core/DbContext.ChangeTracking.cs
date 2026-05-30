@@ -745,7 +745,7 @@ namespace nORM.Core
                     var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lp", leftKeyValues);
                     var rightParamNames = AddKeyParams(cmd, _p.ParamPrefix, "rp", removedValues);
                     var tenantFilter = BuildJoinTenantFilter(map, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)} AND {BuildJoinTablePredicate(jtm.EscRightFkColumns, rightParamNames)}{tenantFilter}";
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTableMergedPredicate(jtm, leftParamNames, rightParamNames)}{tenantFilter}";
                     if (hasTenantFilter)
                         cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
@@ -822,6 +822,12 @@ namespace nORM.Core
             return sb.ToString();
         }
 
+        private static string BuildJoinTableMergedPredicate(JoinTableMapping jtm, IReadOnlyList<string> leftParameterNames, IReadOnlyList<string> rightParameterNames)
+        {
+            var (columns, parameters) = BuildJoinTableMergedColumnParameters(jtm, leftParameterNames, rightParameterNames);
+            return BuildJoinTablePredicate(columns, parameters);
+        }
+
         private static string BuildJoinTenantFilter(TableMapping map, Column? tenantColumn, IReadOnlyList<string> leftParameterNames, string tenantParameterName)
         {
             if (tenantColumn == null)
@@ -833,11 +839,41 @@ namespace nORM.Core
 
         private static string BuildJoinTableInsertIfMissingSql(JoinTableMapping jtm, IReadOnlyList<string> leftParameterNames, IReadOnlyList<string> rightParameterNames)
         {
-            var columns = jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns).ToArray();
-            var parameters = leftParameterNames.Concat(rightParameterNames).ToArray();
+            var (columns, parameters) = BuildJoinTableMergedColumnParameters(jtm, leftParameterNames, rightParameterNames);
             var predicate = BuildJoinTablePredicate(columns, parameters);
 
             return $"INSERT INTO {jtm.EscTableName} ({string.Join(", ", columns)}) SELECT {string.Join(", ", parameters)} WHERE NOT EXISTS (SELECT 1 FROM {jtm.EscTableName} WHERE {predicate})";
+        }
+
+        private static (IReadOnlyList<string> Columns, IReadOnlyList<string> Parameters) BuildJoinTableMergedColumnParameters(
+            JoinTableMapping jtm,
+            IReadOnlyList<string> leftParameterNames,
+            IReadOnlyList<string> rightParameterNames)
+        {
+            if (jtm.EscLeftFkColumns.Count != leftParameterNames.Count)
+                throw new NormConfigurationException(
+                    $"Many-to-many join insert expected {jtm.EscLeftFkColumns.Count} left parameters but received {leftParameterNames.Count}.");
+            if (jtm.EscRightFkColumns.Count != rightParameterNames.Count)
+                throw new NormConfigurationException(
+                    $"Many-to-many join insert expected {jtm.EscRightFkColumns.Count} right parameters but received {rightParameterNames.Count}.");
+
+            var columns = new List<string>(jtm.EscLeftFkColumns.Count + jtm.EscRightFkColumns.Count);
+            var parameters = new List<string>(columns.Capacity);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AddUnique(jtm.EscLeftFkColumns, leftParameterNames);
+            AddUnique(jtm.EscRightFkColumns, rightParameterNames);
+            return (columns, parameters);
+
+            void AddUnique(IReadOnlyList<string> sourceColumns, IReadOnlyList<string> sourceParameters)
+            {
+                for (var i = 0; i < sourceColumns.Count; i++)
+                {
+                    if (!seen.Add(sourceColumns[i]))
+                        continue;
+                    columns.Add(sourceColumns[i]);
+                    parameters.Add(sourceParameters[i]);
+                }
+            }
         }
 
         /// <summary>

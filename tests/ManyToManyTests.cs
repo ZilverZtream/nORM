@@ -126,6 +126,19 @@ public class ManyToManyTests
         ");
     }
 
+    private static SqliteConnection CreateSharedTenantCompositeStudentCourseDb()
+    {
+        return CreateOpenDb(@"
+            CREATE TABLE CompositeStudent (TenantId INTEGER NOT NULL, StudentId INTEGER NOT NULL, Name TEXT NOT NULL, PRIMARY KEY (TenantId, StudentId));
+            CREATE TABLE CompositeCourse (TenantId INTEGER NOT NULL, CourseId INTEGER NOT NULL, Title TEXT NOT NULL, PRIMARY KEY (TenantId, CourseId));
+            CREATE TABLE StudentCourse (
+                TenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                PRIMARY KEY (TenantId, StudentId, CourseId));
+        ");
+    }
+
     private static DbContext CreateArticleContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
     {
         OnModelCreating = mb =>
@@ -160,6 +173,22 @@ public class ManyToManyTests
                   "StudentCourse",
                   new[] { "StudentTenantId", "StudentId" },
                   new[] { "CourseTenantId", "CourseId" });
+            mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
+        }
+    });
+
+    private static DbContext CreateSharedTenantCompositeStudentContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<CompositeStudent>()
+              .HasKey(s => new { s.TenantId, s.StudentId })
+              .HasMany<CompositeCourse>(s => s.Courses)
+              .WithMany()
+              .UsingTable(
+                  "StudentCourse",
+                  new[] { "TenantId", "StudentId" },
+                  new[] { "TenantId", "CourseId" });
             mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
         }
     });
@@ -270,6 +299,21 @@ public class ManyToManyTests
         Assert.Equal(new[] { "CourseTenantId", "CourseId" }, jtm.RightFkColumns);
         Assert.Equal(new[] { "\"StudentTenantId\"", "\"StudentId\"" }, jtm.EscLeftFkColumns);
         Assert.Equal(new[] { "\"CourseTenantId\"", "\"CourseId\"" }, jtm.EscRightFkColumns);
+    }
+
+    [Fact]
+    public void M2M1_SharedTenantCompositeKeys_UsingTable_RegistersJoinMapping()
+    {
+        using var cn = CreateSharedTenantCompositeStudentCourseDb();
+        using var ctx = CreateSharedTenantCompositeStudentContext(cn);
+
+        var map = ctx.GetMapping(typeof(CompositeStudent));
+        var jtm = Assert.Single(map.ManyToManyJoins);
+
+        Assert.Equal(new[] { "TenantId", "StudentId" }, jtm.LeftFkColumns);
+        Assert.Equal(new[] { "TenantId", "CourseId" }, jtm.RightFkColumns);
+        Assert.Equal(new[] { "\"TenantId\"", "\"StudentId\"" }, jtm.EscLeftFkColumns);
+        Assert.Equal(new[] { "\"TenantId\"", "\"CourseId\"" }, jtm.EscRightFkColumns);
     }
 
     [Fact]
@@ -694,6 +738,42 @@ public class ManyToManyTests
     }
 
     [Fact]
+    public async Task M2M6_SharedTenantCompositeKeys_Add_InsertsOneTenantColumn()
+    {
+        using var cn = CreateSharedTenantCompositeStudentCourseDb();
+        using var ctx = CreateSharedTenantCompositeStudentContext(cn);
+
+        var c1 = new CompositeCourse { TenantId = 7, CourseId = 10, Title = "Math" };
+        var c2 = new CompositeCourse { TenantId = 7, CourseId = 20, Title = "Physics" };
+        ctx.Add(c1);
+        ctx.Add(c2);
+        await ctx.SaveChangesAsync();
+
+        var student = new CompositeStudent
+        {
+            TenantId = 7,
+            StudentId = 1,
+            Name = "Alice",
+            Courses = new List<CompositeCourse> { c1, c2 }
+        };
+        ctx.Add(student);
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT TenantId, StudentId, CourseId FROM StudentCourse ORDER BY CourseId";
+        using var reader = cmd.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(7, reader.GetInt32(0));
+        Assert.Equal(1, reader.GetInt32(1));
+        Assert.Equal(10, reader.GetInt32(2));
+        Assert.True(reader.Read());
+        Assert.Equal(7, reader.GetInt32(0));
+        Assert.Equal(1, reader.GetInt32(1));
+        Assert.Equal(20, reader.GetInt32(2));
+        Assert.False(reader.Read());
+    }
+
+    [Fact]
     public async Task M2M6_CompositeKeys_Query_Include_LoadsCourses()
     {
         using var cn = CreateCompositeStudentCourseDb();
@@ -751,6 +831,38 @@ public class ManyToManyTests
 
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "SELECT CourseId FROM StudentCourse WHERE StudentTenantId = 7 AND StudentId = 1";
+        var remaining = (long)cmd.ExecuteScalar()!;
+        Assert.Equal(20, remaining);
+    }
+
+    [Fact]
+    public async Task M2M6_SharedTenantCompositeKeys_Update_RemovesOnlyTargetJoinRow()
+    {
+        using var cn = CreateSharedTenantCompositeStudentCourseDb();
+        using var ctx = CreateSharedTenantCompositeStudentContext(cn);
+
+        var c1 = new CompositeCourse { TenantId = 7, CourseId = 10, Title = "Math" };
+        var c2 = new CompositeCourse { TenantId = 7, CourseId = 20, Title = "Physics" };
+        ctx.Add(c1);
+        ctx.Add(c2);
+        await ctx.SaveChangesAsync();
+
+        var student = new CompositeStudent
+        {
+            TenantId = 7,
+            StudentId = 1,
+            Name = "Alice",
+            Courses = new List<CompositeCourse> { c1, c2 }
+        };
+        ctx.Add(student);
+        await ctx.SaveChangesAsync();
+
+        student.Courses.Remove(c1);
+        ctx.Update(student);
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT CourseId FROM StudentCourse WHERE TenantId = 7 AND StudentId = 1";
         var remaining = (long)cmd.ExecuteScalar()!;
         Assert.Equal(20, remaining);
     }

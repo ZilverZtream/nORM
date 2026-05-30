@@ -863,9 +863,6 @@ namespace nORM.Configuration
                         throw new ArgumentException("Join table schema cannot be whitespace.", nameof(schema));
                     ValidateCompositeFkColumns(leftFkColumns, nameof(leftFkColumns));
                     ValidateCompositeFkColumns(rightFkColumns, nameof(rightFkColumns));
-                    if (leftFkColumns.Any(left => rightFkColumns.Any(right => string.Equals(left, right, StringComparison.OrdinalIgnoreCase))))
-                        throw new ArgumentException("Left and right FK column sets in a many-to-many join table must not overlap.", nameof(rightFkColumns));
-
                     _parent._config.AddManyToMany(new ManyToManyConfiguration(
                         _principalNavigation.Name,
                         typeof(TDependent),
