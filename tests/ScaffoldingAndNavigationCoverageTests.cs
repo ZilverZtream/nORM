@@ -2583,6 +2583,63 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCompositeAlternateKeyPureJoinTable_EmitsManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                Code TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                UNIQUE (TenantId, Code)
+            );
+            CREATE TABLE Book (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                Isbn TEXT NOT NULL,
+                Title TEXT NOT NULL,
+                UNIQUE (TenantId, Isbn)
+            );
+            CREATE TABLE AuthorBook (
+                TenantId INTEGER NOT NULL,
+                AuthorCode TEXT NOT NULL,
+                BookIsbn TEXT NOT NULL,
+                PRIMARY KEY (TenantId, AuthorCode, BookIsbn),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (TenantId, AuthorCode) REFERENCES Author(TenantId, Code),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (TenantId, BookIsbn) REFERENCES Book(TenantId, Isbn)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeAlternateKeyJoinCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeAlternateKeyJoinCtx.cs"));
+            var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            Assert.Contains(".UsingTable(\"AuthorBook\", new[] { \"TenantId\", \"AuthorCode\" }, new[] { \"TenantId\", \"BookIsbn\" }, p => new { p.TenantId, p.Code }, p => new { p.TenantId, p.Isbn });", contextCode);
+            if (File.Exists(warningJsonPath))
+            {
+                using var warningJson = JsonDocument.Parse(File.ReadAllText(warningJsonPath));
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+                Assert.Empty(joinTables.EnumerateArray());
+            }
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSharedTenantCompositeKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
