@@ -332,6 +332,18 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(skippedObjects, item =>
                     item.GetProperty("kind").GetString() == "Routine" &&
                     item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                if (kind == ProviderKind.Postgres)
+                {
+                    var routine = Assert.Single(skippedObjects, item =>
+                        item.GetProperty("kind").GetString() == "Routine" &&
+                        item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                    var metadata = routine.GetProperty("metadata");
+                    Assert.Equal(1, metadata.GetProperty("parameterCount").GetInt32());
+                    var parameters = metadata.GetProperty("parameters").EnumerateArray().ToArray();
+                    var parameter = Assert.Single(parameters);
+                    Assert.Equal("IN", parameter.GetProperty("mode").GetString());
+                }
+
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

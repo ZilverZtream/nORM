@@ -689,6 +689,7 @@ namespace nORM.Scaffolding
                                FROM information_schema.parameters p
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
+                                 AND p.parameter_mode IS NOT NULL
                            ), 0)::text ||
                            '; outputParameters=' ||
                            COALESCE((
@@ -718,6 +719,7 @@ namespace nORM.Scaffolding
                                FROM information_schema.parameters p
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
+                                 AND p.parameter_mode IS NOT NULL
                            ), '') ||
                            '; callShape=' ||
                            CASE
