@@ -420,7 +420,8 @@ namespace nORM.Core
                 m => all.Where(other => other != m && Array.Exists(m.Columns, c =>
                     // FK-2: Match by full type name first (namespace-qualified) to avoid collisions
                     // between types with the same simple name in different namespaces.
-                    MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type))).ToList());
+                    MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type)) ||
+                    HasExplicitRelationshipDependency(m, other)).ToList());
 
             var result = new List<TableMapping>();
             var visited = new HashSet<TableMapping>();
@@ -470,6 +471,9 @@ namespace nORM.Core
             // Fall back to simple name match for backward compatibility
             return string.Equals(principalTypeName, candidateType.Name, StringComparison.OrdinalIgnoreCase);
         }
+
+        private static bool HasExplicitRelationshipDependency(TableMapping dependent, TableMapping candidatePrincipal)
+            => candidatePrincipal.Relations.Values.Any(r => r.DependentType == dependent.Type);
 
         private string BuildInsertBatch(TableMapping map, int startParamIndex)
         {

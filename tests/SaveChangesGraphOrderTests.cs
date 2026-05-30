@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -48,6 +50,24 @@ public class SaveChangesGraphOrderTests
         public int GraphPostId { get; set; }   // auto-detected FK → GraphPost
     }
 
+    [Table("GraphTenantOrder")]
+    private class GraphTenantOrder
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public ICollection<GraphTenantOrderLine> Lines { get; set; } = new List<GraphTenantOrderLine>();
+    }
+
+    [Table("GraphTenantOrderLine")]
+    private class GraphTenantOrderLine
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
+        public string Sku { get; set; } = string.Empty;
+    }
+
     private static async Task<(SqliteConnection Cn, DbContext Ctx)> CreateContextAsync()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -68,6 +88,48 @@ public class SaveChangesGraphOrderTests
         }
 
         return (cn, new DbContext(cn, new SqliteProvider()));
+    }
+
+    private static async Task<(SqliteConnection Cn, DbContext Ctx)> CreateCompositeContextAsync()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+
+        await using (var pragma = cn.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA foreign_keys = ON;";
+            await pragma.ExecuteNonQueryAsync();
+        }
+
+        await using (var ddl = cn.CreateCommand())
+        {
+            ddl.CommandText =
+                "CREATE TABLE GraphTenantOrder (" +
+                "TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, Status TEXT NOT NULL, " +
+                "PRIMARY KEY(TenantId, OrderId));" +
+                "CREATE TABLE GraphTenantOrderLine (" +
+                "TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, Sku TEXT NOT NULL, " +
+                "PRIMARY KEY(TenantId, OrderId, LineNo), " +
+                "FOREIGN KEY(TenantId, OrderId) REFERENCES GraphTenantOrder(TenantId, OrderId));";
+            await ddl.ExecuteNonQueryAsync();
+        }
+
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<GraphTenantOrder>()
+                    .HasKey(o => new { o.TenantId, o.OrderId })
+                    .HasMany(o => o.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => new { l.TenantId, l.OrderId }, o => new { o.TenantId, o.OrderId });
+
+                mb.Entity<GraphTenantOrderLine>()
+                    .HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
+            }
+        };
+
+        return (cn, new DbContext(cn, new SqliteProvider(), options));
     }
 
     // ── Inserts ───────────────────────────────────────────────────────────────
@@ -131,6 +193,27 @@ public class SaveChangesGraphOrderTests
         Assert.Equal(3, affected);
     }
 
+    [Fact]
+    public async Task Insert_CompositeForeignKey_DependentAddedFirst_PrincipalGoesFirst()
+    {
+        var (cn, ctx) = await CreateCompositeContextAsync();
+        await using var _cn = cn;
+        await using var _ctx = ctx;
+
+        var order = new GraphTenantOrder { TenantId = 1, OrderId = 100, Status = "Open" };
+        var line = new GraphTenantOrderLine { TenantId = 1, OrderId = 100, LineNo = 1, Sku = "lens" };
+
+        ctx.Add(line);
+        ctx.Add(order);
+
+        var affected = await ctx.SaveChangesAsync();
+        Assert.Equal(2, affected);
+
+        await using var verify = cn.CreateCommand();
+        verify.CommandText = "SELECT COUNT(*) FROM GraphTenantOrderLine WHERE TenantId = 1 AND OrderId = 100";
+        Assert.Equal(1L, verify.ExecuteScalar());
+    }
+
     // ── Deletes ───────────────────────────────────────────────────────────────
 
     [Fact]
@@ -187,5 +270,30 @@ public class SaveChangesGraphOrderTests
 
         var affected = await ctx.SaveChangesAsync(detectChanges: false);
         Assert.Equal(3, affected);
+    }
+
+    [Fact]
+    public async Task Delete_CompositeForeignKey_PrincipalRemovedFirst_DependentDeletedFirst()
+    {
+        var (cn, ctx) = await CreateCompositeContextAsync();
+        await using var _cn = cn;
+        await using var _ctx = ctx;
+
+        await using (var seed = cn.CreateCommand())
+        {
+            seed.CommandText =
+                "INSERT INTO GraphTenantOrder VALUES (1,100,'Open');" +
+                "INSERT INTO GraphTenantOrderLine VALUES (1,100,1,'lens');";
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var order = new GraphTenantOrder { TenantId = 1, OrderId = 100, Status = "Open" };
+        var line = new GraphTenantOrderLine { TenantId = 1, OrderId = 100, LineNo = 1, Sku = "lens" };
+
+        ctx.Remove(order);
+        ctx.Remove(line);
+
+        var affected = await ctx.SaveChangesAsync(detectChanges: false);
+        Assert.Equal(2, affected);
     }
 }
