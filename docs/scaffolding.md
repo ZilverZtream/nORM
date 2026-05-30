@@ -355,7 +355,8 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship
-  shapes, provider-owned/default-promotion and
+  shapes, dynamic scaffolding of computed/generated and identity columns across
+  live providers, provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 - `RelationshipConfigurationTests` covers generated non-cascade relationship
