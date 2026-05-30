@@ -2133,7 +2133,9 @@ namespace nORM.Scaffolding
                 if (closeIndex <= openIndex)
                     continue;
 
-                var suffixEnd = Math.Min(createTableSql.Length, closeIndex + 32);
+                var suffixEnd = createTableSql.IndexOf(',', closeIndex + 1);
+                if (suffixEnd < 0)
+                    suffixEnd = createTableSql.Length;
                 var suffix = createTableSql.Substring(closeIndex + 1, suffixEnd - closeIndex - 1);
                 var stored = suffix.Contains("STORED", StringComparison.OrdinalIgnoreCase);
                 var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
@@ -3745,7 +3747,24 @@ namespace nORM.Scaffolding
             while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
                 candidate = candidate[1..^1].Trim();
 
+            candidate = TrimTrailingComputedStorageToken(candidate, "VIRTUAL");
+            candidate = TrimTrailingComputedStorageToken(candidate, "STORED");
+            candidate = TrimTrailingComputedStorageToken(candidate, "PERSISTED");
+
             return (candidate, stored);
+        }
+
+        private static string TrimTrailingComputedStorageToken(string sql, string token)
+        {
+            var trimmed = sql.TrimEnd();
+            if (!trimmed.EndsWith(token, StringComparison.OrdinalIgnoreCase))
+                return sql;
+
+            var tokenStart = trimmed.Length - token.Length;
+            if (tokenStart > 0 && (char.IsLetterOrDigit(trimmed[tokenStart - 1]) || trimmed[tokenStart - 1] == '_'))
+                return sql;
+
+            return trimmed[..tokenStart].TrimEnd();
         }
 
         private static string NormalizeScaffoldCheckSql(string raw)

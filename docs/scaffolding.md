@@ -64,6 +64,9 @@ must be reviewed and edited like handwritten model code.
   Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
+  SQLite generated-column `VIRTUAL`/`STORED` storage tokens are separated from
+  the expression before emitting `HasComputedColumnSql(...)`; stored generated
+  columns pass `stored: true`.
   SQL Server rowversion/timestamp columns are marked as `[Timestamp]` and
   database-generated for optimistic concurrency, while the provider DDL remains
   outside the generated model.

@@ -2089,6 +2089,7 @@ public class DatabaseScaffolderPrivateMethodTests
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Name TEXT COLLATE NOCASE NOT NULL DEFAULT 'new',
                 NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL,
+                NameLengthStored INTEGER GENERATED ALWAYS AS (length(Name) + 1) STORED,
                 CONSTRAINT CK_FeatureOwned_Name CHECK (length(Name) > 0)
             );
             CREATE TRIGGER TR_FeatureOwned_Audit AFTER INSERT ON FeatureOwned BEGIN SELECT 1; END;
@@ -2108,7 +2109,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasDefaultValueSql(\"'new'\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().HasCheckConstraint(\"CK_FeatureOwned_Name\", \"length(Name) > 0\");", contextCode);
-            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name) VIRTUAL\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name)\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLengthStored).HasComputedColumnSql(\"length(Name) + 1\", stored: true);", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasCollation(\"NOCASE\");", contextCode);
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);

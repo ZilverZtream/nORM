@@ -119,6 +119,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("PrecisionScale", source, StringComparison.Ordinal);
         Assert.Contains("RowVersion", source, StringComparison.Ordinal);
         Assert.Contains("IdentityStrategy", source, StringComparison.Ordinal);
+        Assert.Contains("TrimTrailingComputedStorageToken", source, StringComparison.Ordinal);
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("RelationshipPrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
