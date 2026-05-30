@@ -1725,6 +1725,7 @@ public class DatabaseScaffolderPrivateMethodTests
         finally
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            cn.Close();
             if (File.Exists(auxFile)) File.Delete(auxFile);
         }
     }

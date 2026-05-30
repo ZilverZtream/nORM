@@ -261,7 +261,7 @@ public class CliIntegrationTests
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
             Assert.DoesNotContain("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
-            Assert.DoesNotContain("99", result.Stdout, StringComparison.Ordinal);
+            Assert.DoesNotContain("totalWarnings", result.Stdout, StringComparison.Ordinal);
         }
         finally
         {
