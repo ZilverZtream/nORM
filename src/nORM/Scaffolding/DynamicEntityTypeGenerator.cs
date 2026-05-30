@@ -338,15 +338,23 @@ namespace nORM.Scaffolding
                 var effectiveAllowNull = allowNull && !isKey;
                 var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto), effectiveAllowNull);
 
-                int? maxLength = null;
-                if (clrType == typeof(string) && schema.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
-                {
-                    if (int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0)
-                        maxLength = size;
-                }
+                var maxLength = GetScaffoldMaxLength(clrType, row);
 
                 yield return new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, isAuto, isComputed, isRowVersion, maxLength);
             }
+        }
+
+        private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
+        {
+            if (clrType != typeof(string) && clrType != typeof(byte[]))
+                return null;
+
+            if (!row.Table.Columns.Contains("ColumnSize") || row["ColumnSize"] == DBNull.Value)
+                return null;
+
+            return int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0 && size < int.MaxValue
+                ? size
+                : null;
         }
 
         private static IReadOnlySet<string> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)

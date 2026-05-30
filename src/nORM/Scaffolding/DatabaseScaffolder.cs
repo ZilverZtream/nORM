@@ -248,13 +248,7 @@ namespace nORM.Scaffolding
                     // Decide C# type name with correct nullability for value OR reference types
                     var typeName = GetTypeName(clrType, effectiveAllowNull);
 
-                    // String length if available
-                    int? maxLength = null;
-                    if (clrType == typeof(string) && row.Table.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
-                    {
-                        if (int.TryParse(row["ColumnSize"]!.ToString(), out var size) && size > 0)
-                            maxLength = size;
-                    }
+                    var maxLength = GetScaffoldMaxLength(clrType, row);
 
                     sb.AppendLine("    /// <summary>");
                     sb.AppendLine($"    /// Maps to column {EscapeXmlDocumentation(colName)}");
@@ -2713,6 +2707,19 @@ namespace nORM.Scaffolding
             }
 
             return name;
+        }
+
+        private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
+        {
+            if (clrType != typeof(string) && clrType != typeof(byte[]))
+                return null;
+
+            if (!row.Table.Columns.Contains("ColumnSize") || row["ColumnSize"] == DBNull.Value)
+                return null;
+
+            return int.TryParse(row["ColumnSize"]!.ToString(), out var size) && size > 0 && size < int.MaxValue
+                ? size
+                : null;
         }
 
         private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto)

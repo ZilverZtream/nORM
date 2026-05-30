@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -160,6 +161,30 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var m = GetMethod("GetTypeName", new[] { typeof(Type), typeof(bool) });
         return (string)m.Invoke(null, new object[] { type, allowNull })!;
+    }
+
+    private static int? InvokeGetScaffoldMaxLength(Type type, object? columnSize)
+    {
+        var m = GetMethod("GetScaffoldMaxLength", new[] { typeof(Type), typeof(DataRow) });
+        return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
+    }
+
+    private static int? InvokeDynamicGetScaffoldMaxLength(Type type, object? columnSize)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("GetScaffoldMaxLength", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(Type), typeof(DataRow) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "GetScaffoldMaxLength");
+        return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
+    }
+
+    private static DataRow CreateSchemaRow(object? columnSize)
+    {
+        var table = new DataTable();
+        table.Columns.Add("ColumnSize", typeof(object));
+        var row = table.NewRow();
+        row["ColumnSize"] = columnSize ?? DBNull.Value;
+        table.Rows.Add(row);
+        return row;
     }
 
     private static string InvokeGetUnqualifiedName(string identifier)
@@ -446,6 +471,18 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     // ── GetUnqualifiedName ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(typeof(string), 64, 64)]
+    [InlineData(typeof(byte[]), 32, 32)]
+    [InlineData(typeof(int), 32, null)]
+    [InlineData(typeof(string), 0, null)]
+    [InlineData(typeof(string), int.MaxValue, null)]
+    public void GetScaffoldMaxLength_StaticAndDynamic_UseBoundedStringAndBinarySizes(Type clrType, int columnSize, int? expected)
+    {
+        Assert.Equal(expected, InvokeGetScaffoldMaxLength(clrType, columnSize));
+        Assert.Equal(expected, InvokeDynamicGetScaffoldMaxLength(clrType, columnSize));
+    }
 
     [Theory]
     [InlineData(typeof(sbyte), "sbyte")]
