@@ -63,6 +63,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
+    private const string MySqlTypedColumnTable = "ScaffoldLiveMySqlTypedColumns";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
@@ -707,6 +708,49 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownPostgresTypedColumnTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_mysql_json_and_year_columns_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlTypedColumnTableAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_typed_columns_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlTypedColumnContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { MySqlTypedColumnTable },
+                        OverwriteFiles = false
+                    });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlTypedColumnTable + ".cs"));
+
+                Assert.Contains("public string Payload { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains("FiscalYear { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("object FiscalYear", entityCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownMySqlTypedColumnTableAsync(connection, provider);
             }
         }
     }
@@ -1590,6 +1634,15 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL)");
     }
 
+    private static async Task SetupMySqlTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownMySqlTypedColumnTableAsync(connection, provider);
+
+        var table = provider.Escape(MySqlTypedColumnTable);
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("Payload")} JSON NOT NULL, {provider.Escape("FiscalYear")} YEAR NOT NULL)");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -1967,6 +2020,18 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresTypedColumnTable, Qualified(provider, "public", PostgresTypedColumnTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownMySqlTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlTypedColumnTable, provider.Escape(MySqlTypedColumnTable)));
         }
         catch
         {
