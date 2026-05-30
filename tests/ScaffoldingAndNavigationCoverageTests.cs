@@ -2818,8 +2818,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "payload-columns");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated primary keys or exact ordered unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated surrogate primary key plus an exact unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated primary keys or exact ordered unfiltered unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated surrogate primary key plus an exact unfiltered unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -3001,6 +3001,57 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithFilteredUniqueSurrogateJoinTable_DoesNotEmitUnsafeManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Student (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE Course (
+                Id INTEGER PRIMARY KEY,
+                Title TEXT NOT NULL
+            );
+            CREATE TABLE StudentCourse (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                StudentId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                CONSTRAINT FK_StudentCourse_Student FOREIGN KEY (StudentId) REFERENCES Student(Id),
+                CONSTRAINT FK_StudentCourse_Course FOREIGN KEY (CourseId) REFERENCES Course(Id)
+            );
+            CREATE UNIQUE INDEX UX_StudentCourse_Filtered ON StudentCourse(StudentId, CourseId) WHERE StudentId > 0;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FilteredSurrogateJoinCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredSurrogateJoinCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables").EnumerateArray().ToArray();
+
+            Assert.True(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
+            Assert.DoesNotContain(".UsingTable(\"StudentCourse\"", contextCode, StringComparison.Ordinal);
+            Assert.Contains("StudentCourse", warnings);
+            var join = Assert.Single(joinTables);
+            Assert.Equal("StudentCourse", join.GetProperty("table").GetString());
+            Assert.Contains("primary-key-not-exact-bridge-columns", join.GetProperty("reasons").EnumerateArray().Select(reason => reason.GetString()));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithAlternateKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -3044,6 +3095,49 @@ public class DatabaseScaffolderPrivateMethodTests
                 var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
                 Assert.Empty(joinTables.EnumerateArray());
             }
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithFilteredUniquePrincipalIndex_ReportsPartialIndexAndDoesNotInventRelationship()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=OFF;
+            CREATE TABLE Customer (
+                Id INTEGER PRIMARY KEY,
+                Code TEXT NOT NULL,
+                Name TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX UX_Customer_Code_Filtered ON Customer(Code) WHERE Code <> '';
+            CREATE TABLE CustomerNote (
+                Id INTEGER PRIMARY KEY,
+                CustomerCode TEXT NOT NULL,
+                Note TEXT NOT NULL,
+                CONSTRAINT FK_CustomerNote_Customer FOREIGN KEY (CustomerCode) REFERENCES Customer(Code)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FilteredPrincipalRelationshipCtx");
+
+            var noteCode = File.ReadAllText(Path.Combine(dir, "CustomerNote.cs"));
+            var customerCode = File.ReadAllText(Path.Combine(dir, "Customer.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredPrincipalRelationshipCtx.cs"));
+
+            Assert.Contains("FilterSql = \"Code <> ''\"", customerCode);
+            Assert.DoesNotContain("public Customer Customer", noteCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

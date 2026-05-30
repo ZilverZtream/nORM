@@ -2075,7 +2075,7 @@ namespace nORM.Scaffolding
                     TableKey(fk.DependentSchema, fk.DependentTable),
                     "RelationshipPrincipalKey",
                     fk.ConstraintName,
-                    $"FK references {principalKey}.({principalColumns}), which is neither the generated principal primary key nor an exact ordered unique index."));
+                    $"FK references {principalKey}.({principalColumns}), which is neither the generated principal primary key nor an exact ordered unfiltered unique index."));
             }
         }
 
@@ -2428,7 +2428,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Composite Foreign Keys");
                     sb.AppendLine();
-                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact ordered unique index, so v1 scaffolding keeps them diagnostic.");
+                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact ordered unfiltered unique index, so v1 scaffolding keeps them diagnostic.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
@@ -2461,7 +2461,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact ordered unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact ordered unfiltered unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -2616,7 +2616,7 @@ namespace nORM.Scaffolding
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
         private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact ordered unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
+            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact ordered unfiltered unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unfiltered unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
 
         private static string ScaffoldDiagnosticSeverity()
             => "Warning";
@@ -2698,7 +2698,7 @@ namespace nORM.Scaffolding
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
-                "RelationshipPrincipalKey" => "Add a primary key or exact ordered unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
+                "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Parsed SQL Server IDENTITY(seed, increment) metadata is scaffolded into HasIdentityOptions; review any unparsed provider-specific identity strategy manually.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
@@ -3196,8 +3196,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string> columnNames)
         {
             return indexes
-                .Where(index => index.IsUnique
-                                && !index.IsIncluded
+                .Where(index => IsUnfilteredUniqueKeyIndex(index)
                                 && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
                 .Any(group =>
@@ -3285,7 +3284,7 @@ namespace nORM.Scaffolding
 
             var principalColumns = rows.Select(row => row.PrincipalColumn).ToArray();
             return indexes
-                .Where(index => index.IsUnique && !index.IsIncluded && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
+                .Where(index => IsUnfilteredUniqueKeyIndex(index) && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
                 .Any(group =>
                 {
@@ -3299,6 +3298,11 @@ namespace nORM.Scaffolding
                            && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
                 });
         }
+
+        private static bool IsUnfilteredUniqueKeyIndex(ScaffoldIndex index)
+            => index.IsUnique
+               && !index.IsIncluded
+               && string.IsNullOrWhiteSpace(index.FilterSql);
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
