@@ -87,7 +87,7 @@ namespace nORM.Query
             if (hasTenantFilter)
             {
                 var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
-                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", leftMapping.KeyColumns);
+                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", jtm.LeftKeyColumns);
                 cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON {leftJoinPredicate} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND {leftPredicate}";
                 cmd.AddParam(tp, tenantId!);
             }
@@ -125,7 +125,7 @@ namespace nORM.Query
 
             // Load related (right) entities in a single query
             await using var cmd2 = _ctx.CreateCommand();
-            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, rightMapping.KeyColumns, rightKeyValues.Values.ToList());
+            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, jtm.RightKeyColumns, rightKeyValues.Values.ToList());
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;
@@ -241,7 +241,7 @@ namespace nORM.Query
             if (hasTenantFilter)
             {
                 var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
-                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", leftMapping.KeyColumns);
+                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", jtm.LeftKeyColumns);
                 cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON {leftJoinPredicate} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND {leftPredicate}";
                 cmd.AddParam(tp, tenantId!);
             }
@@ -277,7 +277,7 @@ namespace nORM.Query
             if (allRightPks.Count == 0) return;
 
             using var cmd2 = _ctx.CreateCommand();
-            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, rightMapping.KeyColumns, rightKeyValues.Values.ToList());
+            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, jtm.RightKeyColumns, rightKeyValues.Values.ToList());
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;

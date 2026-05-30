@@ -252,5 +252,15 @@ namespace nORM.Configuration
 
         /// <summary>Ordered join-table columns referencing the related entity's key.</summary>
         public IReadOnlyList<string> RightFkColumns { get; init; } = new[] { RightFkColumn };
+
+        /// <summary>
+        /// Optional ordered key properties on the left entity. When omitted, the entity primary key is used.
+        /// </summary>
+        public IReadOnlyList<PropertyInfo>? LeftKeyProperties { get; init; }
+
+        /// <summary>
+        /// Optional ordered key properties on the right entity. When omitted, the related entity primary key is used.
+        /// </summary>
+        public IReadOnlyList<PropertyInfo>? RightKeyProperties { get; init; }
     }
 }

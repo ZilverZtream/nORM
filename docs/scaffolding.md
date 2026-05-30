@@ -116,13 +116,17 @@ must be reviewed and edited like handwritten model code.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   non-null foreign-key constraints, no payload columns, a join-table primary
   key made exactly from those FK columns, and both references targeting the
-  exact generated primary keys. Single-column and composite-key pure junction
-  tables are supported. Both entity sides receive collection navigations, and the join table is emitted as fluent
-  `HasMany().WithMany(inverse).UsingTable(...)` configuration instead of a join
-  entity. Schema-qualified join tables use the schema-aware `UsingTable`
-  overload so generated SQL targets the qualified bridge table rather than a
-  literal dotted table name. Self-referencing pure join tables receive distinct
-  role-based navigations from the join FK columns and are consumer-build tested.
+  exact generated primary keys or exact unique indexes. Single-column,
+  composite-key, shared-column tenant, and alternate-key pure junction tables
+  are supported. Both entity sides receive collection navigations, and the join
+  table is emitted as fluent `HasMany().WithMany(inverse).UsingTable(...)`
+  configuration instead of a join entity. Alternate-key bridges use the
+  key-selector `UsingTable` overload so runtime include/loading and join-table
+  sync use the referenced unique columns instead of assuming primary keys.
+  Schema-qualified join tables use the schema-aware `UsingTable` overload so
+  generated SQL targets the qualified bridge table rather than a literal dotted
+  table name. Self-referencing pure join tables receive distinct role-based
+  navigations from the join FK columns and are consumer-build tested.
 - Payload bridge tables are emitted as explicit join entities with payload
   columns and normal FK navigations. They are also reported as possible
   many-to-many candidates so reviewers do not accidentally collapse domain data
@@ -437,9 +441,10 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF207` | `virtual-table` | SQLite virtual-table shadow table discovered and skipped. |
 | `SCF299` | `database-object` | Unknown skipped database object. |
 
-For v1 runtime mapping, `UsingTable` skip navigations support single-column and
-composite-key pure junction tables when both sides reference the generated
-primary keys. Unsafe bridge shapes remain explicit join entities.
+For v1 runtime mapping, `UsingTable` skip navigations support single-column,
+composite-key, shared-column tenant, and alternate-key pure junction tables when
+both sides reference either the generated primary keys or exact unique indexes.
+Unsafe bridge shapes remain explicit join entities.
 
 The report is additive: new fields may be added in later versions, but v1 tools
 should tolerate unknown fields and should not treat an empty diagnostics file as

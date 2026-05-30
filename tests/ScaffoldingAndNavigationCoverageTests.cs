@@ -2529,7 +2529,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithAlternateKeyPureJoinTable_EmitsExplicitJoinEntityAndDiagnostic()
+    public async Task ScaffoldAsync_WithAlternateKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -2561,16 +2561,18 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "AlternateKeyJoinCtx");
 
-            Assert.True(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
             var contextCode = File.ReadAllText(Path.Combine(dir, "AlternateKeyJoinCtx.cs"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
 
-            Assert.DoesNotContain(".UsingTable(\"AuthorBook\"", contextCode);
-            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
-            var joinTable = Assert.Single(joinTables.EnumerateArray());
-            Assert.Equal("AuthorBook", joinTable.GetProperty("table").GetString());
-            Assert.Contains(joinTable.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "principal-key-not-primary-key");
-            Assert.Contains("primary keys", joinTable.GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorCode\", \"BookIsbn\", p => p.Code, p => p.Isbn);", contextCode);
+            if (File.Exists(warningJsonPath))
+            {
+                using var warningJson = JsonDocument.Parse(File.ReadAllText(warningJsonPath));
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+                Assert.Empty(joinTables.EnumerateArray());
+            }
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {

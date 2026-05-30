@@ -82,6 +82,25 @@ public class ManyToManyTests
         public List<CompositeCourse> Courses { get; set; } = new();
     }
 
+    private class AlternateAuthor
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public List<AlternateBook> Books { get; set; } = new();
+    }
+
+    private class AlternateBook
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Isbn { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private static SqliteConnection CreateOpenDb(string ddl)
@@ -139,6 +158,15 @@ public class ManyToManyTests
         ");
     }
 
+    private static SqliteConnection CreateAlternateKeyAuthorBookDb()
+    {
+        return CreateOpenDb(@"
+            CREATE TABLE AlternateAuthor (Id INTEGER PRIMARY KEY AUTOINCREMENT, Code TEXT NOT NULL UNIQUE, Name TEXT NOT NULL);
+            CREATE TABLE AlternateBook (Id INTEGER PRIMARY KEY AUTOINCREMENT, Isbn TEXT NOT NULL UNIQUE, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (AuthorCode TEXT NOT NULL, BookIsbn TEXT NOT NULL, PRIMARY KEY (AuthorCode, BookIsbn));
+        ");
+    }
+
     private static DbContext CreateArticleContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
     {
         OnModelCreating = mb =>
@@ -190,6 +218,17 @@ public class ManyToManyTests
                   new[] { "TenantId", "StudentId" },
                   new[] { "TenantId", "CourseId" });
             mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
+        }
+    });
+
+    private static DbContext CreateAlternateKeyAuthorContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<AlternateAuthor>()
+              .HasMany<AlternateBook>(a => a.Books)
+              .WithMany()
+              .UsingTable("AuthorBook", "AuthorCode", "BookIsbn", a => a.Code, b => b.Isbn);
         }
     });
 
@@ -314,6 +353,21 @@ public class ManyToManyTests
         Assert.Equal(new[] { "TenantId", "CourseId" }, jtm.RightFkColumns);
         Assert.Equal(new[] { "\"TenantId\"", "\"StudentId\"" }, jtm.EscLeftFkColumns);
         Assert.Equal(new[] { "\"TenantId\"", "\"CourseId\"" }, jtm.EscRightFkColumns);
+    }
+
+    [Fact]
+    public void M2M1_AlternateKeys_UsingTable_RegistersJoinMapping()
+    {
+        using var cn = CreateAlternateKeyAuthorBookDb();
+        using var ctx = CreateAlternateKeyAuthorContext(cn);
+
+        var map = ctx.GetMapping(typeof(AlternateAuthor));
+        var jtm = Assert.Single(map.ManyToManyJoins);
+
+        Assert.Equal("AuthorCode", jtm.LeftFkColumn);
+        Assert.Equal("BookIsbn", jtm.RightFkColumn);
+        Assert.Equal("Code", Assert.Single(jtm.LeftKeyColumns).PropName);
+        Assert.Equal("Isbn", Assert.Single(jtm.RightKeyColumns).PropName);
     }
 
     [Fact]
@@ -774,6 +828,28 @@ public class ManyToManyTests
     }
 
     [Fact]
+    public async Task M2M6_AlternateKeys_Add_InsertsJoinRowsWithAlternateValues()
+    {
+        using var cn = CreateAlternateKeyAuthorBookDb();
+        using var ctx = CreateAlternateKeyAuthorContext(cn);
+
+        var b1 = new AlternateBook { Isbn = "978-a", Title = "A" };
+        var b2 = new AlternateBook { Isbn = "978-b", Title = "B" };
+        ctx.Add(b1);
+        ctx.Add(b2);
+        await ctx.SaveChangesAsync();
+
+        var author = new AlternateAuthor { Code = "auth-1", Name = "Author", Books = new List<AlternateBook> { b1, b2 } };
+        ctx.Add(author);
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM AuthorBook WHERE AuthorCode = 'auth-1' AND BookIsbn IN ('978-a', '978-b')";
+        var count = (long)cmd.ExecuteScalar()!;
+        Assert.Equal(2L, count);
+    }
+
+    [Fact]
     public async Task M2M6_CompositeKeys_Query_Include_LoadsCourses()
     {
         using var cn = CreateCompositeStudentCourseDb();
@@ -801,6 +877,28 @@ public class ManyToManyTests
         Assert.Equal(new[] { "Math", "Physics" }, alice.Courses.Select(c => c.Title).OrderBy(t => t));
         Assert.Single(bob.Courses);
         Assert.Equal("Chemistry", bob.Courses[0].Title);
+    }
+
+    [Fact]
+    public async Task M2M6_AlternateKeys_Query_Include_LoadsRelatedEntities()
+    {
+        using var cn = CreateAlternateKeyAuthorBookDb();
+        using var ctx = CreateAlternateKeyAuthorContext(cn);
+
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = @"
+                INSERT INTO AlternateAuthor (Code, Name) VALUES ('auth-1', 'Author');
+                INSERT INTO AlternateBook (Isbn, Title) VALUES ('978-a', 'A'), ('978-b', 'B');
+                INSERT INTO AuthorBook (AuthorCode, BookIsbn) VALUES ('auth-1', '978-a'), ('auth-1', '978-b');";
+            cmd.ExecuteNonQuery();
+        }
+
+        var loaded = await ((INormQueryable<AlternateAuthor>)ctx.Query<AlternateAuthor>())
+            .Include(a => a.Books)
+            .SingleAsync(a => a.Code == "auth-1");
+
+        Assert.Equal(new[] { "A", "B" }, loaded.Books.Select(b => b.Title).OrderBy(t => t));
     }
 
     [Fact]

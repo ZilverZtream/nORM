@@ -671,7 +671,7 @@ namespace nORM.Core
             var map = entry.Mapping;
             var tenantId = Options.TenantProvider != null ? GetRequiredTenantId(map, "many-to-many sync") : null;
             var leftTenantCol = Options.TenantProvider != null ? RequireTenantColumn(map, "many-to-many sync") : null;
-            var hasTenantFilter = Options.TenantProvider != null && map.KeyColumns.Length > 0;
+            var hasTenantFilter = Options.TenantProvider != null;
 
             foreach (var jtm in map.ManyToManyJoins)
             {
@@ -687,7 +687,7 @@ namespace nORM.Core
                 {
                     cmd.Parameters.Clear();
                     var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lpk", leftKeyValues);
-                    var tenantFilter = BuildJoinTenantFilter(map, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
+                    var tenantFilter = BuildJoinTenantFilter(map, jtm.LeftKeyColumns, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
                     cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)}{tenantFilter}";
                     if (hasTenantFilter)
                         cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
@@ -744,7 +744,7 @@ namespace nORM.Core
                     cmd.Parameters.Clear();
                     var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lp", leftKeyValues);
                     var rightParamNames = AddKeyParams(cmd, _p.ParamPrefix, "rp", removedValues);
-                    var tenantFilter = BuildJoinTenantFilter(map, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
+                    var tenantFilter = BuildJoinTenantFilter(map, jtm.LeftKeyColumns, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
                     cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTableMergedPredicate(jtm, leftParamNames, rightParamNames)}{tenantFilter}";
                     if (hasTenantFilter)
                         cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
@@ -828,12 +828,12 @@ namespace nORM.Core
             return BuildJoinTablePredicate(columns, parameters);
         }
 
-        private static string BuildJoinTenantFilter(TableMapping map, Column? tenantColumn, IReadOnlyList<string> leftParameterNames, string tenantParameterName)
+        private static string BuildJoinTenantFilter(TableMapping map, IReadOnlyList<Column> leftKeyColumns, Column? tenantColumn, IReadOnlyList<string> leftParameterNames, string tenantParameterName)
         {
             if (tenantColumn == null)
                 return "";
 
-            var entityKeyPredicate = BuildJoinTablePredicate(map.KeyColumns.Select(c => c.EscCol).ToArray(), leftParameterNames);
+            var entityKeyPredicate = BuildJoinTablePredicate(leftKeyColumns.Select(c => c.EscCol).ToArray(), leftParameterNames);
             return $" AND EXISTS (SELECT 1 FROM {map.EscTable} WHERE {entityKeyPredicate} AND {tenantColumn.EscCol} = {tenantParameterName})";
         }
 

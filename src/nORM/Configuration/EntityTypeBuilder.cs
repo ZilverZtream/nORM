@@ -848,6 +848,52 @@ namespace nORM.Configuration
                 }
 
                 /// <summary>
+                /// Specifies a join table whose columns reference alternate keys instead of primary keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFk">Column referencing this entity's selected key.</param>
+                /// <param name="rightFk">Column referencing the related entity's selected key.</param>
+                /// <param name="leftKey">Property on this entity referenced by <paramref name="leftFk"/>.</param>
+                /// <param name="rightKey">Property on the related entity referenced by <paramref name="rightFk"/>.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    string leftFk,
+                    string rightFk,
+                    Expression<Func<TEntity, object>> leftKey,
+                    Expression<Func<TDependent, object>> rightKey)
+                    => UsingTable(joinTable, leftFk, rightFk, leftKey, rightKey, schema: null);
+
+                /// <summary>
+                /// Specifies a schema-qualified join table whose columns reference alternate keys instead of primary keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFk">Column referencing this entity's selected key.</param>
+                /// <param name="rightFk">Column referencing the related entity's selected key.</param>
+                /// <param name="leftKey">Property on this entity referenced by <paramref name="leftFk"/>.</param>
+                /// <param name="rightKey">Property on the related entity referenced by <paramref name="rightFk"/>.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    string leftFk,
+                    string rightFk,
+                    Expression<Func<TEntity, object>> leftKey,
+                    Expression<Func<TDependent, object>> rightKey,
+                    string? schema)
+                {
+                    ArgumentNullException.ThrowIfNull(leftKey);
+                    ArgumentNullException.ThrowIfNull(rightKey);
+                    return UsingTable(
+                        joinTable,
+                        new[] { leftFk },
+                        new[] { rightFk },
+                        leftKey,
+                        rightKey,
+                        schema);
+                }
+
+                /// <summary>
                 /// Specifies a schema-qualified join table with ordered composite FK columns for both sides.
                 /// </summary>
                 /// <param name="joinTable">Name of the join table without schema qualification.</param>
@@ -874,6 +920,73 @@ namespace nORM.Configuration
                         JoinTableSchema = schema,
                         LeftFkColumns = leftFkColumns.ToArray(),
                         RightFkColumns = rightFkColumns.ToArray()
+                    });
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Specifies a join table with ordered FK columns that reference selected single or composite keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's selected key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's selected key.</param>
+                /// <param name="leftKey">Property or anonymous-object property list on this entity referenced by <paramref name="leftFkColumns"/>.</param>
+                /// <param name="rightKey">Property or anonymous-object property list on the related entity referenced by <paramref name="rightFkColumns"/>.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    IReadOnlyList<string> leftFkColumns,
+                    IReadOnlyList<string> rightFkColumns,
+                    Expression<Func<TEntity, object>> leftKey,
+                    Expression<Func<TDependent, object>> rightKey)
+                    => UsingTable(joinTable, leftFkColumns, rightFkColumns, leftKey, rightKey, schema: null);
+
+                /// <summary>
+                /// Specifies a schema-qualified join table with ordered FK columns that reference selected single or composite keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's selected key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's selected key.</param>
+                /// <param name="leftKey">Property or anonymous-object property list on this entity referenced by <paramref name="leftFkColumns"/>.</param>
+                /// <param name="rightKey">Property or anonymous-object property list on the related entity referenced by <paramref name="rightFkColumns"/>.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    IReadOnlyList<string> leftFkColumns,
+                    IReadOnlyList<string> rightFkColumns,
+                    Expression<Func<TEntity, object>> leftKey,
+                    Expression<Func<TDependent, object>> rightKey,
+                    string? schema)
+                {
+                    ArgumentNullException.ThrowIfNull(leftKey);
+                    ArgumentNullException.ThrowIfNull(rightKey);
+                    if (string.IsNullOrWhiteSpace(joinTable))
+                        throw new ArgumentException("Join table name cannot be null or whitespace.", nameof(joinTable));
+                    if (schema is not null && string.IsNullOrWhiteSpace(schema))
+                        throw new ArgumentException("Join table schema cannot be whitespace.", nameof(schema));
+                    ValidateCompositeFkColumns(leftFkColumns, nameof(leftFkColumns));
+                    ValidateCompositeFkColumns(rightFkColumns, nameof(rightFkColumns));
+                    var leftKeyProperties = _parent.GetProperties(leftKey);
+                    var rightKeyProperties = _parent.GetProperties(rightKey);
+                    if (leftKeyProperties.Count != leftFkColumns.Count)
+                        throw new ArgumentException("Left FK column count must match the selected left key property count.", nameof(leftFkColumns));
+                    if (rightKeyProperties.Count != rightFkColumns.Count)
+                        throw new ArgumentException("Right FK column count must match the selected right key property count.", nameof(rightFkColumns));
+
+                    _parent._config.AddManyToMany(new ManyToManyConfiguration(
+                        _principalNavigation.Name,
+                        typeof(TDependent),
+                        joinTable,
+                        leftFkColumns[0],
+                        rightFkColumns[0],
+                        _inverseNavName)
+                    {
+                        JoinTableSchema = schema,
+                        LeftFkColumns = leftFkColumns.ToArray(),
+                        RightFkColumns = rightFkColumns.ToArray(),
+                        LeftKeyProperties = leftKeyProperties.ToArray(),
+                        RightKeyProperties = rightKeyProperties.ToArray()
                     });
                     return _parent;
                 }

@@ -385,26 +385,34 @@ namespace nORM.Mapping
 
             foreach (var m2m in fluentConfig.ManyToManyRelationships)
             {
-                var leftPkColumns = KeyColumns;
-                if (leftPkColumns.Length == 0)
+                var leftKeyColumns = ResolveManyToManyKeyColumns(
+                    m2m.LeftKeyProperties,
+                    Columns,
+                    Type,
+                    "left");
+                if (leftKeyColumns.Length == 0)
                     throw new NormConfigurationException(
-                        $"Many-to-many relationship on '{Type.Name}' requires a primary key.");
+                        $"Many-to-many relationship on '{Type.Name}' requires a primary key or explicit left key.");
 
-                if (m2m.LeftFkColumns.Count != leftPkColumns.Length)
+                if (m2m.LeftFkColumns.Count != leftKeyColumns.Length)
                     throw new NormConfigurationException(
                         $"Many-to-many relationship on '{Type.Name}' declares {m2m.LeftFkColumns.Count} left FK columns " +
-                        $"but the entity key has {leftPkColumns.Length} columns.");
+                        $"but the entity key has {leftKeyColumns.Length} columns.");
 
                 var rightMapping = ctx.GetMapping(m2m.RelatedType);
-                var rightPkColumns = rightMapping.KeyColumns;
-                if (rightPkColumns.Length == 0)
+                var rightKeyColumns = ResolveManyToManyKeyColumns(
+                    m2m.RightKeyProperties,
+                    rightMapping.Columns,
+                    m2m.RelatedType,
+                    "right");
+                if (rightKeyColumns.Length == 0)
                     throw new NormConfigurationException(
-                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which must have a primary key.");
+                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which must have a primary key or explicit right key.");
 
-                if (m2m.RightFkColumns.Count != rightPkColumns.Length)
+                if (m2m.RightFkColumns.Count != rightKeyColumns.Length)
                     throw new NormConfigurationException(
                         $"Many-to-many relationship on '{Type.Name}' declares {m2m.RightFkColumns.Count} right FK columns " +
-                        $"but related entity '{m2m.RelatedType.Name}' has {rightPkColumns.Length} key columns.");
+                        $"but related entity '{m2m.RelatedType.Name}' has {rightKeyColumns.Length} key columns.");
 
                 // Resolve nav properties
                 var leftNavProp = Type.GetProperty(m2m.NavPropertyName)
@@ -424,12 +432,34 @@ namespace nORM.Mapping
                     m2m.RelatedType,
                     m2m.NavPropertyName,
                     m2m.RelatedNavPropertyName,
-                    leftPkColumns,
-                    rightPkColumns,
+                    leftKeyColumns,
+                    rightKeyColumns,
                     leftNavProp,
                     rightNavProp,
                     p));
             }
+        }
+
+        private static Column[] ResolveManyToManyKeyColumns(
+            IReadOnlyList<PropertyInfo>? keyProperties,
+            IReadOnlyList<Column> columns,
+            Type entityType,
+            string side)
+        {
+            if (keyProperties is null)
+                return columns.Where(c => c.IsKey).ToArray();
+
+            var resolved = new Column[keyProperties.Count];
+            for (var i = 0; i < keyProperties.Count; i++)
+            {
+                var property = keyProperties[i];
+                resolved[i] = columns.FirstOrDefault(c => c.Prop == property || c.Prop.Name == property.Name)
+                    ?? throw new NormConfigurationException(
+                        $"Many-to-many relationship on '{entityType.Name}' declares {side} key property '{property.Name}', " +
+                        "but that property is not mapped as a column.");
+            }
+
+            return resolved;
         }
 
         /// <summary>

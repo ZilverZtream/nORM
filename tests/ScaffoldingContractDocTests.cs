@@ -271,11 +271,13 @@ public class ScaffoldingContractDocTests
 
         Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
         Assert.Contains("non-null foreign-key constraints", doc, StringComparison.Ordinal);
-        Assert.Contains("Single-column and composite-key pure junction", doc, StringComparison.Ordinal);
+        Assert.Contains("Single-column,", doc, StringComparison.Ordinal);
+        Assert.Contains("alternate-key pure junction", doc, StringComparison.Ordinal);
+        Assert.Contains("key-selector `UsingTable` overload", doc, StringComparison.Ordinal);
         Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
         Assert.Contains("schema-aware `UsingTable`", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables receive distinct", doc, StringComparison.Ordinal);
-        Assert.Contains("role-based navigations", doc, StringComparison.Ordinal);
+        Assert.Contains("navigations from the join FK columns", doc, StringComparison.Ordinal);
         Assert.Contains("JoinTableSchema", source, StringComparison.Ordinal);
         Assert.Contains(".WithMany(p => p.", source, StringComparison.Ordinal);
         Assert.Contains("isSelfJoin", source, StringComparison.Ordinal);

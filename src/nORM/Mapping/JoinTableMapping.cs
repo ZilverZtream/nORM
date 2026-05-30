@@ -72,6 +72,12 @@ namespace nORM.Mapping
         /// <summary>Gets the ordered right key values from a right entity instance.</summary>
         public IReadOnlyList<Func<object, object?>> RightPkGetters { get; }
 
+        /// <summary>Ordered key columns on the left entity referenced by the join table.</summary>
+        public IReadOnlyList<Column> LeftKeyColumns { get; }
+
+        /// <summary>Ordered key columns on the right entity referenced by the join table.</summary>
+        public IReadOnlyList<Column> RightKeyColumns { get; }
+
         /// <summary>Gets the collection of related (right) entities from a left entity instance.</summary>
         public Func<object, IList?> LeftCollectionGetter { get; }
 
@@ -146,8 +152,10 @@ namespace nORM.Mapping
             LeftNavPropertyName = leftNavPropertyName;
             RightNavPropertyName = rightNavPropertyName;
 
-            LeftPkGetters = leftPkColumns.Select(column => column.Getter).ToArray();
-            RightPkGetters = rightPkColumns.Select(column => column.Getter).ToArray();
+            LeftKeyColumns = leftPkColumns.ToArray();
+            RightKeyColumns = rightPkColumns.ToArray();
+            LeftPkGetters = LeftKeyColumns.Select(column => column.Getter).ToArray();
+            RightPkGetters = RightKeyColumns.Select(column => column.Getter).ToArray();
             LeftPkGetter = LeftPkGetters[0];
             RightPkGetter = RightPkGetters[0];
 
