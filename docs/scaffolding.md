@@ -23,6 +23,9 @@ must be reviewed and edited like handwritten model code.
   `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.
   SQLite rowid integer primary keys are normalized to non-null `long` properties
   even when provider schema metadata reports nullable `int`.
+  Composite primary keys are also emitted in generated context configuration
+  with `HasKey(e => new { ... })` so the reverse-engineered model carries the
+  full key shape explicitly.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
   Computed/generated columns are marked

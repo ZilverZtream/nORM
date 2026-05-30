@@ -1412,6 +1412,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("List<TenantOrderLine>", principalCode);
             Assert.Contains("public TenantOrder?", dependentCode);
             Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderId }, p => new { p.TenantId, p.OrderId }, cascadeDelete: false);", contextCode);
+            Assert.Contains("mb.Entity<TenantOrder>().HasKey(e => new { e.TenantId, e.OrderId });", contextCode);
+            Assert.Contains("mb.Entity<TenantOrderLine>().HasKey(e => new { e.TenantId, e.OrderId, e.LineNo });", contextCode);
             Assert.Contains("[Key]", principalCode);
             Assert.Contains("TenantId { get; set; }", principalCode);
             Assert.Contains("OrderId { get; set; }", principalCode);

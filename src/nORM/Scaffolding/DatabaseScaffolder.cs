@@ -122,6 +122,7 @@ namespace nORM.Scaffolding
                     primaryKeyColumnsByTable,
                     indexes,
                     memberNamesByTable);
+                var compositePrimaryKeys = BuildCompositePrimaryKeys(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
                 var generatedFiles = new List<(string Path, string Content)>();
 
                 foreach (var table in tables)
@@ -152,7 +153,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -2449,6 +2450,34 @@ namespace nORM.Scaffolding
             => ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable)
                || ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes);
 
+        private static IReadOnlyList<ScaffoldPrimaryKey> BuildCompositePrimaryKeys(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
+            IReadOnlySet<string> skippedTableKeys)
+        {
+            var keys = new List<ScaffoldPrimaryKey>();
+            foreach (var (tableKey, keyColumns) in primaryKeyColumnsByTable.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                if (keyColumns.Count <= 1
+                    || skippedTableKeys.Contains(tableKey)
+                    || !entityByTable.TryGetValue(tableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(tableKey, out var propertyNames))
+                {
+                    continue;
+                }
+
+                var keyProperties = propertyNames
+                    .Where(pair => keyColumns.Contains(pair.Key))
+                    .Select(pair => pair.Value)
+                    .ToArray();
+                if (keyProperties.Length == keyColumns.Count)
+                    keys.Add(new ScaffoldPrimaryKey(entityName, keyProperties));
+            }
+
+            return keys;
+        }
+
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
@@ -3009,8 +3038,10 @@ namespace nORM.Scaffolding
             IEnumerable<string> entities,
             IReadOnlyList<ScaffoldRelationship> relationships,
             IReadOnlyList<ScaffoldManyToManyJoin> manyToManyJoins,
-            IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null)
+            IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null,
+            IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null)
         {
+            compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3024,7 +3055,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine("using System.Threading.Tasks;");
                 }
                 sb.AppendLine("using System.Linq;");
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0)
                     sb.AppendLine("using System;");
                 sb.AppendLine("using nORM.Core;");
                 sb.AppendLine("using nORM.Configuration;");
@@ -3034,7 +3065,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3056,7 +3087,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3066,6 +3097,12 @@ namespace nORM.Scaffolding
                     sb.AppendLine("        configuredOptions.OnModelCreating = mb =>");
                     sb.AppendLine("        {");
                     sb.AppendLine("            configure?.Invoke(mb);");
+                    foreach (var key in compositePrimaryKeys
+                        .OrderBy(k => k.EntityName, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(key.EntityName);
+                        sb.AppendLine($"            mb.Entity<{entity}>().HasKey({FormatScaffoldKeySelector("e", key.PropertyNames)});");
+                    }
                     foreach (var relationship in relationships
                         .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
                         .ThenBy(r => r.DependentEntityName, StringComparer.Ordinal)
@@ -3690,6 +3727,10 @@ namespace nORM.Scaffolding
         private readonly record struct RoutineStubParameter(
             string Name,
             string TypeName);
+
+        private readonly record struct ScaffoldPrimaryKey(
+            string EntityName,
+            string[] PropertyNames);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,
