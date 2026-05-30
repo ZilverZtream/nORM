@@ -71,6 +71,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
     private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
+    private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -555,6 +556,55 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownPostgresSetReturningRoutineAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_postgres_array_and_uuid_routine_parameters_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresTypedRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_typed_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresTypedRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresTypedRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routine = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Routine" &&
+                            item.GetProperty("name").GetString()!.EndsWith(PostgresTypedRoutineName, StringComparison.Ordinal));
+                var parameters = routine.GetProperty("metadata").GetProperty("parameters").EnumerateArray().ToArray();
+
+                Assert.Contains($"public sealed class {PostgresTypedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int[]? ids { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public Guid? traceId { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "ids" &&
+                    item.GetProperty("dbType").GetString()!.Contains("ARRAY", StringComparison.OrdinalIgnoreCase));
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "trace_id" &&
+                    item.GetProperty("clrType").GetString() == "Guid?");
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresTypedRoutineAsync(connection, provider);
             }
         }
     }
@@ -1387,6 +1437,14 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresSetReturningRoutineName)}(tenantId integer) RETURNS SETOF integer LANGUAGE SQL AS $$ SELECT tenantId $$");
     }
 
+    private static async Task SetupPostgresTypedRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresTypedRoutineAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) $$");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -1717,6 +1775,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection,
                 $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresSetReturningRoutineName)}(integer)");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresTypedRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(integer[], uuid)");
         }
         catch
         {
