@@ -32,6 +32,7 @@ var outputOpt = new Option<string>("--output") { Description = "Output directory
 var nsOpt = new Option<string>("--namespace") { Description = "Namespace for generated classes", DefaultValueFactory = _ => "Scaffolded" };
 var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
 var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names; literal dotted names that collide with schema-qualified names are rejected." };
+var tableOpt = new Option<string[]>("--table") { Description = "Optional repeatable table filter for names that should not be comma-split. May be specified multiple times." };
 var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
 var scaffoldDryRunOpt = new Option<bool>("--dry-run") { Description = "Validate scaffold output without creating, deleting, or overwriting files." };
 var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md/json." };
@@ -45,6 +46,7 @@ scaffold.Add(outputOpt);
 scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
 scaffold.Add(tablesOpt);
+scaffold.Add(tableOpt);
 scaffold.Add(noOverwriteOpt);
 scaffold.Add(scaffoldDryRunOpt);
 scaffold.Add(failOnWarningsOpt);
@@ -66,7 +68,7 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         var provider = CreateProvider(prov);
         var options = new ScaffoldOptions
         {
-            Tables = ParseCsvList(result.GetValue(tablesOpt)),
+            Tables = ParseTableFilters(result.GetValue(tablesOpt), result.GetValue(tableOpt)),
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
             DryRun = result.GetValue(scaffoldDryRunOpt),
             FailOnWarnings = result.GetValue(failOnWarningsOpt),
@@ -638,6 +640,22 @@ static IReadOnlyCollection<string> ParseCsvList(string? value)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+
+static IReadOnlyCollection<string> ParseTableFilters(string? commaSeparatedTables, IReadOnlyCollection<string>? repeatedTables)
+{
+    var filters = new List<string>();
+    filters.AddRange(ParseCsvList(commaSeparatedTables));
+    if (repeatedTables is not null)
+    {
+        filters.AddRange(repeatedTables
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim()));
+    }
+
+    return filters
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
 
 static bool IsSystemSchema(string provider, string? schemaName)
 {

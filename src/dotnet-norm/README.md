@@ -55,10 +55,12 @@ Repeated scaffolds of the same schema are ordered deterministically for
 reviewable diffs. Clean later runs remove stale `nORM.ScaffoldWarnings.*`
 reports when overwrite is allowed, so old warnings do not leak into CI logs.
 
-`--tables` accepts bare table names and schema-qualified names. Literal dotted
-table names are supported, but if a literal dotted table name collides with the
-same text as a schema-qualified table, scaffolding fails with an actionable
-error because the v1 filter syntax cannot disambiguate those objects safely.
+`--tables` accepts comma-separated bare table names and schema-qualified names.
+Use repeatable `--table` for literal table names that contain commas and must
+not be split. Literal dotted table names are supported, but if a literal dotted
+table name collides with the same text as a schema-qualified table, scaffolding
+fails with an actionable error because the v1 filter syntax cannot disambiguate
+those objects safely.
 
 It is a bounded bootstrap tool, not a database-first completeness claim.
 Composite foreign keys that do not target the generated principal primary key

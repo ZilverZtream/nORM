@@ -108,9 +108,59 @@ public class CliIntegrationTests
         Assert.Contains("nORM.ScaffoldWarnings.md/json", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--fail-on-warnings", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--dry-run", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--table", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-view-entities", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-query-artifacts", result.Stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Scaffold_repeatable_table_filter_preserves_literal_commas()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_table_filter_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_table_filter_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE "Keep,Me" (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL
+                    );
+                    CREATE TABLE SkipMe (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL
+                    );
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --table {Quote("Keep,Me")}",
+                root);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+
+            var generatedText = string.Join(
+                Environment.NewLine,
+                Directory.EnumerateFiles(output, "*.cs", SearchOption.AllDirectories)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .Select(File.ReadAllText));
+
+            Assert.Contains("\"Keep,Me\"", generatedText, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"SkipMe\"", generatedText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
     }
 
     [Fact]

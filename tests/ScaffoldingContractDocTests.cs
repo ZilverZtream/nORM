@@ -369,6 +369,21 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Doc_and_cli_pin_repeatable_table_filter_for_literal_commas()
+    {
+        var doc = ReadDoc();
+        var cliSource = ReadRepoFile("src", "dotnet-norm", "Program.cs");
+        var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
+
+        Assert.Contains("repeatable CLI `--table`", doc, StringComparison.Ordinal);
+        Assert.Contains("literal table names that contain commas", doc, StringComparison.Ordinal);
+        Assert.Contains("--table \"Keep,Me\"", doc, StringComparison.Ordinal);
+        Assert.Contains("Option<string[]>(\"--table\")", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ParseTableFilters", cliSource, StringComparison.Ordinal);
+        Assert.Contains("Use repeatable `--table`", cliReadme, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_names_the_public_scaffolder_types()
     {
         var doc = ReadDoc();

@@ -144,8 +144,10 @@ must be reviewed and edited like handwritten model code.
   columns and normal FK navigations. They are also reported as possible
   many-to-many candidates so reviewers do not accidentally collapse domain data
   into a payload-free skip navigation.
-- Optional table filtering through `ScaffoldOptions.Tables` and CLI
-  `--tables`; null or blank API filters are treated as empty rather than
+- Optional table filtering through `ScaffoldOptions.Tables`, CLI
+  comma-separated `--tables`, and repeatable CLI `--table` entries. Use
+  repeatable `--table` for literal table names that contain commas and must not
+  be split. Null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an
   actionable error when the same table name exists in multiple schemas; use a
   schema-qualified filter in that case. If a literal dotted table name collides
@@ -391,6 +393,7 @@ Examples:
 ```bash
 norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
 norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite --fail-on-warnings
+norm scaffold --provider sqlite --connection "Data Source=legacy.db" --table "Keep,Me"
 norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --dry-run
 ```
 
