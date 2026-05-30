@@ -1690,6 +1690,49 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSelfReferencingPureJoinTable_EmitsDistinctManyToManyNavigations()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Person (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE PersonRelationship (
+                MentorId INTEGER NOT NULL,
+                MenteeId INTEGER NOT NULL,
+                PRIMARY KEY (MentorId, MenteeId),
+                CONSTRAINT FK_PersonRelationship_Mentor FOREIGN KEY (MentorId) REFERENCES Person(Id),
+                CONSTRAINT FK_PersonRelationship_Mentee FOREIGN KEY (MenteeId) REFERENCES Person(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SelfJoinCtx");
+
+            Assert.False(File.Exists(Path.Combine(dir, "PersonRelationship.cs")));
+            var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
+            Assert.Contains("public List<Person> Persons { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> Persons2 { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.Persons)", contextCode);
+            Assert.Contains(".WithMany(p => p.Persons2)", contextCode);
+            Assert.Contains(".UsingTable(\"PersonRelationship\", \"MenteeId\", \"MentorId\");", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPayloadJoinTable_EmitsManyToManyDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

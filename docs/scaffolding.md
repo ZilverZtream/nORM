@@ -78,7 +78,8 @@ must be reviewed and edited like handwritten model code.
   `HasMany().WithMany(inverse).UsingTable(...)` configuration instead of a join
   entity. Schema-qualified join tables use the schema-aware `UsingTable`
   overload so generated SQL targets the qualified bridge table rather than a
-  literal dotted table name.
+  literal dotted table name. Self-referencing pure join tables receive distinct
+  de-duplicated navigations and are consumer-build tested.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`; null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an
@@ -123,6 +124,7 @@ must be reviewed and edited like handwritten model code.
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
+  self-referencing pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column/descending index diagnostics,
   composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
