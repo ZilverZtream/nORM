@@ -5356,8 +5356,11 @@ namespace nORM.Scaffolding
                 "numeric" or "decimal" => typeof(decimal),
                 "bool" or "boolean" => typeof(bool),
                 "uuid" => typeof(Guid),
-                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" => typeof(string),
+                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => typeof(string),
+                "bytea" => typeof(byte[]),
                 "date" => typeof(DateOnly),
+                "time" or "time without time zone" or "time with time zone" => typeof(TimeOnly),
+                "interval" => typeof(TimeSpan),
                 "timestamp" or "timestamp without time zone" => typeof(DateTime),
                 "timestamptz" or "timestamp with time zone" => typeof(DateTimeOffset),
                 _ => null

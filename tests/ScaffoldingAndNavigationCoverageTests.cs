@@ -686,7 +686,11 @@ public class DatabaseScaffolderPrivateMethodTests
     [Theory]
     [InlineData("ARRAY (_int4)", typeof(int[]))]
     [InlineData("ARRAY (_text)", typeof(string[]))]
+    [InlineData("ARRAY (_citext)", typeof(string[]))]
     [InlineData("ARRAY (_uuid)", typeof(Guid[]))]
+    [InlineData("ARRAY (_bytea)", typeof(byte[][]))]
+    [InlineData("ARRAY (_time)", typeof(TimeOnly[]))]
+    [InlineData("ARRAY (_interval)", typeof(TimeSpan[]))]
     [InlineData("ARRAY (_timestamptz)", typeof(DateTimeOffset[]))]
     public void TryMapPostgresArrayType_MapsSafeScalarArrays(string detail, Type expected)
     {

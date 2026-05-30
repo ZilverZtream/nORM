@@ -35,10 +35,11 @@ must be reviewed and edited like handwritten model code.
   `json`/`year` columns likewise scaffold as safe scalar CLR storage instead
   of warning-only provider-specific type rows; native JSON/XML operator
   semantics remain provider-bound.
-  PostgreSQL arrays over safe scalar elements scaffold as CLR arrays so the
-  model compiles and materializes with Npgsql; they remain provider-specific
-  schema diagnostics because SQL Server/MySQL/SQLite do not share native array
-  DDL.
+  PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
+  UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR
+  arrays so the model compiles and materializes with Npgsql; they remain
+  provider-specific schema diagnostics because SQL Server/MySQL/SQLite do not
+  share native array DDL.
   PostgreSQL domain columns are reported with the domain schema/name and
   underlying provider type so reviewers can preserve or remodel domain-owned
   constraints before claiming provider mobility.
