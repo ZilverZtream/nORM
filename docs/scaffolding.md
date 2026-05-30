@@ -107,6 +107,12 @@ must be reviewed and edited like handwritten model code.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
+- Optional provider-bound routine wrappers through
+  `ScaffoldOptions.EmitRoutineStubs` and CLI `--emit-routine-stubs`.
+  Generated context methods call nORM's stored-procedure APIs with the
+  discovered schema-qualified routine name and XML comments listing parameter
+  metadata. Routine bodies remain provider-owned and are not translated across
+  database engines.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
@@ -156,6 +162,9 @@ must be reviewed and edited like handwritten model code.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
+- `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
+  output compiles as a consumer project and keeps the provider-bound routine
+  warning/metadata contract explicit.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, computed/identity/rowversion metadata in the dynamic cache key

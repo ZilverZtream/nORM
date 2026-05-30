@@ -46,9 +46,15 @@ permissions follow least privilege.
 
 ## Scaffolding Inventory
 
-`dotnet-norm scaffold` and `DatabaseScaffolder` do not generate stored
-procedure wrappers. They report routines as skipped provider-bound objects. On
-SQL Server, PostgreSQL, and MySQL the diagnostic detail includes routine
+`dotnet-norm scaffold` and `DatabaseScaffolder` report routines as
+provider-bound objects by default. When `--emit-routine-stubs` or
+`ScaffoldOptions.EmitRoutineStubs` is enabled, the generated context also
+includes convenience wrapper methods that call nORM's stored-procedure APIs
+with the discovered schema-qualified routine name. These wrappers do not
+translate procedure/function bodies, do not add tenant predicates, and do not
+make the routine provider-mobile.
+
+On SQL Server, PostgreSQL, and MySQL the diagnostic detail includes routine
 metadata such as parameter count, ordered parameter mode/type summaries,
 output-parameter count when available, and declared result/data type hints.
 The JSON warning report also exposes structured `metadata` for routine rows so

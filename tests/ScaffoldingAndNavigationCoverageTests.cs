@@ -213,6 +213,29 @@ public class DatabaseScaffolderPrivateMethodTests
         return (string)m.Invoke(null, new object[] { ns, ctxName, entities })!;
     }
 
+    private static string InvokeScaffoldContextWithRoutineStub()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var routine = Activator.CreateInstance(
+            skippedObjectType,
+            "dbo",
+            "GetRevenue",
+            "Routine",
+            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal")!;
+        var relationships = Array.CreateInstance(relationshipType, 0);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 1);
+        routines.SetValue(routine, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships" && m.GetParameters().Length == 6);
+
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines })!;
+    }
+
     // ── ToPascalCase ────────────────────────────────────────────────────────
 
     [Fact]
@@ -638,6 +661,35 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var code = InvokeScaffoldContext("MyApp", "Ctx", Array.Empty<string>());
         Assert.Contains("auto-generated", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithRoutineStub_EmitsProviderBoundWrapperMethods()
+    {
+        var code = InvokeScaffoldContextWithRoutineStub();
+
+        Assert.Contains("using System.Threading;", code);
+        Assert.Contains("using System.Threading.Tasks;", code);
+        Assert.Contains("Executes provider-bound stored procedure `dbo.GetRevenue`", code);
+        Assert.Contains("Parameters discovered at scaffold time: @tenantId IN int, @total OUT decimal", code);
+        Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(object? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
+        Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
+        Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     // ── ScaffoldAsync (public integration) ─────────────────────────────────

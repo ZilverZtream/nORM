@@ -29,5 +29,13 @@ namespace nORM.Scaffolding
         /// model code.
         /// </summary>
         public bool FailOnWarnings { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether provider-bound stored procedure/function
+        /// wrapper methods should be generated on the scaffolded context. Generated
+        /// wrappers call nORM's stored-procedure APIs and do not translate routine
+        /// bodies across database providers.
+        /// </summary>
+        public bool EmitRoutineStubs { get; init; }
     }
 }

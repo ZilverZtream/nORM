@@ -34,6 +34,7 @@ var ctxOpt = new Option<string>("--context") { Description = "DbContext class na
 var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names; literal dotted names that collide with schema-qualified names are rejected." };
 var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
 var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md/json." };
+var emitRoutineStubsOpt = new Option<bool>("--emit-routine-stubs") { Description = "Generate provider-bound context wrapper methods for discovered routines/stored procedures. Routine bodies remain provider-owned." };
 scaffold.Add(connOpt);
 scaffold.Add(providerOpt);
 scaffold.Add(outputOpt);
@@ -42,6 +43,7 @@ scaffold.Add(ctxOpt);
 scaffold.Add(tablesOpt);
 scaffold.Add(noOverwriteOpt);
 scaffold.Add(failOnWarningsOpt);
+scaffold.Add(emitRoutineStubsOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
     try
@@ -58,7 +60,8 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         {
             Tables = ParseCsvList(result.GetValue(tablesOpt)),
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
-            FailOnWarnings = result.GetValue(failOnWarningsOpt)
+            FailOnWarnings = result.GetValue(failOnWarningsOpt),
+            EmitRoutineStubs = result.GetValue(emitRoutineStubsOpt)
         };
         try
         {
