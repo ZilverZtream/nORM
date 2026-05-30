@@ -24,6 +24,14 @@ namespace nORM.Scaffolding
         public bool OverwriteFiles { get; init; } = true;
 
         /// <summary>
+        /// Gets a value indicating whether scaffolding should validate and
+        /// generate output in memory without creating, deleting, or overwriting
+        /// files. This is intended for CI/preflight checks before a real
+        /// scaffold run.
+        /// </summary>
+        public bool DryRun { get; init; }
+
+        /// <summary>
         /// Gets a value indicating whether scaffolding should fail when diagnostics
         /// are produced for schema features that cannot be emitted as runnable nORM
         /// model code.

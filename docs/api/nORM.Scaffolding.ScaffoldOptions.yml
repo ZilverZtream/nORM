@@ -5,6 +5,7 @@ items:
   id: ScaffoldOptions
   parent: nORM.Scaffolding
   children:
+  - nORM.Scaffolding.ScaffoldOptions.DryRun
   - nORM.Scaffolding.ScaffoldOptions.FailOnWarnings
   - nORM.Scaffolding.ScaffoldOptions.OverwriteFiles
   - nORM.Scaffolding.ScaffoldOptions.Tables
@@ -117,6 +118,44 @@ items:
       type: System.Boolean
     content.vb: Public Property OverwriteFiles As Boolean
   overload: nORM.Scaffolding.ScaffoldOptions.OverwriteFiles*
+- uid: nORM.Scaffolding.ScaffoldOptions.DryRun
+  commentId: P:nORM.Scaffolding.ScaffoldOptions.DryRun
+  id: DryRun
+  parent: nORM.Scaffolding.ScaffoldOptions
+  langs:
+  - csharp
+  - vb
+  name: DryRun
+  nameWithType: ScaffoldOptions.DryRun
+  fullName: nORM.Scaffolding.ScaffoldOptions.DryRun
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Scaffolding/ScaffoldOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DryRun
+    path: src/nORM/Scaffolding/ScaffoldOptions.cs
+    startLine: 31
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: >-
+    Gets a value indicating whether scaffolding should validate and
+
+    generate output in memory without creating, deleting, or overwriting
+
+    files. This is intended for CI/preflight checks before a real
+
+    scaffold run.
+  example: []
+  syntax:
+    content: public bool DryRun { get; init; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property DryRun As Boolean
+  overload: nORM.Scaffolding.ScaffoldOptions.DryRun*
 - uid: nORM.Scaffolding.ScaffoldOptions.FailOnWarnings
   commentId: P:nORM.Scaffolding.ScaffoldOptions.FailOnWarnings
   id: FailOnWarnings
@@ -1205,6 +1244,12 @@ references:
   name: OverwriteFiles
   nameWithType: ScaffoldOptions.OverwriteFiles
   fullName: nORM.Scaffolding.ScaffoldOptions.OverwriteFiles
+- uid: nORM.Scaffolding.ScaffoldOptions.DryRun*
+  commentId: Overload:nORM.Scaffolding.ScaffoldOptions.DryRun
+  href: nORM.Scaffolding.ScaffoldOptions.html#nORM_Scaffolding_ScaffoldOptions_DryRun
+  name: DryRun
+  nameWithType: ScaffoldOptions.DryRun
+  fullName: nORM.Scaffolding.ScaffoldOptions.DryRun
 - uid: System.Boolean
   commentId: T:System.Boolean
   parent: System

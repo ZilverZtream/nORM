@@ -107,6 +107,7 @@ public class CliIntegrationTests
         Assert.Contains("bounded v1 nORM model", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("nORM.ScaffoldWarnings.md/json", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--fail-on-warnings", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--dry-run", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-view-entities", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-query-artifacts", result.Stdout, StringComparison.Ordinal);
@@ -190,6 +191,39 @@ public class CliIntegrationTests
             Assert.Contains("schema-feature=1", result.Stdout, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
+    public void Scaffold_dry_run_does_not_write_output_files()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_dry_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_dry_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE TABLE DryRunRow (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --dry-run",
+                root);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Scaffolding dry run completed", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("No files were written", result.Stdout, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(output));
         }
         finally
         {

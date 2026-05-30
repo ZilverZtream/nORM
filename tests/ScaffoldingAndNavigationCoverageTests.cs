@@ -3445,6 +3445,68 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithDryRun_DoesNotCreateOrWriteOutputDirectory()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE DryRunItem (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_dry_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "DryRunCtx",
+                new ScaffoldOptions { DryRun = true });
+
+            Assert.False(Directory.Exists(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithDryRun_DoesNotRemoveStaleWarningReports()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE DryRunClean (Id INTEGER PRIMARY KEY)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_dry_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+            File.WriteAllText(warningPath, "# stale");
+
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "DryRunCtx",
+                new ScaffoldOptions { DryRun = true });
+
+            Assert.Equal("# stale", File.ReadAllText(warningPath));
+            Assert.False(File.Exists(Path.Combine(dir, "DryRunClean.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "DryRunCtx.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithNoOverwrite_PreflightsAllFilesBeforeWriting()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

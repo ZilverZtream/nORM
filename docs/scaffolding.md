@@ -137,6 +137,10 @@ must be reviewed and edited like handwritten model code.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`. Output file conflicts are preflighted before any file
   is written, so a later collision does not leave a partially generated model.
+- Optional dry-run validation through `ScaffoldOptions.DryRun` and CLI
+  `--dry-run`. Dry runs perform schema discovery and in-memory generation
+  without creating the output directory, deleting stale warning reports, or
+  writing generated files.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
@@ -347,6 +351,7 @@ Examples:
 ```bash
 norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --namespace App.Data
 norm scaffold --provider postgres --connection "$NORM_POSTGRES" --tables public.customer,public.order --no-overwrite --fail-on-warnings
+norm scaffold --provider sqlite --connection "Data Source=app.db" --output Models --dry-run
 ```
 
 Do not use scaffolding as evidence for provider mobility by itself. Provider

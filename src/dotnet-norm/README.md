@@ -74,6 +74,8 @@ navigation generation beyond the safe primary-key subset, payload join-table
 modeling, owned-type inference, inheritance inference, view entity generation, and provider-specific schema
 semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
+Use `--dry-run` to validate scaffold output without creating, deleting, or
+overwriting files.
 Tables and query artifacts without primary keys are generated with
 `[ReadOnlyEntity]`, so they remain queryable but generated writes are rejected
 before SQL generation until the model has a real key.

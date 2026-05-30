@@ -81,7 +81,8 @@ namespace nORM.Scaffolding
 
             try
             {
-                Directory.CreateDirectory(outputDirectory);
+                if (!options.DryRun)
+                    Directory.CreateDirectory(outputDirectory);
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
                 var emitQueryArtifacts = options.EmitViewEntities || options.EmitQueryArtifacts;
@@ -218,19 +219,25 @@ namespace nORM.Scaffolding
                 }
                 else
                 {
-                    EnsureNoStaleScaffoldWarningReports(outputDirectory, options);
+                    if (!options.DryRun)
+                        EnsureNoStaleScaffoldWarningReports(outputDirectory, options);
                 }
 
-                EnsureNoOutputFileConflicts(generatedFiles.Select(file => file.Path), options);
-                foreach (var (path, content) in generatedFiles)
-                    await WriteGeneratedFileAsync(path, content).ConfigureAwait(false);
+                if (!options.DryRun)
+                {
+                    EnsureNoOutputFileConflicts(generatedFiles.Select(file => file.Path), options);
+                    foreach (var (path, content) in generatedFiles)
+                        await WriteGeneratedFileAsync(path, content).ConfigureAwait(false);
+                }
 
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     if (options.FailOnWarnings)
                         throw new NormConfigurationException(
                             "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
-                            "Review nORM.ScaffoldWarnings.md or disable ScaffoldOptions.FailOnWarnings.");
+                            (options.DryRun
+                                ? "Rerun without ScaffoldOptions.DryRun to write nORM.ScaffoldWarnings.md, or disable ScaffoldOptions.FailOnWarnings."
+                                : "Review nORM.ScaffoldWarnings.md or disable ScaffoldOptions.FailOnWarnings."));
                 }
             }
             finally

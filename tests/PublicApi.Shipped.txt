@@ -1403,6 +1403,7 @@ P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandTy
 P:nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
+P:nORM.Scaffolding.ScaffoldOptions.DryRun:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitQueryArtifacts:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitRoutineStubs:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitSequenceStubs:System.Boolean

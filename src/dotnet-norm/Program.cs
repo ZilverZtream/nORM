@@ -33,6 +33,7 @@ var nsOpt = new Option<string>("--namespace") { Description = "Namespace for gen
 var ctxOpt = new Option<string>("--context") { Description = "DbContext class name", DefaultValueFactory = _ => "AppDbContext" };
 var tablesOpt = new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names; literal dotted names that collide with schema-qualified names are rejected." };
 var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse to overwrite existing generated files." };
+var scaffoldDryRunOpt = new Option<bool>("--dry-run") { Description = "Validate scaffold output without creating, deleting, or overwriting files." };
 var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md/json." };
 var emitRoutineStubsOpt = new Option<bool>("--emit-routine-stubs") { Description = "Generate provider-bound context wrapper methods for discovered routines/stored procedures. Routine bodies remain provider-owned." };
 var emitSequenceStubsOpt = new Option<bool>("--emit-sequence-stubs") { Description = "Generate provider-bound context wrapper methods for discovered SQL Server/PostgreSQL standalone sequences." };
@@ -45,6 +46,7 @@ scaffold.Add(nsOpt);
 scaffold.Add(ctxOpt);
 scaffold.Add(tablesOpt);
 scaffold.Add(noOverwriteOpt);
+scaffold.Add(scaffoldDryRunOpt);
 scaffold.Add(failOnWarningsOpt);
 scaffold.Add(emitRoutineStubsOpt);
 scaffold.Add(emitSequenceStubsOpt);
@@ -66,6 +68,7 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
         {
             Tables = ParseCsvList(result.GetValue(tablesOpt)),
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
+            DryRun = result.GetValue(scaffoldDryRunOpt),
             FailOnWarnings = result.GetValue(failOnWarningsOpt),
             EmitRoutineStubs = result.GetValue(emitRoutineStubsOpt),
             EmitSequenceStubs = result.GetValue(emitSequenceStubsOpt),
@@ -82,9 +85,18 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
             return Fail(ex);
         }
 
-        Console.WriteLine($"Scaffolding completed. Files written to {output}.");
-        if (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
+        if (options.DryRun)
+        {
+            Console.WriteLine($"Scaffolding dry run completed. No files were written to {output}.");
+        }
+        else
+        {
+            Console.WriteLine($"Scaffolding completed. Files written to {output}.");
+        }
+
+        if (!options.DryRun && (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
             || File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")))
+        )
         {
             Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
             PrintScaffoldWarningSummary(output);
