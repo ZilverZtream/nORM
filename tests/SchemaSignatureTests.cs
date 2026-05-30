@@ -322,6 +322,26 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void GenerateEntityType_WithSqliteUuidDeclaredType_UsesGuidProperty()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicUuid (
+                Id INTEGER PRIMARY KEY,
+                ExternalId UUID NOT NULL,
+                OptionalExternalId UUID NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "DynamicUuid");
+
+        Assert.Equal(typeof(Guid), type.GetProperty("ExternalId")!.PropertyType);
+        Assert.Equal(typeof(Guid?), type.GetProperty("OptionalExternalId")!.PropertyType);
+    }
+
+    [Fact]
     public void GenerateEntityType_WithObjectMemberColumnNames_GeneratesUniqueProperties()
     {
         using var cn = OpenMemory();

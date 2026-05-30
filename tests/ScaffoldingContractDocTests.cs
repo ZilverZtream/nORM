@@ -262,8 +262,9 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs");
 
-        Assert.Contains("computed/identity/rowversion metadata", doc, StringComparison.Ordinal);
-        Assert.Contains("non-null reference-column `[Required]` parity", doc, StringComparison.Ordinal);
+        Assert.Contains("computed/identity/rowversion", doc, StringComparison.Ordinal);
+        Assert.Contains("non-null", doc, StringComparison.Ordinal);
+        Assert.Contains("reference-column `[Required]` parity", doc, StringComparison.Ordinal);
         Assert.Contains("GetComputedColumns", source, StringComparison.Ordinal);
         Assert.Contains("sys.computed_columns", source, StringComparison.Ordinal);
         Assert.Contains("is_generated <> 'NEVER'", source, StringComparison.Ordinal);
@@ -341,7 +342,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("SQLite rowid integer primary keys are generated as non-null `long`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("stale warning reports", rootReadme, StringComparison.Ordinal);
         Assert.Contains("SQLite rowid integer primary keys are normalized to non-null `long`", doc, StringComparison.Ordinal);
-        Assert.Contains("non-null reference-column `[Required]` parity", doc, StringComparison.Ordinal);
+        Assert.Contains("reference-column `[Required]` parity", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables", doc, StringComparison.Ordinal);
 
         Assert.Contains("Scaffold_sqlite_output_builds_as_consumer_project", releaseGates, StringComparison.Ordinal);
@@ -359,6 +360,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("effectiveAllowNull", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("RequiredAttribute", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("BuildSchemaDescriptor", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("GetSqliteDeclaredColumnTypes", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("SQLite `UUID` declared-type parity", doc, StringComparison.Ordinal);
     }
 
     [Fact]

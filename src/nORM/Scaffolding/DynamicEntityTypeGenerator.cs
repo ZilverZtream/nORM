@@ -320,6 +320,7 @@ namespace nORM.Scaffolding
             var computedColumns = GetComputedColumns(connection, schemaName, tableName);
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
+            var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
@@ -336,7 +337,8 @@ namespace nORM.Scaffolding
                     || computedColumns.Contains(colName);
                 var isRowVersion = rowVersionColumns.Contains(colName);
                 var effectiveAllowNull = allowNull && !isKey;
-                var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto), effectiveAllowNull);
+                sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
+                var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType), effectiveAllowNull);
 
                 var maxLength = GetScaffoldMaxLength(clrType, row);
 
@@ -424,6 +426,32 @@ namespace nORM.Scaffolding
             }
 
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
+        {
+            if (!connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
+
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                ? string.Empty
+                : EscapeIdentifier(connection, schemaName!) + ".";
+            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (!ReaderHasColumn(reader, "name") || !ReaderHasColumn(reader, "type"))
+                    continue;
+
+                var name = Convert.ToString(reader["name"]);
+                var type = Convert.ToString(reader["type"]);
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type))
+                    result[name] = type;
+            }
+
+            return result;
         }
 
         private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
@@ -643,8 +671,14 @@ namespace nORM.Scaffolding
             return type;
         }
 
-        private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto)
+        private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
         {
+            if (connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase)
+                && IsSqliteUuidDeclaredType(declaredType))
+            {
+                return typeof(Guid);
+            }
+
             if (connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase)
                 && isKey
                 && isAuto
@@ -658,6 +692,10 @@ namespace nORM.Scaffolding
 
             return clrType;
         }
+
+        private static bool IsSqliteUuidDeclaredType(string? declaredType)
+            => !string.IsNullOrWhiteSpace(declaredType)
+               && declaredType.Trim().ToUpperInvariant().Contains("UUID", StringComparison.Ordinal);
 
         private static string ToPascalCase(string name)
         {

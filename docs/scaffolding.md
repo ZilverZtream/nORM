@@ -306,9 +306,10 @@ must be reviewed and edited like handwritten model code.
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
-  preservation, computed/identity/rowversion metadata in the dynamic cache key
-  and generated attributes, non-null reference-column `[Required]` parity, and
-  connection ownership for sync/async dynamic scaffolding calls.
+  preservation, SQLite `UUID` declared-type parity, computed/identity/rowversion
+  metadata in the dynamic cache key and generated attributes, non-null
+  reference-column `[Required]` parity, and connection ownership for sync/async
+  dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted
   identifiers.
