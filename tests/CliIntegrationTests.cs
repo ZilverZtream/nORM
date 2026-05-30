@@ -109,6 +109,7 @@ public class CliIntegrationTests
         Assert.Contains("--fail-on-warnings", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-view-entities", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--emit-query-artifacts", result.Stdout, StringComparison.Ordinal);
     }
 
     [Fact]

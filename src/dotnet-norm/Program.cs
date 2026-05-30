@@ -36,6 +36,7 @@ var noOverwriteOpt = new Option<bool>("--no-overwrite") { Description = "Refuse 
 var failOnWarningsOpt = new Option<bool>("--fail-on-warnings") { Description = "Fail scaffolding when unsupported schema features are reported in nORM.ScaffoldWarnings.md/json." };
 var emitRoutineStubsOpt = new Option<bool>("--emit-routine-stubs") { Description = "Generate provider-bound context wrapper methods for discovered routines/stored procedures. Routine bodies remain provider-owned." };
 var emitViewEntitiesOpt = new Option<bool>("--emit-view-entities") { Description = "Generate query-only entity classes for discovered views/materialized views and SQLite virtual tables. Query-artifact writes remain caller-owned/provider-bound." };
+var emitQueryArtifactsOpt = new Option<bool>("--emit-query-artifacts") { Description = "Alias for --emit-view-entities; generates bounded read-oriented query artifacts for supported provider objects." };
 scaffold.Add(connOpt);
 scaffold.Add(providerOpt);
 scaffold.Add(outputOpt);
@@ -46,6 +47,7 @@ scaffold.Add(noOverwriteOpt);
 scaffold.Add(failOnWarningsOpt);
 scaffold.Add(emitRoutineStubsOpt);
 scaffold.Add(emitViewEntitiesOpt);
+scaffold.Add(emitQueryArtifactsOpt);
 scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
 {
     try
@@ -64,7 +66,7 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
             FailOnWarnings = result.GetValue(failOnWarningsOpt),
             EmitRoutineStubs = result.GetValue(emitRoutineStubsOpt),
-            EmitViewEntities = result.GetValue(emitViewEntitiesOpt)
+            EmitViewEntities = result.GetValue(emitViewEntitiesOpt) || result.GetValue(emitQueryArtifactsOpt)
         };
         try
         {
