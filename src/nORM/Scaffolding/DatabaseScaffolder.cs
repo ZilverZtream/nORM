@@ -3512,10 +3512,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine("        {");
                         foreach (var parameter in outputParameters)
                         {
-                            var sizeArgument = parameter.Size.HasValue
-                                ? ", " + parameter.Size.Value.ToString(CultureInfo.InvariantCulture)
-                                : string.Empty;
-                            sb.AppendLine($"            new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}{sizeArgument}),");
+                            sb.AppendLine($"            {FormatRoutineOutputParameterCreation(parameter)},");
                         }
                         sb.AppendLine("        };");
                     }
@@ -3617,11 +3614,39 @@ namespace nORM.Scaffolding
                     return Array.Empty<RoutineOutputParameter>();
 
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                names.Add(new RoutineOutputParameter(escaped, GetRoutineParameterDbTypeName(dataType), GetRoutineParameterSize(dataType)));
+                names.Add(new RoutineOutputParameter(
+                    escaped,
+                    GetRoutineParameterDbTypeName(dataType),
+                    GetRoutineParameterSize(dataType),
+                    GetRoutineParameterDirection(mode)));
             }
 
             return names.ToArray();
         }
+
+        private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)
+        {
+            var baseCall = $"new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}";
+            var hasNonDefaultDirection = !string.Equals(parameter.Direction, nameof(ParameterDirection.Output), StringComparison.Ordinal);
+            if (!parameter.Size.HasValue && !hasNonDefaultDirection)
+                return baseCall + ")";
+
+            var sizeArgument = parameter.Size.HasValue
+                ? parameter.Size.Value.ToString(CultureInfo.InvariantCulture)
+                : "null";
+            if (!hasNonDefaultDirection)
+                return baseCall + ", " + sizeArgument + ")";
+
+            return baseCall + ", " + sizeArgument + ", System.Data.ParameterDirection." + parameter.Direction + ")";
+        }
+
+        private static string GetRoutineParameterDirection(string? mode)
+            => mode?.Trim().ToUpperInvariant() switch
+            {
+                "INOUT" => nameof(ParameterDirection.InputOutput),
+                "RETURN" => nameof(ParameterDirection.ReturnValue),
+                _ => nameof(ParameterDirection.Output)
+            };
 
         private static int? GetRoutineParameterSize(string? dataType)
         {
@@ -4143,7 +4168,8 @@ namespace nORM.Scaffolding
         private readonly record struct RoutineOutputParameter(
             string Name,
             string DbType,
-            int? Size);
+            int? Size,
+            string Direction);
 
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,

@@ -226,7 +226,7 @@ public class DatabaseScaffolderPrivateMethodTests
             "dbo",
             "GetRevenue",
             "Routine",
-            "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:OUT:nvarchar(32)")!;
+            "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32)")!;
         var relationships = Array.CreateInstance(relationshipType, 0);
         var manyToMany = Array.CreateInstance(manyToManyType, 0);
         var routines = Array.CreateInstance(skippedObjectType, 1);
@@ -678,13 +678,14 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Parameters discovered at scaffold time: @tenantId IN int, @total OUT decimal", code);
         Assert.Contains("public sealed class GetRevenueParameters", code);
         Assert.Contains("public int? tenantId { get; init; }", code);
+        Assert.Contains("public string? message { get; init; }", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
         Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
-        Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32)", code);
+        Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", code);
         Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_" + Guid.NewGuid().ToString("N"));

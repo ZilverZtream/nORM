@@ -298,6 +298,26 @@ public class StoredProcedureTests
         Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
     }
 
+    [Fact]
+    public async Task SP1_OutputParamDirection_Input_ThrowsNormUsageException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT);";
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureWithOutputAsync<Item>(
+                "SELECT Id, Name FROM Item",
+                outputParameters: new OutputParameter("badDirection", DbType.Int32, null, ParameterDirection.Input)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
     /// <summary>
     /// All three SP overloads in DbContext.cs must use ctx._p.StoredProcedureCommandType.
     /// This test validates the async-enumerable overload (which was correct before) still works.

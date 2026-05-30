@@ -366,7 +366,15 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"Task<StoredProcedureResult<TResult>> {RoutineOutputName}WithOutputAsync<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public static OutputParameter[] Create{RoutineOutputName}OutputParameters()", contextCode, StringComparison.Ordinal);
                 Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", contextCode, StringComparison.Ordinal);
-                Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32)", contextCode, StringComparison.Ordinal);
+                if (kind == ProviderKind.MySql)
+                {
+                    Assert.Contains("public string? message { get; init; }", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", contextCode, StringComparison.Ordinal);
+                }
+                else
+                {
+                    Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32)", contextCode, StringComparison.Ordinal);
+                }
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
@@ -816,7 +824,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 break;
             case ProviderKind.MySql:
                 await ExecuteAsync(connection,
-                    $"CREATE PROCEDURE {provider.Escape(RoutineOutputName)}(IN tenantId INT, OUT total DECIMAL(18,2), OUT message VARCHAR(32)) BEGIN SET total = 12.34; SET message = 'ok'; SELECT tenantId AS Id, 'ok' AS Name; END");
+                    $"CREATE PROCEDURE {provider.Escape(RoutineOutputName)}(IN tenantId INT, OUT total DECIMAL(18,2), INOUT message VARCHAR(32)) BEGIN SET total = 12.34; SET message = CONCAT(COALESCE(message, ''), 'ok'); SELECT tenantId AS Id, 'ok' AS Name; END");
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind), kind, "Routine output scaffolding live test only targets providers with OUT parameter support in this test harness.");

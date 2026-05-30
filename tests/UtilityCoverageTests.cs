@@ -966,13 +966,17 @@ public class UtilityCoverageTests
         Assert.Equal("MyParam", p.Name);
         Assert.Equal(System.Data.DbType.Int32, p.DbType);
         Assert.Null(p.Size);
+        Assert.Equal(System.Data.ParameterDirection.Output, p.Direction);
+        Assert.Null(p.Value);
     }
 
     [Fact]
     public void OutputParameter_WithSize_SetsSize()
     {
-        var p = new OutputParameter("Str", System.Data.DbType.String, 100);
+        var p = new OutputParameter("Str", System.Data.DbType.String, 100, System.Data.ParameterDirection.InputOutput, "seed");
         Assert.Equal(100, p.Size);
+        Assert.Equal(System.Data.ParameterDirection.InputOutput, p.Direction);
+        Assert.Equal("seed", p.Value);
     }
 
     [Fact]

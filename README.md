@@ -302,9 +302,9 @@ Opt-in scaffold switches can emit provider-bound routine wrappers
 (`--emit-query-artifacts` / `--emit-view-entities`, also used for SQLite virtual-table query artifacts);
 both remain explicitly bounded and are not provider mobility proof by
 themselves. Routine wrappers preserve discovered input CLR types, output
-`DbType` values, and string/binary output sizes where providers expose them.
-Payload bridge tables scaffold as explicit join entities with payload columns
-and FK navigations.
+`DbType` values, INOUT direction, and string/binary output sizes where
+providers expose them. Payload bridge tables scaffold as explicit join
+entities with payload columns and FK navigations.
 Owned-type inference, inheritance inference, view write semantics, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding
 Contract](docs/scaffolding.md).

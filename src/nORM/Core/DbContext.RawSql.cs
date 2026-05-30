@@ -361,13 +361,33 @@ namespace nORM.Core
                     if (!IsSafeOutputParamName(op.Name))
                         throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
                             "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
+                    if (op.Direction is not (ParameterDirection.Output or ParameterDirection.InputOutput or ParameterDirection.ReturnValue))
+                    {
+                        throw new NormUsageException(
+                            $"Invalid output parameter direction for '{op.Name}': {op.Direction}. " +
+                            "Use Output, InputOutput, or ReturnValue.");
+                    }
+
                     var pName = ctx._p.ParamPrefix + op.Name;
-                    var p = cmd.CreateParameter();
-                    p.ParameterName = pName;
+                    var p = FindParameter(cmd.Parameters, pName);
+                    if (p is null)
+                    {
+                        p = cmd.CreateParameter();
+                        p.ParameterName = pName;
+                        cmd.Parameters.Add(p);
+                    }
+
                     p.DbType = op.DbType;
-                    p.Direction = ParameterDirection.Output;
+                    p.Direction = op.Direction;
                     if (op.Size.HasValue) p.Size = op.Size.Value;
-                    cmd.Parameters.Add(p);
+                    if (op.Direction == ParameterDirection.InputOutput)
+                    {
+                        if (op.Value is not null)
+                            p.Value = op.Value;
+                        else if (p.Value is null)
+                            p.Value = DBNull.Value;
+                    }
+
                     outputParamMap[op.Name] = p;
                 }
 
@@ -390,6 +410,17 @@ namespace nORM.Core
                 cmd.Parameters.Clear();
                 return new StoredProcedureResult<T>(list, outputs);
             }, ct);
+        }
+
+        private static DbParameter? FindParameter(DbParameterCollection parameters, string parameterName)
+        {
+            foreach (DbParameter parameter in parameters)
+            {
+                if (string.Equals(parameter.ParameterName, parameterName, StringComparison.OrdinalIgnoreCase))
+                    return parameter;
+            }
+
+            return null;
         }
 
         internal static void ValidateStoredProcedureCommandText(

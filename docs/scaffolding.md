@@ -131,11 +131,11 @@ must be reviewed and edited like handwritten model code.
   scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
   etc.) and falls back to `object?` only for unmapped provider types. When safe
   output parameter metadata is available, scaffolding also emits an
-  `OutputParameter[]` factory with mapped `DbType` values and discovered
-  string/binary sizes where providers expose them. XML comments list the
-  discovered parameter metadata, including sized types such as `nvarchar(32)`
-  and `decimal(18,2)`. Routine bodies remain provider-owned and are not
-  translated across database engines.
+  `OutputParameter[]` factory with mapped `DbType` values, discovered
+  string/binary sizes where providers expose them, and `InputOutput` direction
+  for INOUT parameters. XML comments list the discovered parameter metadata,
+  including sized types such as `nvarchar(32)` and `decimal(18,2)`. Routine
+  bodies remain provider-owned and are not translated across database engines.
 - Optional query-artifact entities through
   `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
   `EmitViewEntities`) and CLI `--emit-query-artifacts` or
@@ -259,8 +259,8 @@ must be reviewed and edited like handwritten model code.
   as opt-in provider-bound call stubs.
   Routine diagnostics include provider metadata such as parameter counts,
   output-parameter counts where the provider exposes them, ordered parameter
-  mode/type summaries, output string/binary sizes where providers expose them,
-  and result/data type hints so stored
+  mode/type summaries, INOUT direction, output string/binary sizes where
+  providers expose them, and result/data type hints so stored
   procedures/functions are not lost during provider-mobility review.
 - Provider-specific filtered/partial indexes, expression indexes, and
   included-column indexes. These are discovered and reported for review; v1
