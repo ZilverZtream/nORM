@@ -123,7 +123,7 @@ public class PostgresMigrationSqlGeneratorTests
     public void CreateTable_WithIncludedIndexColumn_EmitsIncludeClause()
     {
         var code = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false };
-        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", Order = 0 });
+        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", Order = 0, FilterSql = "\"Code\" IS NOT NULL" });
         var name = new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = false };
         name.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", IsIncluded = true });
         var table = BuildTable("Product",
@@ -135,7 +135,7 @@ public class PostgresMigrationSqlGeneratorTests
 
         var sql = Gen.GenerateSql(diff);
 
-        Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\") INCLUDE (\"Name\")");
+        Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\") INCLUDE (\"Name\") WHERE \"Code\" IS NOT NULL");
     }
 
     [Fact]

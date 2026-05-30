@@ -1011,6 +1011,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.G
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
+P:nORM.Configuration.IndexAttribute.FilterSql:System.String
 P:nORM.Configuration.IndexAttribute.IsDescending:System.Boolean
 P:nORM.Configuration.IndexAttribute.IsIncluded:System.Boolean
 P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
@@ -1213,6 +1214,7 @@ P:nORM.Mapping.TableMapping.UpdateColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableSplitAttribute.PrincipalType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ModelType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ProviderType:System.Type
+P:nORM.Migration.ColumnIndexSchema.FilterSql:System.String
 P:nORM.Migration.ColumnIndexSchema.IsDescending:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.IsIncluded:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.IsUnique:System.Boolean

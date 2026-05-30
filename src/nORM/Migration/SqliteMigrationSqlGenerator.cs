@@ -105,7 +105,7 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
 
                 down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
@@ -182,7 +182,7 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
             }
 
@@ -348,7 +348,7 @@ namespace nORM.Migration
             {
                 var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                 EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
             }
         }
 
@@ -378,6 +378,9 @@ namespace nORM.Migration
             if (includedColumnNames.Length > 0)
                 throw new NotSupportedException($"SQLite does not support INCLUDE columns for index '{indexName}'. Use key columns only or keep the covering-index tuning in provider-specific migration code.");
         }
+
+        private static string FormatFilter(string? filterSql)
+            => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.

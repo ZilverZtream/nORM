@@ -1299,7 +1299,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithSqlitePartialAndExpressionIndexes_EmitsDiagnosticsInsteadOfPortableIndexes()
+    public async Task ScaffoldAsync_WithSqlitePartialAndExpressionIndexes_EmitsPartialIndexAndExpressionDiagnostic()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1324,15 +1324,15 @@ public class DatabaseScaffolderPrivateMethodTests
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
-            Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_Name_Active\")]", entityCode);
+            Assert.Contains("[Index(\"IX_IndexedProviderSpecific_Name_Active\", FilterSql = \"Active = 1\")]", entityCode);
             Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_LowerName\")]", entityCode);
-            Assert.Contains("PartialIndex", warnings);
+            Assert.DoesNotContain("PartialIndex", warnings);
             Assert.Contains("ExpressionIndex", warnings);
-            Assert.Contains("IX_IndexedProviderSpecific_Name_Active", warnings);
+            Assert.DoesNotContain("IX_IndexedProviderSpecific_Name_Active", warnings);
             Assert.Contains("IX_IndexedProviderSpecific_LowerName", warnings);
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
+            Assert.DoesNotContain(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "PartialIndex" &&
                 item.GetProperty("name").GetString() == "IX_IndexedProviderSpecific_Name_Active");
             Assert.Contains(providerOwned.EnumerateArray(), item =>

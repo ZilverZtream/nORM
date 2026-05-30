@@ -43,5 +43,10 @@ namespace nORM.Configuration
         /// Gets or sets whether this column is an included, non-key column in the index.
         /// </summary>
         public bool IsIncluded { get; set; }
+
+        /// <summary>
+        /// Gets or sets the provider-specific filter predicate for a filtered/partial index.
+        /// </summary>
+        public string? FilterSql { get; set; }
     }
 }

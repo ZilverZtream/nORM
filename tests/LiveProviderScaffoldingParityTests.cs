@@ -572,12 +572,16 @@ public sealed class LiveProviderScaffoldingParityTests
                     new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
 
                 var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
-                var warnings = await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+                var warnings = File.Exists(warningPath) ? await File.ReadAllTextAsync(warningPath) : string.Empty;
+                using var warningJson = File.Exists(warningJsonPath)
+                    ? JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath))
+                    : JsonDocument.Parse("{\"providerOwnedSchemaFeatures\":[]}");
 
-                Assert.DoesNotContain(ProviderPartialIndex, entityCode, StringComparison.Ordinal);
-                Assert.Contains("PartialIndex", warnings, StringComparison.Ordinal);
-                Assert.Contains(ProviderPartialIndex, warnings, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{ProviderPartialIndex}\", FilterSql = ", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("PartialIndex", warnings, StringComparison.Ordinal);
+                Assert.DoesNotContain(ProviderPartialIndex, warnings, StringComparison.Ordinal);
 
                 if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
                 {
@@ -595,7 +599,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 }
 
                 var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
-                Assert.Contains(providerOwned, item =>
+                Assert.DoesNotContain(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "PartialIndex" &&
                     item.GetProperty("name").GetString() == ProviderPartialIndex);
                 Assert.DoesNotContain(providerOwned, item =>

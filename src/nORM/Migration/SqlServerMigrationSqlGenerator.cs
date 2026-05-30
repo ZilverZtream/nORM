@@ -155,7 +155,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
                 }
             }
 
@@ -251,7 +251,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
                 }
             }
 
@@ -336,6 +336,9 @@ namespace nORM.Migration
             => includedColumnNames.Length == 0
                 ? string.Empty
                 : " INCLUDE (" + string.Join(", ", includedColumnNames.Select(Esc)) + ")";
+
+        private static string FormatFilter(string? filterSql)
+            => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.

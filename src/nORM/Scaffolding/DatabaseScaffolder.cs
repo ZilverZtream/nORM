@@ -110,6 +110,7 @@ namespace nORM.Scaffolding
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
+                RemoveSupportedPartialIndexDiagnostics(unsupportedFeatures, indexes);
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
@@ -310,7 +311,8 @@ namespace nORM.Scaffolding
                         var orderSuffix = index.ColumnCount > 1 && !index.IsIncluded ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
                         var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
                         var includedSuffix = index.IsIncluded ? ", IsIncluded = true" : string.Empty;
-                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix})]");
+                        var filterSuffix = string.IsNullOrWhiteSpace(index.FilterSql) ? string.Empty : $", FilterSql = \"{EscapeStringLiteral(index.FilterSql)}\"";
+                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix}{filterSuffix})]");
                     }
                     if (clrType == typeof(decimal)
                         && decimalPrecisions is not null
@@ -901,8 +903,11 @@ namespace nORM.Scaffolding
 
                     foreach (var (name, isUnique, origin, isPartial) in tableIndexes)
                     {
-                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase) || isPartial)
+                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
                             continue;
+                        var filterSql = isPartial
+                            ? await GetSqliteIndexFilterSqlAsync(connection, name).ConfigureAwait(false)
+                            : null;
 
                         await using var infoCommand = connection.CreateCommand();
                         infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", name);
@@ -939,7 +944,7 @@ namespace nORM.Scaffolding
                             continue;
 
                         foreach (var column in columns.OrderBy(static c => c.Ordinal))
-                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending, false));
+                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending, false, filterSql));
                     }
                 }
 
@@ -958,7 +963,8 @@ namespace nORM.Scaffolding
                         SUM(CASE WHEN ic.is_included_column = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
                         CASE WHEN ic.is_included_column = 1 THEN 2147483647 ELSE ic.key_ordinal - 1 END AS Ordinal,
                         ic.is_descending_key AS IsDescending,
-                        ic.is_included_column AS IsIncluded
+                        ic.is_included_column AS IsIncluded,
+                        i.filter_definition AS FilterSql
                     FROM sys.indexes i
                     INNER JOIN sys.tables t ON t.object_id = i.object_id
                     INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
@@ -966,7 +972,6 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND i.is_primary_key = 0
                       AND i.is_hypothetical = 0
-                      AND i.has_filter = 0
                       AND i.name IS NOT NULL
                     ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
                     """).ConfigureAwait(false);
@@ -984,7 +989,8 @@ namespace nORM.Scaffolding
                         ix.indnkeyatts AS ColumnCount,
                         CASE WHEN key.ord > ix.indnkeyatts THEN 2147483647 ELSE key.ord - 1 END AS Ordinal,
                         CASE WHEN key.ord <= ix.indnkeyatts AND (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending,
-                        CASE WHEN key.ord > ix.indnkeyatts THEN 1 ELSE 0 END AS IsIncluded
+                        CASE WHEN key.ord > ix.indnkeyatts THEN 1 ELSE 0 END AS IsIncluded,
+                        CASE WHEN ix.indpred IS NULL THEN NULL ELSE pg_get_expr(ix.indpred, ix.indrelid) END AS FilterSql
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -992,7 +998,6 @@ namespace nORM.Scaffolding
                     INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
                     INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
                     WHERE ix.indisprimary = false
-                      AND ix.indpred IS NULL
                       AND ix.indexprs IS NULL
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
@@ -1019,6 +1024,22 @@ namespace nORM.Scaffolding
             }
 
             return Array.Empty<ScaffoldIndex>();
+        }
+
+        private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, string indexName)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = @name";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@name";
+            p.Value = indexName;
+            cmd.Parameters.Add(p);
+            var sql = Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
+            if (string.IsNullOrWhiteSpace(sql))
+                return null;
+
+            var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
+            return where < 0 ? null : sql[(where + 7)..].Trim();
         }
 
         private static async Task<IReadOnlyList<ScaffoldIndex>> QueryIndexesAsync(DbConnection connection, string sql)
@@ -1050,7 +1071,8 @@ namespace nORM.Scaffolding
                     ReaderHasColumn(reader, "IsDescending")
                         && Convert.ToBoolean(reader["IsDescending"], System.Globalization.CultureInfo.InvariantCulture),
                     ReaderHasColumn(reader, "IsIncluded")
-                        && Convert.ToBoolean(reader["IsIncluded"], System.Globalization.CultureInfo.InvariantCulture)));
+                        && Convert.ToBoolean(reader["IsIncluded"], System.Globalization.CultureInfo.InvariantCulture),
+                    ReaderHasColumn(reader, "FilterSql") ? NullIfWhiteSpace(Convert.ToString(reader["FilterSql"])) : null));
             }
 
             return indexes;
@@ -1756,6 +1778,20 @@ namespace nORM.Scaffolding
             features.RemoveAll(feature =>
                 string.Equals(feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
                 && supportedIncluded.Contains(feature.TableKey + "\u001f" + feature.Name));
+        }
+
+        private static void RemoveSupportedPartialIndexDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
+        {
+            var supportedPartial = indexes
+                .Where(static index => !string.IsNullOrWhiteSpace(index.FilterSql))
+                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            features.RemoveAll(feature =>
+                string.Equals(feature.Kind, "PartialIndex", StringComparison.OrdinalIgnoreCase)
+                && supportedPartial.Contains(feature.TableKey + "\u001f" + feature.Name));
         }
 
         private static void AddRelationshipPrincipalKeyDiagnostics(
@@ -4210,7 +4246,8 @@ namespace nORM.Scaffolding
             int ColumnCount,
             int Ordinal,
             bool IsDescending,
-            bool IsIncluded);
+            bool IsIncluded,
+            string? FilterSql);
 
         private readonly record struct ScaffoldRelationship(
             string DependentTableKey,

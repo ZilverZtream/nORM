@@ -121,6 +121,7 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+                    EnsureNoFilter(index.FilterSql, index.IndexName);
                     up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
@@ -199,6 +200,7 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+                    EnsureNoFilter(index.FilterSql, index.IndexName);
                     down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
@@ -278,6 +280,12 @@ namespace nORM.Migration
         {
             if (includedColumnNames.Length > 0)
                 throw new NotSupportedException($"MySQL does not support INCLUDE columns for index '{indexName}'. Use key columns only or keep the covering-index tuning in provider-specific migration code.");
+        }
+
+        private static void EnsureNoFilter(string? filterSql, string indexName)
+        {
+            if (!string.IsNullOrWhiteSpace(filterSql))
+                throw new NotSupportedException($"MySQL does not support filtered indexes for index '{indexName}'. Keep the predicate in provider-specific migration code or remodel it as a generated column plus ordinary index.");
         }
 
         /// <summary>

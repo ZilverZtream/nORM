@@ -127,6 +127,8 @@ namespace nORM.Migration
         public bool IsDescending { get; set; }
         /// <summary>True when this column is an included, non-key column.</summary>
         public bool IsIncluded { get; set; }
+        /// <summary>Provider-specific filter predicate for a filtered/partial index.</summary>
+        public string? FilterSql { get; set; }
     }
 
     /// <summary>
@@ -277,7 +279,8 @@ namespace nORM.Migration
                             IsUnique = indexAttr.IsUnique,
                             Order = indexAttr.Order,
                             IsDescending = indexAttr.IsDescending,
-                            IsIncluded = indexAttr.IsIncluded
+                            IsIncluded = indexAttr.IsIncluded,
+                            FilterSql = indexAttr.FilterSql
                         });
                     }
                     table.Columns.Add(column);
@@ -732,7 +735,7 @@ namespace nORM.Migration
                 var oldIndexes = BuildIndexMap(oldTable);
                 var newIndexes = BuildIndexMap(newTable);
 
-                foreach (var (name, (isUnique, cols, descending, included)) in newIndexes)
+                foreach (var (name, (isUnique, cols, descending, included, filterSql)) in newIndexes)
                 {
                     if (!oldIndexes.ContainsKey(name))
                     {
@@ -741,12 +744,13 @@ namespace nORM.Migration
                     else
                     {
                         // Index exists in both — check for definition changes
-                        var (oldIsUnique, oldCols, oldDescending, oldIncluded) = oldIndexes[name];
+                        var (oldIsUnique, oldCols, oldDescending, oldIncluded, oldFilterSql) = oldIndexes[name];
                         // Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
                         var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         var directionChanged = !oldDescending.SequenceEqual(descending);
                         var includedChanged = !oldIncluded.SequenceEqual(included, StringComparer.OrdinalIgnoreCase);
-                        if (oldIsUnique != isUnique || colsChanged || directionChanged || includedChanged)
+                        var filterChanged = !string.Equals(oldFilterSql, filterSql, StringComparison.OrdinalIgnoreCase);
+                        if (oldIsUnique != isUnique || colsChanged || directionChanged || includedChanged || filterChanged)
                         {
                             // Use oldTable for DroppedIndexes (the index existed on the OLD table).
                             diff.DroppedIndexes.Add((oldTable, name));
@@ -854,20 +858,20 @@ namespace nORM.Migration
             a.PrincipalColumns.Zip(b.PrincipalColumns, (x, y) =>
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
-        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)> GetExplicitIndexes(TableSchema table)
+        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
                 .Where(static index => !index.Key.StartsWith("__PK__", StringComparison.Ordinal) &&
                                        !index.Key.StartsWith("__UQ__", StringComparison.Ordinal))
-                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.IncludedColumnNames))
+                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.IncludedColumnNames, index.Value.FilterSql))
                 .ToArray();
 
         /// <summary>
         /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
         /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
         /// </summary>
-        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)> BuildIndexMap(TableSchema table)
+        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> BuildIndexMap(TableSchema table)
         {
-            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name, bool IsDescending)> Columns, List<(int Sequence, string Name)> IncludedColumns)>(StringComparer.OrdinalIgnoreCase);
+            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name, bool IsDescending)> Columns, List<(int Sequence, string Name)> IncludedColumns, string? FilterSql)>(StringComparer.OrdinalIgnoreCase);
             var sequence = 0;
             foreach (var col in table.Columns)
             {
@@ -878,8 +882,10 @@ namespace nORM.Migration
                         if (string.IsNullOrWhiteSpace(index.Name))
                             continue;
                         if (!intermediate.TryGetValue(index.Name, out var explicitEntry))
-                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>());
+                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>(), null);
                         explicitEntry.IsUnique = explicitEntry.IsUnique || index.IsUnique;
+                        if (!string.IsNullOrWhiteSpace(index.FilterSql) && string.IsNullOrWhiteSpace(explicitEntry.FilterSql))
+                            explicitEntry.FilterSql = index.FilterSql;
                         if (index.IsIncluded)
                             explicitEntry.IncludedColumns.Add((sequence++, col.Name));
                         else
@@ -901,14 +907,14 @@ namespace nORM.Migration
                         continue;
                 }
                 if (!intermediate.TryGetValue(indexKey, out var entry))
-                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>());
+                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>(), null);
                 entry.IsUnique = entry.IsUnique || col.IsUnique || col.IsPrimaryKey;
                 entry.Columns.Add((col.IndexOrder, sequence++, col.Name, false));
                 intermediate[indexKey] = entry;
             }
 
-            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, (isUnique, columns, includedColumnsRaw)) in intermediate)
+            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, (isUnique, columns, includedColumnsRaw, filterSql)) in intermediate)
             {
                 var orderedColumns = columns
                     .OrderBy(static column => column.Order ?? int.MaxValue)
@@ -921,7 +927,7 @@ namespace nORM.Migration
                     .OrderBy(static column => column.Sequence)
                     .Select(static column => column.Name)
                     .ToArray();
-                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), includedColumns);
+                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), includedColumns, filterSql);
             }
             return map;
         }
