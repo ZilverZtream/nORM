@@ -1865,7 +1865,8 @@ namespace nORM.Scaffolding
                 reasons.Add("payload-columns");
             }
 
-            if (!primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns))
+            if (!primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
+                || primaryKeyColumns.Count == 0)
             {
                 reasons.Add("missing-primary-key");
             }
@@ -2395,10 +2396,11 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
             => ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable)
-               || ReferencesUniqueIndex(foreignKeyGroup, indexes);
+               || ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes);
 
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
         {
             var rows = foreignKeyGroup.ToArray();
@@ -2406,6 +2408,12 @@ namespace nORM.Scaffolding
                 return false;
 
             var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
+            if (!primaryKeyColumnsByTable.TryGetValue(principalKey, out var primaryKeyColumns)
+                || primaryKeyColumns.Count == 0)
+            {
+                return false;
+            }
+
             var principalColumns = rows.Select(row => row.PrincipalColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
             return indexes
                 .Where(index => index.IsUnique && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))

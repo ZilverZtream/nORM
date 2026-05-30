@@ -1391,7 +1391,8 @@ public class DatabaseScaffolderPrivateMethodTests
             var dependentCode = File.ReadAllText(Path.Combine(dir, "ExternalOrderEvent.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeUniqueFkCtx.cs"));
 
-            Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true)]", principalCode);
+            Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true, Order = 0)]", principalCode);
+            Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true, Order = 1)]", principalCode);
             Assert.Contains("List<ExternalOrderEvent>", principalCode);
             Assert.Contains("public ExternalOrder?", dependentCode);
             Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, cascadeDelete: false);", contextCode);

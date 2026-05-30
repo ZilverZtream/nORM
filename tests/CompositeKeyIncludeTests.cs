@@ -70,6 +70,27 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
         public string Tracking { get; set; } = string.Empty;
     }
 
+    [Table("CkiExternalOrder")]
+    private class ExternalOrder
+    {
+        public int Id { get; set; }
+        public int TenantId { get; set; }
+        public string ExternalNo { get; set; } = string.Empty;
+        public string Customer { get; set; } = string.Empty;
+        public ICollection<ExternalOrderEvent> Events { get; set; } = new List<ExternalOrderEvent>();
+    }
+
+    [Table("CkiExternalOrderEvent")]
+    private class ExternalOrderEvent
+    {
+        public int Id { get; set; }
+        public int TenantId { get; set; }
+        public string ExternalNo { get; set; } = string.Empty;
+        public string EventName { get; set; } = string.Empty;
+        [NotMapped]
+        public ExternalOrder? Order { get; set; }
+    }
+
     private static DbContextOptions BuildOptions() => new()
     {
         OnModelCreating = mb =>
@@ -90,6 +111,12 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
                 .HasMany(l => l.Shipments)
                 .WithOne()
                 .HasForeignKey(s => new { s.TenantId, s.OrderId, s.LineNo }, l => new { l.TenantId, l.OrderId, l.LineNo });
+            mb.Entity<ExternalOrder>().HasKey(x => x.Id);
+            mb.Entity<ExternalOrderEvent>().HasKey(x => x.Id);
+            mb.Entity<ExternalOrder>()
+                .HasMany(o => o.Events)
+                .WithOne(e => e.Order)
+                .HasForeignKey(e => new { e.TenantId, e.ExternalNo }, o => new { o.TenantId, o.ExternalNo });
         }
     };
 
@@ -106,9 +133,14 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
             CREATE TABLE CkiTenantOrder(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, Customer TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId));
             CREATE TABLE CkiTenantOrderLine(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId, LineNo));
             CREATE TABLE CkiTenantShipment(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, ShipmentId INTEGER NOT NULL, Tracking TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId, LineNo, ShipmentId));
+            CREATE TABLE CkiExternalOrder(Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, ExternalNo TEXT NOT NULL, Customer TEXT NOT NULL);
+            CREATE UNIQUE INDEX UX_CkiExternalOrder_Tenant_ExternalNo ON CkiExternalOrder(TenantId, ExternalNo);
+            CREATE TABLE CkiExternalOrderEvent(Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, ExternalNo TEXT NOT NULL, EventName TEXT NOT NULL);
             INSERT INTO CkiTenantOrder VALUES (1,100,'Alice'),(2,100,'Bob'),(1,101,'Cara');
             INSERT INTO CkiTenantOrderLine VALUES (1,100,1,'a-100-1'),(1,100,2,'a-100-2'),(2,100,1,'b-100-1'),(1,101,1,'a-101-1');
             INSERT INTO CkiTenantShipment VALUES (1,100,1,1,'a-ship-1'),(1,100,1,2,'a-ship-2'),(2,100,1,1,'b-ship-1'),(1,101,1,1,'c-ship-1');
+            INSERT INTO CkiExternalOrder VALUES (1,1,'EXT-100','Alice'),(2,2,'EXT-100','Bob'),(3,1,'EXT-101','Cara');
+            INSERT INTO CkiExternalOrderEvent VALUES (1,1,'EXT-100','created'),(2,1,'EXT-100','paid'),(3,2,'EXT-100','created'),(4,1,'EXT-101','created');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider(), BuildOptions());
@@ -242,5 +274,32 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
         var bobLine = Assert.Single(bob.Lines);
         var bobShipment = Assert.Single(bobLine.Shipments);
         Assert.Equal("b-ship-1", bobShipment.Tracking);
+    }
+
+    [Fact]
+    public async Task Include_CompositeForeignKey_to_unique_principal_key_loads_matching_children()
+    {
+        var orders = await ((INormQueryable<ExternalOrder>)_ctx.Query<ExternalOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Events)
+            .OrderBy(o => o.TenantId)
+            .ThenBy(o => o.ExternalNo)
+            .ToListAsync();
+
+        var alice = orders.Single(o => o.TenantId == 1 && o.ExternalNo == "EXT-100");
+        Assert.Equal(new[] { "created", "paid" }, alice.Events.Select(e => e.EventName).OrderBy(x => x).ToArray());
+        Assert.All(alice.Events, e =>
+        {
+            Assert.Equal(1, e.TenantId);
+            Assert.Equal("EXT-100", e.ExternalNo);
+        });
+
+        var bob = orders.Single(o => o.TenantId == 2 && o.ExternalNo == "EXT-100");
+        var bobEvent = Assert.Single(bob.Events);
+        Assert.Equal("created", bobEvent.EventName);
+
+        var cara = orders.Single(o => o.TenantId == 1 && o.ExternalNo == "EXT-101");
+        var caraEvent = Assert.Single(cara.Events);
+        Assert.Equal("created", caraEvent.EventName);
     }
 }
