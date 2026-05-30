@@ -2374,6 +2374,44 @@ public class DatabaseScaffolderPrivateMethodTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_RepeatedRuns_ProduceDeterministicOutput()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE ZetaDeterministic (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL DEFAULT 'z'
+            );
+            CREATE TABLE AlphaDeterministic (
+                Id INTEGER PRIMARY KEY,
+                ZetaId INTEGER NOT NULL,
+                Value TEXT NOT NULL,
+                CONSTRAINT FK_Alpha_Zeta FOREIGN KEY (ZetaId) REFERENCES ZetaDeterministic(Id)
+            );
+            CREATE INDEX IX_Alpha_Value ON AlphaDeterministic(Value);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var first = Path.Combine(Path.GetTempPath(), "san_scaffold_det_a_" + Guid.NewGuid().ToString("N"));
+        var second = Path.Combine(Path.GetTempPath(), "san_scaffold_det_b_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), first, "TestNs", "DeterministicCtx");
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), second, "TestNs", "DeterministicCtx");
+
+            Assert.Equal(ReadScaffoldSnapshot(first), ReadScaffoldSnapshot(second));
+        }
+        finally
+        {
+            if (Directory.Exists(first)) Directory.Delete(first, recursive: true);
+            if (Directory.Exists(second)) Directory.Delete(second, recursive: true);
+        }
+    }
+
     private static void AssertScaffoldOutputBuildsAsConsumerProject(string outputDirectory)
     {
         var root = FindRepositoryRoot();
@@ -2420,6 +2458,12 @@ public class DatabaseScaffolderPrivateMethodTests
 
         throw new InvalidOperationException("Could not locate repository root from " + AppContext.BaseDirectory);
     }
+
+    private static IReadOnlyList<(string RelativePath, string Content)> ReadScaffoldSnapshot(string outputDirectory)
+        => Directory.EnumerateFiles(outputDirectory)
+            .Select(path => (RelativePath: Path.GetFileName(path), Content: File.ReadAllText(path)))
+            .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+            .ToArray();
 }
 
 // ── NavigationContext tests ───────────────────────────────────────────────────

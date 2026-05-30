@@ -2473,7 +2473,10 @@ namespace nORM.Scaffolding
                 tables.Add(new ScaffoldTable(table, string.IsNullOrWhiteSpace(schema) ? null : schema));
             }
 
-            return tables;
+            return tables
+                .OrderBy(t => t.Schema ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(t => t.Name, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetSchemaTablesAsync(DbConnection connection)
@@ -2497,7 +2500,10 @@ namespace nORM.Scaffolding
                 tables.Add(new ScaffoldTable(tableName, string.IsNullOrWhiteSpace(schemaName) ? null : schemaName));
             }
 
-            return tables;
+            return tables
+                .OrderBy(t => t.Schema ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(t => t.Name, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
