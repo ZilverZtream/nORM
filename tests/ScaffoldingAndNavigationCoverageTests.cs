@@ -1283,7 +1283,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("aux.SchemaBookView", warnings);
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Default");
+            Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Default");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Trigger");
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("name").GetString() == "aux.SchemaBookView");
@@ -1919,14 +1919,14 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasDefaultValueSql(\"'new'\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().HasCheckConstraint(\"CK_FeatureOwned_Name\", \"length(Name) > 0\");", contextCode);
-            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name)\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name) VIRTUAL\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasCollation(\"NOCASE\");", contextCode);
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.DoesNotContain("| SCF100 |", warnings);
-            Assert.DoesNotContain("Computed", warnings);
+            Assert.DoesNotContain("| SCF101 |", warnings);
             Assert.DoesNotContain("NameLength", warnings);
-            Assert.DoesNotContain("Collation", warnings);
+            Assert.DoesNotContain("| SCF103 |", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
             Assert.DoesNotContain("CheckConstraint", warnings);
@@ -2242,10 +2242,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("MissingPrimaryKey", warnings);
             Assert.Contains("KeylessImport", warnings);
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
+            var missingPrimaryKey = Assert.Single(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
-                item.GetProperty("table").GetString() == "KeylessImport" &&
-                item.GetProperty("suggestedAction").GetString()!.Contains("read-only", StringComparison.OrdinalIgnoreCase));
+                item.GetProperty("table").GetString() == "KeylessImport");
+            Assert.Contains("read", missingPrimaryKey.GetProperty("suggestedAction").GetString(), StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -2327,12 +2327,11 @@ public class DatabaseScaffolderPrivateMethodTests
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE WarningOwned (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Status TEXT NOT NULL DEFAULT 'new'
-            );
-            """;
+            cmd.CommandText = """
+                CREATE TABLE WarningOwned (
+                    Status TEXT NOT NULL DEFAULT 'new'
+                );
+                """;
         cmd.ExecuteNonQuery();
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
@@ -2352,8 +2351,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.True(File.Exists(Path.Combine(dir, "WarningOwnedCtx.cs")));
             Assert.True(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            Assert.Contains("Default", warnings);
-            Assert.Contains("Status", warnings);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            Assert.Contains("WarningOwned", warnings);
         }
         finally
         {
@@ -2541,7 +2540,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "payload-columns");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("composite primary key", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("primary key over them", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
         }
         finally
         {

@@ -128,7 +128,7 @@ public class CliIntegrationTests
                 using var cmd = cn.CreateCommand();
                 cmd.CommandText = """
                     CREATE TABLE WarningRow (
-                        Status TEXT NOT NULL DEFAULT 'new'
+                        Status TEXT NOT NULL
                     );
                     """;
                 cmd.ExecuteNonQuery();
@@ -141,12 +141,12 @@ public class CliIntegrationTests
             Assert.NotEqual(0, result.ExitCode);
             Assert.Contains("Scaffolding produced warnings", result.Stderr + result.Stdout, StringComparison.Ordinal);
             Assert.Contains("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
-            Assert.Contains("SCF100=1", result.Stdout, StringComparison.Ordinal);
-            Assert.Contains("schema-feature=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("SCF116=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("table-shape=1", result.Stdout, StringComparison.Ordinal);
             var warningFile = Path.Combine(output, "nORM.ScaffoldWarnings.md");
             Assert.True(File.Exists(warningFile));
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
-            Assert.Contains("Default", File.ReadAllText(warningFile), StringComparison.Ordinal);
+            Assert.Contains("MissingPrimaryKey", File.ReadAllText(warningFile), StringComparison.Ordinal);
         }
         finally
         {
@@ -170,7 +170,7 @@ public class CliIntegrationTests
                 using var cmd = cn.CreateCommand();
                 cmd.CommandText = """
                     CREATE TABLE WarningRow (
-                        Status TEXT NOT NULL DEFAULT 'new'
+                        Status TEXT NOT NULL
                     );
                     """;
                 cmd.ExecuteNonQuery();
@@ -185,8 +185,8 @@ public class CliIntegrationTests
             Assert.Contains("nORM.ScaffoldWarnings.md", result.Stdout, StringComparison.Ordinal);
             Assert.Contains("nORM.ScaffoldWarnings.json", result.Stdout, StringComparison.Ordinal);
             Assert.Contains("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
-            Assert.Contains("SCF100=1", result.Stdout, StringComparison.Ordinal);
-            Assert.Contains("schema-feature=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("SCF116=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("table-shape=1", result.Stdout, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.True(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
         }
