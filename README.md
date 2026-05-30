@@ -304,8 +304,9 @@ SQLite `UUID` columns scaffold as `Guid`, and SQLite declared `JSON`/`XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as
 safe scalar CLR storage while native JSON/XML operator semantics stay provider-bound,
-and PostgreSQL arrays over safe scalar elements scaffold as CLR arrays while
-remaining provider-specific diagnostics,
+and PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
+UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR arrays
+while remaining provider-specific diagnostics,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 
@@ -321,10 +322,9 @@ routines, sequences, synonyms, materialized views, and events are reported in
 model code. The JSON report includes stable diagnostic codes, categories,
 section counts, and suggested actions so CI can route scaffold follow-up without
 parsing prose.
-Tables and query artifacts without primary keys are emitted as
+Tables without primary keys and all opt-in query artifacts are emitted as
 `[ReadOnlyEntity]` types: they can be queried, but nORM rejects generated
-insert/update/delete and tracked `SaveChanges` writes before SQL generation
-until the model has a real key.
+insert/update/delete and tracked `SaveChanges` writes before SQL generation.
 Opt-in query artifacts can include views, materialized views, SQLite virtual
 tables, and SQL Server synonyms whose local base object resolves as a table or
 view; non-query, remote, or unresolved synonyms remain provider-owned
@@ -344,7 +344,8 @@ Opt-in scaffold switches can emit provider-bound routine wrappers
 both remain explicitly bounded and are not provider mobility proof by
 themselves. Routine wrappers preserve discovered input CLR types, output
 `DbType` values, INOUT direction, and string/binary output sizes where
-providers expose them. Payload bridge tables scaffold as explicit join
+providers expose them; PostgreSQL set-returning functions scaffold as
+table-valued `SELECT * FROM function(...)` wrappers. Payload bridge tables scaffold as explicit join
 entities with payload columns and FK navigations.
 Owned-type inference, inheritance inference, view write semantics, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding

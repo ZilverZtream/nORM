@@ -95,8 +95,9 @@ SQLite `UUID` declared columns scaffold as `Guid`; declared `JSON` and `XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as
 safe scalar CLR storage while native JSON/XML query semantics remain explicit
-provider-bound work. PostgreSQL arrays over safe scalar elements scaffold as
-CLR arrays while remaining provider-specific diagnostics.
+provider-bound work. PostgreSQL arrays over safe scalar elements, including
+numeric, text/citext, UUID, binary, date/time, interval, and timestamp arrays,
+scaffold as CLR arrays while remaining provider-specific diagnostics.
 Use `--emit-sequence-stubs` to generate provider-bound next-value wrappers for
 SQL Server and PostgreSQL standalone sequences; sequence DDL and allocation
 semantics remain provider-owned.
@@ -106,11 +107,13 @@ instead of stored-procedure calls. Stored-procedure stubs include buffered and
 streaming result wrappers; stubs with discovered output metadata include a
 convenience overload that uses the scaffolded `OutputParameter` definitions plus
 an explicit-output overload for reviewed signature changes, including INOUT and
-return-value directions where provider metadata exposes them.
+return-value directions where provider metadata exposes them. PostgreSQL
+set-returning functions scaffold as table-valued `SELECT * FROM function(...)`
+wrappers.
 With `--emit-query-artifacts`, views, materialized views, SQLite virtual
 tables, and SQL Server synonyms whose local base object resolves as a table or
-view can be emitted as read-oriented entities; non-query, remote, or unresolved
-synonyms remain diagnostics.
+view can be emitted as `[ReadOnlyEntity]` read-oriented entities; non-query,
+remote, or unresolved synonyms remain diagnostics.
 When warnings are present, the CLI prints a compact summary with stable
 diagnostic codes and categories, for example `SCF100=1` and
 `schema-feature=1`, so CI logs can route scaffold follow-up without parsing the
