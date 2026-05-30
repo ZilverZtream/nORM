@@ -130,11 +130,12 @@ public class ScaffoldingContractDocTests
         Assert.Contains("p.data_type", source, StringComparison.Ordinal);
         Assert.Contains("domain_name", source, StringComparison.Ordinal);
         Assert.Contains("domain_schema", source, StringComparison.Ordinal);
+        Assert.Contains("column_type", source, StringComparison.Ordinal);
+        Assert.Contains("unsigned", source, StringComparison.Ordinal);
         Assert.Contains("BuildSkippedObjectMetadata", source, StringComparison.Ordinal);
         Assert.Contains("ParseRoutineParameters", source, StringComparison.Ordinal);
         Assert.Contains("information_schema.parameters", source, StringComparison.Ordinal);
         Assert.Contains("specific_name", source, StringComparison.Ordinal);
-        Assert.Contains("column_type", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
         Assert.Contains("'VirtualTable'", source, StringComparison.Ordinal);
         Assert.Contains("'VirtualTableShadow'", source, StringComparison.Ordinal);

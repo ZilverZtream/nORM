@@ -1913,6 +1913,12 @@ namespace nORM.Scaffolding
                           'year'
                       )
                     UNION ALL
+                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType', column_type
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND LOWER(COALESCE(column_type, '')) LIKE '%unsigned%'
+                      AND data_type IN ('tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint')
+                    UNION ALL
                     SELECT NULL, table_name, column_name, 'PrecisionScale',
                         CONCAT(data_type, '(', numeric_precision, ',', numeric_scale, ')')
                     FROM information_schema.columns
