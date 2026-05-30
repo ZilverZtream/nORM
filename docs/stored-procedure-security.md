@@ -43,3 +43,13 @@ Treat every stored procedure call as privileged application code. Code review
 must verify the procedure name is fixed or allowlisted, all runtime values are
 parameters, tenant isolation is enforced inside the procedure, and procedure
 permissions follow least privilege.
+
+## Scaffolding Inventory
+
+`dotnet-norm scaffold` and `DatabaseScaffolder` do not generate stored
+procedure wrappers. They report routines as skipped provider-bound objects. On
+SQL Server, PostgreSQL, and MySQL the diagnostic detail includes routine
+metadata such as parameter count, output-parameter count when available, and
+declared result/data type hints. Use that report as migration inventory: each
+routine needs either a generated nORM query/write replacement, a provider-bound
+deployment path, or an explicit tenant/security review.

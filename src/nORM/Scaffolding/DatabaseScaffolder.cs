@@ -443,7 +443,11 @@ namespace nORM.Scaffolding
                     FROM sys.views v
                     WHERE v.is_ms_shipped = 0
                     UNION ALL
-                    SELECT SCHEMA_NAME(p.schema_id), p.name, 'Routine', 'SQL Server stored procedure'
+                    SELECT SCHEMA_NAME(p.schema_id), p.name, 'Routine',
+                           CONCAT('SQL Server stored procedure; parameters=',
+                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id),
+                                  '; outputParameters=',
+                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1))
                     FROM sys.procedures p
                     WHERE p.is_ms_shipped = 0
                     UNION ALL
@@ -481,9 +485,17 @@ namespace nORM.Scaffolding
                     FROM pg_matviews
                     WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT routine_schema, routine_name, 'Routine', 'PostgreSQL routine'
-                    FROM information_schema.routines
-                    WHERE routine_schema NOT IN ('pg_catalog', 'information_schema')
+                    SELECT r.routine_schema, r.routine_name, 'Routine',
+                           'PostgreSQL ' || LOWER(r.routine_type) || '; parameters=' ||
+                           COALESCE((
+                               SELECT COUNT(*)
+                               FROM information_schema.parameters p
+                               WHERE p.specific_schema = r.specific_schema
+                                 AND p.specific_name = r.specific_name
+                           ), 0)::text ||
+                           '; dataType=' || COALESCE(r.data_type, '')
+                    FROM information_schema.routines r
+                    WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
                     ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
             }
@@ -495,9 +507,15 @@ namespace nORM.Scaffolding
                     FROM information_schema.views
                     WHERE table_schema = DATABASE()
                     UNION ALL
-                    SELECT NULL, routine_name, 'Routine', CONCAT('MySQL ', routine_type)
-                    FROM information_schema.routines
-                    WHERE routine_schema = DATABASE()
+                    SELECT NULL, r.routine_name, 'Routine',
+                           CONCAT('MySQL ', r.routine_type, '; parameters=',
+                                  (SELECT COUNT(*)
+                                   FROM information_schema.parameters p
+                                   WHERE p.specific_schema = r.routine_schema
+                                     AND p.specific_name = r.specific_name),
+                                  '; dataType=', COALESCE(r.data_type, ''))
+                    FROM information_schema.routines r
+                    WHERE r.routine_schema = DATABASE()
                     UNION ALL
                     SELECT NULL, event_name, 'Event', 'MySQL event'
                     FROM information_schema.events

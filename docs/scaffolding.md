@@ -193,6 +193,10 @@ must be reviewed and edited like handwritten model code.
   routines, sequences, synonyms, materialized views, and events are discovered
   and reported in scaffold diagnostics, but not converted into complete
   provider-neutral model code.
+  Routine diagnostics include provider metadata such as parameter counts,
+  output-parameter counts where the provider exposes them, and result/data type
+  hints so stored procedures/functions are not lost during provider-mobility
+  review.
 - Provider-specific filtered/partial indexes, expression indexes,
   included-column indexes, and descending index key sort direction. These are
   discovered and reported for review; v1 scaffolding emits provider-neutral

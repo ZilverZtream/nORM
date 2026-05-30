@@ -115,6 +115,9 @@ public class ScaffoldingContractDocTests
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("RelationshipPrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
+        Assert.Contains("outputParameters", source, StringComparison.Ordinal);
+        Assert.Contains("information_schema.parameters", source, StringComparison.Ordinal);
+        Assert.Contains("specific_name", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
         Assert.Contains("'VirtualTable'", source, StringComparison.Ordinal);
         Assert.Contains("'VirtualTableShadow'", source, StringComparison.Ordinal);
