@@ -296,7 +296,9 @@ preserved, and MySQL discovery does not bake the current database/catalog name
 into the model.
 SQLite rowid integer primary keys are generated as non-null `long` properties,
 SQLite `UUID` columns scaffold as `Guid`, and SQLite declared `JSON`/`XML`
-columns scaffold as string storage,
+columns scaffold as string storage. SQL Server `xml`, PostgreSQL
+`json`/`jsonb`/`xml`/`uuid`, and MySQL `json` columns also scaffold as safe
+scalar CLR storage while native JSON/XML operator semantics stay provider-bound,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 

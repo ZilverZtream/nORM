@@ -652,6 +652,21 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("xml", true)]
+    [InlineData("json", true)]
+    [InlineData("jsonb", true)]
+    [InlineData("uuid", true)]
+    [InlineData("USER-DEFINED (uuid)", true)]
+    [InlineData("geometry", false)]
+    [InlineData("inet", false)]
+    [InlineData("enum", false)]
+    public void IsScaffoldableProviderSpecificColumnType_PromotesSafeScalarStorage(string detail, bool expected)
+    {
+        var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });
+        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+    }
+
+    [Theory]
     [InlineData(typeof(sbyte), "sbyte")]
     [InlineData(typeof(uint), "uint")]
     [InlineData(typeof(ulong), "ulong")]

@@ -117,6 +117,7 @@ namespace nORM.Scaffolding
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
                 unsupportedFeatures.RemoveAll(feature =>
                     string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
@@ -2245,6 +2246,30 @@ namespace nORM.Scaffolding
                || normalizedDeclaredType.Contains("XML", StringComparison.Ordinal)
                || normalizedDeclaredType.Contains("UUID", StringComparison.Ordinal);
 
+        private static void RemoveSupportedProviderSpecificColumnTypeDiagnostics(
+            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+        {
+            unsupportedFeatures.RemoveAll(feature =>
+                string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
+                && IsScaffoldableProviderSpecificColumnType(feature.Detail)
+                && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                && properties.ContainsKey(feature.Name));
+        }
+
+        private static bool IsScaffoldableProviderSpecificColumnType(string? detail)
+        {
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var normalized = detail.Trim().ToLowerInvariant();
+            return normalized == "xml"
+                   || normalized == "json"
+                   || normalized == "jsonb"
+                   || normalized == "uuid"
+                   || normalized == "user-defined (uuid)";
+        }
+
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
@@ -2319,7 +2344,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
