@@ -28,6 +28,13 @@ must be reviewed and edited like handwritten model code.
   full key shape explicitly.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
+  Simple SQL defaults that pass nORM's migration default allowlist (numeric,
+  boolean, `NULL`, single-quoted string literals, and known no-argument
+  date/time/UUID functions) are emitted in generated context configuration via
+  `Property(...).HasDefaultValueSql(...)` so schema snapshots and migration
+  generators can round-trip the default metadata. This is DDL metadata only:
+  it does not mark the column as database-generated and does not cause nORM to
+  omit the property from runtime inserts.
   Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
@@ -146,7 +153,7 @@ must be reviewed and edited like handwritten model code.
   do not target the generated principal primary key or an exact unique index
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
-  defaults, computed/generated columns, check
+  unsafe/provider-specific defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions,
@@ -180,7 +187,8 @@ must be reviewed and edited like handwritten model code.
   self-referencing pure many-to-many join scaffolding,
   composite-key pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column/descending index diagnostics,
-  unsafe composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
+  safe default-to-`HasDefaultValueSql` promotion, unsafe composite-FK,
+  many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
@@ -204,7 +212,7 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship
-  shapes, provider-owned/default and
+  shapes, provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 - `RelationshipConfigurationTests` covers generated non-cascade relationship
@@ -229,9 +237,11 @@ must be reviewed and edited like handwritten model code.
   navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
   target the generated primary keys are reported in scaffold diagnostics rather
   than converted into unsafe fluent mappings.
-- Provider-specific computed columns, default constraints, check constraints,
+- Provider-specific computed columns, complex default constraints, check constraints,
   collations, column types, triggers, temporal tables, and keyless tables.
-  Defaults, computed/generated columns, check constraints, collations,
+  Simple safe default literals/functions are emitted as migration metadata with
+  `HasDefaultValueSql`; complex/provider-specific defaults that fail the
+  allowlist remain diagnostics. Computed/generated columns, check constraints, collations,
   provider-specific column types, non-default identity
   seed/increment settings, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,

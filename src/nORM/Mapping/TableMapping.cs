@@ -82,6 +82,9 @@ namespace nORM.Mapping
 
         private readonly IEntityTypeConfiguration? _fluentConfig;
 
+        /// <summary>Gets the fluent configuration used to create this mapping, if any.</summary>
+        internal IEntityTypeConfiguration? FluentConfiguration => _fluentConfig;
+
         // Cache derived type discovery to avoid an expensive AppDomain.GetAssemblies() scan on every mapping
         // (scanning all assemblies can take 100–1000 ms+ in large applications).
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, List<Type>> _derivedTypesCache = new();

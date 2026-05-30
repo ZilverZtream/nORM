@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Configuration;
+using nORM.Migration;
 using nORM.Providers;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.ObjectPool;
@@ -109,6 +110,11 @@ namespace nORM.Scaffolding
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
+                    && defaultValuesByTable.TryGetValue(feature.TableKey, out var defaults)
+                    && defaults.ContainsKey(feature.Name));
                 var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
                 unsupportedFeatures.RemoveAll(static feature =>
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
@@ -125,6 +131,7 @@ namespace nORM.Scaffolding
                     indexes,
                     memberNamesByTable);
                 var compositePrimaryKeys = BuildCompositePrimaryKeys(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
+                var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, defaultValuesByTable);
                 var generatedFiles = new List<(string Path, string Content)>();
 
                 foreach (var table in tables)
@@ -155,7 +162,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -2714,6 +2721,120 @@ namespace nORM.Scaffolding
             return names;
         }
 
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildScaffoldDefaultValueMap(
+            IEnumerable<ScaffoldUnsupportedFeature> features,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+        {
+            var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.ContainsKey(feature.Name)
+                    || !TryNormalizeScaffoldDefaultSql(feature.Detail, out var defaultValueSql))
+                {
+                    continue;
+                }
+
+                if (!result.TryGetValue(feature.TableKey, out var table))
+                {
+                    table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    result[feature.TableKey] = table;
+                }
+
+                table[feature.Name] = defaultValueSql;
+            }
+
+            return result.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyDictionary<string, string>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable)
+        {
+            var result = new List<ScaffoldDefaultValueConfiguration>();
+            foreach (var (tableKey, defaults) in defaultValuesByTable)
+            {
+                if (!entityByTable.TryGetValue(tableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(tableKey, out var properties))
+                    continue;
+
+                foreach (var (columnName, defaultValueSql) in defaults)
+                {
+                    if (properties.TryGetValue(columnName, out var propertyName))
+                        result.Add(new ScaffoldDefaultValueConfiguration(entityName, propertyName, defaultValueSql));
+                }
+            }
+
+            return result;
+        }
+
+        private static bool TryNormalizeScaffoldDefaultSql(string? raw, out string defaultValueSql)
+        {
+            defaultValueSql = string.Empty;
+            if (string.IsNullOrWhiteSpace(raw))
+                return false;
+
+            var candidate = raw.Trim();
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
+
+            try
+            {
+                var validated = DefaultValueValidator.Validate(candidate);
+                if (string.IsNullOrWhiteSpace(validated))
+                    return false;
+
+                defaultValueSql = validated;
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        private static bool HasBalancedOuterParentheses(string value)
+        {
+            var depth = 0;
+            var inString = false;
+            for (var i = 0; i < value.Length; i++)
+            {
+                var ch = value[i];
+                if (ch == '\'')
+                {
+                    if (inString && i + 1 < value.Length && value[i + 1] == '\'')
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString)
+                    continue;
+
+                if (ch == '(')
+                    depth++;
+                else if (ch == ')')
+                    depth--;
+
+                if (depth == 0 && i < value.Length - 1)
+                    return false;
+                if (depth < 0)
+                    return false;
+            }
+
+            return depth == 0 && !inString;
+        }
+
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
@@ -3058,9 +3179,11 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldRelationship> relationships,
             IReadOnlyList<ScaffoldManyToManyJoin> manyToManyJoins,
             IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null,
-            IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null)
+            IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null,
+            IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
+            defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3084,7 +3207,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3106,7 +3229,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3121,6 +3244,15 @@ namespace nORM.Scaffolding
                     {
                         var entity = EscapeCSharpIdentifier(key.EntityName);
                         sb.AppendLine($"            mb.Entity<{entity}>().HasKey({FormatScaffoldKeySelector("e", key.PropertyNames)});");
+                    }
+                    foreach (var defaultValue in defaultValueConfigurations
+                        .OrderBy(d => d.EntityName, StringComparer.Ordinal)
+                        .ThenBy(d => d.PropertyName, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(defaultValue.EntityName);
+                        var property = EscapeCSharpIdentifier(defaultValue.PropertyName);
+                        var sql = EscapeStringLiteral(defaultValue.DefaultValueSql);
+                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\");");
                     }
                     foreach (var relationship in relationships
                         .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
@@ -3853,6 +3985,11 @@ namespace nORM.Scaffolding
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,
             string[] PropertyNames);
+
+        private readonly record struct ScaffoldDefaultValueConfiguration(
+            string EntityName,
+            string PropertyName,
+            string DefaultValueSql);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

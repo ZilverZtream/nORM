@@ -405,20 +405,36 @@ public sealed class LiveProviderScaffoldingParityTests
                 var warnings = await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
                 using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
-                Assert.Contains("Provider-Owned Schema Features", warnings, StringComparison.Ordinal);
-                Assert.Contains("Default", warnings, StringComparison.Ordinal);
                 Assert.Contains("MissingPrimaryKey", warnings, StringComparison.Ordinal);
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldWarningContext.cs"));
+                var defaultPromotedToModel = contextCode.Contains("HasDefaultValueSql", StringComparison.Ordinal);
+                if (!defaultPromotedToModel)
+                {
+                    Assert.Contains("Provider-Owned Schema Features", warnings, StringComparison.Ordinal);
+                    Assert.Contains("Default", warnings, StringComparison.Ordinal);
+                }
 
                 var providerOwned = warningJson.RootElement
                     .GetProperty("providerOwnedSchemaFeatures")
                     .EnumerateArray()
                     .ToArray();
 
-                Assert.Contains(providerOwned, item =>
-                    item.GetProperty("kind").GetString() == "Default" &&
-                    item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
-                    item.GetProperty("name").GetString() == "Status" &&
-                    item.GetProperty("suggestedAction").GetString()!.Contains("default", StringComparison.OrdinalIgnoreCase));
+                if (defaultPromotedToModel)
+                {
+                    Assert.Contains(".Property(e => e.Status).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "Default" &&
+                        item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
+                        item.GetProperty("name").GetString() == "Status");
+                }
+                else
+                {
+                    Assert.Contains(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "Default" &&
+                        item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
+                        item.GetProperty("name").GetString() == "Status" &&
+                        item.GetProperty("suggestedAction").GetString()!.Contains("default", StringComparison.OrdinalIgnoreCase));
+                }
 
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&

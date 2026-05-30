@@ -30,6 +30,13 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> ColumnNames { get; }
 
         /// <summary>
+        /// Gets SQL default literals/functions configured for properties. These values are
+        /// consumed by migration snapshots and do not change runtime insert/update column
+        /// participation.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
+
+        /// <summary>
         /// Gets the CLR type that this entity shares its table with, if any.
         /// </summary>
         Type? TableSplitWith { get; }

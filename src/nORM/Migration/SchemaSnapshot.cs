@@ -394,6 +394,9 @@ namespace nORM.Migration
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
                         IndexOrder   = null,
                         IsIdentity   = col.IsDbGenerated,
+                        DefaultValue = map.FluentConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
+                            ? defaultValue
+                            : null,
                     });
                 }
                 snapshot.Tables.Add(table);

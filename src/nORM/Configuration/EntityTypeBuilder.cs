@@ -22,6 +22,7 @@ namespace nORM.Configuration
             public string? TableName { get; private set; }
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
+            public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
@@ -31,6 +32,7 @@ namespace nORM.Configuration
             // Explicit interface implementations for read-only surface of IEntityTypeConfiguration.
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyDictionary<PropertyInfo, OwnedNavigation> IEntityTypeConfiguration.OwnedNavigations => OwnedNavigations;
             IReadOnlyDictionary<string, ShadowPropertyConfiguration> IEntityTypeConfiguration.ShadowProperties => ShadowProperties;
             IReadOnlyList<RelationshipConfiguration> IEntityTypeConfiguration.Relationships => Relationships;
@@ -79,6 +81,23 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(name))
                     throw new ArgumentException("Column name cannot be null or whitespace.", nameof(name));
                 ColumnNames[prop] = name;
+            }
+
+            /// <summary>
+            /// Sets SQL default metadata for the specified property. The value is used by
+            /// migration snapshots and generators; it does not mark the property as
+            /// database-generated for runtime writes.
+            /// </summary>
+            /// <param name="prop">The property whose column default to configure.</param>
+            /// <param name="sql">A SQL literal or no-argument function accepted by the migration default validator.</param>
+            /// <exception cref="ArgumentNullException">Thrown when <paramref name="prop"/> is null.</exception>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is null or whitespace.</exception>
+            public void SetDefaultValueSql(PropertyInfo prop, string sql)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (string.IsNullOrWhiteSpace(sql))
+                    throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
+                DefaultValues[prop] = sql.Trim();
             }
 
             /// <summary>
@@ -461,6 +480,20 @@ namespace nORM.Configuration
             {
                 // Validation delegated to SetColumnName
                 _parent._config.SetColumnName(_property, name);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures SQL default metadata for this property for migration snapshot
+            /// generation. This does not mark the property as database-generated and does
+            /// not cause nORM to omit the column from INSERT statements.
+            /// </summary>
+            /// <param name="sql">A SQL literal or no-argument function accepted by migration default validation.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is null or whitespace.</exception>
+            public PropertyBuilder HasDefaultValueSql(string sql)
+            {
+                _parent._config.SetDefaultValueSql(_property, sql);
                 return this;
             }
 

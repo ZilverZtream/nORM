@@ -266,7 +266,8 @@ Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 schema-preserving table mapping, identifier cleanup, table filtering,
 deterministic repeated output, preflighted overwrite protection, nullable-safe output, provider
 metadata-backed identity columns, computed/generated column metadata, SQL
-Server rowversion/timestamp metadata, single-column FK
+Server rowversion/timestamp metadata, safe SQL default metadata via generated
+`HasDefaultValueSql(...)` configuration, single-column FK
 navigation generation with cascade/non-cascade delete behavior, role-based
 self-referencing FK and self-join names, pure many-to-many join mapping including
 schema-qualified and composite-key junction tables, and
@@ -280,8 +281,8 @@ and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 
 Unsupported composite foreign keys that do not target generated primary keys or
-exact unique indexes, payload join tables, provider-specific
-defaults, computed column expressions, check constraints, collations, provider
+exact unique indexes, payload join tables, complex/provider-specific
+defaults that fail the migration default allowlist, computed column expressions, check constraints, collations, provider
 column types, non-default identity settings,
 non-default FK referential actions, triggers, SQL Server provider-native
 temporal tables, tables without primary keys, SQLite virtual tables and shadow

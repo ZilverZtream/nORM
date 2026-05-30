@@ -3,8 +3,11 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Data.Sqlite;
 using nORM.Configuration;
+using nORM.Core;
 using nORM.Migration;
+using nORM.Providers;
 using Xunit;
 
 namespace nORM.Tests;
@@ -65,6 +68,13 @@ public class SchemaSnapshotTests
         [Key] public int Id { get; set; }
         [Column(TypeName = "decimal(28,6)")]
         public decimal Amount { get; set; }
+    }
+
+    [Table("SnapshotDefaultEntity")]
+    private class SnapshotDefaultEntity
+    {
+        [Key] public int Id { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 
  // Helper: build a single-type snapshot using the assembly of the test type
@@ -143,6 +153,26 @@ public class SchemaSnapshotTests
 
         Assert.False(titleCol.IsPrimaryKey);
         Assert.Null(titleCol.IndexName);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesFluentDefaultValueSql()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotDefaultEntity>()
+                    .Property(e => e.Status)
+                    .HasDefaultValueSql("'new'")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotDefaultEntity");
+        var status = table.Columns.Single(c => c.Name == "Status");
+        Assert.Equal("'new'", status.DefaultValue);
     }
 
     [Fact]
