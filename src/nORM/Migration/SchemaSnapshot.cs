@@ -404,10 +404,10 @@ namespace nORM.Migration
                     }
                     depTable.ForeignKeys.Add(new ForeignKeySchema
                     {
-                        ConstraintName   = $"FK_{depTable.Name}_{map.TableName}_{rel.ForeignKey.Name}",
-                        DependentColumns = new[] { rel.ForeignKey.Name },
+                        ConstraintName   = $"FK_{depTable.Name}_{map.TableName}_{string.Join("_", rel.ForeignKeys.Select(c => c.Name))}",
+                        DependentColumns = rel.ForeignKeys.Select(c => c.Name).ToArray(),
                         PrincipalTable   = map.TableName,
-                        PrincipalColumns = new[] { rel.PrincipalKey.Name },
+                        PrincipalColumns = rel.PrincipalKeys.Select(c => c.Name).ToArray(),
                         OnDelete         = rel.CascadeDelete ? "CASCADE" : "NO ACTION",
                         OnUpdate         = "NO ACTION",
                     });

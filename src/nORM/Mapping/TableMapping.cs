@@ -241,23 +241,25 @@ namespace nORM.Mapping
                 foreach (var rel in _fluentConfig.Relationships)
                 {
                     var dependentMap = ctx.GetMapping(rel.DependentType);
-                    Column principalKey;
-                    if (rel.PrincipalKey != null)
+                    var principalKeys = rel.PrincipalKeys.Count > 0
+                        ? rel.PrincipalKeys.Select(pk => Columns.FirstOrDefault(c => c.Prop == pk)
+                            ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key '{pk.Name}' not found on entity {Type.Name}"))).ToArray()
+                        : KeyColumns;
+                    var foreignKeys = rel.ForeignKeys.Select(fk => dependentMap.Columns.FirstOrDefault(c => c.Prop == fk)
+                            ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Foreign key '{fk.Name}' not found on entity {dependentMap.Type.Name}"))).ToArray();
+
+                    if (principalKeys.Length == 0 || principalKeys.Length != foreignKeys.Length)
                     {
-                        principalKey = Columns.FirstOrDefault(c => c.Prop == rel.PrincipalKey)
-                            ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key '{rel.PrincipalKey.Name}' not found on entity {Type.Name}"));
+                        throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
+                            $"Relationship '{rel.PrincipalNavigation.Name}' on entity {Type.Name} has {principalKeys.Length} principal key columns but {foreignKeys.Length} foreign key columns."));
                     }
-                    else if (KeyColumns.Length == 1)
-                    {
-                        principalKey = KeyColumns[0];
-                    }
-                    else
-                    {
-                        throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key must be specified for relationship '{rel.PrincipalNavigation.Name}' on entity {Type.Name}"));
-                    }
-                    var foreignKey = dependentMap.Columns.FirstOrDefault(c => c.Prop == rel.ForeignKey)
-                        ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Foreign key '{rel.ForeignKey.Name}' not found on entity {dependentMap.Type.Name}"));
-                    Relations[rel.PrincipalNavigation.Name] = new Relation(rel.PrincipalNavigation, rel.DependentType, principalKey, foreignKey, rel.CascadeDelete);
+
+                    Relations[rel.PrincipalNavigation.Name] = new Relation(
+                        rel.PrincipalNavigation,
+                        rel.DependentType,
+                        principalKeys,
+                        foreignKeys,
+                        rel.CascadeDelete);
                 }
             }
 
@@ -420,7 +422,33 @@ namespace nORM.Mapping
         /// <param name="PrincipalKey">The key column on the principal entity used as the relationship principal.</param>
         /// <param name="ForeignKey">The foreign key column on the dependent entity referencing the principal key.</param>
         /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade to dependents.</param>
-        public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true);
+        public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true)
+        {
+            /// <summary>Ordered principal key columns participating in the relationship.</summary>
+            public IReadOnlyList<Column> PrincipalKeys { get; init; } = new[] { PrincipalKey };
+
+            /// <summary>Ordered foreign key columns participating in the relationship.</summary>
+            public IReadOnlyList<Column> ForeignKeys { get; init; } = new[] { ForeignKey };
+
+            /// <summary>Gets whether the relationship spans more than one key column.</summary>
+            public bool IsComposite => PrincipalKeys.Count > 1 || ForeignKeys.Count > 1;
+
+            /// <summary>Creates a relationship backed by multiple key columns.</summary>
+            public Relation(PropertyInfo navProp, Type dependentType, IReadOnlyList<Column> principalKeys, IReadOnlyList<Column> foreignKeys, bool cascadeDelete = true)
+                : this(
+                    navProp,
+                    dependentType,
+                    principalKeys is { Count: > 0 } ? principalKeys[0] : throw new ArgumentException("At least one principal key column is required.", nameof(principalKeys)),
+                    foreignKeys is { Count: > 0 } ? foreignKeys[0] : throw new ArgumentException("At least one foreign key column is required.", nameof(foreignKeys)),
+                    cascadeDelete)
+            {
+                if (principalKeys.Count != foreignKeys.Count)
+                    throw new ArgumentException("Principal key and foreign key column counts must match.", nameof(foreignKeys));
+
+                PrincipalKeys = principalKeys.ToArray();
+                ForeignKeys = foreignKeys.ToArray();
+            }
+        }
 
         private static string GetTableName(Type type, TableAttribute? tableAttribute)
         {

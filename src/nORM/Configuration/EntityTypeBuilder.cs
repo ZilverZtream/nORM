@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using nORM.Core;
@@ -408,6 +409,32 @@ namespace nORM.Configuration
             return GetProperty(expression.Body);
         }
 
+        private IReadOnlyList<PropertyInfo> GetProperties(LambdaExpression expression)
+        {
+            if (expression is null) throw new ArgumentNullException(nameof(expression));
+
+            static Expression UnwrapConvert(Expression e)
+                => e is UnaryExpression ue &&
+                   (ue.NodeType == System.Linq.Expressions.ExpressionType.Convert ||
+                    ue.NodeType == System.Linq.Expressions.ExpressionType.ConvertChecked)
+                    ? ue.Operand
+                    : e;
+
+            var body = UnwrapConvert(expression.Body);
+            if (body is NewExpression ne)
+            {
+                if (ne.Arguments.Count == 0)
+                    throw new ArgumentException("Composite key expression must select at least one property.", nameof(expression));
+
+                var props = new PropertyInfo[ne.Arguments.Count];
+                for (var i = 0; i < ne.Arguments.Count; i++)
+                    props[i] = GetProperty(UnwrapConvert(ne.Arguments[i]));
+                return props;
+            }
+
+            return new[] { GetProperty(body) };
+        }
+
         /// <summary>
         /// Provides configuration options for a specific property on the entity type.
         /// </summary>
@@ -648,21 +675,32 @@ namespace nORM.Configuration
                     bool cascadeDelete = true)
                 {
                     ArgumentNullException.ThrowIfNull(foreignKeyExpression);
-                    var fkProp = _parent.GetProperty(foreignKeyExpression);
-                    PropertyInfo? principalKey = null;
+                    var fkProps = _parent.GetProperties(foreignKeyExpression);
+                    IReadOnlyList<PropertyInfo> principalKeys;
                     if (principalKeyExpression != null)
                     {
-                        principalKey = _parent.GetProperty(principalKeyExpression);
+                        principalKeys = _parent.GetProperties(principalKeyExpression);
                     }
-                    else if (_parent._config.KeyProperties.Count == 1)
+                    else if (_parent._config.KeyProperties.Count == fkProps.Count)
                     {
-                        principalKey = _parent._config.KeyProperties[0];
+                        principalKeys = _parent._config.KeyProperties.ToArray();
                     }
                     else
                     {
                         throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key must be specified for relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name}"));
                     }
-                    _parent._config.AddRelationship(new RelationshipConfiguration(_principalNavigation, typeof(TDependent), _dependentNavigation, principalKey, fkProp, cascadeDelete));
+
+                    if (principalKeys.Count != fkProps.Count)
+                        throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
+                            $"Relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name} has {principalKeys.Count} principal key properties but {fkProps.Count} foreign key properties."));
+
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        cascadeDelete));
                     return _parent;
                 }
             }

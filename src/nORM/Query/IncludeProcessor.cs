@@ -398,12 +398,15 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
 
             var firstRelation = include.Path[0];
+            if (include.Path.Count > 1 && include.Path.Any(r => r.IsComposite))
+                throw new NormUnsupportedFeatureException(
+                    "Multi-level Include over composite-key relationships is not supported yet. Split the query into explicit loads or configure single-column relationship keys.");
 
             // Build lookup of parent entities by key to allow batching
             var parentLookup = new Dictionary<object, List<object>>();
             foreach (var p in parents.Cast<object>())
             {
-                var key = firstRelation.PrincipalKey.Getter(p);
+                var key = GetPrincipalKeyValue(firstRelation, p);
                 if (key == null)
                 {
                     AssignEmptyList(p, firstRelation);
@@ -427,9 +430,10 @@ namespace nORM.Query
             // Determine optimal batch size based on provider parameter limits and relationship depth
             var keys = parentLookup.Keys.ToArray();
             var maxParams = _ctx.RawProvider.MaxParameters;
+            var firstKeyWidth = Math.Max(1, firstRelation.PrincipalKeys.Count);
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
-                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
+                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count * firstKeyWidth));
 
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
@@ -439,14 +443,23 @@ namespace nORM.Query
                 await using var cmd = _ctx.CreateCommand();
 
                 var paramNames = new List<string>();
+                var paramGroups = new List<string[]>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
-                    var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}";
-                    cmd.AddParam(pn, keyBatch[i]!);
-                    paramNames.Add(pn);
+                    var values = GetKeyValues(keyBatch[i]);
+                    var group = new string[values.Length];
+                    for (var j = 0; j < values.Length; j++)
+                    {
+                        var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}_{j}";
+                        cmd.AddParam(pn, values[j]!);
+                        group[j] = pn;
+                        if (values.Length == 1)
+                            paramNames.Add(pn);
+                    }
+                    paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
@@ -477,11 +490,14 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
 
             var firstRelation = include.Path[0];
+            if (include.Path.Count > 1 && include.Path.Any(r => r.IsComposite))
+                throw new NormUnsupportedFeatureException(
+                    "Multi-level Include over composite-key relationships is not supported yet. Split the query into explicit loads or configure single-column relationship keys.");
 
             var parentLookup = new Dictionary<object, List<object>>();
             foreach (var p in parents.Cast<object>())
             {
-                var key = firstRelation.PrincipalKey.Getter(p);
+                var key = GetPrincipalKeyValue(firstRelation, p);
                 if (key == null)
                 {
                     AssignEmptyList(p, firstRelation);
@@ -504,9 +520,10 @@ namespace nORM.Query
 
             var keys = parentLookup.Keys.ToArray();
             var maxParams = _ctx.RawProvider.MaxParameters;
+            var firstKeyWidth = Math.Max(1, firstRelation.PrincipalKeys.Count);
             var maxPerBatch = maxParams == int.MaxValue
                 ? keys.Length
-                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count));
+                : Math.Max(1, (maxParams - ParameterReserve) / Math.Max(1, include.Path.Count * firstKeyWidth));
 
             foreach (var keyBatch in keys.Chunk(maxPerBatch))
             {
@@ -514,14 +531,23 @@ namespace nORM.Query
                 using var cmd = _ctx.CreateCommand();
 
                 var paramNames = new List<string>();
+                var paramGroups = new List<string[]>();
                 for (int i = 0; i < keyBatch.Length; i++)
                 {
-                    var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}";
-                    cmd.AddParam(pn, keyBatch[i]!);
-                    paramNames.Add(pn);
+                    var values = GetKeyValues(keyBatch[i]);
+                    var group = new string[values.Length];
+                    for (var j = 0; j < values.Length; j++)
+                    {
+                        var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}_{j}";
+                        cmd.AddParam(pn, values[j]!);
+                        group[j] = pn;
+                        if (values.Length == 1)
+                            paramNames.Add(pn);
+                    }
+                    paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, cmd);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default);
@@ -560,7 +586,7 @@ namespace nORM.Query
 
                 resultChildren.Add(child);
 
-                var fk = relation.ForeignKey.Getter(child);
+                var fk = GetForeignKeyValue(relation, child);
                 if (fk != null)
                 {
                     if (!childGroups.TryGetValue(fk, out var list))
@@ -571,7 +597,7 @@ namespace nORM.Query
 
             foreach (var p in parents.Cast<object>())
             {
-                var pk = relation.PrincipalKey.Getter(p);
+                var pk = GetPrincipalKeyValue(relation, p);
                 var childList = QueryExecutor.CreateList(relation.DependentType, 0);
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
@@ -592,7 +618,65 @@ namespace nORM.Query
             relation.NavProp.SetValue(parent, childList);
         }
 
-        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, DbCommand cmd)
+        private static object? GetPrincipalKeyValue(TableMapping.Relation relation, object entity)
+            => GetRelationKeyValue(relation.PrincipalKeys, entity);
+
+        private static object? GetForeignKeyValue(TableMapping.Relation relation, object entity)
+            => GetRelationKeyValue(relation.ForeignKeys, entity);
+
+        private static object? GetRelationKeyValue(IReadOnlyList<Column> columns, object entity)
+        {
+            if (columns.Count == 1)
+                return columns[0].Getter(entity);
+
+            var values = new object?[columns.Count];
+            for (var i = 0; i < columns.Count; i++)
+            {
+                values[i] = columns[i].Getter(entity);
+                if (values[i] is null)
+                    return null;
+            }
+
+            return new RelationKey(values);
+        }
+
+        private static object?[] GetKeyValues(object key)
+            => key is RelationKey composite ? composite.Values : new object?[] { key };
+
+        private static void AppendCompositeKeyPredicate(System.Text.StringBuilder sb, TableMapping.Relation relation, List<string[]> paramGroups)
+        {
+            if (paramGroups.Count == 0)
+            {
+                sb.Append("1 = 0");
+                return;
+            }
+
+            sb.Append('(');
+            for (var groupIndex = 0; groupIndex < paramGroups.Count; groupIndex++)
+            {
+                if (groupIndex > 0)
+                    sb.Append(" OR ");
+
+                var group = paramGroups[groupIndex];
+                if (group.Length != relation.ForeignKeys.Count)
+                    throw new NormConfigurationException(
+                        $"Composite Include relationship '{relation.NavProp.Name}' expected {relation.ForeignKeys.Count} key values but received {group.Length}.");
+
+                sb.Append('(');
+                for (var columnIndex = 0; columnIndex < relation.ForeignKeys.Count; columnIndex++)
+                {
+                    if (columnIndex > 0)
+                        sb.Append(" AND ");
+                    sb.Append(relation.ForeignKeys[columnIndex].EscCol)
+                      .Append(" = ")
+                      .Append(group[columnIndex]);
+                }
+                sb.Append(')');
+            }
+            sb.Append(')');
+        }
+
+        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd)
         {
             var tenantActive = _ctx.Options.TenantProvider != null;
             var current = $"({PooledStringBuilder.Join(paramNames, ",")})";
@@ -606,8 +690,16 @@ namespace nORM.Query
                     var tenantCol = tenantActive ? _ctx.RequireTenantColumn(map, "include path load") : null;
 
                     sb.Append("SELECT * FROM ").Append(map.EscTable)
-                      .Append(" WHERE ").Append(relation.ForeignKey.EscCol)
-                      .Append(" IN ").Append(current);
+                      .Append(" WHERE ");
+                    if (i == 0 && relation.IsComposite)
+                    {
+                        AppendCompositeKeyPredicate(sb, relation, paramGroups);
+                    }
+                    else
+                    {
+                        sb.Append(relation.ForeignKey.EscCol)
+                          .Append(" IN ").Append(current);
+                    }
 
                     if (tenantActive)
                     {
@@ -683,7 +775,7 @@ namespace nORM.Query
 
                 resultChildren.Add(child);
 
-                var fk = relation.ForeignKey.Getter(child);
+                var fk = GetForeignKeyValue(relation, child);
                 if (fk != null)
                 {
                     if (!childGroups.TryGetValue(fk, out var list))
@@ -695,7 +787,7 @@ namespace nORM.Query
             foreach (var p in parents.Cast<object>())
             {
                 ct.ThrowIfCancellationRequested();
-                var pk = relation.PrincipalKey.Getter(p);
+                var pk = GetPrincipalKeyValue(relation, p);
                 var childList = QueryExecutor.CreateList(relation.DependentType, 0);
 
                 if (pk != null && childGroups.TryGetValue(pk, out var c))
@@ -727,6 +819,40 @@ namespace nORM.Query
                     return dict[candidate];
             }
             return default;
+        }
+
+        private sealed class RelationKey : IEquatable<RelationKey>
+        {
+            public object?[] Values { get; }
+
+            public RelationKey(object?[] values) => Values = values;
+
+            public bool Equals(RelationKey? other)
+            {
+                if (other is null || other.Values.Length != Values.Length)
+                    return false;
+
+                for (var i = 0; i < Values.Length; i++)
+                {
+                    if (!object.Equals(Values[i], other.Values[i]))
+                        return false;
+                }
+
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as RelationKey);
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var value in Values)
+                    hash.Add(value);
+                return hash.ToHashCode();
+            }
+
+            public override string ToString()
+                => string.Join("|", Values.Select(v => Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture)));
         }
 
         /// <summary>

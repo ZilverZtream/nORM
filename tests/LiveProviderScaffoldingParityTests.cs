@@ -100,7 +100,7 @@ public sealed class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
-    public async Task ScaffoldAsync_reports_same_composite_fk_diagnostics_on_live_provider(ProviderKind kind)
+    public async Task ScaffoldAsync_generates_same_composite_fk_model_shape_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
@@ -121,26 +121,16 @@ public sealed class LiveProviderScaffoldingParityTests
                     new ScaffoldOptions { Tables = new[] { CompositeParentTable, CompositeChildTable }, OverwriteFiles = false });
 
                 var childCode = await File.ReadAllTextAsync(Path.Combine(dir, CompositeChildTable + ".cs"));
-                var warnings = await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var parentCode = await File.ReadAllTextAsync(Path.Combine(dir, CompositeParentTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldCompositeContext.cs"));
 
                 Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
-                Assert.Contains("Composite Foreign Keys", warnings, StringComparison.Ordinal);
-                if (kind != ProviderKind.Sqlite)
-                    Assert.Contains(CompositeFkName, warnings, StringComparison.Ordinal);
-
-                var composites = warningJson.RootElement
-                    .GetProperty("compositeForeignKeys")
-                    .EnumerateArray()
-                    .ToArray();
-                var composite = kind == ProviderKind.Sqlite
-                    ? composites.Single()
-                    : composites.Single(e => e.GetProperty("constraint").GetString() == CompositeFkName);
-
-                Assert.Equal(CompositeChildTable, composite.GetProperty("dependentTable").GetString()!.Split('.').Last());
-                Assert.Equal(new[] { "TenantId", "OrderNo" }, composite.GetProperty("dependentColumns").EnumerateArray().Select(e => e.GetString()).ToArray());
-                Assert.Equal(CompositeParentTable, composite.GetProperty("principalTable").GetString()!.Split('.').Last());
-                Assert.Equal(new[] { "TenantId", "OrderNo" }, composite.GetProperty("principalColumns").EnumerateArray().Select(e => e.GetString()).ToArray());
+                Assert.Contains($"public {CompositeParentTable}? {CompositeParentTable} {{ get; set; }}", childCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{CompositeChildTable}> {CompositeChildTable}s {{ get; set; }} = new();", parentCode, StringComparison.Ordinal);
+                Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderNo }, p => new { p.TenantId, p.OrderNo }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
             }
             finally
             {

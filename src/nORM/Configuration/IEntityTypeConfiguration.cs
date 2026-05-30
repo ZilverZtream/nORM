@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using nORM.Mapping;
 
@@ -87,7 +88,42 @@ namespace nORM.Configuration
     /// <param name="ForeignKey">Foreign key property on the dependent entity.</param>
     /// <param name="CascadeDelete">Whether dependent entities should be cascade deleted.</param>
     public record RelationshipConfiguration(PropertyInfo PrincipalNavigation, Type DependentType,
-        PropertyInfo? DependentNavigation, PropertyInfo? PrincipalKey, PropertyInfo ForeignKey, bool CascadeDelete = true);
+        PropertyInfo? DependentNavigation, PropertyInfo? PrincipalKey, PropertyInfo ForeignKey, bool CascadeDelete = true)
+    {
+        /// <summary>Ordered principal key properties for this relationship.</summary>
+        public IReadOnlyList<PropertyInfo> PrincipalKeys { get; init; } =
+            PrincipalKey is null ? Array.Empty<PropertyInfo>() : new[] { PrincipalKey };
+
+        /// <summary>Ordered foreign key properties on the dependent entity.</summary>
+        public IReadOnlyList<PropertyInfo> ForeignKeys { get; init; } = new[] { ForeignKey };
+
+        /// <summary>Creates a relationship configuration backed by multiple key columns.</summary>
+        public RelationshipConfiguration(
+            PropertyInfo principalNavigation,
+            Type dependentType,
+            PropertyInfo? dependentNavigation,
+            IReadOnlyList<PropertyInfo> principalKeys,
+            IReadOnlyList<PropertyInfo> foreignKeys,
+            bool cascadeDelete = true)
+            : this(
+                principalNavigation,
+                dependentType,
+                dependentNavigation,
+                principalKeys is { Count: > 0 } ? principalKeys[0] : null,
+                foreignKeys is { Count: > 0 } ? foreignKeys[0] : throw new ArgumentException("At least one foreign key property is required.", nameof(foreignKeys)),
+                cascadeDelete)
+        {
+            if (principalKeys is null) throw new ArgumentNullException(nameof(principalKeys));
+            if (foreignKeys is null) throw new ArgumentNullException(nameof(foreignKeys));
+            if (principalKeys.Count == 0)
+                throw new ArgumentException("At least one principal key property is required.", nameof(principalKeys));
+            if (principalKeys.Count != foreignKeys.Count)
+                throw new ArgumentException("Principal key and foreign key property counts must match.", nameof(foreignKeys));
+
+            PrincipalKeys = principalKeys.ToArray();
+            ForeignKeys = foreignKeys.ToArray();
+        }
+    }
 
     /// <summary>Associates a value converter with a mapped property.</summary>
     public record ConverterConfiguration(PropertyInfo Property, IValueConverter Converter);

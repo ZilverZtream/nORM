@@ -137,11 +137,11 @@ namespace nORM.Scaffolding
 
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
-                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, manyToManyJoinTableKeys)));
+                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, manyToManyJoinTableKeys)));
                 }
                 else
                 {
@@ -288,7 +288,8 @@ namespace nORM.Scaffolding
                     .OrderBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
                     .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
                 {
-                    sb.AppendLine($"    [ForeignKey(nameof({EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
+                    if (!reference.IsComposite)
+                        sb.AppendLine($"    [ForeignKey(nameof({EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(reference.PrincipalEntityName)}? {EscapeCSharpIdentifier(reference.ReferenceNavigationName)} {{ get; set; }}");
                     sb.AppendLine();
                 }
@@ -1631,11 +1632,13 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
             IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
                 .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
+                .Where(g => !ReferencesPrimaryKey(g, primaryKeyColumnsByTable))
                 .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
                 .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
@@ -1670,7 +1673,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Composite Foreign Keys");
                     sb.AppendLine();
-                    sb.AppendLine("Composite foreign keys are discovered, but v1 navigation generation only supports single-column relationships.");
+                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key, so v1 scaffolding keeps them diagnostic.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
@@ -1894,11 +1897,13 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
             IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
                 .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
+                .Where(g => !ReferencesPrimaryKey(g, primaryKeyColumnsByTable))
                 .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
                 .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
@@ -2169,6 +2174,20 @@ namespace nORM.Scaffolding
                    && keyColumns.Contains(columnName);
         }
 
+        private static bool ReferencesPrimaryKey(
+            IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable)
+        {
+            var rows = foreignKeyGroup.ToArray();
+            if (rows.Length == 0)
+                return false;
+
+            var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
+            return primaryKeyColumnsByTable.TryGetValue(principalKey, out var keyColumns)
+                   && keyColumns.Count == rows.Length
+                   && rows.All(row => keyColumns.Contains(row.PrincipalColumn));
+        }
+
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, string> entityByTable,
@@ -2178,12 +2197,16 @@ namespace nORM.Scaffolding
         {
             var relationships = new List<ScaffoldRelationship>();
             var relationshipPairCounts = foreignKeys
-                .Where(fk => fk.ColumnCount == 1)
+                .GroupBy(fk => $"{TableKey(fk.DependentSchema, fk.DependentTable)}\u001f{TableKey(fk.PrincipalSchema, fk.PrincipalTable)}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
                 .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable) + "\u001f" + TableKey(fk.PrincipalSchema, fk.PrincipalTable), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-            foreach (var foreignKey in foreignKeys.Where(fk => fk.ColumnCount == 1))
+            foreach (var foreignKeyGroup in foreignKeys
+                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
             {
+                var rows = foreignKeyGroup.ToArray();
+                var foreignKey = rows[0];
                 var dependentKey = TableKey(foreignKey.DependentSchema, foreignKey.DependentTable);
                 var principalKey = TableKey(foreignKey.PrincipalSchema, foreignKey.PrincipalTable);
                 if (!entityByTable.TryGetValue(dependentKey, out var dependentEntity)
@@ -2192,11 +2215,13 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                if (!HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, principalKey, foreignKey.PrincipalColumn))
+                if (!ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable))
                     continue;
 
-                var foreignKeyProperty = GetColumnPropertyName(columnPropertiesByTable, dependentKey, foreignKey.DependentColumn);
-                var principalKeyProperty = GetColumnPropertyName(columnPropertiesByTable, principalKey, foreignKey.PrincipalColumn);
+                var foreignKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, dependentKey, row.DependentColumn)).ToArray();
+                var principalKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, principalKey, row.PrincipalColumn)).ToArray();
+                var foreignKeyProperty = foreignKeyProperties[0];
+                var principalKeyProperty = principalKeyProperties[0];
                 var hasMultipleRelationshipsToSamePrincipal = relationshipPairCounts.TryGetValue(
                     dependentKey + "\u001f" + principalKey,
                     out var relationshipPairCount)
@@ -2236,7 +2261,11 @@ namespace nORM.Scaffolding
                     principalKeyProperty,
                     referenceName,
                     collectionName,
-                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)));
+                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase))
+                {
+                    ForeignKeyPropertyNames = foreignKeyProperties,
+                    PrincipalKeyPropertyNames = principalKeyProperties
+                });
             }
 
             return relationships;
@@ -2690,13 +2719,13 @@ namespace nORM.Scaffolding
                         var dependent = EscapeCSharpIdentifier(relationship.DependentEntityName);
                         var collection = EscapeCSharpIdentifier(relationship.CollectionNavigationName);
                         var reference = EscapeCSharpIdentifier(relationship.ReferenceNavigationName);
-                        var foreignKey = EscapeCSharpIdentifier(relationship.ForeignKeyPropertyName);
-                        var principalKey = EscapeCSharpIdentifier(relationship.PrincipalKeyPropertyName);
+                        var foreignKey = FormatScaffoldKeySelector("d", relationship.ForeignKeyPropertyNames);
+                        var principalKey = FormatScaffoldKeySelector("p", relationship.PrincipalKeyPropertyNames);
                         sb.AppendLine($"            mb.Entity<{principal}>()");
                         sb.AppendLine($"                .HasMany(p => p.{collection})");
                         sb.AppendLine($"                .WithOne(d => d.{reference})");
                         var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
-                        sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey}{cascadeSuffix});");
+                        sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}{cascadeSuffix});");
                     }
                     foreach (var join in manyToManyJoins
                         .OrderBy(j => j.LeftEntityName, StringComparer.Ordinal)
@@ -2734,6 +2763,14 @@ namespace nORM.Scaffolding
                 sb.Clear();
                 _stringBuilderPool.Return(sb);
             }
+        }
+
+        private static string FormatScaffoldKeySelector(string parameterName, IReadOnlyList<string> propertyNames)
+        {
+            if (propertyNames.Count == 1)
+                return $"{parameterName} => {parameterName}.{EscapeCSharpIdentifier(propertyNames[0])}";
+
+            return $"{parameterName} => new {{ {string.Join(", ", propertyNames.Select(name => parameterName + "." + EscapeCSharpIdentifier(name)))} }}";
         }
 
         /// <summary>
@@ -3142,7 +3179,14 @@ namespace nORM.Scaffolding
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
             string CollectionNavigationName,
-            bool CascadeDelete);
+            bool CascadeDelete)
+        {
+            public IReadOnlyList<string> ForeignKeyPropertyNames { get; init; } = new[] { ForeignKeyPropertyName };
+
+            public IReadOnlyList<string> PrincipalKeyPropertyNames { get; init; } = new[] { PrincipalKeyPropertyName };
+
+            public bool IsComposite => ForeignKeyPropertyNames.Count > 1 || PrincipalKeyPropertyNames.Count > 1;
+        }
 
         private readonly record struct ScaffoldManyToManyJoin(
             string JoinTableKey,

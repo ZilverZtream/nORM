@@ -39,6 +39,26 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
         public Blog? Blog { get; set; }
     }
 
+    [Table("CkiTenantOrder")]
+    private class TenantOrder
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public string Customer { get; set; } = string.Empty;
+        public ICollection<TenantOrderLine> Lines { get; set; } = new List<TenantOrderLine>();
+    }
+
+    [Table("CkiTenantOrderLine")]
+    private class TenantOrderLine
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
+        public string Description { get; set; } = string.Empty;
+        [NotMapped]
+        public TenantOrder? Order { get; set; }
+    }
+
     private static DbContextOptions BuildOptions() => new()
     {
         OnModelCreating = mb =>
@@ -48,6 +68,12 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
                 .HasMany(b => b.OrderLines)
                 .WithOne(o => o.Blog)
                 .HasForeignKey(o => o.BlogId, b => b.Id);
+            mb.Entity<TenantOrder>().HasKey(x => new { x.TenantId, x.OrderId });
+            mb.Entity<TenantOrderLine>().HasKey(x => new { x.TenantId, x.OrderId, x.LineNo });
+            mb.Entity<TenantOrder>()
+                .HasMany(o => o.Lines)
+                .WithOne(l => l.Order)
+                .HasForeignKey(l => new { l.TenantId, l.OrderId }, o => new { o.TenantId, o.OrderId });
         }
     };
 
@@ -61,6 +87,10 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
             CREATE TABLE OrderLine(BlogId INTEGER NOT NULL, LineNumber INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(BlogId, LineNumber));
             INSERT INTO Blog(Title) VALUES ('Alpha'), ('Beta'), ('Gamma');
             INSERT INTO OrderLine VALUES (1,1,'a-line1'),(1,2,'a-line2'),(2,1,'b-line1');
+            CREATE TABLE CkiTenantOrder(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, Customer TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId));
+            CREATE TABLE CkiTenantOrderLine(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId, LineNo));
+            INSERT INTO CkiTenantOrder VALUES (1,100,'Alice'),(2,100,'Bob'),(1,101,'Cara');
+            INSERT INTO CkiTenantOrderLine VALUES (1,100,1,'a-100-1'),(1,100,2,'a-100-2'),(2,100,1,'b-100-1'),(1,101,1,'a-101-1');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider(), BuildOptions());
@@ -131,5 +161,47 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
 
         Assert.Single(blogs);
         Assert.Equal(2, blogs[0].OrderLines.Count);
+    }
+
+    [Fact]
+    public async Task Include_CompositeForeignKey_loads_only_matching_composite_children()
+    {
+        var orders = await ((INormQueryable<TenantOrder>)_ctx.Query<TenantOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Lines)
+            .OrderBy(o => o.TenantId)
+            .ThenBy(o => o.OrderId)
+            .ToListAsync();
+
+        Assert.Equal(3, orders.Count);
+
+        var tenantOneOrder = orders.Single(o => o.TenantId == 1 && o.OrderId == 100);
+        Assert.Equal(2, tenantOneOrder.Lines.Count);
+        Assert.All(tenantOneOrder.Lines, l =>
+        {
+            Assert.Equal(1, l.TenantId);
+            Assert.Equal(100, l.OrderId);
+        });
+
+        var tenantTwoSameOrderId = orders.Single(o => o.TenantId == 2 && o.OrderId == 100);
+        var line = Assert.Single(tenantTwoSameOrderId.Lines);
+        Assert.Equal("b-100-1", line.Description);
+        Assert.Equal(2, line.TenantId);
+        Assert.Equal(100, line.OrderId);
+    }
+
+    [Fact]
+    public void Include_CompositeForeignKey_sync_loads_only_matching_composite_children()
+    {
+        var orders = ((INormQueryable<TenantOrder>)_ctx.Query<TenantOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Lines)
+            .ToList();
+
+        var tenantOneOrder = orders.Single(o => o.TenantId == 1 && o.OrderId == 100);
+        Assert.Equal(2, tenantOneOrder.Lines.Count);
+
+        var tenantTwoSameOrderId = orders.Single(o => o.TenantId == 2 && o.OrderId == 100);
+        Assert.Single(tenantTwoSameOrderId.Lines);
     }
 }

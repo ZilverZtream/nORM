@@ -33,6 +33,20 @@ public class RuntimeSnapshotFkTests
         public Author? Author { get; set; }
     }
 
+    private class TenantOrder
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public ICollection<TenantOrderLine> Lines { get; set; } = new List<TenantOrderLine>();
+    }
+
+    private class TenantOrderLine
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
+    }
+
     private static DbContext CreateContext()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -47,6 +61,12 @@ public class RuntimeSnapshotFkTests
                     .HasMany(a => a.Books)
                     .WithOne(b => b.Author)
                     .HasForeignKey(b => b.AuthorId, a => a.AuthorId);
+                mb.Entity<TenantOrder>().HasKey(o => new { o.TenantId, o.OrderId });
+                mb.Entity<TenantOrderLine>().HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
+                mb.Entity<TenantOrder>()
+                    .HasMany(o => o.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => new { l.TenantId, l.OrderId }, o => new { o.TenantId, o.OrderId });
             }
         };
         return new DbContext(cn, new SqliteProvider(), options);
@@ -79,6 +99,22 @@ public class RuntimeSnapshotFkTests
         Assert.Equal("Author", fk.PrincipalTable, ignoreCase: true);
         Assert.Contains("Book", fk.ConstraintName);
         Assert.Contains("Author", fk.ConstraintName);
+    }
+
+    [Fact]
+    public void Build_DbContext_CompositeFkConstraintHasAllOrderedColumns()
+    {
+        using var ctx = CreateContext();
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var lineTable = snapshot.Tables.First(t =>
+            string.Equals(t.Name, nameof(TenantOrderLine), System.StringComparison.OrdinalIgnoreCase));
+        var fk = lineTable.ForeignKeys.Single();
+
+        Assert.Equal(new[] { "TenantId", "OrderId" }, fk.DependentColumns);
+        Assert.Equal(new[] { "TenantId", "OrderId" }, fk.PrincipalColumns);
+        Assert.Equal(nameof(TenantOrder), fk.PrincipalTable);
+        Assert.Contains("TenantId_OrderId", fk.ConstraintName);
     }
 
     [Fact]

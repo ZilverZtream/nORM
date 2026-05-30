@@ -191,6 +191,7 @@ M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Provi
 M:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String):nORM.Configuration.ProviderMobilityTranslationDecision
 M:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(System.String):System.Version
 M:nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision&):System.Boolean
+M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)
 M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Boolean)
 M:nORM.Configuration.RelationshipConfiguration.<Clone>$():nORM.Configuration.RelationshipConfiguration
 M:nORM.Configuration.RelationshipConfiguration.Deconstruct(System.Reflection.PropertyInfo&,System.Type&,System.Reflection.PropertyInfo&,System.Reflection.PropertyInfo&,System.Reflection.PropertyInfo&,System.Boolean&):System.Void
@@ -468,6 +469,7 @@ M:nORM.Mapping.IValueConverter.ConvertToProvider(System.Object):System.Object
 M:nORM.Mapping.OwnedAttribute.#ctor()
 M:nORM.Mapping.RenameColumnAttribute.#ctor(System.String)
 M:nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
+M:nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Boolean)
 M:nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,nORM.Mapping.Column,nORM.Mapping.Column,System.Boolean)
 M:nORM.Mapping.TableMapping.Relation.<Clone>$():nORM.Mapping.TableMapping.Relation
 M:nORM.Mapping.TableMapping.Relation.Deconstruct(System.Reflection.PropertyInfo&,System.Type&,nORM.Mapping.Column&,nORM.Mapping.Column&,System.Boolean&):System.Void
@@ -1029,7 +1031,9 @@ P:nORM.Configuration.RelationshipConfiguration.CascadeDelete:System.Boolean
 P:nORM.Configuration.RelationshipConfiguration.DependentNavigation:System.Reflection.PropertyInfo
 P:nORM.Configuration.RelationshipConfiguration.DependentType:System.Type
 P:nORM.Configuration.RelationshipConfiguration.ForeignKey:System.Reflection.PropertyInfo
+P:nORM.Configuration.RelationshipConfiguration.ForeignKeys:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
 P:nORM.Configuration.RelationshipConfiguration.PrincipalKey:System.Reflection.PropertyInfo
+P:nORM.Configuration.RelationshipConfiguration.PrincipalKeys:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
 P:nORM.Configuration.RelationshipConfiguration.PrincipalNavigation:System.Reflection.PropertyInfo
 P:nORM.Configuration.ShadowPropertyConfiguration.ClrType:System.Type
 P:nORM.Configuration.ShadowPropertyConfiguration.ColumnName:System.String
@@ -1161,8 +1165,11 @@ P:nORM.Mapping.TableMapping.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Mapping.TableMapping.Relation.CascadeDelete:System.Boolean
 P:nORM.Mapping.TableMapping.Relation.DependentType:System.Type
 P:nORM.Mapping.TableMapping.Relation.ForeignKey:nORM.Mapping.Column
+P:nORM.Mapping.TableMapping.Relation.ForeignKeys:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+P:nORM.Mapping.TableMapping.Relation.IsComposite:System.Boolean
 P:nORM.Mapping.TableMapping.Relation.NavProp:System.Reflection.PropertyInfo
 P:nORM.Mapping.TableMapping.Relation.PrincipalKey:nORM.Mapping.Column
+P:nORM.Mapping.TableMapping.Relation.PrincipalKeys:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.Relations:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.TableMapping.Relation}
 P:nORM.Mapping.TableMapping.ShadowFingerprint:System.Int32
 P:nORM.Mapping.TableMapping.TableName:System.String

@@ -57,17 +57,21 @@ must be reviewed and edited like handwritten model code.
   than the raw CLI/API input. If that context name collides with an entity
   class, scaffolding uses a unique context class/file name instead of
   overwriting the entity file.
-- Single-column foreign key relationship generation when provider metadata
+- Single-column foreign key relationship generation and safe composite foreign
+  key relationship generation when provider metadata
   exposes the constraint. Generated entities include reference/collection
-  navigations with `[ForeignKey]` metadata, and the generated `DbContext` wires
-  them through `OnModelCreating` while preserving caller-supplied model
+  navigations; single-column references include `[ForeignKey]` metadata, and
+  composite references are wired through ordered fluent `HasForeignKey`
+  selectors. The generated `DbContext` preserves caller-supplied model
   configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; non-cascade delete actions are generated with
   `cascadeDelete: false`. Relationships are emitted only when the FK targets
-  the generated principal primary key; FK shapes targeting keyless tables or
-  alternate/unique keys are reported for manual configuration instead of
-  emitting unsafe fluent code. Self-referencing FKs use role-based navigation
-  names derived from the FK column instead of vague same-type names.
+  the generated principal primary key. Composite relationships are emitted only
+  when the ordered FK columns reference the exact generated composite primary
+  key; FK shapes targeting keyless tables or alternate/unique keys are reported
+  for manual configuration instead of emitting unsafe fluent code.
+  Self-referencing FKs use role-based navigation names derived from the FK
+  column instead of vague same-type names.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
@@ -105,9 +109,10 @@ must be reviewed and edited like handwritten model code.
   configuration are also ordered by generated names rather than raw provider FK
   discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
-  that are not converted into runnable model code. Composite foreign keys are
-  listed there instead of being silently ignored or converted into fake
-  single-column navigations; defaults, computed/generated columns, check
+  that are not converted into runnable model code. Composite foreign keys that
+  do not target the generated principal primary key are listed there instead of
+  being silently ignored or converted into fake single-column navigations;
+  defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions,
@@ -123,7 +128,8 @@ must be reviewed and edited like handwritten model code.
 
 - `ScaffoldingAndNavigationCoverageTests` covers identifier normalization,
   duplicate generated-name handling, table filtering, overwrite protection,
-  deterministic repeated output, nullable initialization, SQLite FK navigation generation, and SQLite
+  deterministic repeated output, nullable initialization, SQLite FK navigation generation, SQLite
+  composite-FK navigation/model configuration generation, and SQLite
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
   composite primary-key source generation with consumer-build evidence,
@@ -133,7 +139,7 @@ must be reviewed and edited like handwritten model code.
   self-referencing FK role-based navigation naming,
   self-referencing pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column/descending index diagnostics,
-  composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
+  unsafe composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
@@ -146,7 +152,7 @@ must be reviewed and edited like handwritten model code.
   when runtime-generated table or column mappings contain literal dotted
   identifiers.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
-  scaffolding, composite-FK diagnostic shape, provider-owned/default and
+  scaffolding, composite-FK diagnostic shape for unsupported relationships, provider-owned/default and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 - `RelationshipConfigurationTests` covers generated non-cascade relationship
@@ -158,11 +164,15 @@ must be reviewed and edited like handwritten model code.
 
 ## Not Yet Stable
 
-- Composite foreign key relationship navigation generation. Composite FK
-  constraints are discovered and reported in scaffold diagnostics.
-- Composite-key and alternate-key relationship modeling beyond provider schema
-  metadata. Single-column FKs that target an alternate/unique key instead of
-  the generated principal primary key are discovered and reported in scaffold
+- Composite foreign key relationship generation beyond the safe primary-key
+  subset. Composite FK constraints that target the exact generated composite
+  primary key are emitted as navigations and fluent model configuration.
+  Composite FKs that target alternate/unique keys or otherwise differ from the
+  generated principal primary key are discovered and reported in scaffold
+  diagnostics.
+- Alternate-key relationship modeling beyond provider schema metadata.
+  Single-column FKs that target an alternate/unique key instead of the
+  generated principal primary key are discovered and reported in scaffold
   diagnostics.
 - Full FK referential-action modeling beyond tracked-graph cascade on/off.
   Non-cascade delete actions and update actions are discovered and reported in
@@ -246,7 +256,7 @@ dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 | Code | Category | Meaning |
 | --- | --- | --- |
-| `SCF001` | `relationship` | Composite foreign key discovered; scalar columns are generated, but no navigation is emitted. |
+| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered; verify the bridge has exactly two non-null FK columns plus a composite PK over them before hand-writing `UsingTable`, otherwise keep the generated entity. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |

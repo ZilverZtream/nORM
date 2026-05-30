@@ -1306,7 +1306,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithCompositeForeignKey_EmitsDiagnosticsAndNoFakeNavigation()
+    public async Task ScaffoldAsync_WithCompositeForeignKey_EmitsNavigationAndCompositeModelConfig()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1338,30 +1338,17 @@ public class DatabaseScaffolderPrivateMethodTests
             var principalCode = File.ReadAllText(Path.Combine(dir, "TenantOrder.cs"));
             var dependentCode = File.ReadAllText(Path.Combine(dir, "TenantOrderLine.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeFkCtx.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
-            Assert.DoesNotContain("List<TenantOrderLine>", principalCode);
-            Assert.DoesNotContain("public TenantOrder?", dependentCode);
-            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("List<TenantOrderLine>", principalCode);
+            Assert.Contains("public TenantOrder?", dependentCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderId }, p => new { p.TenantId, p.OrderId }, cascadeDelete: false);", contextCode);
             Assert.Contains("[Key]", principalCode);
             Assert.Contains("TenantId { get; set; }", principalCode);
             Assert.Contains("OrderId { get; set; }", principalCode);
             Assert.Contains("[Key]", dependentCode);
             Assert.Contains("LineNo { get; set; }", dependentCode);
-            Assert.Contains("Composite Foreign Keys", warnings);
-            Assert.Contains("sqlite_fk_", warnings);
-            Assert.Contains("TenantId, OrderId", warnings);
-            Assert.Contains("TenantOrderLine", warnings);
-            Assert.Contains("TenantOrder", warnings);
-            var compositeForeignKeys = warningJson.RootElement.GetProperty("compositeForeignKeys");
-            Assert.Equal("SCF001", compositeForeignKeys[0].GetProperty("code").GetString());
-            Assert.Equal("Warning", compositeForeignKeys[0].GetProperty("severity").GetString());
-            Assert.Equal("relationship", compositeForeignKeys[0].GetProperty("category").GetString());
-            Assert.Equal("TenantOrderLine", compositeForeignKeys[0].GetProperty("dependentTable").GetString());
-            Assert.Equal("TenantOrder", compositeForeignKeys[0].GetProperty("principalTable").GetString());
-            Assert.Equal("TenantId", compositeForeignKeys[0].GetProperty("dependentColumns")[0].GetString());
-            Assert.Equal("OrderId", compositeForeignKeys[0].GetProperty("dependentColumns")[1].GetString());
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

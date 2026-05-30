@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
@@ -26,6 +27,20 @@ public class RelationshipConfigurationTests
         public int Id { get; set; }
         public int ParentKey { get; set; }
         public Blog? Parent { get; set; }
+    }
+
+    private class TenantOrder
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public ICollection<TenantOrderLine> Lines { get; set; } = new List<TenantOrderLine>();
+    }
+
+    private class TenantOrderLine
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
     }
 
     private class Author
@@ -120,6 +135,63 @@ public class RelationshipConfigurationTests
 
         var rel = blogMap.Relations[nameof(Blog.Posts)];
         Assert.False(rel.CascadeDelete);
+    }
+
+    [Fact]
+    public void Fluent_composite_relationship_configuration_preserves_ordered_key_pairs()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<TenantOrder>().HasKey(o => new { o.TenantId, o.OrderId });
+                mb.Entity<TenantOrderLine>().HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
+                mb.Entity<TenantOrder>()
+                    .HasMany(o => o.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => new { l.TenantId, l.OrderId }, o => new { o.TenantId, o.OrderId }, cascadeDelete: false);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var orderMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(TenantOrder) })!;
+
+        var rel = orderMap.Relations[nameof(TenantOrder.Lines)];
+        Assert.True(rel.IsComposite);
+        Assert.False(rel.CascadeDelete);
+        Assert.Equal(new[] { "TenantId", "OrderId" }, rel.PrincipalKeys.Select(c => c.PropName).ToArray());
+        Assert.Equal(new[] { "TenantId", "OrderId" }, rel.ForeignKeys.Select(c => c.PropName).ToArray());
+        Assert.Equal("TenantId", rel.PrincipalKey.PropName);
+        Assert.Equal("TenantId", rel.ForeignKey.PropName);
+    }
+
+    [Fact]
+    public void Fluent_composite_relationship_configuration_infers_matching_composite_principal_key()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<TenantOrder>().HasKey(o => new { o.TenantId, o.OrderId });
+                mb.Entity<TenantOrderLine>().HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
+                mb.Entity<TenantOrder>()
+                    .HasMany(o => o.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => new { l.TenantId, l.OrderId });
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var orderMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(TenantOrder) })!;
+
+        var rel = orderMap.Relations[nameof(TenantOrder.Lines)];
+        Assert.True(rel.IsComposite);
+        Assert.Equal(new[] { "TenantId", "OrderId" }, rel.PrincipalKeys.Select(c => c.PropName).ToArray());
+        Assert.Equal(new[] { "TenantId", "OrderId" }, rel.ForeignKeys.Select(c => c.PropName).ToArray());
     }
 
     [Fact]

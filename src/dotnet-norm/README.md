@@ -38,8 +38,9 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 `[Key]`/provider metadata-backed identity/computed/`[Timestamp]`/`[Required]`/`[MaxLength]` metadata,
 deterministic C# identifier cleanup, de-duplicated generated names,
 `IQueryable<T>` context properties backed by nORM's query provider,
-single-column FK navigations with cascade/non-cascade delete behavior
-preserved, role-based self-referencing FK and self-join navigations, pure
+single-column FK navigations and safe composite-FK navigations when the
+constraint targets the generated principal primary key, with cascade/non-cascade
+delete behavior preserved, role-based self-referencing FK and self-join navigations, pure
 many-to-many join mappings including schema-qualified join tables, and single-column/composite index
 metadata, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
@@ -57,7 +58,8 @@ same text as a schema-qualified table, scaffolding fails with an actionable
 error because the v1 filter syntax cannot disambiguate those objects safely.
 
 It is a bounded bootstrap tool, not a database-first completeness claim.
-Unsupported composite foreign keys, payload join tables, provider-specific
+Composite foreign keys that do not target the generated principal primary key,
+payload join tables, provider-specific
 defaults, computed column expressions, check constraints, collations, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 non-default identity seed/increment, non-default FK referential actions,
@@ -65,8 +67,8 @@ triggers, SQL Server provider-native temporal tables, tables without primary
 keys, SQLite virtual tables/shadow tables, skipped views, routines, sequences,
 synonyms, materialized views, and events are reported in
 `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`. Composite FK
-navigation generation, payload join-table modeling, owned-type inference,
-inheritance inference, view entity generation, and provider-specific schema
+navigation generation beyond the safe primary-key subset, payload join-table
+modeling, owned-type inference, inheritance inference, view entity generation, and provider-specific schema
 semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
 When warnings are present, the CLI prints a compact summary with stable
