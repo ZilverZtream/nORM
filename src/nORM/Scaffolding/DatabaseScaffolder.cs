@@ -1862,7 +1862,14 @@ namespace nORM.Scaffolding
                       AND c.collation_name IS NOT NULL
                       AND c.collation_name <> s.default_collation_name
                     UNION ALL
-                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType', data_type
+                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType',
+                        CASE
+                            WHEN data_type IN ('enum', 'set')
+                                 AND column_type IS NOT NULL
+                                 AND column_type <> ''
+                            THEN column_type
+                            ELSE data_type
+                        END
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE()
                       AND data_type IN (

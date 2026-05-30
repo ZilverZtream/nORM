@@ -671,6 +671,8 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData("geometry", false)]
     [InlineData("inet", false)]
     [InlineData("enum", false)]
+    [InlineData("enum('draft','paid','cancelled')", false)]
+    [InlineData("set('read','write','admin')", false)]
     public void IsScaffoldableProviderSpecificColumnType_PromotesSafeScalarStorage(string detail, bool expected)
     {
         var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });
