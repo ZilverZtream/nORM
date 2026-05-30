@@ -1944,13 +1944,13 @@ namespace nORM.Scaffolding
                       AND numeric_precision IS NOT NULL
                       AND numeric_scale IS NOT NULL
                     UNION ALL
-                    SELECT NULL, table_name, index_name, 'DescendingIndex', 'MySQL descending index key'
+                    SELECT DISTINCT NULL, table_name, index_name, 'DescendingIndex', 'MySQL descending index key'
                     FROM information_schema.statistics
                     WHERE table_schema = DATABASE()
                       AND index_name <> 'PRIMARY'
                       AND collation = 'D'
                     UNION ALL
-                    SELECT NULL, table_name, index_name, 'PrefixIndex', 'MySQL prefix index'
+                    SELECT DISTINCT NULL, table_name, index_name, 'PrefixIndex', 'MySQL prefix index'
                     FROM information_schema.statistics
                     WHERE table_schema = DATABASE()
                       AND index_name <> 'PRIMARY'
