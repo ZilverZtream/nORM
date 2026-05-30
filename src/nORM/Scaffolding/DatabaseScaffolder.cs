@@ -5205,7 +5205,7 @@ namespace nORM.Scaffolding
                             return "table type";
 
                         var userDefined = inner.TrimStart('_');
-                        if (userDefined is "citext" or "json" or "jsonb" or "xml")
+                        if (userDefined is "citext" or "json" or "jsonb" or "xml" or "uuid")
                             return userDefined;
                     }
                 }

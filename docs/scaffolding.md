@@ -183,8 +183,8 @@ must be reviewed and edited like handwritten model code.
   `DateOnly?`, `TimeOnly?`, `TimeSpan?`, `Guid?`, `string?`, `byte[]?`,
   etc.) and falls back to `object?` only for unmapped provider types. PostgreSQL
   routine parameters preserve common array metadata (`int[]?`, `string[]?`,
-  `Guid[]?`, temporal arrays, etc.) and known user-defined textual types such
-  as `citext`. SQL Server scalar alias types are mapped through their base
+  `Guid[]?`, temporal arrays, etc.) and known safe PostgreSQL user-defined
+  scalar types such as `citext` and `uuid`. SQL Server scalar alias types are mapped through their base
   system type; SQL Server table-valued parameters scaffold as `DbParameter?`
   so callers pass reviewed provider-specific structured parameters. MySQL
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
