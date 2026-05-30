@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -141,6 +142,35 @@ public class DynamicTypeQueryTests
 
         var row = Assert.Single(rows);
         Assert.Equal("created", row.GetType().GetProperty("Message")!.GetValue(row));
+    }
+
+    [Fact]
+    public void QueryString_WithSchemaQualifiedLiteralDottedTableName_MaterializesRowsFromOriginalTable()
+    {
+        var dbName = $"dynamic_query_schema_dotted_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                ATTACH DATABASE ':memory:' AS aux;
+                CREATE TABLE "aux"."audit.events" (Id INTEGER PRIMARY KEY, Message TEXT);
+                INSERT INTO "aux"."audit.events" (Id, Message) VALUES (1, 'created');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var rows = ctx.Query("aux.audit.events").Cast<object>().ToList();
+
+        var row = Assert.Single(rows);
+        Assert.Equal("created", row.GetType().GetProperty("Message")!.GetValue(row));
+        var table = Assert.Single(row.GetType().GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+        Assert.Equal("aux", table.Schema);
+        Assert.Equal("audit.events", table.Name);
     }
 
     [Fact]
