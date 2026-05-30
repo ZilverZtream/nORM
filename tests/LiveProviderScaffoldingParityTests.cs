@@ -81,6 +81,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
     private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
+    private const string MySqlUnsignedRoutineName = "ScaffoldLiveUnsignedRoutine";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -665,6 +666,45 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownPostgresTypedRoutineAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_mysql_unsigned_routine_parameters_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlUnsignedRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_unsigned_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlUnsignedRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlUnsignedRoutineContext.cs"));
+
+                Assert.Contains($"public sealed class {MySqlUnsignedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public uint? customer_id { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public ulong? max_id { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public ushort? rank { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public byte? flag { get; init; }", contextCode, StringComparison.Ordinal);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownMySqlUnsignedRoutineAsync(connection, provider);
             }
         }
     }
@@ -1625,6 +1665,14 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) $$");
     }
 
+    private static async Task SetupMySqlUnsignedRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownMySqlUnsignedRoutineAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {provider.Escape(MySqlUnsignedRoutineName)}(customer_id INT UNSIGNED, max_id BIGINT UNSIGNED, rank SMALLINT UNSIGNED, flag TINYINT UNSIGNED) RETURNS INT DETERMINISTIC NO SQL RETURN customer_id");
+    }
+
     private static async Task SetupPostgresTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownPostgresTypedColumnTableAsync(connection, provider);
@@ -2008,6 +2056,18 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection,
                 $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(integer[], uuid)");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownMySqlUnsignedRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {provider.Escape(MySqlUnsignedRoutineName)}");
         }
         catch
         {
