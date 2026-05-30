@@ -345,7 +345,7 @@ namespace nORM.Scaffolding
                         maxLength = size;
                 }
 
-                yield return new ColumnInfo(colName, propName, propertyType, allowNull, isKey, isAuto, isComputed, isRowVersion, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, isAuto, isComputed, isRowVersion, maxLength);
             }
         }
 
