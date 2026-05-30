@@ -136,6 +136,25 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void SchemaQualifiedLiteralDottedTableName_UsesFirstDotAsSchemaSeparator()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE "aux"."audit.events" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "aux.audit.events");
+        var table = Assert.Single(type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+
+        Assert.Equal("audit.events", table.Name);
+        Assert.Equal("aux", table.Schema);
+        Assert.NotNull(type.GetProperty("Name"));
+    }
+
+    [Fact]
     public void AddedColumn_DifferentSignature()
     {
         using var cn = OpenMemory();

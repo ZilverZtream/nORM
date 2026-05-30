@@ -544,7 +544,7 @@ namespace nORM.Scaffolding
 
         private static (string? schema, string table) SplitSchema(string identifier)
         {
-            var idx = identifier.LastIndexOf('.');
+            var idx = identifier.IndexOf('.');
             if (idx > 0 && idx < identifier.Length - 1)
                 return (identifier[..idx], identifier[(idx + 1)..]);
             return (null, identifier);
