@@ -2064,7 +2064,7 @@ namespace nORM.Scaffolding
                 "Synonym" => "Resolve the synonym to a supported base table or keep it behind provider-bound integration code.",
                 "MaterializedView" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities for a read-oriented query artifact and keep refresh behavior provider-bound.",
                 "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
-                "VirtualTable" => "Keep the virtual table behind provider-bound query/index code; v1 scaffolding emits normal base-table models only.",
+                "VirtualTable" => "Use --emit-query-artifacts/ScaffoldOptions.EmitQueryArtifacts for a read-oriented query artifact, or keep the virtual table behind provider-bound query/index code.",
                 "VirtualTableShadow" => "Do not map SQLite virtual-table shadow storage as domain entities; keep it provider-owned with the virtual table.",
                 _ => "Keep this database object in provider migrations or hand-written integration code."
             };

@@ -339,13 +339,13 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
 | `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
-| `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-view-entities`. |
+| `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |
 | `SCF202` | `key-generation` | Standalone sequence discovered and skipped. |
 | `SCF203` | `database-object` | SQL Server synonym discovered and skipped. |
-| `SCF204` | `query-object` | PostgreSQL materialized view discovered; skipped unless emitted through `--emit-view-entities`. |
+| `SCF204` | `query-object` | PostgreSQL materialized view discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF205` | `routine` | MySQL event discovered and skipped. |
-| `SCF206` | `virtual-table` | SQLite virtual table discovered; skipped unless emitted as a query artifact through `--emit-view-entities`. |
+| `SCF206` | `virtual-table` | SQLite virtual table discovered; skipped unless emitted as a query artifact through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF207` | `virtual-table` | SQLite virtual-table shadow table discovered and skipped. |
 | `SCF299` | `database-object` | Unknown skipped database object. |
 
