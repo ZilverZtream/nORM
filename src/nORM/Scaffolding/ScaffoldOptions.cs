@@ -37,5 +37,13 @@ namespace nORM.Scaffolding
         /// bodies across database providers.
         /// </summary>
         public bool EmitRoutineStubs { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether views/materialized views should be emitted
+        /// as query-only entity classes. Generated view entities are scaffolding
+        /// bootstrap artifacts; nORM does not infer provider-neutral write semantics
+        /// for views.
+        /// </summary>
+        public bool EmitViewEntities { get; init; }
     }
 }

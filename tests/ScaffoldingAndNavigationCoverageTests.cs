@@ -2838,6 +2838,53 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithEmitViewEntities_GeneratesQueryArtifact()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Existing (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE VIEW ExistingView AS SELECT Id, Name FROM Existing;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "ViewCtx",
+                new ScaffoldOptions { Tables = new[] { "ExistingView" }, EmitViewEntities = true });
+
+            var viewCode = File.ReadAllText(Path.Combine(dir, "ExistingView.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ViewCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[Table(\"ExistingView\")]", viewCode);
+            Assert.Contains("public long Id { get; set; }", viewCode);
+            Assert.Contains("public string", viewCode);
+            Assert.Contains("Name { get; set; }", viewCode);
+            Assert.Contains("IQueryable<ExistingView> ExistingViews", contextCode);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            Assert.DoesNotContain("View ExistingView", warnings);
+            Assert.Empty(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray());
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                item.GetProperty("table").GetString() == "ExistingView");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithNoOverwrite_RefusesExistingFiles()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

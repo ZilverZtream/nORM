@@ -113,6 +113,11 @@ must be reviewed and edited like handwritten model code.
   discovered schema-qualified routine name and XML comments listing parameter
   metadata. Routine bodies remain provider-owned and are not translated across
   database engines.
+- Optional query-artifact view entities through
+  `ScaffoldOptions.EmitViewEntities` and CLI `--emit-view-entities`.
+  Generated view/materialized-view classes are intended for reads; scaffolding
+  still reports missing primary keys where the database does not expose one, and
+  nORM does not infer provider-neutral write semantics for views.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
@@ -165,6 +170,9 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
   output compiles as a consumer project and keeps the provider-bound routine
   warning/metadata contract explicit.
+- `ScaffoldingAndNavigationCoverageTests` proves opt-in view entity scaffolding
+  converts a SQLite view into a compiling query artifact while preserving the
+  missing-primary-key diagnostic.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, computed/identity/rowversion metadata in the dynamic cache key

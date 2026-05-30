@@ -108,6 +108,7 @@ public class CliIntegrationTests
         Assert.Contains("nORM.ScaffoldWarnings.md/json", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--fail-on-warnings", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--emit-view-entities", result.Stdout, StringComparison.Ordinal);
     }
 
     [Fact]

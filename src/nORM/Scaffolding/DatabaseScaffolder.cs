@@ -82,9 +82,17 @@ namespace nORM.Scaffolding
                 Directory.CreateDirectory(outputDirectory);
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-                var tables = FilterTables(discoveredTables, discoveredSkippedObjects, options);
+                var emittedViewObjects = options.EmitViewEntities
+                    ? discoveredSkippedObjects.Where(IsViewLikeObject).ToArray()
+                    : Array.Empty<ScaffoldSkippedObject>();
+                var discoveredTablesAndViews = discoveredTables
+                    .Concat(emittedViewObjects.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
+                    .ToArray();
+                var tables = FilterTables(discoveredTablesAndViews, discoveredSkippedObjects, options);
                 EnsureNoTableKeyCollisions(tables);
-                var skippedObjects = FilterSkippedObjects(discoveredSkippedObjects, options);
+                var skippedObjects = FilterSkippedObjects(
+                    discoveredSkippedObjects.Where(obj => !emittedViewObjects.Contains(obj)).ToArray(),
+                    options);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
@@ -747,6 +755,10 @@ namespace nORM.Scaffolding
         private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObject obj, string requested)
             => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsViewLikeObject(ScaffoldSkippedObject obj)
+            => string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase);
 
         private static string[] GetRequestedTableFilters(ScaffoldOptions options)
         {

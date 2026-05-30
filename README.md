@@ -296,8 +296,12 @@ scaffolds fail in CI after the warning report is written.
 Clean later scaffold runs remove stale warning reports when overwrite is
 allowed, or fail clearly when overwrite protection would leave stale reports in
 place.
+Opt-in scaffold switches can emit provider-bound routine wrappers
+(`--emit-routine-stubs`) and read-oriented view entities
+(`--emit-view-entities`); both remain explicitly bounded and are not provider
+mobility proof by themselves.
 Payload join-table modeling, owned-type
-inference, inheritance inference, view entity generation, and provider-specific
+inference, inheritance inference, view write semantics, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding
 Contract](docs/scaffolding.md).
 
