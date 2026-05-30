@@ -2499,6 +2499,8 @@ public class DatabaseScaffolderPrivateMethodTests
     private static void AssertScaffoldOutputBuildsAsConsumerProject(string outputDirectory)
     {
         var root = FindRepositoryRoot();
+        var normAssembly = Path.Combine(root, "src", "bin", "Release", "net8.0", "nORM.dll");
+        Assert.True(File.Exists(normAssembly), $"Expected built nORM assembly at {normAssembly}. Run dotnet build nORM.sln -c Release first.");
         File.WriteAllText(Path.Combine(outputDirectory, "ScaffoldedConsumer.csproj"), $$"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -2507,7 +2509,9 @@ public class DatabaseScaffolderPrivateMethodTests
                 <ImplicitUsings>enable</ImplicitUsings>
               </PropertyGroup>
               <ItemGroup>
-                <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+                <Reference Include="nORM">
+                  <HintPath>{{normAssembly}}</HintPath>
+                </Reference>
               </ItemGroup>
             </Project>
             """, Encoding.UTF8);

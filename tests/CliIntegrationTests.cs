@@ -338,6 +338,8 @@ public class CliIntegrationTests
             Assert.True(scaffold.ExitCode == 0,
                 $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
 
+            var normAssembly = Path.Combine(root, "src", "bin", "Release", "net8.0", "nORM.dll");
+            Assert.True(File.Exists(normAssembly), $"Expected built nORM assembly at {normAssembly}. Run dotnet build nORM.sln -c Release first.");
             File.WriteAllText(Path.Combine(output, "CliScaffolded.csproj"), $$"""
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
@@ -346,7 +348,9 @@ public class CliIntegrationTests
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
-                    <ProjectReference Include="{{Path.Combine(root, "src", "nORM.csproj")}}" />
+                    <Reference Include="nORM">
+                      <HintPath>{{normAssembly}}</HintPath>
+                    </Reference>
                   </ItemGroup>
                 </Project>
                 """, Encoding.UTF8);
