@@ -32,6 +32,11 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string CompositeStudentCourseTable = "ScaffoldLiveCompositeStudentCourse";
     private const string CompositeStudentCourseStudentFkName = "FK_ScaffoldLiveCompositeStudentCourse_Student";
     private const string CompositeStudentCourseCourseFkName = "FK_ScaffoldLiveCompositeStudentCourse_Course";
+    private const string SharedTenantStudentTable = "ScaffoldLiveSharedTenantStudent";
+    private const string SharedTenantCourseTable = "ScaffoldLiveSharedTenantCourse";
+    private const string SharedTenantStudentCourseTable = "ScaffoldLiveSharedTenantStudentCourse";
+    private const string SharedTenantStudentCourseStudentFkName = "FK_ScaffoldLiveSharedTenantStudentCourse_Student";
+    private const string SharedTenantStudentCourseCourseFkName = "FK_ScaffoldLiveSharedTenantStudentCourse_Course";
     private const string AlternateAuthorTable = "ScaffoldLiveAlternateAuthor";
     private const string AlternateBookTable = "ScaffoldLiveAlternateBook";
     private const string AlternateAuthorBookTable = "ScaffoldLiveAlternateAuthorBook";
@@ -238,6 +243,56 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownCompositeManyToManyAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_shared_tenant_many_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSharedTenantManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_shared_tenant_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSharedTenantManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { SharedTenantStudentTable, SharedTenantCourseTable, SharedTenantStudentCourseTable },
+                        OverwriteFiles = false
+                    });
+
+                var studentCode = await File.ReadAllTextAsync(Path.Combine(dir, SharedTenantStudentTable + ".cs"));
+                var courseCode = await File.ReadAllTextAsync(Path.Combine(dir, SharedTenantCourseTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSharedTenantManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, SharedTenantStudentCourseTable + ".cs")));
+                Assert.Contains($"public List<{SharedTenantCourseTable}> {SharedTenantCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{SharedTenantStudentTable}> {SharedTenantStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SharedTenantStudentCourseTable}\", new[] {{ \"TenantId\", \"StudentId\" }}, new[] {{ \"TenantId\", \"CourseId\" }});", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSharedTenantManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -1605,6 +1660,35 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(CompositeStudentCourseCourseFkName)} FOREIGN KEY ({courseTenantId}, {courseId}) REFERENCES {course} ({tenantId}, {courseId}))");
     }
 
+    private static async Task SetupSharedTenantManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentCourseTable, provider.Escape(SharedTenantStudentCourseTable)));
+        await ExecuteAsync(connection, DropTable(kind, SharedTenantCourseTable, provider.Escape(SharedTenantCourseTable)));
+        await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentTable, provider.Escape(SharedTenantStudentTable)));
+
+        var student = provider.Escape(SharedTenantStudentTable);
+        var course = provider.Escape(SharedTenantCourseTable);
+        var join = provider.Escape(SharedTenantStudentCourseTable);
+        var tenantId = provider.Escape("TenantId");
+        var studentId = provider.Escape("StudentId");
+        var courseId = provider.Escape("CourseId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {student} ({tenantId} {IntType(kind)} NOT NULL, {studentId} {IntType(kind)} NOT NULL, {name} {TextType(kind, 80)} NOT NULL, PRIMARY KEY ({tenantId}, {studentId}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {course} ({tenantId} {IntType(kind)} NOT NULL, {courseId} {IntType(kind)} NOT NULL, {title} {TextType(kind, 80)} NOT NULL, PRIMARY KEY ({tenantId}, {courseId}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({tenantId} {IntType(kind)} NOT NULL, {studentId} {IntType(kind)} NOT NULL, {courseId} {IntType(kind)} NOT NULL, " +
+            $"PRIMARY KEY ({tenantId}, {studentId}, {courseId}), " +
+            $"CONSTRAINT {provider.Escape(SharedTenantStudentCourseStudentFkName)} FOREIGN KEY ({tenantId}, {studentId}) REFERENCES {student} ({tenantId}, {studentId}), " +
+            $"CONSTRAINT {provider.Escape(SharedTenantStudentCourseCourseFkName)} FOREIGN KEY ({tenantId}, {courseId}) REFERENCES {course} ({tenantId}, {courseId}))");
+
+        if (kind == ProviderKind.MySql)
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveSharedTenantStudentCourse_Course")} ON {join} ({tenantId}, {courseId})");
+    }
+
     private static async Task SetupAlternateKeyManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, AlternateAuthorBookTable, provider.Escape(AlternateAuthorBookTable)));
@@ -2083,6 +2167,20 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, CompositeStudentCourseTable, provider.Escape(CompositeStudentCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, CompositeCourseTable, provider.Escape(CompositeCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, CompositeStudentTable, provider.Escape(CompositeStudentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSharedTenantManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentCourseTable, provider.Escape(SharedTenantStudentCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, SharedTenantCourseTable, provider.Escape(SharedTenantCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentTable, provider.Escape(SharedTenantStudentTable)));
         }
         catch
         {
