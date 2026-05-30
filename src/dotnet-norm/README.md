@@ -61,7 +61,7 @@ It is a bounded bootstrap tool, not a database-first completeness claim.
 Composite foreign keys that do not target the generated principal primary key,
 payload join tables, composite-key pure junction tables that exceed v1
 `UsingTable` support, provider-specific
-defaults, computed column expressions, collations, provider
+defaults, collations, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 non-default identity seed/increment, non-default FK referential actions,
 triggers, SQL Server provider-native temporal tables, tables without primary
@@ -74,6 +74,8 @@ semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
 Table CHECK constraints are emitted as provider-bound fluent migration metadata
 with `HasCheckConstraint` instead of being dropped into the warning report.
+Computed/generated column expressions are emitted as provider-bound fluent
+migration metadata with `HasComputedColumnSql`.
 When warnings are present, the CLI prints a compact summary with stable
 diagnostic codes and categories, for example `SCF100=1` and
 `schema-feature=1`, so CI logs can route scaffold follow-up without parsing the

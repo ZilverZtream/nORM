@@ -105,6 +105,17 @@ namespace nORM.Migration
                 int upAltIdx = 0;
                 foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
+                    if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
+                    {
+                        up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(oldCol.Name)}");
+                        if (IsComputedColumn(newCol))
+                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(newCol)}");
+                        else
+                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
+                        upAltIdx++;
+                        continue;
+                    }
+
                     var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
                     var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
                     var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && oldCol.DefaultValue != null);
@@ -134,6 +145,8 @@ namespace nORM.Migration
             {
                 var colDefs = table.Columns.Select(c =>
                 {
+                    if (IsComputedColumn(c))
+                        return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
@@ -166,6 +179,12 @@ namespace nORM.Migration
             // UP-6: Add columns to existing tables.
             foreach (var (table, column) in diff.AddedColumns)
             {
+                if (IsComputedColumn(column))
+                {
+                    up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(column)}");
+                    continue;
+                }
+
                 if (!column.IsNullable && column.DefaultValue == null)
                     throw new InvalidOperationException(
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
@@ -203,6 +222,17 @@ namespace nORM.Migration
                 int downAltIdx = 0;
                 foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
                 {
+                    if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
+                    {
+                        down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(newCol.Name)}");
+                        if (IsComputedColumn(oldCol))
+                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(oldCol)}");
+                        else
+                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}");
+                        downAltIdx++;
+                        continue;
+                    }
+
                     var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
                     var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
                     var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && newCol.DefaultValue != null);
@@ -229,6 +259,11 @@ namespace nORM.Migration
             // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
             foreach (var (table, column) in diff.DroppedColumns)
             {
+                if (IsComputedColumn(column))
+                {
+                    down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(column)}");
+                    continue;
+                }
                 var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
                     ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
                     : "";
@@ -241,6 +276,8 @@ namespace nORM.Migration
             {
                 var colDefs = table.Columns.Select(c =>
                 {
+                    if (IsComputedColumn(c))
+                        return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
@@ -323,7 +360,19 @@ namespace nORM.Migration
             !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
             || oldCol.Precision != newCol.Precision
             || oldCol.Scale != newCol.Scale
-            || oldCol.IsNullable != newCol.IsNullable;
+            || oldCol.IsNullable != newCol.IsNullable
+            || !string.Equals(oldCol.ComputedColumnSql, newCol.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
+            || oldCol.IsStoredComputedColumn != newCol.IsStoredComputedColumn;
+
+        private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;
+
+        private static string BuildComputedColumnDefinition(ColumnSchema column)
+        {
+            if (string.IsNullOrWhiteSpace(column.ComputedColumnSql))
+                throw new NotSupportedException($"Computed column '{column.Name}' requires ComputedColumnSql for SQL Server migration generation.");
+            var persisted = column.IsStoredComputedColumn ? " PERSISTED" : string.Empty;
+            return $"{Esc(column.Name)} AS ({FormatCheckPredicate(column.ComputedColumnSql)}){persisted}";
+        }
 
         // M1/X1: Allowlist for FK referential action tokens.
         // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.

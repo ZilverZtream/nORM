@@ -42,6 +42,11 @@ namespace nORM.Configuration
         IReadOnlyList<CheckConstraintConfiguration> CheckConstraints { get; }
 
         /// <summary>
+        /// Gets SQL expressions configured for database-computed/generated columns.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumnSql { get; }
+
+        /// <summary>
         /// Gets the CLR type that this entity shares its table with, if any.
         /// </summary>
         Type? TableSplitWith { get; }
@@ -96,6 +101,13 @@ namespace nORM.Configuration
     /// <param name="Name">Database constraint name.</param>
     /// <param name="Sql">Provider SQL predicate inside the CHECK constraint.</param>
     public record CheckConstraintConfiguration(string Name, string Sql);
+
+    /// <summary>
+    /// Describes a database-computed/generated column expression configured through the fluent model.
+    /// </summary>
+    /// <param name="Sql">Provider SQL expression used to compute the column.</param>
+    /// <param name="Stored">Whether the generated value should be physically stored when the provider supports that choice.</param>
+    public record ComputedColumnConfiguration(string Sql, bool Stored = false);
 
     /// <summary>
     /// Configuration details for a relationship between entities including navigation and key information.

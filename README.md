@@ -276,6 +276,8 @@ Server/PostgreSQL/SQLite filtered index predicates, and SQL Server/PostgreSQL
 included-column index metadata are supported, including columns that
 participate in multiple indexes. Table CHECK constraints are emitted into
 fluent model configuration with `HasCheckConstraint` and migration snapshots.
+Computed/generated column expressions are emitted with
+`HasComputedColumnSql` and marked as database-generated for runtime writes.
 SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name
@@ -286,7 +288,7 @@ metadata for supported shapes.
 
 Unsupported composite foreign keys that do not target generated primary keys or
 exact unique indexes, payload join tables, complex/provider-specific
-defaults that fail the migration default allowlist, computed column expressions, collations, provider
+defaults that fail the migration default allowlist, collations, provider
 column types, non-default identity settings,
 unrecognized FK referential actions, triggers, SQL Server provider-native
 temporal tables, tables without primary keys, SQLite virtual tables and shadow

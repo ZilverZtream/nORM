@@ -125,11 +125,17 @@ namespace nORM.Scaffolding
                     && checkConstraints.Any(check =>
                         string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
+                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "Computed", StringComparison.OrdinalIgnoreCase)
+                    && computedColumnConfigurations.Any(computed =>
+                        string.Equals(computed.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(computed.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
                 unsupportedFeatures.RemoveAll(static feature =>
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
                     && TryParseDecimalPrecision(feature.Detail, out _, out _));
-                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, nonNullableColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -172,7 +178,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -1315,8 +1321,13 @@ namespace nORM.Scaffolding
 
             if (provider is SqliteProvider)
             {
+                var sqliteCreateSqlByTable = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                 foreach (var table in tables)
                 {
+                    var tableKey = TableKey(table.Schema, table.Name);
+                    var createSql = await GetSqliteCreateTableSqlAsync(connection, provider, table).ConfigureAwait(false);
+                    sqliteCreateSqlByTable[tableKey] = createSql;
+                    var generatedColumns = ExtractSqliteGeneratedColumns(createSql);
                     await using var cmd = connection.CreateCommand();
                     cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
                     await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -1329,7 +1340,12 @@ namespace nORM.Scaffolding
                         if (!string.IsNullOrWhiteSpace(defaultValue))
                             features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Default", name, defaultValue));
                         if (hidden is 2 or 3)
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Computed", name, "SQLite generated column"));
+                        {
+                            var detail = generatedColumns.TryGetValue(name, out var generated)
+                                ? generated.Sql + (generated.Stored ? " STORED" : " VIRTUAL")
+                                : "SQLite generated column";
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Computed", name, detail));
+                        }
                         if (IsSqliteProviderSpecificDeclaredType(declaredType))
                             features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ProviderSpecificColumnType", name, declaredType!));
                     }
@@ -1337,14 +1353,7 @@ namespace nORM.Scaffolding
 
                 foreach (var table in tables)
                 {
-                    await using var checkCommand = connection.CreateCommand();
-                    var schema = string.IsNullOrWhiteSpace(table.Schema) ? "main" : table.Schema!;
-                    checkCommand.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
-                    var tableNameParameter = checkCommand.CreateParameter();
-                    tableNameParameter.ParameterName = "@tableName";
-                    tableNameParameter.Value = table.Name;
-                    checkCommand.Parameters.Add(tableNameParameter);
-                    var createSql = Convert.ToString(await checkCommand.ExecuteScalarAsync().ConfigureAwait(false));
+                    sqliteCreateSqlByTable.TryGetValue(TableKey(table.Schema, table.Name), out var createSql);
                     foreach (var check in ExtractSqliteCheckConstraints(table.Name, createSql))
                     {
                         features.Add(new ScaffoldUnsupportedFeature(
@@ -1860,6 +1869,52 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyDictionary<string, (string Sql, bool Stored)> ExtractSqliteGeneratedColumns(string? createTableSql)
+        {
+            var result = new Dictionary<string, (string Sql, bool Stored)>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return result;
+
+            var regex = new System.Text.RegularExpressions.Regex(
+                @"(?:""(?<name>[^""]+)""|\[(?<name>[^\]]+)\]|`(?<name>[^`]+)`|(?<name>[A-Za-z_][A-Za-z0-9_]*))(?:(?!,).)*?\bGENERATED\s+ALWAYS\s+AS\s*\(",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            foreach (System.Text.RegularExpressions.Match match in regex.Matches(createTableSql))
+            {
+                if (!match.Groups["name"].Success)
+                    continue;
+
+                var openIndex = createTableSql.IndexOf('(', match.Index + match.Length - 1);
+                if (openIndex < 0)
+                    continue;
+
+                var closeIndex = FindMatchingParenthesis(createTableSql, openIndex);
+                if (closeIndex <= openIndex)
+                    continue;
+
+                var suffixEnd = Math.Min(createTableSql.Length, closeIndex + 32);
+                var suffix = createTableSql.Substring(closeIndex + 1, suffixEnd - closeIndex - 1);
+                var stored = suffix.Contains("STORED", StringComparison.OrdinalIgnoreCase);
+                var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                if (!string.IsNullOrWhiteSpace(sql))
+                    result[match.Groups["name"].Value] = (sql, stored);
+            }
+
+            return result;
+        }
+
+        private static async Task<string?> GetSqliteCreateTableSqlAsync(DbConnection connection, DatabaseProvider provider, ScaffoldTable table)
+        {
+            await using var command = connection.CreateCommand();
+            var schema = string.IsNullOrWhiteSpace(table.Schema) ? "main" : table.Schema!;
+            command.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
+            var tableNameParameter = command.CreateParameter();
+            tableNameParameter.ParameterName = "@tableName";
+            tableNameParameter.Value = table.Name;
+            command.Parameters.Add(tableNameParameter);
+            return Convert.ToString(await command.ExecuteScalarAsync().ConfigureAwait(false));
+        }
+
         private static int FindMatchingParenthesis(string sql, int openIndex)
         {
             var depth = 0;
@@ -1996,7 +2051,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults and ordinary table CHECK constraints are emitted as migration metadata when possible. Computed/generated columns, collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -2224,7 +2279,7 @@ namespace nORM.Scaffolding
             => kind switch
             {
                 "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
-                "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
+                "Computed" => "Use explicit HasComputedColumnSql model configuration or keep the provider-specific generated expression in migrations.",
                 "CheckConstraint" => "Use explicit HasCheckConstraint model configuration or keep the provider-specific CHECK predicate in migrations.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
@@ -3018,6 +3073,62 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyList<ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldComputedColumnConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "Computed", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || string.IsNullOrWhiteSpace(feature.Detail)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.TryGetValue(feature.Name, out var propertyName))
+                {
+                    continue;
+                }
+
+                var (sql, stored) = NormalizeScaffoldComputedSql(feature.Detail);
+                if (string.IsNullOrWhiteSpace(sql))
+                    continue;
+
+                result.Add(new ScaffoldComputedColumnConfiguration(
+                    feature.TableKey,
+                    entityName,
+                    feature.Name,
+                    propertyName,
+                    sql,
+                    stored));
+            }
+
+            return result;
+        }
+
+        private static (string Sql, bool Stored) NormalizeScaffoldComputedSql(string raw)
+        {
+            var candidate = raw.Trim();
+            if (candidate.EndsWith("generated column", StringComparison.OrdinalIgnoreCase))
+                return (string.Empty, false);
+            var stored = candidate.Contains("PERSISTED", StringComparison.OrdinalIgnoreCase)
+                || candidate.Contains(" STORED", StringComparison.OrdinalIgnoreCase);
+
+            if (candidate.StartsWith("GENERATED", StringComparison.OrdinalIgnoreCase))
+            {
+                var open = candidate.IndexOf('(');
+                var close = candidate.LastIndexOf(')');
+                if (open >= 0 && close > open)
+                    candidate = candidate.Substring(open + 1, close - open - 1).Trim();
+            }
+
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
+
+            return (candidate, stored);
+        }
+
         private static string NormalizeScaffoldCheckSql(string raw)
         {
             var candidate = raw.Trim();
@@ -3462,11 +3573,13 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null,
             IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null,
             IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
-            IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null)
+            IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
+            IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
             checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
+            computedColumnConfigurations ??= Array.Empty<ScaffoldComputedColumnConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3490,7 +3603,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3512,7 +3625,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3545,6 +3658,16 @@ namespace nORM.Scaffolding
                         var name = EscapeStringLiteral(check.Name);
                         var sql = EscapeStringLiteral(check.Sql);
                         sb.AppendLine($"            mb.Entity<{entity}>().HasCheckConstraint(\"{name}\", \"{sql}\");");
+                    }
+                    foreach (var computed in computedColumnConfigurations
+                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
+                        .ThenBy(c => c.PropertyName, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(computed.EntityName);
+                        var property = EscapeCSharpIdentifier(computed.PropertyName);
+                        var sql = EscapeStringLiteral(computed.Sql);
+                        var storedSuffix = computed.Stored ? ", stored: true" : string.Empty;
+                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasComputedColumnSql(\"{sql}\"{storedSuffix});");
                     }
                     foreach (var relationship in relationships
                         .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
@@ -4358,6 +4481,14 @@ namespace nORM.Scaffolding
             string EntityName,
             string Name,
             string Sql);
+
+        private readonly record struct ScaffoldComputedColumnConfiguration(
+            string TableKey,
+            string EntityName,
+            string ColumnName,
+            string PropertyName,
+            string Sql,
+            bool Stored);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

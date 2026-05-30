@@ -123,6 +123,10 @@ namespace nORM.Migration
         public string? DefaultValue { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
         public bool IsIdentity { get; set; }
+        /// <summary>Provider SQL expression for a computed/generated column.</summary>
+        public string? ComputedColumnSql { get; set; }
+        /// <summary>True when a computed/generated column should be physically stored where supported.</summary>
+        public bool IsStoredComputedColumn { get; set; }
     }
 
     /// <summary>
@@ -276,11 +280,10 @@ namespace nORM.Migration
                         IsUnique = (isPk && pkNames.Count == 1) || hasSingleColumnUniqueIndex,
                         IndexName = isPk ? "PK_" + table.Name : firstIndexAttr?.Name,
                         IndexOrder = firstIndexAttr is null ? null : firstIndexAttr.Order,
-                        // Treat both Identity and Computed as server-managed columns for snapshot
-                        // purposes: both are excluded from INSERT/UPDATE, and both require the
-                        // migration generator to omit a NOT NULL constraint without a DEFAULT.
-                        IsIdentity = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity
-                                  || dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Computed,
+                        IsIdentity = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity,
+                        ComputedColumnSql = dbGenAttr?.DatabaseGeneratedOption == DatabaseGeneratedOption.Computed
+                            ? string.Empty
+                            : null,
                         // [RenameColumn("OldName")] signals the differ that this is a rename, not drop+add.
                         PreviousName = renameAttr?.OldName,
                     };
@@ -400,6 +403,9 @@ namespace nORM.Migration
                                   || Nullable.GetUnderlyingType(col.Prop.PropertyType) != null;
                     var columnAttr = col.Prop.GetCustomAttribute<ColumnAttribute>();
                     var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
+                    ComputedColumnConfiguration? computedColumn = null;
+                    map.FluentConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
+                    var dbGenerated = col.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
                     table.Columns.Add(new ColumnSchema
                     {
                         Name         = col.Name,
@@ -415,7 +421,10 @@ namespace nORM.Migration
                         IsUnique     = col.IsKey && pkCount == 1,
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
                         IndexOrder   = null,
-                        IsIdentity   = col.IsDbGenerated,
+                        IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity,
+                        ComputedColumnSql = computedColumn?.Sql
+                            ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
+                        IsStoredComputedColumn = computedColumn?.Stored == true,
                         DefaultValue = map.FluentConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
                             ? defaultValue
                             : null,
@@ -752,7 +761,9 @@ namespace nORM.Migration
                         || oldCol.IsUnique != col.IsUnique
                         || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
                         || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
-                        || oldCol.IsIdentity != col.IsIdentity)  // detect identity changes
+                        || oldCol.IsIdentity != col.IsIdentity
+                        || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
+                        || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn)
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 

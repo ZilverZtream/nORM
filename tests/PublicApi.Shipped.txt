@@ -134,6 +134,13 @@ M:nORM.Configuration.CheckConstraintConfiguration.Equals(System.Object):System.B
 M:nORM.Configuration.CheckConstraintConfiguration.Equals(nORM.Configuration.CheckConstraintConfiguration):System.Boolean
 M:nORM.Configuration.CheckConstraintConfiguration.GetHashCode():System.Int32
 M:nORM.Configuration.CheckConstraintConfiguration.ToString():System.String
+M:nORM.Configuration.ComputedColumnConfiguration.#ctor(System.String,System.Boolean)
+M:nORM.Configuration.ComputedColumnConfiguration.<Clone>$():nORM.Configuration.ComputedColumnConfiguration
+M:nORM.Configuration.ComputedColumnConfiguration.Deconstruct(System.String&,System.Boolean&):System.Void
+M:nORM.Configuration.ComputedColumnConfiguration.Equals(System.Object):System.Boolean
+M:nORM.Configuration.ComputedColumnConfiguration.Equals(nORM.Configuration.ComputedColumnConfiguration):System.Boolean
+M:nORM.Configuration.ComputedColumnConfiguration.GetHashCode():System.Int32
+M:nORM.Configuration.ComputedColumnConfiguration.ToString():System.String
 M:nORM.Configuration.ConverterConfiguration.#ctor(System.Reflection.PropertyInfo,nORM.Mapping.IValueConverter)
 M:nORM.Configuration.ConverterConfiguration.<Clone>$():nORM.Configuration.ConverterConfiguration
 M:nORM.Configuration.ConverterConfiguration.Deconstruct(System.Reflection.PropertyInfo&,nORM.Mapping.IValueConverter&):System.Void
@@ -164,6 +171,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithOne(System.Linq.Expressions.Ex
 M:nORM.Configuration.EntityTypeBuilder{`0}.#ctor()
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasCheckConstraint(System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasColumnName(System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.HasComputedColumnSql(System.String,System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasConversion(nORM.Mapping.IValueConverter):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasDefaultValueSql(System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
@@ -983,6 +991,8 @@ M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.Stri
 M:nORM.SourceGeneration.GenerateMaterializerAttribute.#ctor()
 P:nORM.Configuration.CheckConstraintConfiguration.Name:System.String
 P:nORM.Configuration.CheckConstraintConfiguration.Sql:System.String
+P:nORM.Configuration.ComputedColumnConfiguration.Sql:System.String
+P:nORM.Configuration.ComputedColumnConfiguration.Stored:System.Boolean
 P:nORM.Configuration.ConverterConfiguration.Converter:nORM.Mapping.IValueConverter
 P:nORM.Configuration.ConverterConfiguration.Property:System.Reflection.PropertyInfo
 P:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy:nORM.Configuration.AmbientTransactionEnlistmentPolicy
@@ -1013,6 +1023,7 @@ P:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking:System.Boolean
 P:nORM.Configuration.EntityTypeBuilder{`0}.Builder:nORM.Configuration.EntityTypeBuilder{`0}
 P:nORM.Configuration.IEntityTypeConfiguration.CheckConstraints:System.Collections.Generic.IReadOnlyList{nORM.Configuration.CheckConstraintConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+P:nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.ComputedColumnConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.Converters:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.KeyProperties:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
@@ -1235,6 +1246,7 @@ P:nORM.Migration.ColumnIndexSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.Name:System.String
 P:nORM.Migration.ColumnIndexSchema.Order:System.Nullable{System.Int32}
 P:nORM.Migration.ColumnSchema.ClrType:System.String
+P:nORM.Migration.ColumnSchema.ComputedColumnSql:System.String
 P:nORM.Migration.ColumnSchema.DefaultValue:System.String
 P:nORM.Migration.ColumnSchema.IndexName:System.String
 P:nORM.Migration.ColumnSchema.IndexOrder:System.Nullable{System.Int32}
@@ -1242,6 +1254,7 @@ P:nORM.Migration.ColumnSchema.Indexes:System.Collections.Generic.List{nORM.Migra
 P:nORM.Migration.ColumnSchema.IsIdentity:System.Boolean
 P:nORM.Migration.ColumnSchema.IsNullable:System.Boolean
 P:nORM.Migration.ColumnSchema.IsPrimaryKey:System.Boolean
+P:nORM.Migration.ColumnSchema.IsStoredComputedColumn:System.Boolean
 P:nORM.Migration.ColumnSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnSchema.Name:System.String
 P:nORM.Migration.ColumnSchema.Precision:System.Nullable{System.Int32}
@@ -1365,6 +1378,7 @@ T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
 T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
 T:nORM.Configuration.CheckConstraintConfiguration
 T:nORM.Configuration.ClientEvaluationPolicy
+T:nORM.Configuration.ComputedColumnConfiguration
 T:nORM.Configuration.ConverterConfiguration
 T:nORM.Configuration.DbContextOptions
 T:nORM.Configuration.EntityTypeBuilder{`0,`1}

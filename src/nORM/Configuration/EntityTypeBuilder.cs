@@ -24,6 +24,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
             public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
+            public Dictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumns { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
@@ -35,6 +36,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
+            IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> IEntityTypeConfiguration.ComputedColumnSql => ComputedColumns;
             IReadOnlyDictionary<PropertyInfo, OwnedNavigation> IEntityTypeConfiguration.OwnedNavigations => OwnedNavigations;
             IReadOnlyDictionary<string, ShadowPropertyConfiguration> IEntityTypeConfiguration.ShadowProperties => ShadowProperties;
             IReadOnlyList<RelationshipConfiguration> IEntityTypeConfiguration.Relationships => Relationships;
@@ -116,6 +118,17 @@ namespace nORM.Configuration
                     throw new ArgumentException("Check constraint SQL cannot be null or whitespace.", nameof(sql));
                 CheckConstraintList.RemoveAll(c => string.Equals(c.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
                 CheckConstraintList.Add(new CheckConstraintConfiguration(name.Trim(), sql.Trim()));
+            }
+
+            /// <summary>
+            /// Sets database-computed/generated column metadata for the specified property.
+            /// </summary>
+            public void SetComputedColumnSql(PropertyInfo prop, string sql, bool stored)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (string.IsNullOrWhiteSpace(sql))
+                    throw new ArgumentException("Computed column SQL cannot be null or whitespace.", nameof(sql));
+                ComputedColumns[prop] = new ComputedColumnConfiguration(sql.Trim(), stored);
             }
 
             /// <summary>
@@ -526,6 +539,21 @@ namespace nORM.Configuration
             public PropertyBuilder HasDefaultValueSql(string sql)
             {
                 _parent._config.SetDefaultValueSql(_property, sql);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures this property as a database-computed/generated column for
+            /// migration snapshot generation. The SQL expression is provider SQL and
+            /// should not include the outer generated-column syntax.
+            /// </summary>
+            /// <param name="sql">Provider SQL expression used to compute the column.</param>
+            /// <param name="stored">Whether the generated value should be physically stored when the provider supports that choice.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is null or whitespace.</exception>
+            public PropertyBuilder HasComputedColumnSql(string sql, bool stored = false)
+            {
+                _parent._config.SetComputedColumnSql(_property, sql, stored);
                 return this;
             }
 

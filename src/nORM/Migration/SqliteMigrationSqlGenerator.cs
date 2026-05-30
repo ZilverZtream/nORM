@@ -73,6 +73,8 @@ namespace nORM.Migration
             {
                 var colDefs = table.Columns.Select(c =>
                 {
+                    if (IsComputedColumn(c))
+                        return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
@@ -120,6 +122,12 @@ namespace nORM.Migration
 
                 foreach (var (_, column) in group)
                 {
+                    if (IsComputedColumn(column))
+                    {
+                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
+                        continue;
+                    }
+
                     // NOT NULL column without a DefaultValue cannot be added to a populated table.
                     if (!column.IsNullable && column.DefaultValue == null)
                         throw new InvalidOperationException(
@@ -160,6 +168,8 @@ namespace nORM.Migration
                 // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
                 {
+                    if (IsComputedColumn(c))
+                        return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
@@ -213,6 +223,12 @@ namespace nORM.Migration
                 // C: include DefaultValue so NOT NULL columns can be restored to populated tables.
                 foreach (var droppedCol in droppedCols)
                 {
+                    if (IsComputedColumn(droppedCol))
+                    {
+                        down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {BuildComputedColumnDefinition(droppedCol)}");
+                        continue;
+                    }
+
                     var restoreDefault = !string.IsNullOrEmpty(droppedCol.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(droppedCol.DefaultValue)}"
                         : "";
@@ -342,6 +358,8 @@ namespace nORM.Migration
             // Build column definitions with full constraint metadata (same as AddedTables path).
             var colDefs = cols.Select(c =>
             {
+                if (IsComputedColumn(c))
+                    return BuildComputedColumnDefinition(c);
                 var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                     ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                     : "";
@@ -435,6 +453,16 @@ namespace nORM.Migration
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON UPDATE {onUpdate}";
             return sql;
+        }
+
+        private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;
+
+        private static string BuildComputedColumnDefinition(ColumnSchema column)
+        {
+            if (string.IsNullOrWhiteSpace(column.ComputedColumnSql))
+                throw new NotSupportedException($"Computed column '{column.Name}' requires ComputedColumnSql for SQLite migration generation.");
+            var storage = column.IsStoredComputedColumn ? " STORED" : " VIRTUAL";
+            return $"{Esc(column.Name)} {GetSqlType(column)} GENERATED ALWAYS AS ({FormatCheckPredicate(column.ComputedColumnSql)}){storage}";
         }
 
         private static string BuildCheckConstraintSql(CheckConstraintSchema check)
