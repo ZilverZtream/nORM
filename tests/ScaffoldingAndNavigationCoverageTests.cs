@@ -1925,6 +1925,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Author");
             Assert.Contains(joinTables[0].GetProperty("principalTables").EnumerateArray(), item => item.GetString() == "Book");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("composite primary key", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
         }
         finally
@@ -1970,6 +1971,49 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "AuthorBook");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNullableJoinTableForeignKeys_DoesNotEmitUnsafeManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER,
+                BookId INTEGER,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "NullableJoinCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "NullableJoinCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain(".UsingTable(\"AuthorBook\"", contextCode);
+            Assert.Contains("Possible Many-To-Many Join Tables", warnings);
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            Assert.Equal("AuthorBook", joinTables[0].GetProperty("table").GetString());
+            Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

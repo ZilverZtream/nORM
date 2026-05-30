@@ -91,6 +91,7 @@ namespace nORM.Scaffolding
                 var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var nonNullableColumnsByTable = await GetNonNullableColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var identityColumnsByTable = await GetIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
@@ -100,7 +101,7 @@ namespace nORM.Scaffolding
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, memberNamesByTable);
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, nonNullableColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
@@ -1778,7 +1779,7 @@ namespace nORM.Scaffolding
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
         private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe pure join table, add/verify a composite primary key over the two FK columns and replace the scaffolded entity with an explicit UsingTable mapping; keep it as an entity if it carries payload, allows duplicate pairs, or has domain behavior.";
+            => "If this is a safe pure join table, add/verify NOT NULL on both FK columns plus a composite primary key over them, then replace the scaffolded entity with an explicit UsingTable mapping; keep it as an entity if it carries payload, allows duplicate pairs, or has domain behavior.";
 
         private static string ScaffoldDiagnosticSeverity()
             => "Warning";
@@ -2028,6 +2029,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -2061,6 +2063,12 @@ namespace nORM.Scaffolding
                 if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns)
                     || joinPrimaryKeyColumns.Count != 2
                     || joinPrimaryKeyColumns.Any(column => !fkColumnNames.Contains(column)))
+                {
+                    continue;
+                }
+
+                if (!nonNullableColumnsByTable.TryGetValue(joinTableKey, out var nonNullableColumns)
+                    || fkColumnNames.Any(column => !nonNullableColumns.Contains(column)))
                 {
                     continue;
                 }
@@ -2256,6 +2264,33 @@ namespace nORM.Scaffolding
             }
 
             return names;
+        }
+
+        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetNonNullableColumnNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var result = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var table in tables)
+            {
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
+                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
+                var schema = reader.GetSchemaTable()!;
+                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (DataRow row in schema.Rows)
+                {
+                    var columnName = row["ColumnName"]!.ToString()!;
+                    var allowNull = row["AllowDBNull"] is bool b && b;
+                    if (!allowNull)
+                        columns.Add(columnName);
+                }
+
+                result[TableKey(table.Schema, table.Name)] = columns;
+            }
+
+            return result;
         }
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetColumnPropertyNamesAsync(
