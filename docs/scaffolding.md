@@ -326,7 +326,11 @@ must be reviewed and edited like handwritten model code.
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.
 - `LiveProviderScaffoldingParityTests` proves opt-in view entity scaffolding
   emits compiling query artifacts and explicit missing-primary-key diagnostics
-  across configured SQLite, SQL Server, PostgreSQL, and MySQL providers.
+  across configured SQLite, SQL Server, PostgreSQL, and MySQL providers. It
+  also pins PostgreSQL materialized-view query artifacts, SQL Server
+  provider-native temporal history read-only scaffolds, SQL Server
+  table-valued-parameter routine stubs, and live alternate-key/self-referencing
+  many-to-many junction-table mappings.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
