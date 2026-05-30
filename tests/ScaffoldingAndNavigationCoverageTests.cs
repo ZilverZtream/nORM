@@ -2115,6 +2115,8 @@ public class DatabaseScaffolderPrivateMethodTests
                 Name TEXT COLLATE NOCASE NOT NULL DEFAULT 'new',
                 NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL,
                 NameLengthStored INTEGER GENERATED ALWAYS AS (length(Name) + 1) STORED,
+                "Display,Name" TEXT COLLATE NOCASE NOT NULL,
+                "Display,Length" INTEGER GENERATED ALWAYS AS (length("Display,Name")) VIRTUAL,
                 CONSTRAINT CK_FeatureOwned_Name CHECK (length(Name) > 0)
             );
             CREATE TRIGGER TR_FeatureOwned_Audit AFTER INSERT ON FeatureOwned BEGIN SELECT 1; END;
@@ -2137,6 +2139,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name)\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLengthStored).HasComputedColumnSql(\"length(Name) + 1\", stored: true);", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasCollation(\"NOCASE\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.DisplayLength).HasComputedColumnSql(\"length(\\\"Display,Name\\\")\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.DisplayName).HasCollation(\"NOCASE\");", contextCode);
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.DoesNotContain("| SCF100 |", warnings);
