@@ -748,8 +748,12 @@ namespace nORM.Scaffolding
                                   '; parameterModes=',
                                   COALESCE((SELECT GROUP_CONCAT(CONCAT(
                                                 COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':',
-                                                COALESCE(p.data_type, ''),
                                                 CASE
+                                                    WHEN LOWER(COALESCE(p.dtd_identifier, '')) LIKE '%unsigned%' THEN COALESCE(p.dtd_identifier, p.data_type, '')
+                                                    ELSE COALESCE(p.data_type, '')
+                                                END,
+                                                CASE
+                                                    WHEN LOWER(COALESCE(p.dtd_identifier, '')) LIKE '%unsigned%' THEN ''
                                                     WHEN p.character_maximum_length IS NOT NULL THEN CONCAT('(', p.character_maximum_length, ')')
                                                     WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN CONCAT('(', p.numeric_precision, ',', p.numeric_scale, ')')
                                                     ELSE ''
@@ -4951,9 +4955,13 @@ namespace nORM.Scaffolding
             return normalized switch
             {
                 "int" or "integer" or "int4" or "mediumint" => "int?",
+                "int unsigned" or "mediumint unsigned" => "uint?",
                 "bigint" or "int8" => "long?",
+                "bigint unsigned" => "ulong?",
                 "smallint" or "int2" => "short?",
+                "smallint unsigned" => "ushort?",
                 "tinyint" => "byte?",
+                "tinyint unsigned" => "byte?",
                 "bit" or "bool" or "boolean" => "bool?",
                 "decimal" or "numeric" or "money" or "smallmoney" => "decimal?",
                 "float" or "float8" or "double" => "double?",
@@ -4996,9 +5004,13 @@ namespace nORM.Scaffolding
             return normalized switch
             {
                 "int" or "integer" or "int4" or "mediumint" => nameof(DbType.Int32),
+                "int unsigned" or "mediumint unsigned" => nameof(DbType.UInt32),
                 "bigint" or "int8" => nameof(DbType.Int64),
+                "bigint unsigned" => nameof(DbType.UInt64),
                 "smallint" or "int2" => nameof(DbType.Int16),
+                "smallint unsigned" => nameof(DbType.UInt16),
                 "tinyint" => nameof(DbType.Byte),
+                "tinyint unsigned" => nameof(DbType.Byte),
                 "bit" or "bool" or "boolean" => nameof(DbType.Boolean),
                 "decimal" or "numeric" or "money" or "smallmoney" => nameof(DbType.Decimal),
                 "float" or "float8" or "double" => nameof(DbType.Double),
@@ -5019,6 +5031,7 @@ namespace nORM.Scaffolding
         private static string NormalizeRoutineDataType(string dataType)
         {
             var normalized = dataType.Trim().ToLowerInvariant();
+            var isUnsigned = normalized.Contains(" unsigned", StringComparison.Ordinal);
             var paren = normalized.IndexOf('(');
             var baseType = paren >= 0 ? normalized[..paren].Trim() : normalized;
 
@@ -5040,10 +5053,13 @@ namespace nORM.Scaffolding
                 }
             }
 
-            normalized = baseType;
+            normalized = isUnsigned && !baseType.EndsWith(" unsigned", StringComparison.Ordinal)
+                ? baseType + " unsigned"
+                : baseType;
 
             return normalized switch
             {
+                "integer unsigned" => "int unsigned",
                 "character varying" or "varying character" => "varchar",
                 "national character varying" => "nvarchar",
                 "character" => "char",

@@ -1094,6 +1094,35 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithMySqlUnsignedRoutineParameters_EmitsUnsignedClrTypes()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            null,
+            "calculate_unsigned_risk",
+            "MySQL FUNCTION; parameters=4; outputParameters=0; parameterModes=customer_id:IN:int unsigned,max_id:IN:bigint unsigned,rank:IN:smallint unsigned,flag:IN:tinyint unsigned; dataType=int");
+
+        Assert.Contains("public uint? customer_id { get; init; }", code);
+        Assert.Contains("public ulong? max_id { get; init; }", code);
+        Assert.Contains("public ushort? rank { get; init; }", code);
+        Assert.Contains("public byte? flag { get; init; }", code);
+        Assert.DoesNotContain("public int? customer_id { get; init; }", code);
+        Assert.DoesNotContain("public long? max_id { get; init; }", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_mysql_unsigned_routine_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithSqlServerSequence_EmitsNextValueWrapper()
     {
         var code = InvokeScaffoldContextWithSequence(

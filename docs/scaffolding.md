@@ -173,7 +173,9 @@ must be reviewed and edited like handwritten model code.
   `Guid[]?`, temporal arrays, etc.) and known user-defined textual types such
   as `citext`. SQL Server scalar alias types are mapped through their base
   system type; SQL Server table-valued parameters remain `object?` because they
-  require reviewed provider-specific structured-parameter binding.
+  require reviewed provider-specific structured-parameter binding. MySQL
+  unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
+  `ushort?`, `byte?`) when the provider exposes the modifier.
   Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper
   and a streaming `IAsyncEnumerable<TResult>` wrapper for large result sets.
   When safe
