@@ -173,6 +173,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("IReadOnlyDictionary<string, object?>", doc, StringComparison.Ordinal);
         Assert.Contains("exact scaffolded", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL set-returning functions", doc, StringComparison.Ordinal);
+        Assert.Contains("Query-artifact generated types are marked with", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
         Assert.Contains("stale `nORM.ScaffoldWarnings.*` files", doc, StringComparison.Ordinal);
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
@@ -181,6 +182,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("category =", source, StringComparison.Ordinal);
         Assert.Contains("metadata = BuildSkippedObjectMetadata", source, StringComparison.Ordinal);
         Assert.Contains("proretset", source, StringComparison.Ordinal);
+        Assert.Contains("queryArtifactTableKeys", source, StringComparison.Ordinal);
         Assert.Contains("reasons = g.Reasons", source, StringComparison.Ordinal);
         Assert.Contains("BuildPossibleJoinTableReasons", source, StringComparison.Ordinal);
         Assert.Contains("totalWarnings =", source, StringComparison.Ordinal);

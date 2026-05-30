@@ -224,9 +224,10 @@ must be reviewed and edited like handwritten model code.
   `--emit-view-entities`.
   Generated view/materialized-view/SQLite virtual-table classes are intended
   for reads; scaffolding still reports missing primary keys where the database
-  does not expose one. Keyless generated types are marked with
-  `[ReadOnlyEntity]`, so nORM can materialize them through queries but rejects
-  insert/update/delete and tracked `SaveChanges` writes before SQL generation.
+  does not expose one. Query-artifact generated types are marked with
+  `[ReadOnlyEntity]` even when a provider exposes key-like metadata, so nORM can
+  materialize them through queries but rejects insert/update/delete and tracked
+  `SaveChanges` writes before SQL generation.
   SQL Server synonyms whose local base object resolves as a table or view can
   also be emitted as read-oriented query artifacts; procedure synonyms, remote
   synonyms, and unresolved synonyms remain provider-owned diagnostics.

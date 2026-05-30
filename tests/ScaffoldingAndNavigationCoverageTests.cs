@@ -2303,6 +2303,7 @@ public class DatabaseScaffolderPrivateMethodTests
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("[Table(\"SearchDocs\")]", entityCode);
+            Assert.Contains("[ReadOnlyEntity]", entityCode);
             Assert.Contains("Body { get; set; }", entityCode);
             Assert.Contains("IQueryable<SearchDocs> SearchDocs", contextCode);
             Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsData", StringComparison.OrdinalIgnoreCase));
@@ -3919,6 +3920,7 @@ public class DatabaseScaffolderPrivateMethodTests
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("[Table(\"ExistingView\")]", viewCode);
+            Assert.Contains("[ReadOnlyEntity]", viewCode);
             Assert.Contains("public long Id { get; set; }", viewCode);
             Assert.Contains("public string", viewCode);
             Assert.Contains("Name { get; set; }", viewCode);

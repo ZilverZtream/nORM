@@ -89,6 +89,9 @@ namespace nORM.Scaffolding
                 var emittedViewObjects = emitQueryArtifacts
                     ? discoveredSkippedObjects.Where(IsQueryArtifactObject).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
+                var queryArtifactTableKeys = emittedViewObjects
+                    .Select(obj => TableKey(obj.Schema, obj.Name))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var discoveredTablesAndViews = discoveredTables
                     .Concat(emittedViewObjects.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
                     .ToArray();
@@ -197,7 +200,8 @@ namespace nORM.Scaffolding
                     decimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
                     sqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
                     providerSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
-                    var isReadOnlyEntity = !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
+                    var isReadOnlyEntity = queryArtifactTableKeys.Contains(tableKey)
+                        || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
                         || primaryKeyColumns.Count == 0;
                     var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
