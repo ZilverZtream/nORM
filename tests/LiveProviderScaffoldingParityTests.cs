@@ -47,6 +47,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
+    private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -334,6 +335,44 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownRoutineAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task ScaffoldAsync_emits_routine_output_factories_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupRoutineWithOutputAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_routine_output_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldRoutineOutputContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRoutineOutputContext.cs"));
+                Assert.Contains($"Task<StoredProcedureResult<TResult>> {RoutineOutputName}WithOutputAsync<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public static OutputParameter[] Create{RoutineOutputName}OutputParameters()", contextCode, StringComparison.Ordinal);
+                Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", contextCode, StringComparison.Ordinal);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownRoutineWithOutputAsync(connection, provider, kind);
             }
         }
     }
@@ -748,6 +787,25 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task SetupRoutineWithOutputAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownRoutineWithOutputAsync(connection, provider, kind);
+
+        switch (kind)
+        {
+            case ProviderKind.SqlServer:
+                await ExecuteAsync(connection,
+                    $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineOutputName)} @tenantId INT, @total DECIMAL(18,2) OUTPUT AS BEGIN SET @total = 12.34; SELECT @tenantId AS Id, CAST('ok' AS nvarchar(20)) AS Name; END");
+                break;
+            case ProviderKind.MySql:
+                await ExecuteAsync(connection,
+                    $"CREATE PROCEDURE {provider.Escape(RoutineOutputName)}(IN tenantId INT, OUT total DECIMAL(18,2)) BEGIN SET total = 12.34; SELECT tenantId AS Id, 'ok' AS Name; END");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Routine output scaffolding live test only targets providers with OUT parameter support in this test harness.");
+        }
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -887,6 +945,26 @@ public sealed class LiveProviderScaffoldingParityTests
                 ProviderKind.SqlServer => $"IF OBJECT_ID(N'dbo.{RoutineName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineName)}",
                 ProviderKind.Postgres => $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(RoutineName)}(integer)",
                 ProviderKind.MySql => $"DROP PROCEDURE IF EXISTS {provider.Escape(RoutineName)}",
+                _ => ""
+            };
+
+            if (!string.IsNullOrWhiteSpace(sql))
+                await ExecuteAsync(connection, sql);
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownRoutineWithOutputAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            var sql = kind switch
+            {
+                ProviderKind.SqlServer => $"IF OBJECT_ID(N'dbo.{RoutineOutputName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineOutputName)}",
+                ProviderKind.MySql => $"DROP PROCEDURE IF EXISTS {provider.Escape(RoutineOutputName)}",
                 _ => ""
             };
 
