@@ -100,7 +100,10 @@ public class ScaffoldingContractDocTests
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK referential actions", doc, StringComparison.Ordinal);
-        Assert.Contains("relationships that do not target the generated principal primary key", doc, StringComparison.Ordinal);
+        Assert.Contains("relationships that do not target the generated principal primary key or an", doc, StringComparison.Ordinal);
+        Assert.Contains("exact unique index", doc, StringComparison.Ordinal);
+        Assert.Contains("ReferencesScaffoldablePrincipalKey", source, StringComparison.Ordinal);
+        Assert.Contains("ReferencesUniqueIndex", source, StringComparison.Ordinal);
         Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);
         Assert.Contains("auto_increment", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("nextval(%", source, StringComparison.Ordinal);

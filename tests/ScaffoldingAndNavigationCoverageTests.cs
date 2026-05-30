@@ -1358,6 +1358,54 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCompositeForeignKeyToUniqueIndex_EmitsNavigationAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE ExternalOrder (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                ExternalNo TEXT NOT NULL,
+                Name TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX UX_ExternalOrder_Tenant_ExternalNo ON ExternalOrder(TenantId, ExternalNo);
+            CREATE TABLE ExternalOrderEvent (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                ExternalNo TEXT NOT NULL,
+                EventName TEXT NOT NULL,
+                CONSTRAINT FK_Event_Order FOREIGN KEY (TenantId, ExternalNo) REFERENCES ExternalOrder(TenantId, ExternalNo)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeUniqueFkCtx");
+
+            var principalCode = File.ReadAllText(Path.Combine(dir, "ExternalOrder.cs"));
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "ExternalOrderEvent.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeUniqueFkCtx.cs"));
+
+            Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true)]", principalCode);
+            Assert.Contains("List<ExternalOrderEvent>", principalCode);
+            Assert.Contains("public ExternalOrder?", dependentCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithProviderOwnedSchemaFeatures_EmitsDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

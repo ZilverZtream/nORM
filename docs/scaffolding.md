@@ -65,11 +65,12 @@ must be reviewed and edited like handwritten model code.
   selectors. The generated `DbContext` preserves caller-supplied model
   configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; non-cascade delete actions are generated with
-  `cascadeDelete: false`. Relationships are emitted only when the FK targets
-  the generated principal primary key. Composite relationships are emitted only
-  when the ordered FK columns reference the exact generated composite primary
-  key; FK shapes targeting keyless tables or alternate/unique keys are reported
-  for manual configuration instead of emitting unsafe fluent code.
+  `cascadeDelete: false`. Relationships are emitted when the FK targets the
+  generated principal primary key or an exact unique index exposed by provider
+  metadata. Composite relationships are emitted when the ordered FK columns
+  reference the exact generated composite primary key or an exact unique index;
+  FK shapes targeting keyless tables or non-unique alternate columns are
+  reported for manual configuration instead of emitting unsafe fluent code.
   Self-referencing FKs use role-based navigation names derived from the FK
   column instead of vague same-type names.
 - Single-column, composite, and multi-membership non-primary-key index
@@ -110,13 +111,15 @@ must be reviewed and edited like handwritten model code.
   discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys that
-  do not target the generated principal primary key are listed there instead of
-  being silently ignored or converted into fake single-column navigations;
+  do not target the generated principal primary key or an exact unique index
+  are listed there instead of being silently ignored or converted into fake
+  single-column navigations;
   defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   decimal precision/scale, SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions,
-  relationships that do not target the generated principal primary key,
+  relationships that do not target the generated principal primary key or an
+  exact unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
   and tables without primary keys are reported as provider-owned schema; SQLite virtual tables and their shadow tables,
   views, routines, sequences, SQL Server synonyms, PostgreSQL materialized
@@ -133,6 +136,7 @@ must be reviewed and edited like handwritten model code.
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
   composite primary-key source generation with consumer-build evidence,
+  composite alternate-key FK generation when the target is an exact unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
@@ -166,16 +170,11 @@ must be reviewed and edited like handwritten model code.
 
 ## Not Yet Stable
 
-- Composite foreign key relationship generation beyond the safe primary-key
-  subset. Composite FK constraints that target the exact generated composite
-  primary key are emitted as navigations and fluent model configuration.
-  Composite FKs that target alternate/unique keys or otherwise differ from the
-  generated principal primary key are discovered and reported in scaffold
-  diagnostics.
-- Alternate-key relationship modeling beyond provider schema metadata.
-  Single-column FKs that target an alternate/unique key instead of the
-  generated principal primary key are discovered and reported in scaffold
-  diagnostics.
+- Relationship generation beyond primary keys and exact unique indexes.
+  Single-column and composite FK constraints that target the exact generated
+  primary key or an exact unique index are emitted as navigations and fluent
+  model configuration. FKs that target keyless or non-unique alternate columns
+  are discovered and reported in scaffold diagnostics.
 - Full FK referential-action modeling beyond tracked-graph cascade on/off.
   Non-cascade delete actions and update actions are discovered and reported in
   scaffold diagnostics; provider DDL remains the source of truth.
@@ -275,7 +274,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 | Code | Category | Meaning |
 | --- | --- | --- |
-| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key. |
+| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Single-column pure bridges can be generated as `UsingTable`; composite-key or payload-capable bridges should stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
@@ -284,7 +283,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
 | `SCF105` | `schema-feature` | Numeric precision/scale discovered. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
-| `SCF107` | `relationship` | FK targets a principal key that is not the generated primary key. |
+| `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
 | `SCF109` | `schema-feature` | Non-default identity strategy discovered. |
 | `SCF110` | `database-object` | Trigger discovered. |
