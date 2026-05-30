@@ -271,7 +271,7 @@ Server rowversion/timestamp metadata, safe SQL default metadata via generated
 navigation generation with supported delete/update referential actions, role-based
 self-referencing FK and self-join names, pure many-to-many join mapping including
 schema-qualified and composite-key junction tables, and
-single-column/composite index metadata are
+single-column/composite index metadata including descending key order are
 supported, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name

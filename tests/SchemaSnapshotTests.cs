@@ -44,6 +44,14 @@ public class SchemaSnapshotTests
         public string Code { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotDescendingIndexedEntity")]
+    private class SnapshotDescendingIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("IX_SnapshotDescendingIndexedEntity_Code", IsDescending = true)]
+        public string Code { get; set; } = string.Empty;
+    }
+
     [Table("SnapshotCompositeIndexedEntity")]
     private class SnapshotCompositeIndexedEntity
     {
@@ -220,6 +228,16 @@ public class SchemaSnapshotTests
 
         Assert.Equal("IX_SnapshotIndexedEntity_Code", code.IndexName);
         Assert.True(code.IsUnique);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsDescendingIndexAttribute()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotDescendingIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotDescendingIndexedEntity");
+        var code = table.Columns.Single(c => c.Name == "Code");
+        var index = Assert.Single(code.Indexes);
+        Assert.True(index.IsDescending);
     }
 
     [Fact]

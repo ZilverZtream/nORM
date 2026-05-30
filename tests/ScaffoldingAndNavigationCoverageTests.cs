@@ -1342,7 +1342,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithDescendingIndex_EmitsDiagnosticsForSortDirection()
+    public async Task ScaffoldAsync_WithDescendingIndex_EmitsIndexMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1362,16 +1362,10 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DirectionIndexCtx");
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedDirection.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
 
-            Assert.Contains("[Index(\"IX_IndexedDirection_Name_Desc\")]", entityCode);
-            Assert.Contains("DescendingIndex", warnings);
-            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "DescendingIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedDirection_Name_Desc" &&
-                item.GetProperty("suggestedAction").GetString()!.Contains("ASC/DESC", StringComparison.Ordinal));
+            Assert.Contains("[Index(\"IX_IndexedDirection_Name_Desc\", IsDescending = true)]", entityCode);
+            Assert.False(File.Exists(warningPath), "Descending ordinary column indexes should scaffold as portable index metadata.");
         }
         finally
         {

@@ -181,6 +181,32 @@ public class SqliteMigrationSqlGeneratorTests
     }
 
     [Fact]
+    public void CreateTable_WithDescendingIndexColumn_EmitsDescendingCreateIndex()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema
+                {
+                    Name = "Name",
+                    ClrType = typeof(string).FullName!,
+                    IsNullable = false,
+                    Indexes = { new ColumnIndexSchema { Name = "idx_Users_Name_Desc", IsDescending = true } }
+                }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Users_Name_Desc") && s.Contains("\"Name\" DESC"));
+    }
+
+    [Fact]
     public void CreateTable_WithoutConstraints_DoesNotEmitConstraintClauses()
     {
         var table = new TableSchema

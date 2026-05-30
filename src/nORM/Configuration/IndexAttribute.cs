@@ -33,5 +33,10 @@ namespace nORM.Configuration
         /// Single-column indexes can leave this at the default value.
         /// </summary>
         public int Order { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether this key column is ordered descending within the index.
+        /// </summary>
+        public bool IsDescending { get; set; }
     }
 }

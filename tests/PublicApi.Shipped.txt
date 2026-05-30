@@ -1007,6 +1007,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.G
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
+P:nORM.Configuration.IndexAttribute.IsDescending:System.Boolean
 P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
 P:nORM.Configuration.IndexAttribute.Name:System.String
 P:nORM.Configuration.IndexAttribute.Order:System.Int32
@@ -1205,6 +1206,7 @@ P:nORM.Mapping.TableMapping.UpdateColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableSplitAttribute.PrincipalType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ModelType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ProviderType:System.Type
+P:nORM.Migration.ColumnIndexSchema.IsDescending:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.Name:System.String
 P:nORM.Migration.ColumnIndexSchema.Order:System.Nullable{System.Int32}
@@ -1241,7 +1243,7 @@ P:nORM.Migration.MigrationSqlStatements.PreTransactionUp:System.Collections.Gene
 P:nORM.Migration.MigrationSqlStatements.Up:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Migration.SchemaDiff.AddedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaDiff.AddedForeignKeys:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ForeignKeySchema}}
-P:nORM.Migration.SchemaDiff.AddedIndexes:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}}
+P:nORM.Migration.SchemaDiff.AddedIndexes:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}}
 P:nORM.Migration.SchemaDiff.AddedTables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.SchemaDiff.AlteredColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaDiff.DroppedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema}}

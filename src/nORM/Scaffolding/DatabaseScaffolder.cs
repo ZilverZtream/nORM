@@ -107,6 +107,7 @@ namespace nORM.Scaffolding
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
+                RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
@@ -305,7 +306,8 @@ namespace nORM.Scaffolding
                         var safeIndexName = EscapeStringLiteral(index.IndexName);
                         var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
                         var orderSuffix = index.ColumnCount > 1 ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
-                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
+                        var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
+                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix})]");
                     }
                     if (clrType == typeof(decimal)
                         && decimalPrecisions is not null
@@ -879,7 +881,7 @@ namespace nORM.Scaffolding
                         await using var infoCommand = connection.CreateCommand();
                         infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", name);
                         await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                        var columns = new List<(int Ordinal, string Name)>();
+                        var columns = new List<(int Ordinal, string Name, bool IsDescending)>();
                         var hasUnsupportedKeyPart = false;
                         while (await infoReader.ReadAsync().ConfigureAwait(false))
                         {
@@ -901,7 +903,9 @@ namespace nORM.Scaffolding
                             {
                                 columns.Add((
                                     Convert.ToInt32(infoReader["seqno"], System.Globalization.CultureInfo.InvariantCulture),
-                                    columnName));
+                                    columnName,
+                                    ReaderHasColumn(infoReader, "desc")
+                                        && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0));
                             }
                         }
 
@@ -909,7 +913,7 @@ namespace nORM.Scaffolding
                             continue;
 
                         foreach (var column in columns.OrderBy(static c => c.Ordinal))
-                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal));
+                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending));
                     }
                 }
 
@@ -926,7 +930,8 @@ namespace nORM.Scaffolding
                         i.name AS IndexName,
                         i.is_unique AS IsUnique,
                         COUNT(*) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
-                        ic.key_ordinal - 1 AS Ordinal
+                        ic.key_ordinal - 1 AS Ordinal,
+                        ic.is_descending_key AS IsDescending
                     FROM sys.indexes i
                     INNER JOIN sys.tables t ON t.object_id = i.object_id
                     INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
@@ -958,7 +963,8 @@ namespace nORM.Scaffolding
                         idx.relname AS IndexName,
                         ix.indisunique AS IsUnique,
                         COUNT(*) OVER (PARTITION BY ix.indexrelid) AS ColumnCount,
-                        key.ord - 1 AS Ordinal
+                        key.ord - 1 AS Ordinal,
+                        CASE WHEN (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -985,7 +991,8 @@ namespace nORM.Scaffolding
                         s.index_name AS IndexName,
                         CASE WHEN s.non_unique = 0 THEN 1 ELSE 0 END AS IsUnique,
                         COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount,
-                        s.seq_in_index - 1 AS Ordinal
+                        s.seq_in_index - 1 AS Ordinal,
+                        CASE WHEN UPPER(COALESCE(s.collation, 'A')) = 'D' THEN 1 ELSE 0 END AS IsDescending
                     FROM information_schema.statistics s
                     WHERE s.table_schema = DATABASE()
                       AND s.index_name <> 'PRIMARY'
@@ -1021,7 +1028,9 @@ namespace nORM.Scaffolding
                     indexName,
                     Convert.ToBoolean(reader["IsUnique"], System.Globalization.CultureInfo.InvariantCulture),
                     columnCount,
-                    Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture)));
+                    Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture),
+                    ReaderHasColumn(reader, "IsDescending")
+                        && Convert.ToBoolean(reader["IsDescending"], System.Globalization.CultureInfo.InvariantCulture)));
             }
 
             return indexes;
@@ -1701,6 +1710,20 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static void RemoveSupportedDescendingIndexDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
+        {
+            var supportedDescending = indexes
+                .Where(static index => index.IsDescending)
+                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            features.RemoveAll(feature =>
+                string.Equals(feature.Kind, "DescendingIndex", StringComparison.OrdinalIgnoreCase)
+                && supportedDescending.Contains(feature.TableKey + "\u001f" + feature.Name));
+        }
+
         private static void AddRelationshipPrincipalKeyDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -2073,7 +2096,7 @@ namespace nORM.Scaffolding
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
                 "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
-                "DescendingIndex" => "Keep index sort direction in provider migrations; v1 scaffolding emits key-column index membership but not per-column ASC/DESC metadata.",
+                "DescendingIndex" => "Review this descending index shape; ordinary column-key descending indexes are generated, but this one was not safe to map as provider-neutral index metadata.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."
@@ -4055,7 +4078,8 @@ namespace nORM.Scaffolding
             string IndexName,
             bool IsUnique,
             int ColumnCount,
-            int Ordinal);
+            int Ordinal,
+            bool IsDescending);
 
         private readonly record struct ScaffoldRelationship(
             string DependentTableKey,

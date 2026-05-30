@@ -87,7 +87,8 @@ must be reviewed and edited like handwritten model code.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
-  filtered/partial, expression, included-column, and descending-key index
+  descending key order is preserved with `IndexAttribute.IsDescending`.
+  Provider-specific filtered/partial, expression, and included-column index
   semantics are reported as diagnostics rather than emitted as portable
   `[Index]` attributes.
 - Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL
@@ -187,7 +188,8 @@ must be reviewed and edited like handwritten model code.
   self-referencing FK role-based navigation naming,
   self-referencing pure many-to-many join scaffolding,
   composite-key pure many-to-many join scaffolding,
-  provider-specific partial/expression/included-column/descending index diagnostics,
+  provider-specific partial/expression/included-column index diagnostics,
+  descending index metadata round-tripping,
   safe default-to-`HasDefaultValueSql` promotion, unsafe composite-FK,
   many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
@@ -257,10 +259,10 @@ must be reviewed and edited like handwritten model code.
   output-parameter counts where the provider exposes them, ordered parameter
   mode/type summaries, and result/data type hints so stored
   procedures/functions are not lost during provider-mobility review.
-- Provider-specific filtered/partial indexes, expression indexes,
-  included-column indexes, and descending index key sort direction. These are
-  discovered and reported for review; v1 scaffolding emits provider-neutral
-  key-column indexes only.
+- Provider-specific filtered/partial indexes, expression indexes, and
+  included-column indexes. These are discovered and reported for review; v1
+  scaffolding emits provider-neutral key-column indexes, including descending
+  key order for ordinary column indexes.
 
 ## v1 Guidance
 

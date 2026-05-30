@@ -104,7 +104,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
 
                 down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
@@ -180,7 +180,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
 
@@ -345,7 +345,7 @@ namespace nORM.Migration
             foreach (var index in SchemaDiffer.GetExplicitIndexes(recreatedTable))
             {
                 var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({string.Join(", ", index.ColumnNames.Select(Esc))})");
+                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
             }
         }
 
@@ -365,6 +365,10 @@ namespace nORM.Migration
                     "Allowed values: NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT.");
             return action;
         }
+
+        private static string FormatIndexColumns(string[] columnNames, bool[] descending)
+            => string.Join(", ", columnNames.Select((name, index) =>
+                Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.
