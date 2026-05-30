@@ -2627,7 +2627,7 @@ namespace nORM.Scaffolding
                 "View" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities to generate a read-oriented query artifact, or keep the view behind explicit provider-bound query code.",
                 "Routine" => "Keep routine calls behind explicit raw SQL/stored-procedure code and document the provider-bound contract.",
                 "Sequence" => "Configure generated-key behavior explicitly or keep sequence DDL in provider migrations.",
-                "Synonym" => "Resolve the synonym to a supported base table or keep it behind provider-bound integration code.",
+                "Synonym" => "Use --emit-query-artifacts for local table/view synonyms, resolve the synonym to a supported base table, or keep non-query/remote synonyms behind provider-bound integration code.",
                 "MaterializedView" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities for a read-oriented query artifact and keep refresh behavior provider-bound.",
                 "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
                 "VirtualTable" => "Use --emit-query-artifacts/ScaffoldOptions.EmitQueryArtifacts for a read-oriented query artifact, or keep the virtual table behind provider-bound query/index code.",
