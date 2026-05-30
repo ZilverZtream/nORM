@@ -80,6 +80,8 @@ must be reviewed and edited like handwritten model code.
   schema-qualified identifiers unless a schema is supplied separately.
 - Dynamic table generation also rejects ambiguous dotted names when the same
   input could mean either a literal table name or a schema-qualified table.
+  Runtime-generated dynamic types for keyless tables are marked with
+  `[ReadOnlyEntity]`, matching static scaffolding's fail-closed write contract.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when
@@ -309,10 +311,10 @@ must be reviewed and edited like handwritten model code.
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
-  preservation, SQLite `UUID` declared-type parity, computed/identity/rowversion
-  metadata in the dynamic cache key and generated attributes, non-null
-  reference-column `[Required]` parity, and connection ownership for sync/async
-  dynamic scaffolding calls.
+  preservation, SQLite `UUID` declared-type parity, keyless dynamic
+  `[ReadOnlyEntity]` parity, computed/identity/rowversion metadata in the
+  dynamic cache key and generated attributes, non-null reference-column `[Required]` parity,
+  and connection ownership for sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted
   identifiers.

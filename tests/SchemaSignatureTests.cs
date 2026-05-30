@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Scaffolding;
 using Xunit;
@@ -339,6 +340,24 @@ public class SchemaSignatureTests
 
         Assert.Equal(typeof(Guid), type.GetProperty("ExternalId")!.PropertyType);
         Assert.Equal(typeof(Guid?), type.GetProperty("OptionalExternalId")!.PropertyType);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithNoPrimaryKey_MarksTypeReadOnly()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicKeyless (
+                ExternalId TEXT NOT NULL,
+                Payload TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "DynamicKeyless");
+
+        Assert.NotNull(type.GetCustomAttributes(typeof(ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
     }
 
     [Fact]

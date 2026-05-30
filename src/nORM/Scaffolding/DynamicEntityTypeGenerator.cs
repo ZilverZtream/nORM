@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using nORM.Configuration;
 using nORM.Core;
 
 namespace nORM.Scaffolding
@@ -158,6 +159,12 @@ namespace nORM.Scaffolding
                         new object[] { tableName },
                         new[] { schemaProperty },
                         new object[] { schemaName }));
+                }
+
+                if (!columns.Any(static column => column.IsKey))
+                {
+                    var readOnlyAttrCtor = typeof(ReadOnlyEntityAttribute).GetConstructor(Type.EmptyTypes)!;
+                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(readOnlyAttrCtor, Array.Empty<object>()));
                 }
 
                 // Add properties for each column
