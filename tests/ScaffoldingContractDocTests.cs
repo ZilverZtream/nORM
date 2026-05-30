@@ -172,6 +172,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("routineType", doc, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyDictionary<string, object?>", doc, StringComparison.Ordinal);
         Assert.Contains("exact scaffolded", doc, StringComparison.Ordinal);
+        Assert.Contains("without the expected parameter object or dictionary shape", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL set-returning functions", doc, StringComparison.Ordinal);
         Assert.Contains("Query-artifact generated types are marked with", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
@@ -189,6 +190,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
+        Assert.Contains("RequireScaffoldedRoutineParameters", source, StringComparison.Ordinal);
     }
 
     [Fact]

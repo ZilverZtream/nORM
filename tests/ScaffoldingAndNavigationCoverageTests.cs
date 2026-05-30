@@ -853,17 +853,18 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("public string? message { get; init; }", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
-        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
-        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
         Assert.Contains("without buffering the full result set", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters, outputParameters)", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")), outputParameters)", code);
         Assert.Contains("output parameters discovered at scaffold time", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters, CreateGetRevenueOutputParameters())", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")), CreateGetRevenueOutputParameters())", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
         Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
         Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", code);
+        Assert.Contains("private static object? RequireScaffoldedRoutineParameters", code);
         Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_" + Guid.NewGuid().ToString("N"));
@@ -890,7 +891,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Parameters discovered at scaffold time: @orderId IN int, return RETURN int", code);
         Assert.Contains("public int? orderId { get; init; }", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> ApplyDiscountWithOutputAsync<TResult>", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\"), ct, parameters, CreateApplyDiscountOutputParameters())", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\"), ct, RequireScaffoldedRoutineParameters(parameters, 1, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\")), CreateApplyDiscountOutputParameters())", code);
         Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_return_" + Guid.NewGuid().ToString("N"));
@@ -1120,8 +1121,9 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.DoesNotContain("public sealed class ImportOddParameters", code);
         Assert.Contains("Task<List<TResult>> ImportOddAsync<TResult>(IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamImportOddAsync<TResult>(IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)", code);
-        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, parameters)", code);
-        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\")))", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\")))", code);
+        Assert.Contains("pass exactly {expectedInputCount} dictionary entries using the provider parameter names", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_dictionary_routine_" + Guid.NewGuid().ToString("N"));
         try

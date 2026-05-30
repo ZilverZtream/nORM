@@ -190,9 +190,12 @@ must be reviewed and edited like handwritten model code.
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
   `ushort?`, `byte?`) when the provider exposes the modifier. Function wrappers
   enforce the exact scaffolded input-argument count before building the SQL
-  invocation, and function wrappers whose provider parameter names cannot
-  safely become C# DTO properties use positional `object?[]` arguments instead
-  of silently dropping or misbinding required function arguments.
+  invocation, and stored-procedure wrappers with scaffolded input metadata fail
+  with `NormConfigurationException` when the generated wrapper is called
+  without the expected parameter object or dictionary shape. Function wrappers
+  whose provider parameter names cannot safely become C# DTO properties use
+  positional `object?[]` arguments instead of silently dropping or misbinding
+  required function arguments.
   Stored-procedure wrappers with such parameter names use
   `IReadOnlyDictionary<string, object?>` arguments so callers can pass exact
   provider parameter names without unsafe DTO generation.

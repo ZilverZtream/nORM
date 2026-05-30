@@ -4642,25 +4642,31 @@ namespace nORM.Scaffolding
                 }
                 else
                 {
+                    var storedProcedureParameters = FormatStoredProcedureParameterArgument(
+                        routine,
+                        discoveredInputParameterCount);
                     sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, parameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
 
                     var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                     sb.AppendLine();
                     sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
                     sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, parameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
                 }
 
                 if (outputParameterCount > 0 && !isFunctionCallShape)
                 {
                     var outputMethod = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "WithOutputAsync", memberNames);
+                    var storedProcedureParameters = FormatStoredProcedureParameterArgument(
+                        routine,
+                        discoveredInputParameterCount);
                     sb.AppendLine();
                     sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters.</summary>");
                     sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, parameters, outputParameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
 
                     if (outputFactory != null)
                     {
@@ -4668,7 +4674,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters discovered at scaffold time.</summary>");
                         sb.AppendLine("    /// <remarks>Use this overload when the scaffolded output parameter metadata still matches the database routine. Pass explicit output parameters to the overload with <c>params OutputParameter[]</c> after routine signature changes.</remarks>");
                         sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, parameters, {outputFactory}());");
+                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
 
                         sb.AppendLine();
                         sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
@@ -4683,6 +4689,21 @@ namespace nORM.Scaffolding
                     }
                 }
             }
+
+            sb.AppendLine();
+            sb.AppendLine("    private static object? RequireScaffoldedRoutineParameters(object? parameters, int expectedInputCount, string routineName)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        if (expectedInputCount <= 0)");
+            sb.AppendLine("            return parameters;");
+            sb.AppendLine();
+            sb.AppendLine("        if (parameters is null)");
+            sb.AppendLine("            throw new NormConfigurationException($\"Routine `{routineName}` was scaffolded with {expectedInputCount} input parameters; pass a parameter object containing the scaffolded inputs.\");");
+            sb.AppendLine();
+            sb.AppendLine("        if (parameters is IReadOnlyDictionary<string, object?> dictionary && dictionary.Count != expectedInputCount)");
+            sb.AppendLine("            throw new NormConfigurationException($\"Routine `{routineName}` was scaffolded with {expectedInputCount} input parameters; pass exactly {expectedInputCount} dictionary entries using the provider parameter names.\");");
+            sb.AppendLine();
+            sb.AppendLine("        return parameters;");
+            sb.AppendLine("    }");
         }
 
         private static bool IsFunctionCallShape(string? callShape)
@@ -4831,6 +4852,14 @@ namespace nORM.Scaffolding
 
             sb.AppendLine($"        if (args.Length != {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)})");
             sb.AppendLine($"            throw new NormConfigurationException(\"Function `{EscapeStringLiteral(QualifiedRoutineName(routine))}` was scaffolded with {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)} input parameters; pass exactly {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)} arguments in scaffolded order.\");");
+        }
+
+        private static string FormatStoredProcedureParameterArgument(ScaffoldSkippedObject routine, int expectedInputParameterCount)
+        {
+            if (expectedInputParameterCount <= 0)
+                return "parameters";
+
+            return $"RequireScaffoldedRoutineParameters(parameters, {expectedInputParameterCount.ToString(CultureInfo.InvariantCulture)}, {FormatProviderEscapedRoutineName(routine)})";
         }
 
         private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters, bool usePositionalArguments = false)
