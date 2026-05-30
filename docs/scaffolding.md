@@ -82,7 +82,7 @@ must be reviewed and edited like handwritten model code.
   entity. Schema-qualified join tables use the schema-aware `UsingTable`
   overload so generated SQL targets the qualified bridge table rather than a
   literal dotted table name. Self-referencing pure join tables receive distinct
-  de-duplicated navigations and are consumer-build tested.
+  role-based navigations from the join FK columns and are consumer-build tested.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`; null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an

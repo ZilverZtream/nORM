@@ -2056,10 +2056,19 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
+                var isSelfJoin = string.Equals(leftTableKey, rightTableKey, StringComparison.OrdinalIgnoreCase);
+                var leftCollectionBase = Pluralize(rightEntity);
+                var rightCollectionBase = Pluralize(leftEntity);
+                if (isSelfJoin)
+                {
+                    leftCollectionBase += "By" + GetColumnPropertyName(columnPropertiesByTable, joinTableKey, left.DependentColumn);
+                    rightCollectionBase += "By" + GetColumnPropertyName(columnPropertiesByTable, joinTableKey, right.DependentColumn);
+                }
+
                 var existingNames = GetOrCreateMemberNames(memberNamesByTable, leftTableKey);
-                var leftCollectionName = MakeUnique(Pluralize(rightEntity), existingNames);
+                var leftCollectionName = MakeUnique(leftCollectionBase, existingNames);
                 var existingInverseNames = GetOrCreateMemberNames(memberNamesByTable, rightTableKey);
-                var rightCollectionName = MakeUnique(Pluralize(leftEntity), existingInverseNames);
+                var rightCollectionName = MakeUnique(rightCollectionBase, existingInverseNames);
                 joins.Add(new ScaffoldManyToManyJoin(
                     joinTableKey,
                     leftTableKey,

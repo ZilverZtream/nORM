@@ -1766,10 +1766,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.False(File.Exists(Path.Combine(dir, "PersonRelationship.cs")));
             var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
-            Assert.Contains("public List<Person> Persons { get; set; } = new();", personCode);
-            Assert.Contains("public List<Person> Persons2 { get; set; } = new();", personCode);
-            Assert.Contains(".HasMany<Person>(p => p.Persons)", contextCode);
-            Assert.Contains(".WithMany(p => p.Persons2)", contextCode);
+            Assert.Contains("public List<Person> PersonsByMenteeId { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> PersonsByMentorId { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.PersonsByMenteeId)", contextCode);
+            Assert.Contains(".WithMany(p => p.PersonsByMentorId)", contextCode);
             Assert.Contains(".UsingTable(\"PersonRelationship\", \"MenteeId\", \"MentorId\");", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
@@ -1896,10 +1896,10 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
 
             Assert.False(File.Exists(Path.Combine(dir, "PersonFriend.cs")));
-            Assert.Contains("public List<Person> Persons { get; set; } = new();", personCode);
-            Assert.Contains("public List<Person> Persons2 { get; set; } = new();", personCode);
-            Assert.Contains(".HasMany<Person>(p => p.Persons)", contextCode);
-            Assert.Contains(".WithMany(p => p.Persons2)", contextCode);
+            Assert.Contains("public List<Person> PersonsByPersonId { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> PersonsByFriendId { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.PersonsByPersonId)", contextCode);
+            Assert.Contains(".WithMany(p => p.PersonsByFriendId)", contextCode);
             Assert.Contains(".UsingTable(\"PersonFriend\", \"PersonId\", \"FriendId\");", contextCode);
         }
         finally
