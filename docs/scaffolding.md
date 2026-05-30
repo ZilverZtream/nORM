@@ -187,11 +187,12 @@ must be reviewed and edited like handwritten model code.
   system type; SQL Server table-valued parameters scaffold as `DbParameter?`
   so callers pass reviewed provider-specific structured parameters. MySQL
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
-  `ushort?`, `byte?`) when the provider exposes the modifier. Function
-  wrappers whose provider parameter names cannot safely become C# DTO
-  properties use positional `object?[]` arguments with an exact scaffolded
-  argument-count guard instead of silently dropping or misbinding required
-  function arguments. Stored-procedure wrappers with such parameter names use
+  `ushort?`, `byte?`) when the provider exposes the modifier. Function wrappers
+  enforce the exact scaffolded input-argument count before building the SQL
+  invocation, and function wrappers whose provider parameter names cannot
+  safely become C# DTO properties use positional `object?[]` arguments instead
+  of silently dropping or misbinding required function arguments.
+  Stored-procedure wrappers with such parameter names use
   `IReadOnlyDictionary<string, object?>` arguments so callers can pass exact
   provider parameter names without unsafe DTO generation.
   Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper

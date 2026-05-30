@@ -967,6 +967,8 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public sealed class GetRevenueRowsParameters", code);
         Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("var args = parameters is null ? System.Array.Empty<object>() : new object[] { (object?)parameters.tenantId ?? System.DBNull.Value };", code);
+        Assert.Contains("if (args.Length != 1)", code);
+        Assert.Contains("Function `dbo.GetRevenueRows` was scaffolded with 1 input parameters", code);
         Assert.Contains("Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenueRows\")", code);
         Assert.Contains("SELECT * FROM ", code);
         Assert.Contains("QueryUnchangedAsync<TResult>", code);
@@ -1055,6 +1057,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public int[]? customer_ids { get; init; }", code);
         Assert.Contains("public string[]? labels { get; init; }", code);
         Assert.Contains("public string? note { get; init; }", code);
+        Assert.Contains("if (args.Length != 5)", code);
         Assert.DoesNotContain("public object? duration { get; init; }", code);
         Assert.DoesNotContain("public object? customer_ids { get; init; }", code);
 
@@ -1085,6 +1088,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("var args = arguments is null ? System.Array.Empty<object>() : System.Array.ConvertAll(arguments, value => (object)(value ?? System.DBNull.Value));", code);
         Assert.Contains("if (args.Length != 2)", code);
         Assert.Contains("Function `public.calculate odd` was scaffolded with 2 input parameters", code);
+        Assert.Contains("pass exactly 2 arguments in scaffolded order", code);
         Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_positional_function_" + Guid.NewGuid().ToString("N"));
