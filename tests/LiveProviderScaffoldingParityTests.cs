@@ -48,6 +48,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
     private const string WarningView = "ScaffoldLiveWarningView";
+    private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
@@ -709,6 +710,53 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_emits_postgres_materialized_view_as_read_only_query_artifact()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresMaterializedViewAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_matview_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresMaterializedViewContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { "public." + PostgresMaterializedView },
+                        EmitQueryArtifacts = true,
+                        OverwriteFiles = false
+                    });
+
+                var viewCode = await File.ReadAllTextAsync(Path.Combine(dir, PostgresMaterializedView + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresMaterializedViewContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+                Assert.Contains("[ReadOnlyEntity]", viewCode, StringComparison.Ordinal);
+                Assert.Contains($"IQueryable<{PostgresMaterializedView}>", contextCode, StringComparison.Ordinal);
+                Assert.Empty(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray());
+                Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                    item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                    item.GetProperty("table").GetString() == "public." + PostgresMaterializedView);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresMaterializedViewAsync(connection, provider);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
@@ -1187,6 +1235,20 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE VIEW {view} AS SELECT {id}, {status} FROM {warning}");
     }
 
+    private static async Task SetupPostgresMaterializedViewAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresMaterializedViewAsync(connection, provider);
+
+        var warning = provider.Escape(WarningTable);
+        var matView = provider.Escape(PostgresMaterializedView);
+        var id = provider.Escape("Id");
+        var status = provider.Escape("Status");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {warning} ({id} {IntType(ProviderKind.Postgres)} NOT NULL PRIMARY KEY, {status} {TextType(ProviderKind.Postgres, 32)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE MATERIALIZED VIEW {matView} AS SELECT {id}, {status} FROM {warning}");
+    }
+
     private static async Task SetupProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
@@ -1450,6 +1512,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropView(kind, WarningView, provider.Escape(WarningView)));
             await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresMaterializedViewAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, $"DROP MATERIALIZED VIEW IF EXISTS {provider.Escape(PostgresMaterializedView)}");
+            await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, WarningTable, provider.Escape(WarningTable)));
         }
         catch
         {
