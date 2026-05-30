@@ -664,6 +664,7 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData("jsonb", true)]
     [InlineData("uuid", true)]
     [InlineData("USER-DEFINED (uuid)", true)]
+    [InlineData("year", true)]
     [InlineData("geometry", false)]
     [InlineData("inet", false)]
     [InlineData("enum", false)]

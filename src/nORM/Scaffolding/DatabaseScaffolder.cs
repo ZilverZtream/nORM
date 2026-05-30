@@ -2284,7 +2284,8 @@ namespace nORM.Scaffolding
                    || normalized == "json"
                    || normalized == "jsonb"
                    || normalized == "uuid"
-                   || normalized == "user-defined (uuid)";
+                   || normalized == "user-defined (uuid)"
+                   || normalized == "year";
         }
 
         private static string ScaffoldDiagnostics(
