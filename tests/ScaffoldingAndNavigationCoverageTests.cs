@@ -224,6 +224,9 @@ public class DatabaseScaffolderPrivateMethodTests
     private static string InvokeScaffoldContextWithRoutineStub()
         => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32)");
 
+    private static string InvokeScaffoldContextWithRoutineReturnStub()
+        => InvokeScaffoldContextWithRoutine("dbo", "ApplyDiscount", "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@orderId:IN:int,return:RETURN:int");
+
     private static string InvokeScaffoldContextWithRoutine(string? schema, string name, string detail)
     {
         var scaffolder = typeof(DatabaseScaffolder);
@@ -868,6 +871,31 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     // ── ScaffoldAsync (public integration) ─────────────────────────────────
+
+    [Fact]
+    public void ScaffoldContext_WithRoutineReturnValue_EmitsReturnOutputParameter()
+    {
+        var code = InvokeScaffoldContextWithRoutineReturnStub();
+
+        Assert.Contains("Parameters discovered at scaffold time: @orderId IN int, return RETURN int", code);
+        Assert.Contains("public int? orderId { get; init; }", code);
+        Assert.Contains("Task<StoredProcedureResult<TResult>> ApplyDiscountWithOutputAsync<TResult>", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.ApplyDiscount\", ct, parameters, CreateApplyDiscountOutputParameters())", code);
+        Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_return_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
 
     [Fact]
     public void ScaffoldContext_WithSqlServerTableValuedFunction_EmitsSelectWrapper()

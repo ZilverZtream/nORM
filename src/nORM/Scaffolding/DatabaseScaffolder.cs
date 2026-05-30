@@ -4612,12 +4612,12 @@ namespace nORM.Scaffolding
                 if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
                     return Array.Empty<RoutineOutputParameter>();
 
-                if (!usedNames.Add(escaped))
+                if (!usedNames.Add(normalized))
                     return Array.Empty<RoutineOutputParameter>();
 
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
                 names.Add(new RoutineOutputParameter(
-                    escaped,
+                    normalized,
                     GetRoutineParameterDbTypeName(dataType),
                     GetRoutineParameterSize(dataType),
                     GetRoutineParameterDirection(mode)));
