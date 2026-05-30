@@ -4614,7 +4614,19 @@ namespace nORM.Scaffolding
                     var scalarValueType = isScalarFunction
                         ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueResult", memberNames)
                         : null;
-                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, scalarValueMethod, scalarValueType, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction, usePositionalArguments: requiresPositionalFunctionArguments);
+                    AppendFunctionRoutineStub(
+                        sb,
+                        methodBase,
+                        streamMethod,
+                        scalarValueMethod,
+                        scalarValueType,
+                        routine,
+                        parameterSignature,
+                        parameterType,
+                        inputParameters,
+                        scalar: isScalarFunction,
+                        usePositionalArguments: requiresPositionalFunctionArguments,
+                        expectedPositionalArgumentCount: requiresPositionalFunctionArguments ? discoveredInputParameterCount : 0);
                 }
                 else
                 {
@@ -4743,11 +4755,13 @@ namespace nORM.Scaffolding
             string? parameterType,
             IReadOnlyList<RoutineStubParameter> inputParameters,
             bool scalar,
-            bool usePositionalArguments)
+            bool usePositionalArguments,
+            int expectedPositionalArgumentCount)
         {
             sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
             sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
+            AppendPositionalRoutineArgumentCountGuard(sb, routine, usePositionalArguments, expectedPositionalArgumentCount);
             sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             if (scalar)
@@ -4769,6 +4783,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine($"    public async Task<TValue?> {scalarValueMethod}<TValue>({parameterSignature}, CancellationToken ct = default)");
                 sb.AppendLine("    {");
                 sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
+                AppendPositionalRoutineArgumentCountGuard(sb, routine, usePositionalArguments, expectedPositionalArgumentCount);
                 sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
                 sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
@@ -4785,12 +4800,26 @@ namespace nORM.Scaffolding
             sb.AppendLine($"    public async IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
             sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
+            AppendPositionalRoutineArgumentCountGuard(sb, routine, usePositionalArguments, expectedPositionalArgumentCount);
             sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
             sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
             sb.AppendLine("            yield return row;");
             sb.AppendLine("    }");
+        }
+
+        private static void AppendPositionalRoutineArgumentCountGuard(
+            StringBuilder sb,
+            ScaffoldSkippedObject routine,
+            bool usePositionalArguments,
+            int expectedPositionalArgumentCount)
+        {
+            if (!usePositionalArguments || expectedPositionalArgumentCount <= 0)
+                return;
+
+            sb.AppendLine($"        if (args.Length != {expectedPositionalArgumentCount.ToString(CultureInfo.InvariantCulture)})");
+            sb.AppendLine($"            throw new NormConfigurationException(\"Function `{EscapeStringLiteral(QualifiedRoutineName(routine))}` was scaffolded with {expectedPositionalArgumentCount.ToString(CultureInfo.InvariantCulture)} input parameters; pass exactly {expectedPositionalArgumentCount.ToString(CultureInfo.InvariantCulture)} positional arguments in scaffolded order.\");");
         }
 
         private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters, bool usePositionalArguments = false)

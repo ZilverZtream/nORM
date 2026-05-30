@@ -1083,6 +1083,8 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
         Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
         Assert.Contains("var args = arguments is null ? System.Array.Empty<object>() : System.Array.ConvertAll(arguments, value => (object)(value ?? System.DBNull.Value));", code);
+        Assert.Contains("if (args.Length != 2)", code);
+        Assert.Contains("Function `public.calculate odd` was scaffolded with 2 input parameters", code);
         Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_positional_function_" + Guid.NewGuid().ToString("N"));
