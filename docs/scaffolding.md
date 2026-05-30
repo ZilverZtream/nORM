@@ -296,10 +296,6 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF111` | `index` | Filtered/partial index discovered. |
 | `SCF112` | `index` | Expression index discovered. |
 | `SCF113` | `index` | Included-column index discovered. |
-
-For v1 runtime mapping, `UsingTable` skip navigations support single-column and
-composite-key pure junction tables when both sides reference the generated
-primary keys. Unsafe bridge shapes remain explicit join entities.
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
@@ -313,6 +309,10 @@ primary keys. Unsafe bridge shapes remain explicit join entities.
 | `SCF206` | `virtual-table` | SQLite virtual table discovered and skipped. |
 | `SCF207` | `virtual-table` | SQLite virtual-table shadow table discovered and skipped. |
 | `SCF299` | `database-object` | Unknown skipped database object. |
+
+For v1 runtime mapping, `UsingTable` skip navigations support single-column and
+composite-key pure junction tables when both sides reference the generated
+primary keys. Unsafe bridge shapes remain explicit join entities.
 
 The report is additive: new fields may be added in later versions, but v1 tools
 should tolerate unknown fields and should not treat an empty diagnostics file as
