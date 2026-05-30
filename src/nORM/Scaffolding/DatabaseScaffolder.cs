@@ -1725,7 +1725,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Composite Foreign Keys");
                     sb.AppendLine();
-                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key, so v1 scaffolding keeps them diagnostic.");
+                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact unique index, so v1 scaffolding keeps them diagnostic.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
@@ -1758,7 +1758,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -1992,7 +1992,7 @@ namespace nORM.Scaffolding
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
-                "RelationshipPrincipalKey" => "Add or scaffold the referenced primary key, or configure the relationship manually against the intended alternate key before relying on generated navigations.",
+                "RelationshipPrincipalKey" => "Add a primary key or exact unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Keep non-default identity seed/increment settings in provider migrations; scaffolded code marks the column as identity but does not recreate provider-specific seed metadata.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
