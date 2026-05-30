@@ -912,6 +912,8 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenueRows\")", code);
         Assert.Contains("SELECT * FROM ", code);
         Assert.Contains("QueryUnchangedAsync<TResult>", code);
+        Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueRowsAsync<TResult>", code);
+        Assert.Contains("QueryUnchangedStreamAsync<TResult>", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenueRows\"", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_tvf_" + Guid.NewGuid().ToString("N"));

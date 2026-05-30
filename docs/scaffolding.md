@@ -156,7 +156,9 @@ must be reviewed and edited like handwritten model code.
   routines and emitted as provider-bound `SELECT` wrappers (`SELECT
   function(...) AS Value` for scalar functions and `SELECT * FROM
   function(...)` for table-valued functions) instead of being miscalled as
-  stored procedures. When provider metadata exposes safe
+  stored procedures. Table-valued functions also receive a streaming wrapper so
+  callers can consume large provider-owned rowsets without buffering. When
+  provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
   etc.) and falls back to `object?` only for unmapped provider types.
@@ -253,7 +255,8 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
   output compiles as a consumer project, keeps the provider-bound routine
   warning/metadata contract explicit, and emits SQL Server/PostgreSQL/MySQL
-  functions as `SELECT` wrappers instead of stored-procedure calls.
+  functions as `SELECT` wrappers instead of stored-procedure calls, including
+  buffered and streaming table-valued function wrappers.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in SQL Server/PostgreSQL
   sequence wrappers generate typed next-value methods and compile in a consumer
   project.

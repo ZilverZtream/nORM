@@ -4377,6 +4377,8 @@ namespace nORM.Scaffolding
                     : null;
                 var procedureName = EscapeStringLiteral(QualifiedRoutineName(routine));
                 var parameterSummary = FormatRoutineParameterSummary(metadata);
+                var isFunctionCallShape = IsFunctionCallShape(callShape);
+                var isScalarFunction = string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
 
                 if (parameterType != null)
                 {
@@ -4395,9 +4397,12 @@ namespace nORM.Scaffolding
                 else
                     sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                 var parameterSignature = parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
-                if (IsFunctionCallShape(callShape))
+                if (isFunctionCallShape)
                 {
-                    AppendFunctionRoutineStub(sb, methodBase, routine, parameterSignature, parameterType, inputParameters, scalar: string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase));
+                    var streamMethod = isScalarFunction
+                        ? null
+                        : MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
+                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction);
                 }
                 else
                 {
@@ -4412,7 +4417,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>(\"{procedureName}\", ct, parameters);");
                 }
 
-                if (outputParameterCount > 0 && !IsFunctionCallShape(callShape))
+                if (outputParameterCount > 0 && !isFunctionCallShape)
                 {
                     var outputMethod = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "WithOutputAsync", memberNames);
                     sb.AppendLine();
@@ -4517,6 +4522,7 @@ namespace nORM.Scaffolding
         private static void AppendFunctionRoutineStub(
             StringBuilder sb,
             string methodBase,
+            string? streamMethod,
             ScaffoldSkippedObject routine,
             string parameterSignature,
             string? parameterType,
@@ -4532,6 +4538,22 @@ namespace nORM.Scaffolding
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
             else
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
+            sb.AppendLine("    }");
+
+            if (streamMethod is null)
+                return;
+
+            sb.AppendLine();
+            sb.AppendLine($"    /// <summary>Streams provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
+            sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
+            sb.AppendLine($"    public async IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default) where TResult : class, new()");
+            sb.AppendLine("    {");
+            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+            sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
+            sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
+            sb.AppendLine("            yield return row;");
             sb.AppendLine("    }");
         }
 

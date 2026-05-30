@@ -59,6 +59,36 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Streams raw SQL results without tracking. Intended for generated provider-bound scaffolding wrappers.
+        /// </summary>
+        protected async IAsyncEnumerable<T> QueryUnchangedStreamAsync<T>(string sql, [EnumeratorCancellation] CancellationToken ct = default, params object[] parameters) where T : class, new()
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(QueryUnchangedAsync));
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var sw = Stopwatch.StartNew();
+            await using var cmd = CommandPool.Get(RawConnection, sql);
+            if (CurrentTransaction != null)
+                cmd.Transaction = CurrentTransaction;
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
+            var paramDict = AddParametersFast(cmd, parameters);
+            NormValidator.ValidateRawQuerySql(sql, RawProvider, paramDict);
+
+            var mapping = GetMapping(typeof(T));
+            var count = 0;
+            await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.SequentialAccess, ct).ConfigureAwait(false);
+            var colOrdinals = ResolveRawResultOrdinals(reader, mapping, typeof(T));
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                count++;
+                yield return MaterializeRawEntity<T>(reader, colOrdinals);
+            }
+
+            Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, count);
+            cmd.Parameters.Clear();
+        }
+
+        /// <summary>
         /// Executes interpolated SQL with every interpolation hole converted into a
         /// database parameter before execution.
         /// </summary>
