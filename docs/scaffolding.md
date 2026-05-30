@@ -246,7 +246,7 @@ dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
 | Code | Category | Meaning |
 | --- | --- | --- |
 | `SCF001` | `relationship` | Composite foreign key discovered; scalar columns are generated, but no navigation is emitted. |
-| `SCF002` | `many-to-many` | Possible payload many-to-many table discovered; review whether to keep the entity or hand-write `UsingTable`. |
+| `SCF002` | `many-to-many` | Possible many-to-many table discovered; verify the bridge has exactly two FK columns plus a composite PK over them before hand-writing `UsingTable`, otherwise keep the generated entity. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
 | `SCF102` | `schema-feature` | Check constraint discovered. |
