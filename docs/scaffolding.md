@@ -39,6 +39,9 @@ must be reviewed and edited like handwritten model code.
   model compiles and materializes with Npgsql; they remain provider-specific
   schema diagnostics because SQL Server/MySQL/SQLite do not share native array
   DDL.
+  PostgreSQL domain columns are reported with the domain schema/name and
+  underlying provider type so reviewers can preserve or remodel domain-owned
+  constraints before claiming provider mobility.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
   the reverse-engineered model carries the full key shape explicitly.
