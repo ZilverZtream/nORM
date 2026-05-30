@@ -157,6 +157,14 @@ public class DatabaseScaffolderPrivateMethodTests
         return (string)m.Invoke(null, new object[] { input })!;
     }
 
+    private static string InvokeDynamicEscapeCSharpIdentifier(string input)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("EscapeCSharpIdentifier", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "EscapeCSharpIdentifier");
+        return (string)m.Invoke(null, new object[] { input })!;
+    }
+
     private static string InvokeGetTypeName(Type type, bool allowNull)
     {
         var m = GetMethod("GetTypeName", new[] { typeof(Type), typeof(bool) });
@@ -356,12 +364,15 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         Assert.Equal("@class", InvokeEscapeCSharpIdentifier("@class"));
         Assert.Equal("@record", InvokeEscapeCSharpIdentifier("@record"));
+        Assert.Equal("@class", InvokeDynamicEscapeCSharpIdentifier("@class"));
+        Assert.Equal("@record", InvokeDynamicEscapeCSharpIdentifier("@record"));
     }
 
     [Fact]
     public void EscapeCSharpIdentifier_InvalidVerbatimIdentifier_IsSanitized()
     {
         Assert.Equal("_bad_name", InvokeEscapeCSharpIdentifier("@bad-name"));
+        Assert.Equal("_bad_name", InvokeDynamicEscapeCSharpIdentifier("@bad-name"));
     }
 
     // ── GetTypeName ─────────────────────────────────────────────────────────

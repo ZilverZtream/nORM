@@ -730,6 +730,9 @@ namespace nORM.Scaffolding
         {
             if (string.IsNullOrWhiteSpace(identifier)) return "_";
 
+            if (identifier[0] == '@' && IsValidEscapedCSharpIdentifier(identifier))
+                return identifier;
+
             var sb = new StringBuilder(identifier.Length + 1);
             for (var i = 0; i < identifier.Length; i++)
             {
@@ -751,6 +754,25 @@ namespace nORM.Scaffolding
 
             var escaped = sb.ToString();
             return _csharpKeywords.Contains(escaped) ? "@" + escaped : escaped;
+        }
+
+        private static bool IsValidEscapedCSharpIdentifier(string identifier)
+        {
+            if (identifier.Length == 1)
+                return false;
+
+            var first = identifier[1];
+            if (!(char.IsLetter(first) || first == '_'))
+                return false;
+
+            for (var i = 2; i < identifier.Length; i++)
+            {
+                var ch = identifier[i];
+                if (!(char.IsLetterOrDigit(ch) || ch == '_'))
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
