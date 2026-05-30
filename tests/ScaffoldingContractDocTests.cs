@@ -172,6 +172,7 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs");
 
         Assert.Contains("computed/identity/rowversion metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("non-null reference-column `[Required]` parity", doc, StringComparison.Ordinal);
         Assert.Contains("GetComputedColumns", source, StringComparison.Ordinal);
         Assert.Contains("sys.computed_columns", source, StringComparison.Ordinal);
         Assert.Contains("is_generated <> 'NEVER'", source, StringComparison.Ordinal);
@@ -179,6 +180,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("IsRowVersion", source, StringComparison.Ordinal);
         Assert.Contains("GetRowVersionColumns", source, StringComparison.Ordinal);
         Assert.Contains("TimestampAttribute", source, StringComparison.Ordinal);
+        Assert.Contains("RequiredAttribute", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeScaffoldClrType", source, StringComparison.Ordinal);
         Assert.Contains("'timestamp', 'rowversion'", source, StringComparison.Ordinal);
         Assert.Contains("RV", source, StringComparison.Ordinal);
     }
@@ -192,8 +195,38 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
         Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
         Assert.Contains("schema-aware `UsingTable`", doc, StringComparison.Ordinal);
+        Assert.Contains("Self-referencing pure join tables receive distinct", doc, StringComparison.Ordinal);
+        Assert.Contains("role-based navigations", doc, StringComparison.Ordinal);
         Assert.Contains("JoinTableSchema", source, StringComparison.Ordinal);
         Assert.Contains(".WithMany(p => p.", source, StringComparison.Ordinal);
+        Assert.Contains("isSelfJoin", source, StringComparison.Ordinal);
+        Assert.Contains("leftCollectionBase += \"By\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_and_source_pin_deterministic_scaffold_output()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+
+        Assert.Contains("generated output are ordered deterministically", doc, StringComparison.Ordinal);
+        Assert.Contains("Relationship navigations and fluent relationship", doc, StringComparison.Ordinal);
+        Assert.Contains("ThenBy(r => r.CollectionNavigationName", source, StringComparison.Ordinal);
+        Assert.Contains("ThenBy(r => r.ReferenceNavigationName", source, StringComparison.Ordinal);
+        Assert.Contains("ThenBy(j => j.LeftCollectionNavigationName", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_and_source_pin_sqlite_rowid_key_normalization()
+    {
+        var doc = ReadDoc();
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+
+        Assert.Contains("SQLite rowid integer primary keys are normalized to non-null `long`", doc, StringComparison.Ordinal);
+        Assert.Contains("PRAGMA", source, StringComparison.Ordinal);
+        Assert.Contains("table_xinfo", source, StringComparison.Ordinal);
+        Assert.Contains("typeof(long)", source, StringComparison.Ordinal);
+        Assert.Contains("provider is SqliteProvider", source, StringComparison.Ordinal);
     }
 
     [Fact]
