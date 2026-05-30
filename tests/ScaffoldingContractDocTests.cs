@@ -123,6 +123,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("outputParameters", source, StringComparison.Ordinal);
         Assert.Contains("parameterModes", source, StringComparison.Ordinal);
+        Assert.Contains("WITHIN GROUP (ORDER BY pa.parameter_id)", source, StringComparison.Ordinal);
         Assert.Contains("ty.name", source, StringComparison.Ordinal);
         Assert.Contains("p.data_type", source, StringComparison.Ordinal);
         Assert.Contains("BuildSkippedObjectMetadata", source, StringComparison.Ordinal);

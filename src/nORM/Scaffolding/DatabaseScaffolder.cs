@@ -564,7 +564,7 @@ namespace nORM.Scaffolding
                                               WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
                                               WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
                                               ELSE ''
-                                          END), ',')
+                                          END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
                                       FROM sys.parameters pa
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                                       WHERE pa.object_id = p.object_id
@@ -599,7 +599,7 @@ namespace nORM.Scaffolding
                                               WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
                                               WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
                                               ELSE ''
-                                          END), ',')
+                                          END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
                                       FROM sys.parameters pa
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                                       WHERE pa.object_id = o.object_id
