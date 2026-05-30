@@ -38,10 +38,11 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 `[Key]`/provider metadata-backed identity/computed/`[Timestamp]`/`[Required]`/`[MaxLength]` metadata,
 deterministic C# identifier cleanup, de-duplicated generated names,
 `IQueryable<T>` context properties backed by nORM's query provider,
-single-column FK navigations and safe composite-FK navigations when the
-constraint targets the generated principal primary key, with cascade/non-cascade
-delete behavior preserved, role-based self-referencing FK and self-join navigations, pure
-many-to-many join mappings including schema-qualified join tables, and single-column/composite index
+single-column and composite FK navigations when the constraint targets the
+generated principal primary key or an exact ordered unique index, with
+cascade/non-cascade delete behavior preserved, role-based self-referencing FK and self-join navigations, pure many-to-many join mappings including
+schema-qualified, composite-key, shared-tenant-column, and alternate-key join
+tables, and single-column/composite index
 metadata, including columns that participate in multiple indexes. SQL Server
 `IDENTITY(seed, increment)` metadata is emitted as `HasIdentityOptions(...)`
 configuration for SQL Server migration round-trips. SQL Server
@@ -60,9 +61,9 @@ same text as a schema-qualified table, scaffolding fails with an actionable
 error because the v1 filter syntax cannot disambiguate those objects safely.
 
 It is a bounded bootstrap tool, not a database-first completeness claim.
-Composite foreign keys that do not target the generated principal primary key,
-payload join tables, composite-key pure junction tables that exceed v1
-`UsingTable` support, provider-specific
+Composite foreign keys that do not target the generated principal primary key
+or an exact ordered unique index, payload join tables, pure junction tables
+whose FK/key/nullability shape cannot be emitted safely, provider-specific
 defaults, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 unparsed provider-specific identity strategies, non-default FK referential actions,
@@ -70,8 +71,9 @@ triggers, SQL Server provider-native temporal tables, SQLite virtual
 tables/shadow tables, skipped views, routines, sequences, synonyms,
 materialized views, and events are reported in
 `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`. Composite FK
-navigation generation beyond the safe primary-key subset, payload join-table
-modeling, owned-type inference, inheritance inference, view entity generation, and provider-specific schema
+navigation generation beyond generated primary keys and exact ordered unique
+indexes, payload join-table modeling, owned-type inference, inheritance
+inference, view entity generation, and provider-specific schema
 semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
 Use `--dry-run` to validate scaffold output and print warning summaries without

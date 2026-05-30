@@ -635,12 +635,41 @@ namespace nORM.Core
         private IReadOnlyDictionary<string, object> AddParametersFast(DbCommand cmd, object[] parameters)
         {
             var span = new (string name, object value)[parameters.Length];
+            var hasProviderParameters = false;
             for (int i = 0; i < parameters.Length; i++)
             {
                 var name = $"{_p.ParamPrefix}p{i}";
                 var value = parameters[i] ?? DBNull.Value;
                 span[i] = (name, value);
+                hasProviderParameters |= value is DbParameter;
             }
+
+            if (hasProviderParameters)
+            {
+                cmd.Parameters.Clear();
+                var providerParameterDict = new Dictionary<string, object>(parameters.Length);
+
+                foreach (var (name, value) in span)
+                {
+                    if (value is DbParameter providerParameter)
+                    {
+                        providerParameter.ParameterName = name;
+                        cmd.Parameters.Add(providerParameter);
+                        providerParameterDict[name] = providerParameter.Value ?? DBNull.Value;
+                    }
+                    else
+                    {
+                        var parameter = cmd.CreateParameter();
+                        parameter.ParameterName = name;
+                        nORM.Query.ParameterAssign.AssignValue(parameter, value);
+                        cmd.Parameters.Add(parameter);
+                        providerParameterDict[name] = value;
+                    }
+                }
+
+                return providerParameterDict;
+            }
+
             cmd.SetParametersFast(span);
 
             // Gate B fix: Always populate the parameter dictionary so that ValidateRawSql

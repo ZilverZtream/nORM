@@ -294,6 +294,8 @@ public class DocumentationContractTests
         Assert.Contains("ValidateRawQuerySql", contract, StringComparison.Ordinal);
         Assert.Contains("provider-aware", contract, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SELECT", contract, StringComparison.Ordinal);
+        Assert.Contains("DbParameter", contract, StringComparison.Ordinal);
+        Assert.Contains("final parameter name", contract, StringComparison.Ordinal);
         Assert.Contains("Privileged Escape Hatches", contract, StringComparison.Ordinal);
         Assert.Contains("ValidateRawQuerySql(sql, ctx.RawProvider", rawSql, StringComparison.Ordinal);
     }

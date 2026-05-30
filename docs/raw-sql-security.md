@@ -11,6 +11,11 @@ hatch.
 - `FromSqlRawAsync<T>` and `QueryUnchangedAsync<T>` are for explicit parameter
   names and advanced read-only SQL. They still run through the same raw query
   validation path.
+- Positional raw-query arguments may be explicit provider `DbParameter`
+  instances when reviewed provider metadata is required. nORM still owns the
+  final parameter name (`@p0`, `@p1`, etc.) so the SQL text and parameter list
+  cannot drift, while provider-specific type, size, precision, and value
+  metadata are preserved.
 - Raw query APIs accept a single read-only `SELECT` statement or CTE. DML, DDL,
   administrative commands, stored procedure execution, and stacked statements
   are rejected before command execution.

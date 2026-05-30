@@ -233,6 +233,37 @@ public class RawSqlEdgeCaseTests
     }
 
     [Fact]
+    public async Task QueryUnchangedAsync_PreservesExplicitDbParameter()
+    {
+        var (cn, ctx) = CreateContext();
+        await using var _ = ctx;
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO RsItem (Name, Value) VALUES ('ProviderParam', 44);" +
+            "INSERT INTO RsItem (Name, Value) VALUES ('Other', 45);";
+        cmd.ExecuteNonQuery();
+
+        var explicitParameter = new SqliteParameter("@ignored", System.Data.DbType.String)
+        {
+            Size = 128,
+            Value = "ProviderParam"
+        };
+
+        var results = await ctx.QueryUnchangedAsync<RsItem>(
+            "SELECT Id, Name, Value FROM RsItem WHERE Name = @p0 AND Value > @p1",
+            default,
+            explicitParameter,
+            40);
+
+        Assert.Single(results);
+        Assert.Equal("ProviderParam", results[0].Name);
+        Assert.Equal("@p0", explicitParameter.ParameterName);
+        Assert.Equal(System.Data.DbType.String, explicitParameter.DbType);
+        Assert.Equal(128, explicitParameter.Size);
+    }
+
+    [Fact]
     public async Task QueryUnchangedInterpolatedAsync_ParameterizesInterpolation()
     {
         var (cn, ctx) = CreateContext();
