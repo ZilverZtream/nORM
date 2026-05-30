@@ -80,8 +80,8 @@ namespace nORM.Migration
                         : "";
                     // SQLite AUTOINCREMENT requires inline "INTEGER PRIMARY KEY AUTOINCREMENT" on the column definition
                     if (c.IsIdentity && c.IsPrimaryKey)
-                        return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                        return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
 
                 // Emit PRIMARY KEY constraint for PK columns.
@@ -137,7 +137,7 @@ namespace nORM.Migration
                             "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
                     var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                    var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
+                    var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
                     up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
                 }
 
@@ -176,8 +176,8 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
                     if (c.IsIdentity && c.IsPrimaryKey)
-                        return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                    return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                        return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -236,7 +236,7 @@ namespace nORM.Migration
                     var restoreDefault = !string.IsNullOrEmpty(droppedCol.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(droppedCol.DefaultValue)}"
                         : "";
-                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
+                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)}{FormatCollation(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                     down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {colDef}");
                 }
             }
@@ -378,8 +378,8 @@ namespace nORM.Migration
                     ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                     : "";
                 if (c.IsIdentity && c.IsPrimaryKey)
-                    return $"{Esc(c.Name)} {GetSqlType(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                return $"{Esc(c.Name)} {GetSqlType(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
             }).ToList();
 
             // Emit PRIMARY KEY constraint for PK columns.
@@ -526,6 +526,26 @@ namespace nORM.Migration
                 return FallbackSqlType;
             }
             return sql;
+        }
+
+        private static string FormatCollation(ColumnSchema column)
+            => string.IsNullOrWhiteSpace(column.Collation)
+                ? string.Empty
+                : $" COLLATE {ValidateCollationIdentifier(column.Collation)}";
+
+        private static string ValidateCollationIdentifier(string collation)
+        {
+            var value = collation.Trim();
+            if (value.Length == 0)
+                throw new ArgumentException("Collation cannot be empty.", nameof(collation));
+
+            foreach (var ch in value)
+            {
+                if (!char.IsLetterOrDigit(ch) && ch != '_' && ch != '-')
+                    throw new ArgumentException($"Collation '{collation}' contains unsupported characters.");
+            }
+
+            return value;
         }
 
         // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;

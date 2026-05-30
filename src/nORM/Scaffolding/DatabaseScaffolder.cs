@@ -131,6 +131,12 @@ namespace nORM.Scaffolding
                     && expressionIndexConfigurations.Any(index =>
                         string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                var collationConfigurations = BuildCollationConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "Collation", StringComparison.OrdinalIgnoreCase)
+                    && collationConfigurations.Any(collation =>
+                        string.Equals(collation.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(collation.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 unsupportedFeatures.RemoveAll(feature =>
@@ -184,7 +190,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -1381,13 +1387,13 @@ namespace nORM.Scaffolding
                             check.Sql));
                     }
 
-                    if (ContainsCollation(createSql))
+                    foreach (var (columnName, collation) in ExtractSqliteColumnCollations(createSql))
                     {
                         features.Add(new ScaffoldUnsupportedFeature(
                             TableKey(table.Schema, table.Name),
                             "Collation",
-                            table.Name,
-                            "SQLite COLLATE clause"));
+                            columnName,
+                            collation));
                     }
                 }
 
@@ -1968,12 +1974,151 @@ namespace nORM.Scaffolding
             return -1;
         }
 
-        private static bool ContainsCollation(string? createTableSql)
-            => !string.IsNullOrWhiteSpace(createTableSql)
-               && System.Text.RegularExpressions.Regex.IsMatch(
-                   createTableSql,
-                   @"\bCOLLATE\s+(?:""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)",
-                   System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        private static IReadOnlyDictionary<string, string> ExtractSqliteColumnCollations(string? createTableSql)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return result;
+
+            var open = createTableSql.IndexOf('(');
+            if (open < 0)
+                return result;
+            var close = FindMatchingParenthesis(createTableSql, open);
+            if (close <= open)
+                return result;
+
+            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(open + 1, close - open - 1)))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
+                    continue;
+
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
+                    continue;
+
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    trimmed,
+                    @"\bCOLLATE\s+(?<name>""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_-]*)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+                if (!match.Success)
+                    continue;
+
+                result[columnName] = UnquoteSqlIdentifier(match.Groups["name"].Value);
+            }
+
+            return result;
+        }
+
+        private static bool StartsWithTableConstraint(string value)
+            => value.StartsWith("CONSTRAINT ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("PRIMARY ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("FOREIGN ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("UNIQUE ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("CHECK ", StringComparison.OrdinalIgnoreCase);
+
+        private static bool TryReadLeadingSqlIdentifier(string value, out string identifier, out int nextIndex)
+        {
+            identifier = string.Empty;
+            nextIndex = 0;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            var i = 0;
+            while (i < value.Length && char.IsWhiteSpace(value[i]))
+                i++;
+            if (i >= value.Length)
+                return false;
+
+            var ch = value[i];
+            if (ch is '"' or '`' or '[')
+            {
+                var close = ch == '[' ? ']' : ch;
+                var start = ++i;
+                var sb = new System.Text.StringBuilder();
+                while (i < value.Length)
+                {
+                    if (value[i] == close)
+                    {
+                        if (i + 1 < value.Length && value[i + 1] == close)
+                        {
+                            sb.Append(close);
+                            i += 2;
+                            continue;
+                        }
+
+                        identifier = sb.ToString();
+                        nextIndex = i + 1;
+                        return identifier.Length > 0;
+                    }
+
+                    sb.Append(value[i++]);
+                }
+
+                nextIndex = start;
+                return false;
+            }
+
+            var begin = i;
+            while (i < value.Length && (char.IsLetterOrDigit(value[i]) || value[i] == '_' || value[i] == '$'))
+                i++;
+            if (i == begin)
+                return false;
+
+            identifier = value.Substring(begin, i - begin);
+            nextIndex = i;
+            return true;
+        }
+
+        private static string UnquoteSqlIdentifier(string value)
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Length >= 2)
+            {
+                var first = trimmed[0];
+                var last = trimmed[^1];
+                if ((first == '"' && last == '"') || (first == '`' && last == '`'))
+                    return trimmed.Substring(1, trimmed.Length - 2).Replace(new string(first, 2), first.ToString(), StringComparison.Ordinal);
+                if (first == '[' && last == ']')
+                    return trimmed.Substring(1, trimmed.Length - 2).Replace("]]", "]", StringComparison.Ordinal);
+            }
+
+            return trimmed;
+        }
+
+        private static IReadOnlyList<string> SplitTopLevelCommaSeparated(string sql)
+        {
+            var result = new List<string>();
+            var start = 0;
+            var depth = 0;
+            var inString = false;
+            for (var i = 0; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (ch == '\'')
+                {
+                    if (inString && i + 1 < sql.Length && sql[i + 1] == '\'')
+                    {
+                        i++;
+                        continue;
+                    }
+                    inString = !inString;
+                    continue;
+                }
+                if (inString)
+                    continue;
+                if (ch == '(')
+                    depth++;
+                else if (ch == ')')
+                    depth--;
+                else if (ch == ',' && depth == 0)
+                {
+                    result.Add(sql.Substring(start, i - start));
+                    start = i + 1;
+                }
+            }
+            result.Add(sql[start..]);
+            return result;
+        }
 
         private static bool IsSqliteProviderSpecificDeclaredType(string? declaredType)
         {
@@ -3123,6 +3268,35 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyList<ScaffoldCollationConfiguration> BuildCollationConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldCollationConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "Collation", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || string.IsNullOrWhiteSpace(feature.Detail)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.TryGetValue(feature.Name, out var propertyName))
+                {
+                    continue;
+                }
+
+                result.Add(new ScaffoldCollationConfiguration(
+                    feature.TableKey,
+                    entityName,
+                    feature.Name,
+                    propertyName,
+                    feature.Detail.Trim()));
+            }
+
+            return result;
+        }
+
         private static string? ExtractWhereClause(string sql)
         {
             var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
@@ -3651,13 +3825,15 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
             IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
             IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
-            IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null)
+            IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
+            IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
             checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
             computedColumnConfigurations ??= Array.Empty<ScaffoldComputedColumnConfiguration>();
             expressionIndexConfigurations ??= Array.Empty<ScaffoldExpressionIndexConfiguration>();
+            collationConfigurations ??= Array.Empty<ScaffoldCollationConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3681,7 +3857,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0 && collationConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3703,7 +3879,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0 || collationConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3746,6 +3922,15 @@ namespace nORM.Scaffolding
                         var sql = EscapeStringLiteral(computed.Sql);
                         var storedSuffix = computed.Stored ? ", stored: true" : string.Empty;
                         sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasComputedColumnSql(\"{sql}\"{storedSuffix});");
+                    }
+                    foreach (var collation in collationConfigurations
+                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
+                        .ThenBy(c => c.PropertyName, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(collation.EntityName);
+                        var property = EscapeCSharpIdentifier(collation.PropertyName);
+                        var value = EscapeStringLiteral(collation.Collation);
+                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasCollation(\"{value}\");");
                     }
                     foreach (var expressionIndex in expressionIndexConfigurations
                         .OrderBy(i => i.EntityName, StringComparer.Ordinal)
@@ -4586,6 +4771,13 @@ namespace nORM.Scaffolding
             string ExpressionSql,
             bool IsUnique,
             string? FilterSql);
+
+        private readonly record struct ScaffoldCollationConfiguration(
+            string TableKey,
+            string EntityName,
+            string ColumnName,
+            string PropertyName,
+            string Collation);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

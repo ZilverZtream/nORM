@@ -111,7 +111,7 @@ namespace nORM.Migration
                         if (IsComputedColumn(newCol))
                             up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(newCol)}");
                         else
-                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
+                            up.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
                         upAltIdx++;
                         continue;
                     }
@@ -130,7 +130,7 @@ namespace nORM.Migration
                     }
                     if (columnDefinitionChanged)
                     {
-                        var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
+                        var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}";
                         up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {newDef}");
                     }
                     if (needsDefaultRebind && newCol.DefaultValue != null)
@@ -152,7 +152,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
                     var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -192,7 +192,7 @@ namespace nORM.Migration
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
                 var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {nullPart}";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {colDef}");
             }
 
@@ -231,7 +231,7 @@ namespace nORM.Migration
                         if (IsComputedColumn(oldCol))
                             down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildComputedColumnDefinition(oldCol)}");
                         else
-                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}");
+                            down.Add($"ALTER TABLE {Esc(table.Name)} ADD {Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}");
                         downAltIdx++;
                         continue;
                     }
@@ -248,7 +248,7 @@ namespace nORM.Migration
                     }
                     if (columnDefinitionChanged)
                     {
-                        var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
+                        var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}";
                         down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {oldDef}");
                     }
                     if (needsDefaultRebind && oldCol.DefaultValue != null)
@@ -270,7 +270,7 @@ namespace nORM.Migration
                 var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
                     ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
                     : "";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {colDef}");
             }
 
@@ -286,7 +286,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
                     var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -367,10 +367,31 @@ namespace nORM.Migration
             || oldCol.Precision != newCol.Precision
             || oldCol.Scale != newCol.Scale
             || oldCol.IsNullable != newCol.IsNullable
+            || !string.Equals(oldCol.Collation, newCol.Collation, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(oldCol.ComputedColumnSql, newCol.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
             || oldCol.IsStoredComputedColumn != newCol.IsStoredComputedColumn;
 
         private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;
+
+        private static string FormatCollation(ColumnSchema column)
+            => string.IsNullOrWhiteSpace(column.Collation)
+                ? string.Empty
+                : $" COLLATE {ValidateCollationIdentifier(column.Collation)}";
+
+        private static string ValidateCollationIdentifier(string collation)
+        {
+            var value = collation.Trim();
+            if (value.Length == 0)
+                throw new ArgumentException("Collation cannot be empty.", nameof(collation));
+
+            foreach (var ch in value)
+            {
+                if (!char.IsLetterOrDigit(ch) && ch != '_')
+                    throw new ArgumentException($"Collation '{collation}' contains unsupported characters.");
+            }
+
+            return value;
+        }
 
         private static string BuildComputedColumnDefinition(ColumnSchema column)
         {

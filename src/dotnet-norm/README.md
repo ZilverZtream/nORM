@@ -61,7 +61,7 @@ It is a bounded bootstrap tool, not a database-first completeness claim.
 Composite foreign keys that do not target the generated principal primary key,
 payload join tables, composite-key pure junction tables that exceed v1
 `UsingTable` support, provider-specific
-defaults, collations, provider
+defaults, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 non-default identity seed/increment, non-default FK referential actions,
 triggers, SQL Server provider-native temporal tables, tables without primary
@@ -76,6 +76,8 @@ Table CHECK constraints are emitted as provider-bound fluent migration metadata
 with `HasCheckConstraint` instead of being dropped into the warning report.
 Computed/generated column expressions are emitted as provider-bound fluent
 migration metadata with `HasComputedColumnSql`.
+Column collations are emitted as provider-bound fluent migration metadata with
+`HasCollation`.
 SQLite/PostgreSQL expression indexes are emitted as provider-bound fluent
 migration metadata with `HasExpressionIndex`.
 When warnings are present, the CLI prints a compact summary with stable

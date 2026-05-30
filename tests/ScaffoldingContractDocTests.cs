@@ -91,7 +91,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("events", doc, StringComparison.Ordinal);
         Assert.Contains("skipped", doc, StringComparison.Ordinal);
         Assert.Contains("tables without primary keys", doc, StringComparison.Ordinal);
-        Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
+        Assert.Contains("HasCollation", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific column types", doc, StringComparison.Ordinal);
         Assert.Contains("decimal precision/scale preservation", doc, StringComparison.Ordinal);
         Assert.Contains("Column(TypeName", doc, StringComparison.Ordinal);

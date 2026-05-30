@@ -23,6 +23,7 @@ namespace nORM.Configuration
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
+            public Dictionary<PropertyInfo, string> CollationValues { get; } = new();
             public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
             public Dictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumns { get; } = new();
             public List<ExpressionIndexConfiguration> ExpressionIndexList { get; } = new();
@@ -36,6 +37,7 @@ namespace nORM.Configuration
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.Collations => CollationValues;
             IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
             IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> IEntityTypeConfiguration.ComputedColumnSql => ComputedColumns;
             IReadOnlyList<ExpressionIndexConfiguration> IEntityTypeConfiguration.ExpressionIndexes => ExpressionIndexList;
@@ -104,6 +106,17 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
                 DefaultValues[prop] = sql.Trim();
+            }
+
+            /// <summary>
+            /// Sets database collation metadata for the specified property.
+            /// </summary>
+            public void SetCollation(PropertyInfo prop, string collation)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (string.IsNullOrWhiteSpace(collation))
+                    throw new ArgumentException("Collation cannot be null or whitespace.", nameof(collation));
+                CollationValues[prop] = collation.Trim();
             }
 
             /// <summary>
@@ -567,6 +580,20 @@ namespace nORM.Configuration
             public PropertyBuilder HasDefaultValueSql(string sql)
             {
                 _parent._config.SetDefaultValueSql(_property, sql);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures the database collation for this property in migration snapshots.
+            /// The value is a provider collation identifier such as <c>NOCASE</c>,
+            /// <c>Latin1_General_100_CI_AS</c>, or <c>utf8mb4_0900_ai_ci</c>.
+            /// </summary>
+            /// <param name="collation">Provider collation identifier.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="collation"/> is null or whitespace.</exception>
+            public PropertyBuilder HasCollation(string collation)
+            {
+                _parent._config.SetCollation(_property, collation);
                 return this;
             }
 

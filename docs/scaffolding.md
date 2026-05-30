@@ -158,8 +158,8 @@ must be reviewed and edited like handwritten model code.
   do not target the generated principal primary key or an exact unique index
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
-  unsafe/provider-specific defaults, computed/generated columns, check
-  constraints, provider-specific collations, provider-specific column types,
+  unsafe/provider-specific defaults that fail the safe default allowlist,
+  provider-specific column types,
   SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
@@ -245,15 +245,15 @@ must be reviewed and edited like handwritten model code.
   navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
   target the generated primary keys are reported in scaffold diagnostics rather
   than converted into unsafe fluent mappings.
-- Provider-specific complex default constraints,
-  collations, column types, triggers, temporal tables, and keyless tables.
+- Provider-specific complex default constraints, column types, triggers,
+  temporal tables, and keyless tables.
   Simple safe default literals/functions are emitted as migration metadata with
   `HasDefaultValueSql`; table CHECK constraints are emitted as provider-bound
   migration metadata with `HasCheckConstraint`; computed/generated column
   expressions are emitted as provider-bound migration metadata with
-  `HasComputedColumnSql`; complex/provider-specific defaults that fail the
-  allowlist remain diagnostics. Collations,
-  provider-specific column types, non-default identity
+  `HasComputedColumnSql`; column collations are emitted as provider-bound
+  migration metadata with `HasCollation`; complex/provider-specific defaults
+  that fail the allowlist remain diagnostics. Provider-specific column types, non-default identity
   seed/increment settings, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,
   synonyms, and events are discovered and reported in scaffold diagnostics, but
@@ -350,7 +350,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
-| `SCF103` | `schema-feature` | Provider/database collation discovered. |
+| `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact unique index. |

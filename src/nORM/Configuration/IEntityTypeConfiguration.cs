@@ -37,6 +37,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
 
         /// <summary>
+        /// Gets database collation names configured for string/comparable text properties.
+        /// Collation names are provider identifiers and are emitted by migration generators.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, string> Collations { get; }
+
+        /// <summary>
         /// Gets table-level CHECK constraints configured for migration snapshots.
         /// </summary>
         IReadOnlyList<CheckConstraintConfiguration> CheckConstraints { get; }

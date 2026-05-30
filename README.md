@@ -278,6 +278,8 @@ participate in multiple indexes. Table CHECK constraints are emitted into
 fluent model configuration with `HasCheckConstraint` and migration snapshots.
 Computed/generated column expressions are emitted with
 `HasComputedColumnSql` and marked as database-generated for runtime writes.
+Column collations are emitted with `HasCollation` so DB-first string
+comparison/order semantics survive the scaffold into migration snapshots.
 SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
 SQL Server/MySQL expression-index shapes are kept on the safer generated-column
 path.
@@ -291,8 +293,8 @@ metadata for supported shapes.
 
 Unsupported composite foreign keys that do not target generated primary keys or
 exact unique indexes, payload join tables, complex/provider-specific
-defaults that fail the migration default allowlist, collations, provider
-column types, non-default identity settings,
+defaults that fail the migration default allowlist, provider column types,
+non-default identity settings,
 unrecognized FK referential actions, triggers, SQL Server provider-native
 temporal tables, tables without primary keys, SQLite virtual tables and shadow
 tables, skipped views, routines, sequences, synonyms, materialized views, and

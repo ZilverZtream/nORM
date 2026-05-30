@@ -138,6 +138,8 @@ namespace nORM.Migration
         public List<ColumnIndexSchema> Indexes { get; } = new();
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
+        /// <summary>Provider collation identifier applied to text comparison and ordering for this column.</summary>
+        public string? Collation { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
         public bool IsIdentity { get; set; }
         /// <summary>Provider SQL expression for a computed/generated column.</summary>
@@ -422,6 +424,8 @@ namespace nORM.Migration
                     var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
                     ComputedColumnConfiguration? computedColumn = null;
                     map.FluentConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
+                    string? collation = null;
+                    map.FluentConfiguration?.Collations.TryGetValue(col.Prop, out collation);
                     var dbGenerated = col.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
                     table.Columns.Add(new ColumnSchema
                     {
@@ -445,6 +449,7 @@ namespace nORM.Migration
                         DefaultValue = map.FluentConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
                             ? defaultValue
                             : null,
+                        Collation = collation,
                     });
                 }
                 if (map.FluentConfiguration is not null)
@@ -797,6 +802,7 @@ namespace nORM.Migration
                         || oldCol.IsUnique != col.IsUnique
                         || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
                         || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
+                        || !string.Equals(oldCol.Collation, col.Collation, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsIdentity != col.IsIdentity
                         || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn)

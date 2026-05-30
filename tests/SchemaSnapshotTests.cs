@@ -250,6 +250,26 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_IncludesFluentCollation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotDefaultEntity>()
+                    .Property(e => e.Status)
+                    .HasCollation("NOCASE")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotDefaultEntity");
+        var status = table.Columns.Single(c => c.Name == "Status");
+        Assert.Equal("NOCASE", status.Collation);
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesExplicitReferentialActions()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
