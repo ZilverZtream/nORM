@@ -26,7 +26,7 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, bool IsAuto, bool IsComputed, bool IsRowVersion, int? MaxLength);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, bool IsRowVersion, int? MaxLength);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -161,14 +161,16 @@ namespace nORM.Scaffolding
                         new object[] { schemaName }));
                 }
 
-                if (!columns.Any(static column => column.IsKey))
+                var orderedColumns = OrderDynamicColumns(columns);
+
+                if (!orderedColumns.Any(static column => column.IsKey))
                 {
                     var readOnlyAttrCtor = typeof(ReadOnlyEntityAttribute).GetConstructor(Type.EmptyTypes)!;
                     typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(readOnlyAttrCtor, Array.Empty<object>()));
                 }
 
                 // Add properties for each column
-                foreach (var col in columns)
+                foreach (var col in orderedColumns)
                 {
                     var propertyType = col.PropertyType;
                     var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
@@ -251,6 +253,13 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static IReadOnlyList<ColumnInfo> OrderDynamicColumns(IReadOnlyList<ColumnInfo> columns)
+            => columns
+                .OrderBy(static column => column.IsKey ? 0 : 1)
+                .ThenBy(static column => column.IsKey ? column.KeyOrdinal : int.MaxValue)
+                .ThenBy(static column => column.SourceOrdinal)
+                .ToArray();
+
         /// <summary>
         /// Computes a stable hash string that represents the schema of the specified table.
         /// The signature is derived from ordered column names, their CLR types, primary-key status,
@@ -296,6 +305,7 @@ namespace nORM.Scaffolding
                 AppendDescriptorPart(sb, column.ColumnName);
                 AppendDescriptorPart(sb, column.PropertyType.FullName ?? string.Empty);
                 AppendDescriptorPart(sb, column.IsKey ? "PK" : "C");
+                AppendDescriptorPart(sb, column.IsKey ? column.KeyOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) : "-");
                 AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
                 AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
                 AppendDescriptorPart(sb, column.IsComputed ? "CMP" : "NCMP");
@@ -328,16 +338,22 @@ namespace nORM.Scaffolding
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
+            var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
+            var sourceOrdinal = 0;
             foreach (DataRow row in schema.Rows)
             {
                 var colName = row["ColumnName"]?.ToString();
                 if (string.IsNullOrEmpty(colName))
                     continue;
+                var currentSourceOrdinal = sourceOrdinal++;
                 var propName = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(colName)), existingPropertyNames);
                 if (row["DataType"] is not Type clrType)
                     continue;
                 var allowNull = row["AllowDBNull"] is bool b && b;
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
+                var keyOrdinal = primaryKeyOrdinals.TryGetValue(colName, out var ordinal)
+                    ? ordinal
+                    : isKey ? currentSourceOrdinal + 1 : 0;
                 var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
                     || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
@@ -349,7 +365,7 @@ namespace nORM.Scaffolding
 
                 var maxLength = GetScaffoldMaxLength(clrType, row);
 
-                yield return new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, isAuto, isComputed, isRowVersion, maxLength);
+                yield return new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, isRowVersion, maxLength);
             }
         }
 
@@ -535,6 +551,76 @@ namespace nORM.Scaffolding
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
+        private static IReadOnlyDictionary<string, int> GetPrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)
+        {
+            var connectionName = connection.GetType().Name;
+
+            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                using var cmd = connection.CreateCommand();
+                var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                    ? string.Empty
+                    : EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (!ReaderHasColumn(reader, "name") || !ReaderHasColumn(reader, "pk"))
+                        continue;
+
+                    var ordinal = Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture);
+                    var name = Convert.ToString(reader["name"]);
+                    if (ordinal > 0 && !string.IsNullOrWhiteSpace(name))
+                        result[name] = ordinal;
+                }
+
+                return result;
+            }
+
+            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnOrdinalMap(connection, """
+                    SELECT c.name AS ColumnName, ic.key_ordinal AS Ordinal
+                    FROM sys.tables t
+                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                    INNER JOIN sys.indexes i ON i.object_id = t.object_id AND i.is_primary_key = 1
+                    INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    WHERE t.name = @tableName
+                      AND (@schemaName IS NULL OR s.name = @schemaName)
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnOrdinalMap(connection, """
+                    SELECT att.attname AS ColumnName, keys.ordinality AS Ordinal
+                    FROM pg_constraint con
+                    INNER JOIN pg_class cls ON cls.oid = con.conrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+                    CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS keys(attnum, ordinality)
+                    INNER JOIN pg_attribute att ON att.attrelid = cls.oid AND att.attnum = keys.attnum
+                    WHERE con.contype = 'p'
+                      AND cls.relname = @tableName
+                      AND (@schemaName IS NULL OR ns.nspname = @schemaName)
+                    """, schemaName, tableName);
+            }
+
+            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                return QueryColumnOrdinalMap(connection, """
+                    SELECT column_name AS ColumnName, ordinal_position AS Ordinal
+                    FROM information_schema.key_column_usage
+                    WHERE table_schema = DATABASE()
+                      AND table_name = @tableName
+                      AND constraint_name = 'PRIMARY'
+                    """, schemaName, tableName);
+            }
+
+            return new Dictionary<string, int>(0, StringComparer.OrdinalIgnoreCase);
+        }
+
         private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
         {
             var connectionName = connection.GetType().Name;
@@ -572,6 +658,34 @@ namespace nORM.Scaffolding
                 var columnName = Convert.ToString(reader["ColumnName"]);
                 if (!string.IsNullOrWhiteSpace(columnName))
                     result.Add(columnName);
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, int> QueryColumnOrdinalMap(DbConnection connection, string sql, string? schemaName, string tableName)
+        {
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName))
+                    continue;
+
+                var ordinal = Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture);
+                if (ordinal > 0)
+                    result[columnName] = ordinal;
             }
 
             return result;

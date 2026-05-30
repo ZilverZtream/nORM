@@ -254,6 +254,46 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void CompositePrimaryKeyOrder_AffectsSignatureAndDynamicKeyPropertyOrder()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE T5CompositeOrder (
+                TenantId INTEGER NOT NULL,
+                LocalId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (LocalId, TenantId)
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE T5CompositeOrder (
+                TenantId INTEGER NOT NULL,
+                LocalId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (TenantId, LocalId)
+            )
+            """;
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var sig1 = gen.ComputeSchemaSignature(cn, "T5CompositeOrder");
+        var sig2 = gen.ComputeSchemaSignature(cn2, "T5CompositeOrder");
+        var type = gen.GenerateEntityType(cn, "T5CompositeOrder");
+        var propertyNames = type.GetProperties().Select(p => p.Name).ToArray();
+
+        Assert.NotEqual(sig1, sig2);
+        Assert.Equal("LocalId", propertyNames[0]);
+        Assert.Equal("TenantId", propertyNames[1]);
+        Assert.Contains(type.GetProperty("LocalId")!.GetCustomAttributes(typeof(KeyAttribute), inherit: false), attr => attr is KeyAttribute);
+        Assert.Contains(type.GetProperty("TenantId")!.GetCustomAttributes(typeof(KeyAttribute), inherit: false), attr => attr is KeyAttribute);
+    }
+
+    [Fact]
     public void IntegerPrimaryKey_MetadataAffectsSignatureAndDynamicAttributes()
     {
         using var cn = OpenMemory();

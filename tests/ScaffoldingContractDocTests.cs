@@ -365,6 +365,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("GetSqliteDeclaredColumnTypes", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("SQLite `UUID` declared-type parity", doc, StringComparison.Ordinal);
         Assert.Contains("keyless dynamic", doc, StringComparison.Ordinal);
+        Assert.Contains("composite primary-key ordinal parity", doc, StringComparison.Ordinal);
+        Assert.Contains("GetPrimaryKeyOrdinals", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("ReadOnlyEntityAttribute", dynamicSource, StringComparison.Ordinal);
     }
 
