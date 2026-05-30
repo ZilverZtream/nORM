@@ -450,8 +450,9 @@ namespace nORM.Scaffolding
                                   (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
                                   '; parameterModes=',
                                   COALESCE((
-                                      SELECT STRING_AGG(CONCAT(pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END), ',')
+                                      SELECT STRING_AGG(CONCAT(pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':', ty.name), ',')
                                       FROM sys.parameters pa
+                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                                       WHERE pa.object_id = p.object_id
                                   ), ''))
                     FROM sys.procedures p
@@ -509,7 +510,7 @@ namespace nORM.Scaffolding
                            ), 0)::text ||
                            '; parameterModes=' ||
                            COALESCE((
-                               SELECT string_agg(COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN'), ',' ORDER BY p.ordinal_position)
+                               SELECT string_agg(COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' || COALESCE(p.data_type, ''), ',' ORDER BY p.ordinal_position)
                                FROM information_schema.parameters p
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
@@ -541,7 +542,7 @@ namespace nORM.Scaffolding
                                      AND p.specific_name = r.specific_name
                                      AND p.parameter_mode IN ('OUT', 'INOUT')),
                                   '; parameterModes=',
-                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN')) ORDER BY p.ordinal_position SEPARATOR ',')
+                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':', COALESCE(p.data_type, '')) ORDER BY p.ordinal_position SEPARATOR ',')
                                             FROM information_schema.parameters p
                                             WHERE p.specific_schema = r.routine_schema
                                               AND p.specific_name = r.specific_name), ''),
@@ -1942,6 +1943,83 @@ namespace nORM.Scaffolding
                 _ => "Keep this database object in provider migrations or hand-written integration code."
             };
 
+        private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(ScaffoldSkippedObject obj)
+        {
+            if (!string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase))
+                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
+
+            var segments = obj.Detail.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 1; i < segments.Length; i++)
+            {
+                var pair = segments[i].Split('=', 2);
+                if (pair.Length == 2)
+                    values[pair[0].Trim()] = pair[1].Trim();
+            }
+
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["provider"] = ParseRoutineProvider(segments.Length > 0 ? segments[0] : string.Empty),
+                ["routineType"] = ParseRoutineType(segments.Length > 0 ? segments[0] : string.Empty),
+                ["parameterCount"] = ParseNullableInt(values.TryGetValue("parameters", out var parameterCount) ? parameterCount : null),
+                ["outputParameterCount"] = ParseNullableInt(values.TryGetValue("outputParameters", out var outputParameterCount) ? outputParameterCount : null)
+            };
+
+            if (values.TryGetValue("dataType", out var dataType) && !string.IsNullOrWhiteSpace(dataType))
+                metadata["dataType"] = dataType;
+
+            if (values.TryGetValue("parameterModes", out var parameterModes))
+                metadata["parameters"] = ParseRoutineParameters(parameterModes);
+
+            return metadata;
+        }
+
+        private static string ParseRoutineProvider(string header)
+        {
+            if (header.StartsWith("SQL Server ", StringComparison.OrdinalIgnoreCase)) return "SQL Server";
+            if (header.StartsWith("PostgreSQL ", StringComparison.OrdinalIgnoreCase)) return "PostgreSQL";
+            if (header.StartsWith("MySQL ", StringComparison.OrdinalIgnoreCase)) return "MySQL";
+            var space = header.IndexOf(' ');
+            return space > 0 ? header[..space] : header;
+        }
+
+        private static string ParseRoutineType(string header)
+        {
+            foreach (var provider in new[] { "SQL Server ", "PostgreSQL ", "MySQL " })
+            {
+                if (header.StartsWith(provider, StringComparison.OrdinalIgnoreCase))
+                    return header[provider.Length..];
+            }
+
+            var space = header.IndexOf(' ');
+            return space > 0 ? header[(space + 1)..] : header;
+        }
+
+        private static int? ParseNullableInt(string? value)
+            => int.TryParse(value, out var parsed) ? parsed : null;
+
+        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParseRoutineParameters(string parameterModes)
+        {
+            if (string.IsNullOrWhiteSpace(parameterModes))
+                return Array.Empty<IReadOnlyDictionary<string, object?>>();
+
+            return parameterModes
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(raw =>
+                {
+                    var parts = raw.Split(':', 3);
+                    var parameter = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["name"] = parts.Length > 0 ? parts[0] : string.Empty,
+                        ["mode"] = parts.Length > 1 ? parts[1] : string.Empty
+                    };
+                    if (parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]))
+                        parameter["dataType"] = parts[2];
+                    return (IReadOnlyDictionary<string, object?>)parameter;
+                })
+                .ToArray();
+        }
+
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyList<ScaffoldUnsupportedFeature> unsupportedFeatures,
@@ -2026,6 +2104,7 @@ namespace nORM.Scaffolding
                     kind = o.Kind,
                     name = TableKey(o.Schema, o.Name),
                     detail = o.Detail,
+                    metadata = BuildSkippedObjectMetadata(o),
                     suggestedAction = SuggestedActionForSkippedObject(o.Kind)
                 })
                 .ToArray();

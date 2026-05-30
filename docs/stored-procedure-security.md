@@ -49,8 +49,10 @@ permissions follow least privilege.
 `dotnet-norm scaffold` and `DatabaseScaffolder` do not generate stored
 procedure wrappers. They report routines as skipped provider-bound objects. On
 SQL Server, PostgreSQL, and MySQL the diagnostic detail includes routine
-metadata such as parameter count, ordered parameter mode summaries, output-
-parameter count when available, and declared result/data type hints. Use that
-report as migration inventory: each routine needs either a generated nORM
-query/write replacement, a provider-bound deployment path, or an explicit
-tenant/security review.
+metadata such as parameter count, ordered parameter mode/type summaries,
+output-parameter count when available, and declared result/data type hints.
+The JSON warning report also exposes structured `metadata` for routine rows so
+CI and migration tools can classify provider-bound routines without parsing the
+human `detail` string. Use that report as migration inventory: each routine
+needs either a generated nORM query/write replacement, a provider-bound
+deployment path, or an explicit tenant/security review.

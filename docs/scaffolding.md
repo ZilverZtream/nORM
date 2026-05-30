@@ -196,9 +196,9 @@ must be reviewed and edited like handwritten model code.
   and reported in scaffold diagnostics, but not converted into complete
   provider-neutral model code.
   Routine diagnostics include provider metadata such as parameter counts,
-  output-parameter counts where the provider exposes them, and result/data type
-  hints so stored procedures/functions are not lost during provider-mobility
-  review.
+  output-parameter counts where the provider exposes them, ordered parameter
+  mode/type summaries, and result/data type hints so stored
+  procedures/functions are not lost during provider-mobility review.
 - Provider-specific filtered/partial indexes, expression indexes,
   included-column indexes, and descending index key sort direction. These are
   discovered and reported for review; v1 scaffolding emits provider-neutral
@@ -256,9 +256,15 @@ Each row also includes stable diagnostic metadata:
   scaffolding.
 - `category`: a coarse bucket such as `relationship`, `schema-feature`,
   `index`, `database-object`, `query-object`, or `virtual-table`.
+- `metadata`: a structured object for rows that have provider-owned details.
+  For `SCF201` routine rows this includes `provider`, `routineType`,
+  `parameterCount`, `outputParameterCount`, optional routine `dataType`, and
+  ordered `parameters` entries with `name`, `mode`, and provider `dataType`
+  when the database exposes it.
 
 Use `code` and `category` for CI baselines, owner routing, and remediation
-dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
+dashboards. Use routine `metadata` for stored procedure/function migration
+inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 ### Diagnostic Code Catalog
 

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Xunit;
 
 namespace nORM.Tests;
@@ -117,6 +119,10 @@ public class ScaffoldingContractDocTests
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("outputParameters", source, StringComparison.Ordinal);
         Assert.Contains("parameterModes", source, StringComparison.Ordinal);
+        Assert.Contains("ty.name", source, StringComparison.Ordinal);
+        Assert.Contains("p.data_type", source, StringComparison.Ordinal);
+        Assert.Contains("BuildSkippedObjectMetadata", source, StringComparison.Ordinal);
+        Assert.Contains("ParseRoutineParameters", source, StringComparison.Ordinal);
         Assert.Contains("information_schema.parameters", source, StringComparison.Ordinal);
         Assert.Contains("specific_name", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);
@@ -144,16 +150,49 @@ public class ScaffoldingContractDocTests
         Assert.Contains("code", doc, StringComparison.Ordinal);
         Assert.Contains("severity", doc, StringComparison.Ordinal);
         Assert.Contains("category", doc, StringComparison.Ordinal);
+        Assert.Contains("metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("parameterCount", doc, StringComparison.Ordinal);
+        Assert.Contains("outputParameterCount", doc, StringComparison.Ordinal);
+        Assert.Contains("routineType", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
         Assert.Contains("stale `nORM.ScaffoldWarnings.*` files", doc, StringComparison.Ordinal);
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
         Assert.Contains("code =", source, StringComparison.Ordinal);
         Assert.Contains("severity =", source, StringComparison.Ordinal);
         Assert.Contains("category =", source, StringComparison.Ordinal);
+        Assert.Contains("metadata = BuildSkippedObjectMetadata", source, StringComparison.Ordinal);
         Assert.Contains("totalWarnings =", source, StringComparison.Ordinal);
         Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Routine_warning_metadata_is_structured_for_ci_inventory()
+    {
+        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var routine = Activator.CreateInstance(
+            skippedObjectType,
+            "dbo",
+            "GetRevenue",
+            "Routine",
+            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal")!;
+        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+        var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
+
+        Assert.Equal("SQL Server", metadata["provider"]);
+        Assert.Equal("stored procedure", metadata["routineType"]);
+        Assert.Equal(2, metadata["parameterCount"]);
+        Assert.Equal(1, metadata["outputParameterCount"]);
+        Assert.Equal("@tenantId", parameters[0]["name"]);
+        Assert.Equal("IN", parameters[0]["mode"]);
+        Assert.Equal("int", parameters[0]["dataType"]);
+        Assert.Equal("@total", parameters[1]["name"]);
+        Assert.Equal("OUT", parameters[1]["mode"]);
+        Assert.Equal("decimal", parameters[1]["dataType"]);
     }
 
     [Fact]
