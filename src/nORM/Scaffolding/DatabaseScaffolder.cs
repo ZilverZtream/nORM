@@ -2275,6 +2275,17 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static HashSet<string> CreateReservedContextMemberNameSet()
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var member in typeof(DbContext).GetMembers())
+                names.Add(member.Name);
+            foreach (var member in typeof(object).GetMembers())
+                names.Add(member.Name);
+            names.Add("ConfigureOptions");
+            return names;
+        }
+
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
@@ -2590,7 +2601,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, ConfigureOptions(options)) {{ }}");
                 }
                 sb.AppendLine();
-                var queryPropertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var queryPropertyNames = CreateReservedContextMemberNameSet();
                 foreach (var entity in entities.OrderBy(e => e))
                 {
                     var safeEntity = EscapeCSharpIdentifier(entity);

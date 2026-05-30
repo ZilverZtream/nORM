@@ -2113,6 +2113,36 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithContextMemberEntityNames_GeneratesUniqueQueryPropertyNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Option (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE ConfigureOption (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ContextMemberCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ContextMemberCtx.cs"));
+            Assert.Contains("public IQueryable<Option> Options2", contextCode);
+            Assert.Contains("public IQueryable<ConfigureOption> ConfigureOptions2", contextCode);
+            Assert.DoesNotContain("public IQueryable<Option> Options =>", contextCode);
+            Assert.DoesNotContain("public IQueryable<ConfigureOption> ConfigureOptions =>", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithTableFilter_GeneratesOnlyRequestedTables()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
