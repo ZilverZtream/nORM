@@ -3136,9 +3136,23 @@ namespace nORM.Scaffolding
                 var outputParameterCount = metadata.TryGetValue("outputParameterCount", out var outputCountValue) && outputCountValue is int outputCount
                     ? outputCount
                     : 0;
+                var inputParameters = GetRoutineInputParameters(metadata);
                 var methodBase = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
+                var parameterType = inputParameters.Count > 0
+                    ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
+                    : null;
                 var procedureName = EscapeStringLiteral(QualifiedRoutineName(routine));
                 var parameterSummary = FormatRoutineParameterSummary(metadata);
+
+                if (parameterType != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"    public sealed class {parameterType}");
+                    sb.AppendLine("    {");
+                    foreach (var parameter in inputParameters)
+                        sb.AppendLine($"        public object? {parameter} {{ get; init; }}");
+                    sb.AppendLine("    }");
+                }
 
                 sb.AppendLine();
                 sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}`.</summary>");
@@ -3146,7 +3160,8 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    /// <remarks>Parameters discovered at scaffold time: {EscapeXmlDocumentation(parameterSummary)}. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                 else
                     sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>(object? parameters = null, CancellationToken ct = default) where TResult : class, new()");
+                var parameterSignature = parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
+                sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
                 sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>(\"{procedureName}\", ct, parameters);");
 
                 if (outputParameterCount > 0)
@@ -3155,7 +3170,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters.</summary>");
                     sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                    sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>(object? parameters = null, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
+                    sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>(\"{procedureName}\", ct, parameters, outputParameters);");
                 }
             }
@@ -3180,6 +3195,48 @@ namespace nORM.Scaffolding
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
                 return string.Join(" ", new[] { name, mode, dataType }.Where(part => !string.IsNullOrWhiteSpace(part)));
             }));
+        }
+
+        private static IReadOnlyList<string> GetRoutineInputParameters(IReadOnlyDictionary<string, object?> metadata)
+        {
+            if (!metadata.TryGetValue("parameters", out var parametersValue)
+                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
+                || parameters.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var names = new List<string>();
+            foreach (var parameter in parameters)
+            {
+                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
+                if (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var rawName = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
+                var normalized = NormalizeRoutineParameterName(rawName);
+                if (string.IsNullOrWhiteSpace(normalized))
+                    return Array.Empty<string>();
+
+                var escaped = EscapeCSharpIdentifier(normalized);
+                if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
+                    return Array.Empty<string>();
+
+                names.Add(escaped);
+            }
+
+            return names.Distinct(StringComparer.Ordinal).ToArray();
+        }
+
+        private static string NormalizeRoutineParameterName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+
+            return name.Trim().TrimStart('@', ':', '?');
         }
 
         private static string FormatScaffoldKeySelector(string parameterName, IReadOnlyList<string> propertyNames)
