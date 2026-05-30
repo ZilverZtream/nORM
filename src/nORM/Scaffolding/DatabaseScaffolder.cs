@@ -2058,6 +2058,13 @@ namespace nORM.Scaffolding
                 if (joinColumns.Count != 2 || joinColumns.Keys.Any(column => !fkColumnNames.Contains(column)))
                     continue;
 
+                if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns)
+                    || joinPrimaryKeyColumns.Count != 2
+                    || joinPrimaryKeyColumns.Any(column => !fkColumnNames.Contains(column)))
+                {
+                    continue;
+                }
+
                 var left = fkRows[0];
                 var right = fkRows[1];
                 var leftTableKey = TableKey(left.PrincipalSchema, left.PrincipalTable);

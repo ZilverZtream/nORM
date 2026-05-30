@@ -214,6 +214,7 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
 
         Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
+        Assert.Contains("join-table primary key made", doc, StringComparison.Ordinal);
         Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
         Assert.Contains("schema-aware `UsingTable`", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables receive distinct", doc, StringComparison.Ordinal);

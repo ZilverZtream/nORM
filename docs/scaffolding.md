@@ -75,9 +75,9 @@ must be reviewed and edited like handwritten model code.
   semantics are reported as diagnostics rather than emitted as portable
   `[Index]` attributes.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
-  single-column foreign keys, no payload columns, and both references targeting
-  single-column primary keys. Both entity sides receive collection navigations,
-  and the join table is emitted as fluent
+  single-column foreign keys, no payload columns, a join-table primary key made
+  exactly from those two FK columns, and both references targeting single-column
+  primary keys. Both entity sides receive collection navigations, and the join table is emitted as fluent
   `HasMany().WithMany(inverse).UsingTable(...)` configuration instead of a join
   entity. Schema-qualified join tables use the schema-aware `UsingTable`
   overload so generated SQL targets the qualified bridge table rather than a

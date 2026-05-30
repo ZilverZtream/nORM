@@ -1933,6 +1933,51 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithKeylessJoinTable_DoesNotEmitUnsafeManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "KeylessJoinCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "KeylessJoinCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain(".UsingTable(\"AuthorBook\"", contextCode);
+            Assert.Contains("Possible Many-To-Many Join Tables", warnings);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            var summary = warningJson.RootElement.GetProperty("summary");
+            Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("possibleManyToManyJoinTables").GetInt32());
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                item.GetProperty("table").GetString() == "AuthorBook");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPureJoinTable_UsesJoinTableNameForNavigationDirection()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
