@@ -151,11 +151,13 @@ must be reviewed and edited like handwritten model code.
   relationships that do not target the generated principal primary key or an
   exact unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
-  and tables without primary keys are reported as provider-owned schema; SQLite virtual tables and their shadow tables,
-  views, routines, sequences, SQL Server synonyms, PostgreSQL materialized
-  views, and MySQL events are discovered and reported as skipped database
-  objects; likely many-to-many join tables are flagged when they are scaffolded
-  as normal entities.
+  and tables without primary keys are reported as provider-owned schema; views,
+  PostgreSQL materialized views, SQLite virtual tables, routines, sequences,
+  SQL Server synonyms, SQLite virtual-table shadow tables, and MySQL events are
+  discovered and reported as skipped database objects unless an explicit
+  opt-in emits the supported query-artifact or routine-stub shape; likely
+  many-to-many join tables are flagged when they are scaffolded as normal
+  entities.
 
 ## Evidence
 
@@ -339,7 +341,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |
 | `SCF202` | `key-generation` | Standalone sequence discovered and skipped. |
 | `SCF203` | `database-object` | SQL Server synonym discovered and skipped. |
-| `SCF204` | `query-object` | PostgreSQL materialized view discovered and skipped. |
+| `SCF204` | `query-object` | PostgreSQL materialized view discovered; skipped unless emitted through `--emit-view-entities`. |
 | `SCF205` | `routine` | MySQL event discovered and skipped. |
 | `SCF206` | `virtual-table` | SQLite virtual table discovered; skipped unless emitted as a query artifact through `--emit-view-entities`. |
 | `SCF207` | `virtual-table` | SQLite virtual-table shadow table discovered and skipped. |
