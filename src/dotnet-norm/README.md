@@ -59,7 +59,8 @@ error because the v1 filter syntax cannot disambiguate those objects safely.
 
 It is a bounded bootstrap tool, not a database-first completeness claim.
 Composite foreign keys that do not target the generated principal primary key,
-payload join tables, provider-specific
+payload join tables, composite-key pure junction tables that exceed v1
+`UsingTable` support, provider-specific
 defaults, computed column expressions, check constraints, collations, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 non-default identity seed/increment, non-default FK referential actions,

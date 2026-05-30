@@ -180,8 +180,10 @@ must be reviewed and edited like handwritten model code.
 - Owned types and inheritance inference.
 - Payload join-table modeling and many-to-many joins whose bridge columns are
   nullable, missing a composite primary key, or whose foreign keys do not target
-  single-column primary keys. These are discovered and reported in scaffold
-  diagnostics rather than converted into unsafe fluent mappings.
+  single-column primary keys. Pure composite-key junction tables are discovered
+  as possible many-to-many shapes, but the join entity is kept because v1
+  `UsingTable` accepts single bridge columns only. These are reported in
+  scaffold diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, views, temporal tables, and keyless
   tables. Defaults, computed/generated columns, check constraints, collations,
@@ -257,7 +259,7 @@ dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
 | Code | Category | Meaning |
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key. |
-| `SCF002` | `many-to-many` | Possible many-to-many table discovered; verify the bridge has exactly two non-null FK columns plus a composite PK over them before hand-writing `UsingTable`, otherwise keep the generated entity. |
+| `SCF002` | `many-to-many` | Possible many-to-many table discovered. Single-column pure bridges can be generated as `UsingTable`; composite-key or payload-capable bridges should stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
 | `SCF102` | `schema-feature` | Check constraint discovered. |
