@@ -2501,6 +2501,62 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSharedTenantCompositeKeyPureJoinTable_EmitsManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Student (
+                TenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (TenantId, StudentId)
+            );
+            CREATE TABLE Course (
+                TenantId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                PRIMARY KEY (TenantId, CourseId)
+            );
+            CREATE TABLE StudentCourse (
+                TenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                PRIMARY KEY (TenantId, StudentId, CourseId),
+                CONSTRAINT FK_StudentCourse_Student FOREIGN KEY (TenantId, StudentId) REFERENCES Student(TenantId, StudentId),
+                CONSTRAINT FK_StudentCourse_Course FOREIGN KEY (TenantId, CourseId) REFERENCES Course(TenantId, CourseId)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SharedTenantCompositeJoinCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SharedTenantCompositeJoinCtx.cs"));
+            var warningsPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+
+            Assert.False(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
+            Assert.Contains(".UsingTable(\"StudentCourse\", new[] { \"TenantId\", \"StudentId\" }, new[] { \"TenantId\", \"CourseId\" });", contextCode);
+            if (File.Exists(warningsPath))
+            {
+                var warnings = File.ReadAllText(warningsPath);
+                Assert.DoesNotContain("possible many-to-many", warnings, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("Composite Foreign Keys", warnings);
+            }
+
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithKeylessJoinTable_DoesNotEmitUnsafeManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
