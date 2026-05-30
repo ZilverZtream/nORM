@@ -74,6 +74,8 @@ namespace nORM.Migration
             // MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 up.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+            foreach (var (table, check) in diff.DroppedCheckConstraints)
+                up.Add($"ALTER TABLE {Esc(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
 
             // UP-2: Drop tables.
             foreach (var table in diff.DroppedTables)
@@ -114,6 +116,8 @@ namespace nORM.Migration
 
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
+                foreach (var check in table.CheckConstraints)
+                    colDefs.Add(BuildCheckConstraintSql(check));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
@@ -140,6 +144,8 @@ namespace nORM.Migration
             }
 
             // UP-7: Add FK constraints last (all tables and columns are in place).
+            foreach (var (table, check) in diff.AddedCheckConstraints)
+                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
 
@@ -148,6 +154,8 @@ namespace nORM.Migration
             // DOWN-1: Drop FK constraints that were added in UP-7 (before touching their columns).
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+            foreach (var (table, check) in diff.AddedCheckConstraints)
+                down.Add($"ALTER TABLE {Esc(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
 
             // DOWN-2: Drop columns that were added in UP-6.
             foreach (var (table, column) in diff.AddedColumns)
@@ -195,6 +203,8 @@ namespace nORM.Migration
                     colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
+                foreach (var check in table.CheckConstraints)
+                    colDefs.Add(BuildCheckConstraintSql(check));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
@@ -206,6 +216,8 @@ namespace nORM.Migration
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
+            foreach (var (table, check) in diff.DroppedCheckConstraints)
+                down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
 
@@ -304,6 +316,26 @@ namespace nORM.Migration
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON UPDATE {onUpdate}";
             return sql;
+        }
+
+        private static string BuildCheckConstraintSql(CheckConstraintSchema check)
+        {
+            ArgumentNullException.ThrowIfNull(check);
+            return $"CONSTRAINT {Esc(check.ConstraintName)} CHECK ({FormatCheckPredicate(check.Sql)})";
+        }
+
+        private static string FormatCheckPredicate(string sql)
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var trimmed = sql.Trim();
+            if (trimmed.StartsWith("CHECK", StringComparison.OrdinalIgnoreCase))
+            {
+                var open = trimmed.IndexOf('(');
+                var close = trimmed.LastIndexOf(')');
+                if (open >= 0 && close > open)
+                    trimmed = trimmed.Substring(open + 1, close - open - 1).Trim();
+            }
+            return trimmed;
         }
 
         // NOTE: identical copies of ResolveType and ValidateFkAction exist in the other three generators;

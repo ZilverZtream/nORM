@@ -1509,6 +1509,7 @@ public class DatabaseScaffolderPrivateMethodTests
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasDefaultValueSql(\"'new'\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().HasCheckConstraint(\"CK_FeatureOwned_Name\", \"length(Name) > 0\");", contextCode);
             Assert.Contains("Provider-Owned Schema Features", warnings);
             Assert.DoesNotContain("Composite Foreign Keys", warnings);
             Assert.DoesNotContain("| SCF100 |", warnings);
@@ -1517,16 +1518,16 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Collation", warnings);
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
-            Assert.Contains("CheckConstraint", warnings);
+            Assert.DoesNotContain("CheckConstraint", warnings);
             Assert.Contains("Skipped Database Objects", warnings);
             Assert.Contains("FeatureOwnedView", warnings);
             var summary = warningJson.RootElement.GetProperty("summary");
-            Assert.Equal(5, summary.GetProperty("totalWarnings").GetInt32());
-            Assert.Equal(4, summary.GetProperty("sectionCounts").GetProperty("providerOwnedSchemaFeatures").GetInt32());
+            Assert.Equal(4, summary.GetProperty("totalWarnings").GetInt32());
+            Assert.Equal(3, summary.GetProperty("sectionCounts").GetProperty("providerOwnedSchemaFeatures").GetInt32());
             Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("skippedDatabaseObjects").GetInt32());
             Assert.False(summary.GetProperty("codes").TryGetProperty("SCF100", out _));
             Assert.Equal(1, summary.GetProperty("codes").GetProperty("SCF200").GetInt32());
-            Assert.Equal(3, summary.GetProperty("categories").GetProperty("schema-feature").GetInt32());
+            Assert.Equal(2, summary.GetProperty("categories").GetProperty("schema-feature").GetInt32());
             Assert.Equal(1, summary.GetProperty("categories").GetProperty("database-object").GetInt32());
             Assert.Equal(1, summary.GetProperty("categories").GetProperty("query-object").GetInt32());
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
@@ -1534,7 +1535,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed" && item.GetProperty("name").GetString() == "NameLength");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Collation" && item.GetProperty("name").GetString() == "FeatureOwned");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
-            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint" && item.GetProperty("name").GetString() == "FeatureOwned");
+            Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("code").GetString() == "SCF110" && item.GetProperty("category").GetString() == "database-object");
             Assert.All(providerOwned.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));

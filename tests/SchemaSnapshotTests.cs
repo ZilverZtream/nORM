@@ -208,6 +208,26 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_IncludesFluentCheckConstraints()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotDefaultEntity>()
+                    .HasCheckConstraint("CK_SnapshotDefaultEntity_Status", "length(Status) > 0")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotDefaultEntity");
+        var check = Assert.Single(table.CheckConstraints);
+        Assert.Equal("CK_SnapshotDefaultEntity_Status", check.ConstraintName);
+        Assert.Equal("length(Status) > 0", check.Sql);
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesExplicitReferentialActions()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

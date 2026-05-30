@@ -119,6 +119,12 @@ namespace nORM.Scaffolding
                     string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
                     && defaultValuesByTable.TryGetValue(feature.TableKey, out var defaults)
                     && defaults.ContainsKey(feature.Name));
+                var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, unsupportedFeatures);
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
+                    && checkConstraints.Any(check =>
+                        string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
                 unsupportedFeatures.RemoveAll(static feature =>
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
@@ -166,7 +172,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -1339,13 +1345,13 @@ namespace nORM.Scaffolding
                     tableNameParameter.Value = table.Name;
                     checkCommand.Parameters.Add(tableNameParameter);
                     var createSql = Convert.ToString(await checkCommand.ExecuteScalarAsync().ConfigureAwait(false));
-                    if (ContainsCheckConstraint(createSql))
+                    foreach (var check in ExtractSqliteCheckConstraints(table.Name, createSql))
                     {
                         features.Add(new ScaffoldUnsupportedFeature(
                             TableKey(table.Schema, table.Name),
                             "CheckConstraint",
-                            table.Name,
-                            "SQLite CHECK constraint"));
+                            check.Name,
+                            check.Sql));
                     }
 
                     if (ContainsCollation(createSql))
@@ -1561,9 +1567,12 @@ namespace nORM.Scaffolding
                     FROM information_schema.triggers
                     WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT table_schema, table_name, constraint_name, 'CheckConstraint', 'PostgreSQL CHECK constraint'
-                    FROM information_schema.table_constraints
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND constraint_type = 'CHECK'
+                    SELECT ns.nspname, tbl.relname, con.conname, 'CheckConstraint', pg_get_constraintdef(con.oid)
+                    FROM pg_constraint con
+                    INNER JOIN pg_class tbl ON tbl.oid = con.conrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    WHERE con.contype = 'c'
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
                     SELECT table_schema, table_name, column_name, 'Collation', collation_name
                     FROM information_schema.columns
@@ -1640,9 +1649,12 @@ namespace nORM.Scaffolding
                     FROM information_schema.triggers
                     WHERE trigger_schema = DATABASE()
                     UNION ALL
-                    SELECT NULL, table_name, constraint_name, 'CheckConstraint', 'MySQL CHECK constraint'
-                    FROM information_schema.table_constraints
-                    WHERE table_schema = DATABASE() AND constraint_type = 'CHECK'
+                    SELECT NULL, tc.table_name, tc.constraint_name, 'CheckConstraint', cc.check_clause
+                    FROM information_schema.table_constraints tc
+                    INNER JOIN information_schema.check_constraints cc
+                        ON cc.constraint_schema = tc.constraint_schema
+                       AND cc.constraint_name = tc.constraint_name
+                    WHERE tc.table_schema = DATABASE() AND tc.constraint_type = 'CHECK'
                     UNION ALL
                     SELECT NULL, c.table_name, c.column_name, 'Collation', c.collation_name
                     FROM information_schema.columns c
@@ -1817,12 +1829,70 @@ namespace nORM.Scaffolding
             }
         }
 
-        private static bool ContainsCheckConstraint(string? createTableSql)
-            => !string.IsNullOrWhiteSpace(createTableSql)
-               && System.Text.RegularExpressions.Regex.IsMatch(
-                   createTableSql,
-                   @"\bCHECK\s*\(",
-                   System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        private static IReadOnlyList<(string Name, string Sql)> ExtractSqliteCheckConstraints(string tableName, string? createTableSql)
+        {
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return Array.Empty<(string Name, string Sql)>();
+
+            var result = new List<(string Name, string Sql)>();
+            var regex = new System.Text.RegularExpressions.Regex(
+                @"(?:(?:CONSTRAINT)\s+(?:""(?<name>[^""]+)""|\[(?<name>[^\]]+)\]|`(?<name>[^`]+)`|(?<name>[A-Za-z_][A-Za-z0-9_]*))\s+)?CHECK\s*\(",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            var ordinal = 0;
+            foreach (System.Text.RegularExpressions.Match match in regex.Matches(createTableSql))
+            {
+                var openIndex = createTableSql.IndexOf('(', match.Index + match.Length - 1);
+                if (openIndex < 0)
+                    continue;
+
+                var closeIndex = FindMatchingParenthesis(createTableSql, openIndex);
+                if (closeIndex <= openIndex)
+                    continue;
+
+                var name = match.Groups["name"].Success
+                    ? match.Groups["name"].Value
+                    : $"CK_{ToPascalCase(tableName)}_{++ordinal}";
+                var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                if (!string.IsNullOrWhiteSpace(sql))
+                    result.Add((name, sql));
+            }
+
+            return result;
+        }
+
+        private static int FindMatchingParenthesis(string sql, int openIndex)
+        {
+            var depth = 0;
+            var inString = false;
+            for (var i = openIndex; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (ch == '\'')
+                {
+                    if (inString && i + 1 < sql.Length && sql[i + 1] == '\'')
+                    {
+                        i++;
+                        continue;
+                    }
+                    inString = !inString;
+                    continue;
+                }
+                if (inString)
+                    continue;
+                if (ch == '(')
+                {
+                    depth++;
+                }
+                else if (ch == ')')
+                {
+                    depth--;
+                    if (depth == 0)
+                        return i;
+                }
+            }
+
+            return -1;
+        }
 
         private static bool ContainsCollation(string? createTableSql)
             => !string.IsNullOrWhiteSpace(createTableSql)
@@ -1926,7 +1996,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults and ordinary table CHECK constraints are emitted as migration metadata when possible. Computed/generated columns, collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -2155,7 +2225,7 @@ namespace nORM.Scaffolding
             {
                 "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
                 "Computed" => "Keep the generated expression in provider migrations and model the column as database-owned/read-only.",
-                "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
+                "CheckConstraint" => "Use explicit HasCheckConstraint model configuration or keep the provider-specific CHECK predicate in migrations.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
@@ -2919,6 +2989,52 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildCheckConstraintConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldCheckConstraintConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || string.IsNullOrWhiteSpace(feature.Detail)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName))
+                {
+                    continue;
+                }
+
+                var sql = NormalizeScaffoldCheckSql(feature.Detail);
+                if (string.IsNullOrWhiteSpace(sql))
+                    continue;
+
+                result.Add(new ScaffoldCheckConstraintConfiguration(
+                    feature.TableKey,
+                    entityName,
+                    feature.Name,
+                    sql));
+            }
+
+            return result;
+        }
+
+        private static string NormalizeScaffoldCheckSql(string raw)
+        {
+            var candidate = raw.Trim();
+            if (candidate.StartsWith("CHECK", StringComparison.OrdinalIgnoreCase))
+            {
+                var open = candidate.IndexOf('(');
+                var close = candidate.LastIndexOf(')');
+                if (open >= 0 && close > open)
+                    candidate = candidate.Substring(open + 1, close - open - 1).Trim();
+            }
+
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
+
+            return candidate;
+        }
+
         private static bool TryNormalizeScaffoldDefaultSql(string? raw, out string defaultValueSql)
         {
             defaultValueSql = string.Empty;
@@ -3345,10 +3461,12 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldManyToManyJoin> manyToManyJoins,
             IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null,
             IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null,
-            IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null)
+            IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
+            IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
+            checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3372,7 +3490,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3394,7 +3512,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3418,6 +3536,15 @@ namespace nORM.Scaffolding
                         var property = EscapeCSharpIdentifier(defaultValue.PropertyName);
                         var sql = EscapeStringLiteral(defaultValue.DefaultValueSql);
                         sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\");");
+                    }
+                    foreach (var check in checkConstraintConfigurations
+                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
+                        .ThenBy(c => c.Name, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(check.EntityName);
+                        var name = EscapeStringLiteral(check.Name);
+                        var sql = EscapeStringLiteral(check.Sql);
+                        sb.AppendLine($"            mb.Entity<{entity}>().HasCheckConstraint(\"{name}\", \"{sql}\");");
                     }
                     foreach (var relationship in relationships
                         .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
@@ -4225,6 +4352,12 @@ namespace nORM.Scaffolding
             string EntityName,
             string PropertyName,
             string DefaultValueSql);
+
+        private readonly record struct ScaffoldCheckConstraintConfiguration(
+            string TableKey,
+            string EntityName,
+            string Name,
+            string Sql);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

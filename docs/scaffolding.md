@@ -245,11 +245,12 @@ must be reviewed and edited like handwritten model code.
   navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
   target the generated primary keys are reported in scaffold diagnostics rather
   than converted into unsafe fluent mappings.
-- Provider-specific computed columns, complex default constraints, check constraints,
+- Provider-specific computed columns, complex default constraints,
   collations, column types, triggers, temporal tables, and keyless tables.
   Simple safe default literals/functions are emitted as migration metadata with
-  `HasDefaultValueSql`; complex/provider-specific defaults that fail the
-  allowlist remain diagnostics. Computed/generated columns, check constraints, collations,
+  `HasDefaultValueSql`; table CHECK constraints are emitted as provider-bound
+  migration metadata with `HasCheckConstraint`; complex/provider-specific defaults that fail the
+  allowlist remain diagnostics. Computed/generated columns, collations,
   provider-specific column types, non-default identity
   seed/increment settings, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,
@@ -344,7 +345,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column and composite-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-primary-key bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
-| `SCF102` | `schema-feature` | Check constraint discovered. |
+| `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |

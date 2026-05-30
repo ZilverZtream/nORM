@@ -37,6 +37,19 @@ namespace nORM.Migration
         public List<ColumnSchema> Columns { get; init; } = new();
         /// <summary>Foreign key constraints defined on this table.</summary>
         public List<ForeignKeySchema> ForeignKeys { get; init; } = new();
+        /// <summary>CHECK constraints defined on this table.</summary>
+        public List<CheckConstraintSchema> CheckConstraints { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Describes a table-level CHECK constraint.
+    /// </summary>
+    public class CheckConstraintSchema
+    {
+        /// <summary>Name of the CHECK constraint.</summary>
+        public string ConstraintName { get; set; } = string.Empty;
+        /// <summary>Provider SQL predicate inside the CHECK clause.</summary>
+        public string Sql { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -408,6 +421,17 @@ namespace nORM.Migration
                             : null,
                     });
                 }
+                if (map.FluentConfiguration is not null)
+                {
+                    foreach (var check in map.FluentConfiguration.CheckConstraints)
+                    {
+                        table.CheckConstraints.Add(new CheckConstraintSchema
+                        {
+                            ConstraintName = check.Name,
+                            Sql = check.Sql
+                        });
+                    }
+                }
                 snapshot.Tables.Add(table);
                 tableByType[map.Type] = table;
             }
@@ -586,6 +610,10 @@ namespace nORM.Migration
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> AddedForeignKeys { get; } = new();
         /// <summary>FK constraints present in the old snapshot but not the new for an existing table.</summary>
         public List<(TableSchema Table, ForeignKeySchema ForeignKey)> DroppedForeignKeys { get; } = new();
+        /// <summary>CHECK constraints present in the new snapshot but not the old for an existing table.</summary>
+        public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> AddedCheckConstraints { get; } = new();
+        /// <summary>CHECK constraints present in the old snapshot but not the new for an existing table.</summary>
+        public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> DroppedCheckConstraints { get; } = new();
         /// <summary>
         /// Column renames detected via <c>[RenameColumn("oldName")]</c>. Each entry carries the table,
         /// the old column name, and the new <see cref="ColumnSchema"/> (with its new name). The differ
@@ -598,6 +626,7 @@ namespace nORM.Migration
             || AddedIndexes.Count > 0 || DroppedIndexes.Count > 0
             || DroppedTables.Count > 0 || DroppedColumns.Count > 0
             || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0
+            || AddedCheckConstraints.Count > 0 || DroppedCheckConstraints.Count > 0
             || RenamedColumns.Count > 0;
 
         /// <summary>
@@ -662,13 +691,21 @@ namespace nORM.Migration
             if (newSnapshot.Tables is null)
                 throw new ArgumentException("newSnapshot.Tables must not be null.", nameof(newSnapshot));
 
-            // Validate FK arrays on both snapshots before starting the diff.
+            // Validate constraint metadata on both snapshots before starting the diff.
             foreach (var t in oldSnapshot.Tables)
+            {
                 foreach (var fk in t.ForeignKeys)
                     ValidateFkSchema(fk, t.Name);
+                foreach (var check in t.CheckConstraints)
+                    ValidateCheckConstraintSchema(check, t.Name);
+            }
             foreach (var t in newSnapshot.Tables)
+            {
                 foreach (var fk in t.ForeignKeys)
                     ValidateFkSchema(fk, t.Name);
+                foreach (var check in t.CheckConstraints)
+                    ValidateCheckConstraintSchema(check, t.Name);
+            }
 
             // Build O(1) lookup dictionaries to avoid O(n²) scans inside the loops.
             // Use last-wins for duplicate table names to match the pre-existing FirstOrDefault behaviour.
@@ -788,6 +825,29 @@ namespace nORM.Migration
                     if (!newFks.ContainsKey(name))
                         diff.DroppedForeignKeys.Add((newTable, oldFk));
                 }
+
+                // Detect CHECK constraint changes by name and normalized SQL predicate.
+                var oldChecks = BuildCheckMap(oldTable);
+                var newChecks = BuildCheckMap(newTable);
+
+                foreach (var (name, newCheck) in newChecks)
+                {
+                    if (!oldChecks.TryGetValue(name, out var oldCheck))
+                    {
+                        diff.AddedCheckConstraints.Add((newTable, newCheck));
+                    }
+                    else if (!CheckEqual(oldCheck, newCheck))
+                    {
+                        diff.DroppedCheckConstraints.Add((newTable, oldCheck));
+                        diff.AddedCheckConstraints.Add((newTable, newCheck));
+                    }
+                }
+
+                foreach (var (name, oldCheck) in oldChecks)
+                {
+                    if (!newChecks.ContainsKey(name))
+                        diff.DroppedCheckConstraints.Add((newTable, oldCheck));
+                }
             }
 
             // Detect dropped tables — tables present in old but not in new.
@@ -816,6 +876,14 @@ namespace nORM.Migration
             if (string.IsNullOrWhiteSpace(fk.PrincipalTable))
                 throw new ArgumentException(
                     $"FK '{fk.ConstraintName}' on table '{owningTableName}' has no PrincipalTable.");
+        }
+
+        private static void ValidateCheckConstraintSchema(CheckConstraintSchema check, string owningTableName)
+        {
+            if (string.IsNullOrWhiteSpace(check.ConstraintName))
+                throw new ArgumentException($"CHECK constraint on table '{owningTableName}' has no ConstraintName.");
+            if (string.IsNullOrWhiteSpace(check.Sql))
+                throw new ArgumentException($"CHECK constraint '{check.ConstraintName}' on table '{owningTableName}' has no SQL predicate.");
         }
 
         /// <summary>
@@ -857,6 +925,12 @@ namespace nORM.Migration
             a.PrincipalColumns.Length == b.PrincipalColumns.Length &&
             a.PrincipalColumns.Zip(b.PrincipalColumns, (x, y) =>
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
+
+        private static bool CheckEqual(CheckConstraintSchema a, CheckConstraintSchema b) =>
+            string.Equals(NormalizeCheckSql(a.Sql), NormalizeCheckSql(b.Sql), StringComparison.OrdinalIgnoreCase);
+
+        private static string NormalizeCheckSql(string sql)
+            => string.Join(" ", sql.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
         internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
@@ -928,6 +1002,18 @@ namespace nORM.Migration
                     .Select(static column => column.Name)
                     .ToArray();
                 map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), includedColumns, filterSql);
+            }
+            return map;
+        }
+
+        private static Dictionary<string, CheckConstraintSchema> BuildCheckMap(TableSchema table)
+        {
+            var map = new Dictionary<string, CheckConstraintSchema>(table.CheckConstraints.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var check in table.CheckConstraints)
+            {
+                if (!map.TryAdd(check.ConstraintName, check))
+                    throw new InvalidOperationException(
+                        $"Duplicate CHECK constraint name '{check.ConstraintName}' on table '{table.Name}'.");
             }
             return map;
         }

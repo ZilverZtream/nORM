@@ -37,6 +37,11 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
 
         /// <summary>
+        /// Gets table-level CHECK constraints configured for migration snapshots.
+        /// </summary>
+        IReadOnlyList<CheckConstraintConfiguration> CheckConstraints { get; }
+
+        /// <summary>
         /// Gets the CLR type that this entity shares its table with, if any.
         /// </summary>
         Type? TableSplitWith { get; }
@@ -84,6 +89,13 @@ namespace nORM.Configuration
     /// <param name="ClrType">The CLR type of the shadow property.</param>
     /// <param name="ColumnName">Optional column name override.</param>
     public record ShadowPropertyConfiguration(Type ClrType, string? ColumnName = null);
+
+    /// <summary>
+    /// Describes a table-level CHECK constraint configured through the fluent model.
+    /// </summary>
+    /// <param name="Name">Database constraint name.</param>
+    /// <param name="Sql">Provider SQL predicate inside the CHECK constraint.</param>
+    public record CheckConstraintConfiguration(string Name, string Sql);
 
     /// <summary>
     /// Configuration details for a relationship between entities including navigation and key information.

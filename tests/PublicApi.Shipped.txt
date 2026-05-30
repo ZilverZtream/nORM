@@ -127,6 +127,13 @@ F:nORM.Execution.AdaptiveTimeoutManager.OperationType.value__:System.Int32
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan):System.Void
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32):System.Void
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32):System.Void
+M:nORM.Configuration.CheckConstraintConfiguration.#ctor(System.String,System.String)
+M:nORM.Configuration.CheckConstraintConfiguration.<Clone>$():nORM.Configuration.CheckConstraintConfiguration
+M:nORM.Configuration.CheckConstraintConfiguration.Deconstruct(System.String&,System.String&):System.Void
+M:nORM.Configuration.CheckConstraintConfiguration.Equals(System.Object):System.Boolean
+M:nORM.Configuration.CheckConstraintConfiguration.Equals(nORM.Configuration.CheckConstraintConfiguration):System.Boolean
+M:nORM.Configuration.CheckConstraintConfiguration.GetHashCode():System.Int32
+M:nORM.Configuration.CheckConstraintConfiguration.ToString():System.String
 M:nORM.Configuration.ConverterConfiguration.#ctor(System.Reflection.PropertyInfo,nORM.Mapping.IValueConverter)
 M:nORM.Configuration.ConverterConfiguration.<Clone>$():nORM.Configuration.ConverterConfiguration
 M:nORM.Configuration.ConverterConfiguration.Deconstruct(System.Reflection.PropertyInfo&,nORM.Mapping.IValueConverter&):System.Void
@@ -155,6 +162,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.St
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithMany(System.Linq.Expressions.Expression{System.Func{`1,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0,`1}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.WithOne(System.Linq.Expressions.Expression{System.Func{`1,`0}}):nORM.Configuration.EntityTypeBuilder{`0,`1}
 M:nORM.Configuration.EntityTypeBuilder{`0}.#ctor()
+M:nORM.Configuration.EntityTypeBuilder{`0}.HasCheckConstraint(System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasColumnName(System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasConversion(nORM.Mapping.IValueConverter):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasDefaultValueSql(System.String):nORM.Configuration.EntityTypeBuilder{`0}
@@ -496,6 +504,7 @@ M:nORM.Mapping.TableMapping.SetPrimaryKey(System.Object,System.Object):System.Vo
 M:nORM.Mapping.TableSplitAttribute.#ctor(System.Type)
 M:nORM.Mapping.ValueConverter{`0,`1}.ConvertFromProvider(`1):System.Object
 M:nORM.Mapping.ValueConverter{`0,`1}.ConvertToProvider(`0):System.Object
+M:nORM.Migration.CheckConstraintSchema.#ctor()
 M:nORM.Migration.ColumnIndexSchema.#ctor()
 M:nORM.Migration.ColumnSchema.#ctor()
 M:nORM.Migration.ForeignKeySchema.#ctor()
@@ -972,6 +981,8 @@ M:nORM.SourceGeneration.CompiledMaterializerStore.Get``1(System.String):System.F
 M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{System.Object}}&):System.Boolean
 M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.String,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{System.Object}}&):System.Boolean
 M:nORM.SourceGeneration.GenerateMaterializerAttribute.#ctor()
+P:nORM.Configuration.CheckConstraintConfiguration.Name:System.String
+P:nORM.Configuration.CheckConstraintConfiguration.Sql:System.String
 P:nORM.Configuration.ConverterConfiguration.Converter:nORM.Mapping.IValueConverter
 P:nORM.Configuration.ConverterConfiguration.Property:System.Reflection.PropertyInfo
 P:nORM.Configuration.DbContextOptions.AmbientTransactionPolicy:nORM.Configuration.AmbientTransactionEnlistmentPolicy
@@ -1000,6 +1011,7 @@ P:nORM.Configuration.DbContextOptions.TimeoutConfiguration:nORM.Execution.Adapti
 P:nORM.Configuration.DbContextOptions.UseBatchedBulkOps:System.Boolean
 P:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking:System.Boolean
 P:nORM.Configuration.EntityTypeBuilder{`0}.Builder:nORM.Configuration.EntityTypeBuilder{`0}
+P:nORM.Configuration.IEntityTypeConfiguration.CheckConstraints:System.Collections.Generic.IReadOnlyList{nORM.Configuration.CheckConstraintConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.Converters:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
@@ -1214,6 +1226,8 @@ P:nORM.Mapping.TableMapping.UpdateColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableSplitAttribute.PrincipalType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ModelType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ProviderType:System.Type
+P:nORM.Migration.CheckConstraintSchema.ConstraintName:System.String
+P:nORM.Migration.CheckConstraintSchema.Sql:System.String
 P:nORM.Migration.ColumnIndexSchema.FilterSql:System.String
 P:nORM.Migration.ColumnIndexSchema.IsDescending:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.IsIncluded:System.Boolean
@@ -1251,11 +1265,13 @@ P:nORM.Migration.MigrationSqlStatements.PostTransactionUp:System.Collections.Gen
 P:nORM.Migration.MigrationSqlStatements.PreTransactionDown:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Migration.MigrationSqlStatements.PreTransactionUp:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Migration.MigrationSqlStatements.Up:System.Collections.Generic.IReadOnlyList{System.String}
+P:nORM.Migration.SchemaDiff.AddedCheckConstraints:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
 P:nORM.Migration.SchemaDiff.AddedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaDiff.AddedForeignKeys:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ForeignKeySchema}}
 P:nORM.Migration.SchemaDiff.AddedIndexes:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}}
 P:nORM.Migration.SchemaDiff.AddedTables:System.Collections.Generic.List{nORM.Migration.TableSchema}
 P:nORM.Migration.SchemaDiff.AlteredColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema,nORM.Migration.ColumnSchema}}
+P:nORM.Migration.SchemaDiff.DroppedCheckConstraints:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
 P:nORM.Migration.SchemaDiff.DroppedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaDiff.DroppedForeignKeys:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ForeignKeySchema}}
 P:nORM.Migration.SchemaDiff.DroppedIndexes:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String}}
@@ -1264,6 +1280,7 @@ P:nORM.Migration.SchemaDiff.HasChanges:System.Boolean
 P:nORM.Migration.SchemaDiff.HasDestructiveChanges:System.Boolean
 P:nORM.Migration.SchemaDiff.RenamedColumns:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,nORM.Migration.ColumnSchema}}
 P:nORM.Migration.SchemaSnapshot.Tables:System.Collections.Generic.List{nORM.Migration.TableSchema}
+P:nORM.Migration.TableSchema.CheckConstraints:System.Collections.Generic.List{nORM.Migration.CheckConstraintSchema}
 P:nORM.Migration.TableSchema.Columns:System.Collections.Generic.List{nORM.Migration.ColumnSchema}
 P:nORM.Migration.TableSchema.ForeignKeys:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
 P:nORM.Migration.TableSchema.Name:System.String
@@ -1346,6 +1363,7 @@ P:nORM.SourceGeneration.CompiledMaterializerStore.Hits:System.Int64
 P:nORM.SourceGeneration.CompiledMaterializerStore.Misses:System.Int64
 T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
 T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
+T:nORM.Configuration.CheckConstraintConfiguration
 T:nORM.Configuration.ClientEvaluationPolicy
 T:nORM.Configuration.ConverterConfiguration
 T:nORM.Configuration.DbContextOptions
@@ -1439,6 +1457,7 @@ T:nORM.Mapping.TableMapping
 T:nORM.Mapping.TableMapping.Relation
 T:nORM.Mapping.TableSplitAttribute
 T:nORM.Mapping.ValueConverter{`0,`1}
+T:nORM.Migration.CheckConstraintSchema
 T:nORM.Migration.ColumnIndexSchema
 T:nORM.Migration.ColumnSchema
 T:nORM.Migration.ForeignKeySchema

@@ -23,6 +23,7 @@ namespace nORM.Configuration
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
+            public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
@@ -33,6 +34,7 @@ namespace nORM.Configuration
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
+            IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
             IReadOnlyDictionary<PropertyInfo, OwnedNavigation> IEntityTypeConfiguration.OwnedNavigations => OwnedNavigations;
             IReadOnlyDictionary<string, ShadowPropertyConfiguration> IEntityTypeConfiguration.ShadowProperties => ShadowProperties;
             IReadOnlyList<RelationshipConfiguration> IEntityTypeConfiguration.Relationships => Relationships;
@@ -98,6 +100,22 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
                 DefaultValues[prop] = sql.Trim();
+            }
+
+            /// <summary>
+            /// Adds a table-level CHECK constraint for migration snapshot generation.
+            /// </summary>
+            /// <param name="name">Database constraint name.</param>
+            /// <param name="sql">Provider SQL predicate inside the CHECK clause.</param>
+            /// <exception cref="ArgumentException">Thrown when either argument is null or whitespace.</exception>
+            public void AddCheckConstraint(string name, string sql)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                    throw new ArgumentException("Check constraint name cannot be null or whitespace.", nameof(name));
+                if (string.IsNullOrWhiteSpace(sql))
+                    throw new ArgumentException("Check constraint SQL cannot be null or whitespace.", nameof(sql));
+                CheckConstraintList.RemoveAll(c => string.Equals(c.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+                CheckConstraintList.Add(new CheckConstraintConfiguration(name.Trim(), sql.Trim()));
             }
 
             /// <summary>
@@ -265,6 +283,20 @@ namespace nORM.Configuration
                 var prop = GetProperty(keyExpression.Body);
                 _config.AddKey(prop);
             }
+            return this;
+        }
+
+        /// <summary>
+        /// Configures a table-level CHECK constraint for migration snapshot generation.
+        /// The SQL predicate is provider SQL and should not include the outer CHECK keyword.
+        /// </summary>
+        /// <param name="name">Database constraint name.</param>
+        /// <param name="sql">Provider SQL predicate inside the CHECK clause.</param>
+        /// <returns>The same builder instance for chaining.</returns>
+        /// <exception cref="ArgumentException">Thrown when either argument is null or whitespace.</exception>
+        public EntityTypeBuilder<TEntity> HasCheckConstraint(string name, string sql)
+        {
+            _config.AddCheckConstraint(name, sql);
             return this;
         }
 

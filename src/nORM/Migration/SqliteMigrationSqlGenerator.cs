@@ -98,6 +98,8 @@ namespace nORM.Migration
                 // MG-1: Emit inline FOREIGN KEY constraints
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
+                foreach (var check in table.CheckConstraints)
+                    colDefs.Add(BuildCheckConstraintSql(check));
 
                 up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
 
@@ -177,6 +179,8 @@ namespace nORM.Migration
                 // MG-1: Restore FK constraints in Down recreation
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
+                foreach (var check in table.CheckConstraints)
+                    colDefs.Add(BuildCheckConstraintSql(check));
                 down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
@@ -258,6 +262,36 @@ namespace nORM.Migration
                 needsDownFkPragma = true;
             }
 
+            // SQLite cannot ALTER CHECK constraints directly. Recreate the table with
+            // the post-diff or pre-diff constraint set, preserving data and indexes.
+            foreach (var tableGroup in diff.AddedCheckConstraints
+                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = diff.AddedCheckConstraints
+                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints);
+                var addedNames = tableGroup.Select(x => x.CheckConstraint.ConstraintName)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var oldChecks = table.CheckConstraints
+                    .Where(check => !addedNames.Contains(check.ConstraintName)).ToList();
+                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, oldChecks);
+                needsUpFkPragma = true;
+                needsDownFkPragma = true;
+            }
+
+            foreach (var tableGroup in diff.DroppedCheckConstraints
+                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = diff.DroppedCheckConstraints
+                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
+                var droppedChecks = tableGroup.Select(x => x.CheckConstraint).ToList();
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints);
+                var restoredChecks = table.CheckConstraints.Concat(droppedChecks).ToList();
+                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, restoredChecks);
+                needsUpFkPragma = true;
+                needsDownFkPragma = true;
+            }
+
             // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
             {
@@ -295,7 +329,8 @@ namespace nORM.Migration
         /// MG-1: Accepts an optional explicit FK list; defaults to table.ForeignKeys when null.
         /// </summary>
         private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols,
-            Dictionary<string, ColumnSchema>? overrides, IReadOnlyList<ForeignKeySchema>? fks = null)
+            Dictionary<string, ColumnSchema>? overrides, IReadOnlyList<ForeignKeySchema>? fks = null,
+            IReadOnlyList<CheckConstraintSchema>? checks = null)
         {
             // Apply overrides if supplied
             if (overrides != null)
@@ -331,6 +366,8 @@ namespace nORM.Migration
             // MG-1: Emit inline FOREIGN KEY constraints (explicit list or fall back to table.ForeignKeys)
             foreach (var fk in fks ?? table.ForeignKeys)
                 colDefs.Add(BuildFkConstraintSql(fk));
+            foreach (var check in checks ?? table.CheckConstraints)
+                colDefs.Add(BuildCheckConstraintSql(check));
 
             // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
             var tempName = $"\"__temp__{table.Name.Replace("\"", "\"\"")}\"";
@@ -398,6 +435,26 @@ namespace nORM.Migration
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON UPDATE {onUpdate}";
             return sql;
+        }
+
+        private static string BuildCheckConstraintSql(CheckConstraintSchema check)
+        {
+            ArgumentNullException.ThrowIfNull(check);
+            return $"CONSTRAINT {Esc(check.ConstraintName)} CHECK ({FormatCheckPredicate(check.Sql)})";
+        }
+
+        private static string FormatCheckPredicate(string sql)
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var trimmed = sql.Trim();
+            if (trimmed.StartsWith("CHECK", StringComparison.OrdinalIgnoreCase))
+            {
+                var open = trimmed.IndexOf('(');
+                var close = trimmed.LastIndexOf(')');
+                if (open >= 0 && close > open)
+                    trimmed = trimmed.Substring(open + 1, close - open - 1).Trim();
+            }
+            return trimmed;
         }
 
         [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
