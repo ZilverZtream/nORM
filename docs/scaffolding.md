@@ -330,10 +330,10 @@ must be reviewed and edited like handwritten model code.
   also pins PostgreSQL materialized-view query artifacts, SQL Server
   provider-native temporal history read-only scaffolds, SQL Server
   table-valued-parameter routine stubs, PostgreSQL array/UUID routine parameter
-  stubs, SQL Server local-table synonym query artifacts, and live
-  alternate-key/self-referencing/schema-qualified many-to-many junction-table
-  mappings, including filtered-unique surrogate join tables that must remain
-  explicit entities instead of unsafe skip navigations.
+  stubs, PostgreSQL UUID/array column scaffolds, SQL Server local-table synonym
+  query artifacts, and live alternate-key/self-referencing/schema-qualified
+  many-to-many junction-table mappings, including filtered-unique surrogate join
+  tables that must remain explicit entities instead of unsafe skip navigations.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
