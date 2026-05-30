@@ -1107,7 +1107,7 @@ namespace nORM.Scaffolding
                         if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
                             continue;
                         var filterSql = isPartial
-                            ? await GetSqliteIndexFilterSqlAsync(connection, name).ConfigureAwait(false)
+                            ? await GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name).ConfigureAwait(false)
                             : null;
 
                         await using var infoCommand = connection.CreateCommand();
@@ -1228,15 +1228,9 @@ namespace nORM.Scaffolding
             return Array.Empty<ScaffoldIndex>();
         }
 
-        private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, string indexName)
+        private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
         {
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = @name";
-            var p = cmd.CreateParameter();
-            p.ParameterName = "@name";
-            p.Value = indexName;
-            cmd.Parameters.Add(p);
-            var sql = Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
+            var sql = await GetSqliteIndexSqlAsync(connection, provider, schemaName, indexName).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(sql))
                 return null;
 

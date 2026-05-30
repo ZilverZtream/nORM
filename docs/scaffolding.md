@@ -128,6 +128,8 @@ must be reviewed and edited like handwritten model code.
   with `IndexAttribute.FilterSql`; SQL Server and PostgreSQL included-column
   indexes are preserved with `IndexAttribute.IsIncluded`. Expression index
   semantics remain diagnostics rather than portable `[Index]` attributes.
+  SQLite attached-schema partial index predicates are read from the owning
+  schema instead of assuming `main.sqlite_master`.
   MySQL prefix indexes are diagnostics and are not used as unique alternate-key
   evidence because prefix uniqueness is not full-column uniqueness.
 - Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL

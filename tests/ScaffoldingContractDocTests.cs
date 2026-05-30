@@ -261,6 +261,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
         Assert.Contains("expression", doc, StringComparison.Ordinal);
         Assert.Contains("included-column", doc, StringComparison.Ordinal);
+        Assert.Contains("SQLite attached-schema partial index predicates", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL prefix indexes", doc, StringComparison.Ordinal);
         Assert.Contains("descending", doc, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PartialIndex", source, StringComparison.Ordinal);
@@ -268,6 +269,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("IncludedColumnIndex", source, StringComparison.Ordinal);
         Assert.Contains("DescendingIndex", source, StringComparison.Ordinal);
         Assert.Contains("PrefixIndex", source, StringComparison.Ordinal);
+        Assert.Contains("GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name)", source, StringComparison.Ordinal);
         Assert.Contains("s.sub_part IS NULL", source, StringComparison.Ordinal);
         Assert.Contains("sub_part IS NOT NULL", source, StringComparison.Ordinal);
     }

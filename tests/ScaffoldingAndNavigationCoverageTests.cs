@@ -1468,6 +1468,7 @@ public class DatabaseScaffolderPrivateMethodTests
                     CONSTRAINT FK_SchemaBook_Author FOREIGN KEY (AuthorId) REFERENCES SchemaAuthor(Id)
                 );
                 CREATE INDEX "aux"."IX_SchemaBook_Title" ON "SchemaBook"(Title);
+                CREATE INDEX "aux"."IX_SchemaBook_Title_Filtered" ON "SchemaBook"(Title) WHERE Title <> '';
                 CREATE TRIGGER "aux"."TR_SchemaBook_Audit" AFTER INSERT ON "SchemaBook" BEGIN SELECT 1; END;
                 CREATE VIEW "aux"."SchemaBookView" AS SELECT Id, Title FROM "SchemaBook";
                 """;
@@ -1490,6 +1491,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
             Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false)", contextCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title\")]", bookCode);
+            Assert.Contains("[Index(\"IX_SchemaBook_Title_Filtered\", FilterSql = \"Title <> ''\")]", bookCode);
             Assert.Contains("aux.SchemaBook", warnings);
             Assert.Contains("TR_SchemaBook_Audit", warnings);
             Assert.Contains("aux.SchemaBookView", warnings);
