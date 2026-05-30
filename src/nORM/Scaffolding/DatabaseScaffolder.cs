@@ -288,20 +288,26 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                 }
 
-                foreach (var reference in references ?? Array.Empty<ScaffoldRelationship>())
+                foreach (var reference in (references ?? Array.Empty<ScaffoldRelationship>())
+                    .OrderBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
+                    .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
                 {
                     sb.AppendLine($"    [ForeignKey(nameof({EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(reference.PrincipalEntityName)}? {EscapeCSharpIdentifier(reference.ReferenceNavigationName)} {{ get; set; }}");
                     sb.AppendLine();
                 }
 
-                foreach (var collection in collections ?? Array.Empty<ScaffoldRelationship>())
+                foreach (var collection in (collections ?? Array.Empty<ScaffoldRelationship>())
+                    .OrderBy(r => r.CollectionNavigationName, StringComparer.Ordinal)
+                    .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
                 {
                     sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.DependentEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
                     sb.AppendLine();
                 }
 
-                foreach (var collection in manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
+                foreach (var collection in (manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
+                    .OrderBy(n => n.CollectionNavigationName, StringComparer.Ordinal)
+                    .ThenBy(n => n.TargetEntityName, StringComparer.Ordinal))
                 {
                     sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.TargetEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
                     sb.AppendLine();
@@ -2563,7 +2569,12 @@ namespace nORM.Scaffolding
                     sb.AppendLine("        configuredOptions.OnModelCreating = mb =>");
                     sb.AppendLine("        {");
                     sb.AppendLine("            configure?.Invoke(mb);");
-                    foreach (var relationship in relationships.OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal).ThenBy(r => r.DependentEntityName, StringComparer.Ordinal))
+                    foreach (var relationship in relationships
+                        .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
+                        .ThenBy(r => r.DependentEntityName, StringComparer.Ordinal)
+                        .ThenBy(r => r.CollectionNavigationName, StringComparer.Ordinal)
+                        .ThenBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
+                        .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
                     {
                         var principal = EscapeCSharpIdentifier(relationship.PrincipalEntityName);
                         var dependent = EscapeCSharpIdentifier(relationship.DependentEntityName);
@@ -2577,7 +2588,12 @@ namespace nORM.Scaffolding
                         var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
                         sb.AppendLine($"                .HasForeignKey(d => d.{foreignKey}, p => p.{principalKey}{cascadeSuffix});");
                     }
-                    foreach (var join in manyToManyJoins.OrderBy(j => j.LeftEntityName, StringComparer.Ordinal).ThenBy(j => j.RightEntityName, StringComparer.Ordinal))
+                    foreach (var join in manyToManyJoins
+                        .OrderBy(j => j.LeftEntityName, StringComparer.Ordinal)
+                        .ThenBy(j => j.RightEntityName, StringComparer.Ordinal)
+                        .ThenBy(j => j.LeftCollectionNavigationName, StringComparer.Ordinal)
+                        .ThenBy(j => j.RightCollectionNavigationName, StringComparer.Ordinal)
+                        .ThenBy(j => j.JoinTableKey, StringComparer.Ordinal))
                     {
                         var left = EscapeCSharpIdentifier(join.LeftEntityName);
                         var right = EscapeCSharpIdentifier(join.RightEntityName);

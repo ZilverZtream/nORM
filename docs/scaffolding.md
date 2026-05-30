@@ -99,7 +99,9 @@ must be reviewed and edited like handwritten model code.
   is allowed, or reported as an error when overwrite protection is enabled.
 - Table discovery and generated output are ordered deterministically so repeated
   scaffolds of the same schema produce reviewable diffs instead of provider
-  metadata-order churn.
+  metadata-order churn. Relationship navigations and fluent relationship
+  configuration are also ordered by generated names rather than raw provider FK
+  discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys are
   listed there instead of being silently ignored or converted into fake
