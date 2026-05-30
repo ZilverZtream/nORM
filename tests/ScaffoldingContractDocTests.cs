@@ -103,7 +103,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
         Assert.Contains("unrecognized FK referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("relationships that do not target the generated principal primary key or an", doc, StringComparison.Ordinal);
-        Assert.Contains("exact unique index", doc, StringComparison.Ordinal);
+        Assert.Contains("exact ordered unique index", doc, StringComparison.Ordinal);
         Assert.Contains("ReferencesScaffoldablePrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("ReferencesUniqueIndex", source, StringComparison.Ordinal);
         Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);

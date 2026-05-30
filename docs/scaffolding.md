@@ -96,9 +96,9 @@ must be reviewed and edited like handwritten model code.
   cascade behavior; valid database referential actions (`NO ACTION`,
   `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
   fluent configuration, including `ON UPDATE` actions. Relationships are emitted when the FK targets the
-  generated principal primary key or an exact unique index exposed by provider
+  generated principal primary key or an exact ordered unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
-  reference the exact generated composite primary key or an exact unique index;
+  reference the exact generated composite primary key or an exact ordered unique index;
   FK shapes targeting keyless tables or non-unique alternate columns are
   reported for manual configuration instead of emitting unsafe fluent code.
   Self-referencing FKs use role-based navigation names derived from the FK
