@@ -1100,6 +1100,34 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithStoredProcedureParametersThatCannotBecomeDto_UsesDictionaryArguments()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "import odd",
+            "SQL Server stored procedure; parameters=2; outputParameters=0; parameterModes=@tenant-id:IN:int,@search text:IN:nvarchar(64)");
+
+        Assert.DoesNotContain("public sealed class ImportOddParameters", code);
+        Assert.Contains("Task<List<TResult>> ImportOddAsync<TResult>(IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("IAsyncEnumerable<TResult> StreamImportOddAsync<TResult>(IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"import odd\"), ct, parameters)", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_dictionary_routine_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithPostgresTableFunction_EmitsSelectStarInvocationWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(

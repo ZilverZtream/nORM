@@ -4596,8 +4596,12 @@ namespace nORM.Scaffolding
                 var requiresPositionalFunctionArguments = isFunctionCallShape
                     && discoveredInputParameterCount > 0
                     && inputParameters.Count == 0;
+                var requiresDictionaryRoutineArguments = !isFunctionCallShape
+                    && discoveredInputParameterCount > 0
+                    && inputParameters.Count == 0;
                 var parameterSignature = requiresPositionalFunctionArguments
                     ? "object?[]? arguments = null"
+                    : requiresDictionaryRoutineArguments ? "IReadOnlyDictionary<string, object?>? parameters = null"
                     : parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
                 if (isFunctionCallShape)
                 {

@@ -170,6 +170,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("parameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("outputParameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("routineType", doc, StringComparison.Ordinal);
+        Assert.Contains("IReadOnlyDictionary<string, object?>", doc, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", doc, StringComparison.Ordinal);
         Assert.Contains("stale `nORM.ScaffoldWarnings.*` files", doc, StringComparison.Ordinal);
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");

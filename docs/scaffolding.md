@@ -187,7 +187,9 @@ must be reviewed and edited like handwritten model code.
   `ushort?`, `byte?`) when the provider exposes the modifier. Function
   wrappers whose provider parameter names cannot safely become C# DTO
   properties use positional `object?[]` arguments instead of silently dropping
-  required function arguments.
+  required function arguments. Stored-procedure wrappers with such parameter
+  names use `IReadOnlyDictionary<string, object?>` arguments so callers can pass
+  exact provider parameter names without unsafe DTO generation.
   Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper
   and a streaming `IAsyncEnumerable<TResult>` wrapper for large result sets.
   When safe
