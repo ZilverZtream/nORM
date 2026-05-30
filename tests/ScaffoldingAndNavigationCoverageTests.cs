@@ -700,6 +700,17 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("SQL Server synonym; baseObject=[dbo].[Orders]; baseType=U", true)]
+    [InlineData("SQL Server synonym; baseObject=[dbo].[OrderView]; baseType=V", true)]
+    [InlineData("SQL Server synonym; baseObject=[dbo].[Rebuild]; baseType=P", false)]
+    [InlineData("SQL Server synonym; baseObject=[remote].[dbo].[Orders]; baseType=", false)]
+    public void IsTableLikeSqlServerSynonym_AllowsOnlyResolvedTableOrViewTargets(string detail, bool expected)
+    {
+        var m = GetMethod("IsTableLikeSqlServerSynonym", new[] { typeof(string) });
+        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+    }
+
+    [Theory]
     [InlineData(typeof(sbyte), "sbyte")]
     [InlineData(typeof(uint), "uint")]
     [InlineData(typeof(ulong), "ulong")]

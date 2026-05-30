@@ -618,7 +618,9 @@ namespace nORM.Scaffolding
                     FROM sys.sequences s
                     INNER JOIN sys.types ty ON ty.user_type_id = s.user_type_id
                     UNION ALL
-                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Synonym', 'SQL Server synonym'
+                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Synonym',
+                           CONCAT('SQL Server synonym; baseObject=', s.base_object_name,
+                                  '; baseType=', COALESCE(CONVERT(nvarchar(20), OBJECTPROPERTYEX(OBJECT_ID(s.base_object_name), 'BaseType')), ''))
                     FROM sys.synonyms s
                     ORDER BY ObjectSchema, ObjectName
                     """).ConfigureAwait(false);
@@ -956,7 +958,18 @@ namespace nORM.Scaffolding
         private static bool IsQueryArtifactObject(ScaffoldSkippedObject obj)
             => string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
                || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase);
+               || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase)
+               || (string.Equals(obj.Kind, "Synonym", StringComparison.OrdinalIgnoreCase) && IsTableLikeSqlServerSynonym(obj.Detail));
+
+        private static bool IsTableLikeSqlServerSynonym(string detail)
+        {
+            if (!detail.StartsWith("SQL Server synonym", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var baseType = ParseSemicolonValue(detail, "baseType");
+            return string.Equals(baseType, "U", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(baseType, "V", StringComparison.OrdinalIgnoreCase);
+        }
 
         private static string[] GetRequestedTableFilters(ScaffoldOptions options)
         {

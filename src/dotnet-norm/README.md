@@ -97,6 +97,10 @@ semantics remain provider-owned.
 With `--emit-routine-stubs`, SQL Server scalar/table-valued functions plus
 PostgreSQL and MySQL functions are emitted as provider-bound `SELECT` wrappers
 instead of stored-procedure calls.
+With `--emit-query-artifacts`, views, materialized views, SQLite virtual
+tables, and SQL Server synonyms whose local base object resolves as a table or
+view can be emitted as read-oriented entities; non-query, remote, or unresolved
+synonyms remain diagnostics.
 When warnings are present, the CLI prints a compact summary with stable
 diagnostic codes and categories, for example `SCF100=1` and
 `schema-feature=1`, so CI logs can route scaffold follow-up without parsing the

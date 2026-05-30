@@ -174,6 +174,9 @@ must be reviewed and edited like handwritten model code.
   does not expose one. Keyless generated types are marked with
   `[ReadOnlyEntity]`, so nORM can materialize them through queries but rejects
   insert/update/delete and tracked `SaveChanges` writes before SQL generation.
+  SQL Server synonyms whose local base object resolves as a table or view can
+  also be emitted as read-oriented query artifacts; procedure synonyms, remote
+  synonyms, and unresolved synonyms remain provider-owned diagnostics.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
@@ -303,11 +306,12 @@ must be reviewed and edited like handwritten model code.
   `HasIdentityOptions`; provider-specific column types, unparsed identity
   strategies, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,
-  synonyms, and events are discovered and reported in scaffold diagnostics, but
-  not converted into complete provider-neutral model code. Views and
-  materialized views and SQLite virtual tables can be emitted as opt-in query
-  artifacts with explicit keyless warnings, and routine wrappers can be emitted
-  as opt-in provider-bound call stubs.
+  unresolved/non-query synonyms, and events are discovered and reported in
+  scaffold diagnostics, but not converted into complete provider-neutral model
+  code. Views, materialized views, SQLite virtual tables, and resolved
+  table/view SQL Server synonyms can be emitted as opt-in query artifacts with
+  explicit keyless warnings, and routine wrappers can be emitted as opt-in
+  provider-bound call stubs.
   Routine diagnostics include provider metadata such as parameter counts,
   output-parameter counts where the provider exposes them, ordered parameter
   mode/type summaries, INOUT direction, output string/binary sizes where
@@ -414,7 +418,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |
 | `SCF202` | `key-generation` | Standalone sequence discovered and skipped. |
-| `SCF203` | `database-object` | SQL Server synonym discovered and skipped. |
+| `SCF203` | `database-object` | SQL Server synonym discovered and skipped. Local table/view synonyms can be emitted through `--emit-query-artifacts`; procedure, remote, or unresolved synonyms remain diagnostics. |
 | `SCF204` | `query-object` | PostgreSQL materialized view discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF205` | `routine` | MySQL event discovered and skipped. |
 | `SCF206` | `virtual-table` | SQLite virtual table discovered; skipped unless emitted as a query artifact through `--emit-query-artifacts` / `--emit-view-entities`. |

@@ -321,6 +321,10 @@ Tables and query artifacts without primary keys are emitted as
 `[ReadOnlyEntity]` types: they can be queried, but nORM rejects generated
 insert/update/delete and tracked `SaveChanges` writes before SQL generation
 until the model has a real key.
+Opt-in query artifacts can include views, materialized views, SQLite virtual
+tables, and SQL Server synonyms whose local base object resolves as a table or
+view; non-query, remote, or unresolved synonyms remain provider-owned
+diagnostics.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
 Clean later scaffold runs remove stale warning reports when overwrite is
