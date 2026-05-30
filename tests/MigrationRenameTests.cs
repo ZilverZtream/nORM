@@ -239,6 +239,7 @@ public class MigrationRenameTests
 
         // New snapshot: built from RenameAttributeEntity which has [RenameColumn("TotalCost")] on TotalAmount.
         var newSnap = SchemaSnapshotBuilder.Build(typeof(RenameAttributeEntity).Assembly);
+        newSnap.Tables.RemoveAll(t => !string.Equals(t.Name, "RenameAttributeOrders", StringComparison.Ordinal));
 
         var diff = SchemaDiffer.Diff(oldSnap, newSnap);
 
