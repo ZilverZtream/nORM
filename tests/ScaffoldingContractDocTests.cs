@@ -101,6 +101,9 @@ public class ScaffoldingContractDocTests
         Assert.Contains("owned sequences are treated as", doc, StringComparison.Ordinal);
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server `PERSISTED`", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL stored generated", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL `VIRTUAL GENERATED`/`STORED", doc, StringComparison.Ordinal);
         Assert.Contains("unrecognized FK referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("relationships that do not target the generated principal primary key or an", doc, StringComparison.Ordinal);
         Assert.Contains("exact ordered unfiltered unique index", doc, StringComparison.Ordinal);
@@ -120,6 +123,10 @@ public class ScaffoldingContractDocTests
         Assert.Contains("RowVersion", source, StringComparison.Ordinal);
         Assert.Contains("IdentityStrategy", source, StringComparison.Ordinal);
         Assert.Contains("TrimTrailingComputedStorageToken", source, StringComparison.Ordinal);
+        Assert.Contains("cc.is_persisted", source, StringComparison.Ordinal);
+        Assert.Contains("generation_expression || ' STORED'", source, StringComparison.Ordinal);
+        Assert.Contains("stored generated", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("virtual generated", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ReferentialAction", source, StringComparison.Ordinal);
         Assert.Contains("RelationshipPrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);

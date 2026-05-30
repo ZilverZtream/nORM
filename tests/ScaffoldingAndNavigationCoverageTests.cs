@@ -179,6 +179,12 @@ public class DatabaseScaffolderPrivateMethodTests
         return (string)m.Invoke(null, new object[] { type, allowNull })!;
     }
 
+    private static (string Sql, bool Stored) InvokeNormalizeScaffoldComputedSql(string raw)
+    {
+        var m = GetMethod("NormalizeScaffoldComputedSql", new[] { typeof(string) });
+        return ((string Sql, bool Stored))m.Invoke(null, new object[] { raw })!;
+    }
+
     private static int? InvokeGetScaffoldMaxLength(Type type, object? columnSize)
     {
         var m = GetMethod("GetScaffoldMaxLength", new[] { typeof(Type), typeof(DataRow) });
@@ -358,6 +364,23 @@ public class DatabaseScaffolderPrivateMethodTests
         var result = InvokeToPascalCase("CUSTOMER_ID");
         // Each segment: C+ustomer = "Customer", I+d = "Id"
         Assert.Equal("CustomerId", result);
+    }
+
+    [Theory]
+    [InlineData("length(Name) VIRTUAL", "length(Name)", false)]
+    [InlineData("length(Name) STORED", "length(Name)", true)]
+    [InlineData("([Total]+[Tax]) PERSISTED", "[Total]+[Tax]", true)]
+    [InlineData("GENERATED ALWAYS AS (Price * Quantity) STORED", "Price * Quantity", true)]
+    [InlineData("GENERATED ALWAYS AS (Price * Quantity) VIRTUAL", "Price * Quantity", false)]
+    public void NormalizeScaffoldComputedSql_StripsStorageTokensAndPreservesStoredFlag(
+        string raw,
+        string expectedSql,
+        bool expectedStored)
+    {
+        var (sql, stored) = InvokeNormalizeScaffoldComputedSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+        Assert.Equal(expectedStored, stored);
     }
 
     [Fact]

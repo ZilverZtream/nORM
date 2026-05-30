@@ -1662,7 +1662,8 @@ namespace nORM.Scaffolding
                     INNER JOIN sys.tables t ON t.object_id = dc.parent_object_id
                     WHERE t.is_ms_shipped = 0
                     UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Computed', cc.definition
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Computed',
+                        CONCAT(cc.definition, CASE WHEN cc.is_persisted = 1 THEN ' PERSISTED' ELSE '' END)
                     FROM sys.computed_columns cc
                     INNER JOIN sys.columns c ON c.object_id = cc.object_id AND c.column_id = cc.column_id
                     INNER JOIN sys.tables t ON t.object_id = cc.object_id
@@ -1785,7 +1786,7 @@ namespace nORM.Scaffolding
                       AND is_identity <> 'YES'
                       AND column_default NOT LIKE 'nextval(%'
                     UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression
+                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression || ' STORED'
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND is_generated <> 'NEVER'
                     UNION ALL
@@ -1878,7 +1879,14 @@ namespace nORM.Scaffolding
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE() AND column_default IS NOT NULL
                     UNION ALL
-                    SELECT NULL, table_name, column_name, 'Computed', generation_expression
+                    SELECT NULL, table_name, column_name, 'Computed',
+                        CONCAT(
+                            generation_expression,
+                            CASE
+                                WHEN LOWER(COALESCE(extra, '')) LIKE '%stored generated%' THEN ' STORED'
+                                WHEN LOWER(COALESCE(extra, '')) LIKE '%virtual generated%' THEN ' VIRTUAL'
+                                ELSE ''
+                            END)
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE() AND generation_expression IS NOT NULL AND generation_expression <> ''
                     UNION ALL
@@ -3750,6 +3758,9 @@ namespace nORM.Scaffolding
             candidate = TrimTrailingComputedStorageToken(candidate, "VIRTUAL");
             candidate = TrimTrailingComputedStorageToken(candidate, "STORED");
             candidate = TrimTrailingComputedStorageToken(candidate, "PERSISTED");
+
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
 
             return (candidate, stored);
         }
