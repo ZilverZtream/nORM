@@ -2188,22 +2188,34 @@ namespace nORM.Scaffolding
         private static int FindMatchingParenthesis(string sql, int openIndex)
         {
             var depth = 0;
-            var inString = false;
+            char? quote = null;
             for (var i = openIndex; i < sql.Length; i++)
             {
                 var ch = sql[i];
-                if (ch == '\'')
+                if (quote is not null)
                 {
-                    if (inString && i + 1 < sql.Length && sql[i + 1] == '\'')
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
                     {
-                        i++;
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
                         continue;
                     }
-                    inString = !inString;
+
                     continue;
                 }
-                if (inString)
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
                     continue;
+                }
+
                 if (ch == '(')
                 {
                     depth++;
