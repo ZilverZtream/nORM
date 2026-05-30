@@ -1220,6 +1220,7 @@ namespace nORM.Scaffolding
                     FROM information_schema.statistics s
                     WHERE s.table_schema = DATABASE()
                       AND s.index_name <> 'PRIMARY'
+                      AND s.sub_part IS NULL
                     ORDER BY s.table_schema, s.table_name, s.index_name, s.seq_in_index
                     """).ConfigureAwait(false);
             }
@@ -1952,6 +1953,12 @@ namespace nORM.Scaffolding
                     WHERE table_schema = DATABASE()
                       AND index_name <> 'PRIMARY'
                       AND collation = 'D'
+                    UNION ALL
+                    SELECT NULL, table_name, index_name, 'PrefixIndex', 'MySQL prefix index'
+                    FROM information_schema.statistics
+                    WHERE table_schema = DATABASE()
+                      AND index_name <> 'PRIMARY'
+                      AND sub_part IS NOT NULL
                     """).ConfigureAwait(false);
             }
 
@@ -2662,6 +2669,7 @@ namespace nORM.Scaffolding
                 "DescendingIndex" => "SCF114",
                 "TemporalTable" => "SCF115",
                 "MissingPrimaryKey" => "SCF116",
+                "PrefixIndex" => "SCF117",
                 _ => "SCF199"
             };
 
@@ -2669,7 +2677,7 @@ namespace nORM.Scaffolding
             => kind switch
             {
                 "ReferentialAction" or "RelationshipPrincipalKey" => "relationship",
-                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" => "index",
+                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" or "PrefixIndex" => "index",
                 "Trigger" or "TemporalTable" => "database-object",
                 "MissingPrimaryKey" => "table-shape",
                 _ => "schema-feature"
@@ -2716,6 +2724,7 @@ namespace nORM.Scaffolding
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
                 "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
                 "DescendingIndex" => "Review this descending index shape; ordinary column-key descending indexes are generated, but this one was not safe to map as provider-neutral index metadata.",
+                "PrefixIndex" => "Keep the MySQL prefix index in provider migrations; prefix uniqueness is not full-column uniqueness and is not used for generated alternate-key relationships.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Generated code marks this type with [ReadOnlyEntity] so query materialization works but nORM writes are rejected; add a primary key before using generated writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."

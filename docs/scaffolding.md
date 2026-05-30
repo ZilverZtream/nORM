@@ -128,6 +128,8 @@ must be reviewed and edited like handwritten model code.
   with `IndexAttribute.FilterSql`; SQL Server and PostgreSQL included-column
   indexes are preserved with `IndexAttribute.IsIncluded`. Expression index
   semantics remain diagnostics rather than portable `[Index]` attributes.
+  MySQL prefix indexes are diagnostics and are not used as unique alternate-key
+  evidence because prefix uniqueness is not full-column uniqueness.
 - Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL
   `decimal`/`numeric` columns. Scaffolding emits
   `[Column(TypeName = "decimal(p,s)")]`; schema snapshots read that metadata,
@@ -297,6 +299,8 @@ must be reviewed and edited like handwritten model code.
   self-referencing pure many-to-many join scaffolding,
   composite-key pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column index diagnostics,
+  MySQL prefix-index diagnostics that exclude prefix uniqueness from generated
+  relationship inference,
   descending index metadata round-tripping,
   safe default-to-`HasDefaultValueSql` promotion, unsafe composite-FK,
   many-to-many candidate, and provider-owned schema diagnostics.
@@ -489,6 +493,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
+| `SCF117` | `index` | MySQL prefix index discovered. Prefix indexes stay provider-owned and are not used as full-column unique alternate-key evidence. |
 | `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
 | `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |

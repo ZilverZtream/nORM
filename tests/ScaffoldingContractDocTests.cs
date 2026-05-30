@@ -240,7 +240,7 @@ public class ScaffoldingContractDocTests
             "SCF001", "SCF002",
             "SCF100", "SCF101", "SCF102", "SCF103", "SCF104", "SCF106", "SCF107",
             "SCF108", "SCF109", "SCF110", "SCF111", "SCF112", "SCF113", "SCF114", "SCF115",
-            "SCF116", "SCF199",
+            "SCF116", "SCF117", "SCF199",
             "SCF200", "SCF201", "SCF202", "SCF203", "SCF204", "SCF205", "SCF206", "SCF207",
             "SCF299"
         };
@@ -261,11 +261,15 @@ public class ScaffoldingContractDocTests
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
         Assert.Contains("expression", doc, StringComparison.Ordinal);
         Assert.Contains("included-column", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL prefix indexes", doc, StringComparison.Ordinal);
         Assert.Contains("descending", doc, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PartialIndex", source, StringComparison.Ordinal);
         Assert.Contains("ExpressionIndex", source, StringComparison.Ordinal);
         Assert.Contains("IncludedColumnIndex", source, StringComparison.Ordinal);
         Assert.Contains("DescendingIndex", source, StringComparison.Ordinal);
+        Assert.Contains("PrefixIndex", source, StringComparison.Ordinal);
+        Assert.Contains("s.sub_part IS NULL", source, StringComparison.Ordinal);
+        Assert.Contains("sub_part IS NOT NULL", source, StringComparison.Ordinal);
     }
 
     [Fact]
