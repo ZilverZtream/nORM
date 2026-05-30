@@ -99,7 +99,8 @@ PostgreSQL and MySQL functions are emitted as provider-bound `SELECT` wrappers
 instead of stored-procedure calls. Stored-procedure stubs include buffered and
 streaming result wrappers; stubs with discovered output metadata include a
 convenience overload that uses the scaffolded `OutputParameter` definitions plus
-an explicit-output overload for reviewed signature changes.
+an explicit-output overload for reviewed signature changes, including INOUT and
+return-value directions where provider metadata exposes them.
 With `--emit-query-artifacts`, views, materialized views, SQLite virtual
 tables, and SQL Server synonyms whose local base object resolves as a table or
 view can be emitted as read-oriented entities; non-query, remote, or unresolved

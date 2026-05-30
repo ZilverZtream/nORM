@@ -291,7 +291,8 @@ PostgreSQL and MySQL functions as provider-bound `SELECT` wrappers instead of
 stored-procedure calls. Stored-procedure stubs include buffered and streaming
 result wrappers; stubs with discovered output metadata include a convenience
 overload that uses the scaffolded `OutputParameter` definitions plus an
-explicit-output overload for reviewed signature changes.
+explicit-output overload for reviewed signature changes, including INOUT and
+return-value directions where provider metadata exposes them.
 Opt-in sequence stubs generate provider-bound next-value wrappers for SQL Server
 and PostgreSQL standalone sequences.
 SQL Server
