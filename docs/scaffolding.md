@@ -23,6 +23,10 @@ must be reviewed and edited like handwritten model code.
   `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.
   SQLite rowid integer primary keys are normalized to non-null `long` properties
   even when provider schema metadata reports nullable `int`.
+  SQLite declared `UUID` columns scaffold as `Guid`, while declared `JSON` and
+  `XML` columns scaffold as string storage instead of being warning-only
+  provider-specific type rows. JSON/XML query semantics remain ordinary string
+  semantics unless the application adds explicit provider-bound queries.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` so the reverse-engineered model carries the
   full key shape explicitly.
@@ -171,7 +175,8 @@ must be reviewed and edited like handwritten model code.
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
   unsafe/provider-specific defaults that fail the safe default allowlist,
-  provider-specific column types,
+  provider-specific column types that cannot be represented as safe scalar
+  storage,
   SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an

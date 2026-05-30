@@ -292,6 +292,8 @@ and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name
 into the model.
 SQLite rowid integer primary keys are generated as non-null `long` properties,
+SQLite `UUID` columns scaffold as `Guid`, and SQLite declared `JSON`/`XML`
+columns scaffold as string storage,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 

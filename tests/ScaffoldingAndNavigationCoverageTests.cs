@@ -595,9 +595,10 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
-    [InlineData("JSON", true)]
+    [InlineData("JSON", false)]
+    [InlineData("XML", false)]
+    [InlineData("UUID", false)]
     [InlineData("GEOMETRY", true)]
-    [InlineData("UUID", true)]
     [InlineData("TEXT", false)]
     [InlineData("INTEGER", false)]
     public void IsSqliteProviderSpecificDeclaredType_FlagsProviderShapedTypes(string declaredType, bool expected)
@@ -1701,6 +1702,8 @@ public class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE ProviderTyped (
                 Id INTEGER PRIMARY KEY,
                 Payload JSON NOT NULL,
+                ExternalUuid UUID NOT NULL,
+                XmlPayload XML NULL,
                 Shape GEOMETRY NULL,
                 PortableText TEXT NOT NULL
             );
@@ -1713,17 +1716,19 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ProviderTypedCtx");
 
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "ProviderTyped.cs"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("ProviderSpecificColumnType", warnings);
-            Assert.Contains("Payload", warnings);
+            Assert.DoesNotContain("Payload |", warnings);
+            Assert.DoesNotContain("ExternalUuid |", warnings);
+            Assert.DoesNotContain("XmlPayload |", warnings);
             Assert.Contains("Shape", warnings);
             Assert.DoesNotContain("PortableText |", warnings);
+            Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
+            Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
+            Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
-                item.GetProperty("name").GetString() == "Payload" &&
-                item.GetProperty("code").GetString() == "SCF104");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                 item.GetProperty("name").GetString() == "Shape" &&
