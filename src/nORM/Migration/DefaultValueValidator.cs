@@ -20,8 +20,9 @@ namespace nORM.Migration
     ///   <item>Standard SQL no-argument functions: CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME,
     ///         LOCALTIME, LOCALTIMESTAMP, CURRENT_USER,
     ///         NOW(), GETDATE(), GETUTCDATE(), NEWID(), NEWSEQUENTIALID(), UUID(),
-    ///         GEN_RANDOM_UUID(), SYSDATE(), SYSDATETIME(), RANDOM(), LAST_INSERT_ID(),
-    ///         CLOCK_TIMESTAMP(), NEXTVAL</item>
+    ///         GEN_RANDOM_UUID(), SYSDATE(), SYSDATETIME(), SYSUTCDATETIME(),
+    ///         SYSDATETIMEOFFSET(), UTC_TIMESTAMP(), RANDOM(), LAST_INSERT_ID(),
+    ///         CLOCK_TIMESTAMP(), TRANSACTION_TIMESTAMP(), NEXTVAL</item>
     /// </list>
     /// All other values (including any string containing semicolons, comments, unbalanced quotes,
     /// or keywords such as DROP/SELECT/INSERT) are rejected with <see cref="ArgumentException"/>.
@@ -42,10 +43,11 @@ namespace nORM.Migration
             @"|now\(\)|getdate\(\)|getutcdate\(\)" +                    // common date functions
             @"|newid\(\)|newsequentialid\(\)" +                         // SQL Server UUID generators
             @"|uuid\(\)|gen_random_uuid\(\)" +                          // PostgreSQL / MySQL UUID generators
-            @"|sysdate\(\)|sysdatetime\(\)" +                           // Oracle / SQL Server variants
+            @"|sysdate\(\)|sysdatetime\(\)|sysutcdatetime\(\)|sysdatetimeoffset\(\)" + // Oracle / SQL Server variants
+            @"|utc_timestamp\(\)" +                                      // MySQL UTC timestamp
             @"|random\(\)" +                                            // H: SQLite / PostgreSQL random value
             @"|last_insert_id\(\)" +                                    // H: MySQL last inserted row ID
-            @"|clock_timestamp\(\)" +                                   // H: PostgreSQL wall-clock timestamp
+            @"|clock_timestamp\(\)|transaction_timestamp\(\)" +          // H: PostgreSQL clock functions
             // H: PostgreSQL/MySQL NEXTVAL — handles both NEXTVAL('seq') and NEXTVAL( 'seq' ) with optional spaces
             @"|nextval\s*\(\s*'[^']*'\s*\)" +                          // sequence nextval (Postgres + MySQL)
             @")\z",
@@ -72,7 +74,7 @@ namespace nORM.Migration
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted ANSI/Unicode strings, boolean literals (TRUE/FALSE), NULL, " +
-                    "and standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), NEWID(), UUID(), etc.) are allowed. " +
+                    "and standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.) are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
 
             return trimmed;

@@ -135,6 +135,11 @@ public class DefaultValueValidatorTests
         new object[] { "GEN_RANDOM_UUID()" },
         new object[] { "SYSDATE()" },
         new object[] { "SYSDATETIME()" },
+        new object[] { "SYSUTCDATETIME()" },
+        new object[] { "SYSDATETIMEOFFSET()" },
+        new object[] { "UTC_TIMESTAMP()" },
+        new object[] { "CLOCK_TIMESTAMP()" },
+        new object[] { "TRANSACTION_TIMESTAMP()" },
     };
 
     [Theory]
