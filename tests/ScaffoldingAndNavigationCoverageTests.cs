@@ -843,14 +843,14 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("public string? message { get; init; }", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
-        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters)", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
-        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters)", code);
         Assert.Contains("without buffering the full result set", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters, outputParameters)", code);
         Assert.Contains("output parameters discovered at scaffold time", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, CreateGetRevenueOutputParameters())", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, parameters, CreateGetRevenueOutputParameters())", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
         Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
         Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", code);
@@ -880,10 +880,35 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Parameters discovered at scaffold time: @orderId IN int, return RETURN int", code);
         Assert.Contains("public int? orderId { get; init; }", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> ApplyDiscountWithOutputAsync<TResult>", code);
-        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.ApplyDiscount\", ct, parameters, CreateApplyDiscountOutputParameters())", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\"), ct, parameters, CreateApplyDiscountOutputParameters())", code);
         Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_return_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithQuotedStoredProcedureName_UsesProviderEscapedInvocationName()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "sales ops",
+            "Get Revenue",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenantId:IN:int");
+
+        Assert.Contains("Provider.Escape(\"sales ops\") + \".\" + Provider.Escape(\"Get Revenue\")", code);
+        Assert.DoesNotContain("\"sales ops.Get Revenue\"", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_quoted_routine_" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(dir);

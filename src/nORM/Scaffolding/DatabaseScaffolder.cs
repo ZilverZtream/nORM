@@ -4464,7 +4464,7 @@ namespace nORM.Scaffolding
                 var outputFactory = outputParameters.Count > 0
                     ? MakeUnique("Create" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "OutputParameters", memberNames)
                     : null;
-                var procedureName = EscapeStringLiteral(QualifiedRoutineName(routine));
+                var routineNameExpression = FormatProviderEscapedRoutineName(routine);
                 var parameterSummary = FormatRoutineParameterSummary(metadata);
                 var isFunctionCallShape = IsFunctionCallShape(callShape);
                 var isScalarFunction = string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
@@ -4502,14 +4502,14 @@ namespace nORM.Scaffolding
                 else
                 {
                     sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>(\"{procedureName}\", ct, parameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, parameters);");
 
                     var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                     sb.AppendLine();
                     sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
                     sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>(\"{procedureName}\", ct, parameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, parameters);");
                 }
 
                 if (outputParameterCount > 0 && !isFunctionCallShape)
@@ -4519,7 +4519,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters.</summary>");
                     sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>(\"{procedureName}\", ct, parameters, outputParameters);");
+                    sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, parameters, outputParameters);");
 
                     if (outputFactory != null)
                     {
@@ -4527,7 +4527,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters discovered at scaffold time.</summary>");
                         sb.AppendLine("    /// <remarks>Use this overload when the scaffolded output parameter metadata still matches the database routine. Pass explicit output parameters to the overload with <c>params OutputParameter[]</c> after routine signature changes.</remarks>");
                         sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>(\"{procedureName}\", ct, parameters, {outputFactory}());");
+                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, parameters, {outputFactory}());");
 
                         sb.AppendLine();
                         sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
