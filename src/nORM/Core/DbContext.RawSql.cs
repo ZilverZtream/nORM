@@ -465,6 +465,7 @@ namespace nORM.Core
             var keyProperty = keyValueType.GetProperty(nameof(KeyValuePair<string, object?>.Key))!;
             var valueProperty = keyValueType.GetProperty(nameof(KeyValuePair<string, object?>.Value))!;
             var values = new List<(string name, object value)>();
+            var hasProviderParameters = false;
             foreach (var item in enumerable)
             {
                 if (item is null)
@@ -474,10 +475,38 @@ namespace nORM.Core
                 var pName = FormatStoredProcedureParameterName(provider, key ?? string.Empty);
                 var pValue = valueProperty.GetValue(item) ?? DBNull.Value;
                 values.Add((pName, pValue));
-                paramDict[pName] = pValue;
+                hasProviderParameters |= pValue is DbParameter;
             }
 
-            cmd.SetParametersFast(values.ToArray());
+            if (hasProviderParameters)
+            {
+                cmd.Parameters.Clear();
+                foreach (var (name, value) in values)
+                {
+                    if (value is DbParameter providerParameter)
+                    {
+                        providerParameter.ParameterName = name;
+                        cmd.Parameters.Add(providerParameter);
+                        paramDict[name] = providerParameter.Value ?? DBNull.Value;
+                    }
+                    else
+                    {
+                        var parameter = cmd.CreateParameter();
+                        parameter.ParameterName = name;
+                        nORM.Query.ParameterAssign.AssignValue(parameter, value);
+                        cmd.Parameters.Add(parameter);
+                        paramDict[name] = value;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var (name, value) in values)
+                    paramDict[name] = value;
+
+                cmd.SetParametersFast(values.ToArray());
+            }
+
             return true;
         }
 

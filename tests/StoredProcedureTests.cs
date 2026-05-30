@@ -132,6 +132,56 @@ public class StoredProcedureTests
         Assert.Equal(11, results[0].Id);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_BindsDbParameterDictionaryValues()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(12,'Mu'),(13,'Nu');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?>
+        {
+            ["id"] = new SqliteParameter { Value = 13 }
+        };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Nu", results[0].Name);
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_DictionaryKeyOverridesDbParameterName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(14,'Xi'),(15,'Omicron');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?>
+        {
+            ["id"] = new SqliteParameter("@wrong", 15)
+        };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Omicron", results[0].Name);
+    }
+
     /// <summary>
     /// ExecuteStoredProcedureAsAsyncEnumerable already correctly uses Provider.StoredProcedureCommandType.
     /// Verify all three overloads produce consistent results on SQLite.
