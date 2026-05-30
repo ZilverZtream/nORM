@@ -1010,6 +1010,36 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithPostgresFunctionAdvancedParameterTypes_EmitsTypedParameterDto()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate_campaign",
+            "PostgreSQL function; parameters=5; outputParameters=0; parameterModes=tenant_id:IN:integer,duration:IN:interval,customer_ids:IN:ARRAY (_int4),labels:IN:ARRAY (_text),note:IN:USER-DEFINED (citext); dataType=integer");
+
+        Assert.Contains("public int? tenant_id { get; init; }", code);
+        Assert.Contains("public TimeSpan? duration { get; init; }", code);
+        Assert.Contains("public int[]? customer_ids { get; init; }", code);
+        Assert.Contains("public string[]? labels { get; init; }", code);
+        Assert.Contains("public string? note { get; init; }", code);
+        Assert.DoesNotContain("public object? duration { get; init; }", code);
+        Assert.DoesNotContain("public object? customer_ids { get; init; }", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_pg_routine_types_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithPostgresTableFunction_EmitsSelectStarInvocationWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(

@@ -678,7 +678,13 @@ namespace nORM.Scaffolding
                            COALESCE((
                                SELECT string_agg(
                                    COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' ||
-                                   COALESCE(p.data_type, '') ||
+                                   CASE
+                                       WHEN p.data_type IN ('ARRAY', 'USER-DEFINED')
+                                            AND p.udt_name IS NOT NULL
+                                            AND p.udt_name <> ''
+                                       THEN p.data_type || ' (' || p.udt_name || ')'
+                                       ELSE COALESCE(p.data_type, '')
+                                   END ||
                                    CASE
                                        WHEN p.character_maximum_length IS NOT NULL THEN '(' || p.character_maximum_length::text || ')'
                                        WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN '(' || p.numeric_precision::text || ',' || p.numeric_scale::text || ')'
@@ -4908,10 +4914,9 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(dataType))
                 return "object?";
 
-            var normalized = dataType.Trim().ToLowerInvariant();
-            var paren = normalized.IndexOf('(');
-            if (paren >= 0)
-                normalized = normalized[..paren].Trim();
+            var normalized = NormalizeRoutineDataType(dataType);
+            if (TryMapPostgresArrayRoutineType(normalized, out var arrayTypeName))
+                return arrayTypeName + "?";
 
             normalized = normalized switch
             {
@@ -4937,9 +4942,11 @@ namespace nORM.Scaffolding
                 "real" or "float4" => "float?",
                 "date" => "DateOnly?",
                 "time" => "TimeOnly?",
+                "interval" => "TimeSpan?",
                 "datetime" or "datetime2" or "smalldatetime" or "timestamp" => "DateTime?",
                 "datetimeoffset" or "timestamptz" => "DateTimeOffset?",
                 "uniqueidentifier" or "uuid" => "Guid?",
+                "bpchar" => "string?",
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
                 "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => "byte[]?",
                 _ => "object?"
@@ -4951,10 +4958,9 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(dataType))
                 return nameof(DbType.Object);
 
-            var normalized = dataType.Trim().ToLowerInvariant();
-            var paren = normalized.IndexOf('(');
-            if (paren >= 0)
-                normalized = normalized[..paren].Trim();
+            var normalized = NormalizeRoutineDataType(dataType);
+            if (TryMapPostgresArrayRoutineType(normalized, out _))
+                return nameof(DbType.Object);
 
             normalized = normalized switch
             {
@@ -4979,14 +4985,89 @@ namespace nORM.Scaffolding
                 "float" or "float8" or "double" => nameof(DbType.Double),
                 "real" or "float4" => nameof(DbType.Single),
                 "date" => nameof(DbType.Date),
-                "time" => nameof(DbType.Time),
+                "time" or "interval" => nameof(DbType.Time),
                 "datetime" or "datetime2" or "smalldatetime" or "timestamp" => nameof(DbType.DateTime),
                 "datetimeoffset" or "timestamptz" => nameof(DbType.DateTimeOffset),
                 "uniqueidentifier" or "uuid" => nameof(DbType.Guid),
+                "bpchar" => nameof(DbType.String),
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => nameof(DbType.String),
                 "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => nameof(DbType.Binary),
                 _ => nameof(DbType.Object)
             };
+        }
+
+        private static string NormalizeRoutineDataType(string dataType)
+        {
+            var normalized = dataType.Trim().ToLowerInvariant();
+            var paren = normalized.IndexOf('(');
+            var baseType = paren >= 0 ? normalized[..paren].Trim() : normalized;
+
+            if (paren >= 0 && (baseType == "array" || baseType == "user-defined"))
+            {
+                var close = normalized.IndexOf(')', paren + 1);
+                if (close > paren)
+                {
+                    var inner = normalized.Substring(paren + 1, close - paren - 1).Trim();
+                    if (!string.IsNullOrWhiteSpace(inner))
+                    {
+                        if (baseType == "array")
+                            return "array (" + inner + ")";
+
+                        var userDefined = inner.TrimStart('_');
+                        if (userDefined is "citext" or "json" or "jsonb" or "xml")
+                            return userDefined;
+                    }
+                }
+            }
+
+            normalized = baseType;
+
+            return normalized switch
+            {
+                "character varying" or "varying character" => "varchar",
+                "national character varying" => "nvarchar",
+                "character" => "char",
+                "double precision" => "double",
+                "timestamp without time zone" => "timestamp",
+                "timestamp with time zone" => "timestamptz",
+                "time without time zone" or "time with time zone" => "time",
+                _ => normalized
+            };
+        }
+
+        private static bool TryMapPostgresArrayRoutineType(string normalized, out string typeName)
+        {
+            typeName = string.Empty;
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+                return false;
+
+            var open = normalized.IndexOf('(');
+            var close = normalized.IndexOf(')', open + 1);
+            if (open < 0 || close <= open)
+                return false;
+
+            var element = normalized.Substring(open + 1, close - open - 1).Trim().TrimStart('_');
+            typeName = element switch
+            {
+                "int2" or "smallint" => "short[]",
+                "int4" or "integer" => "int[]",
+                "int8" or "bigint" => "long[]",
+                "float4" or "real" => "float[]",
+                "float8" or "double precision" => "double[]",
+                "numeric" or "decimal" => "decimal[]",
+                "bool" or "boolean" => "bool[]",
+                "uuid" => "Guid[]",
+                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => "string[]",
+                "bytea" => "byte[][]",
+                "date" => "DateOnly[]",
+                "time" or "time without time zone" or "time with time zone" => "TimeOnly[]",
+                "interval" => "TimeSpan[]",
+                "timestamp" or "timestamp without time zone" => "DateTime[]",
+                "timestamptz" or "timestamp with time zone" => "DateTimeOffset[]",
+                _ => string.Empty
+            };
+
+            return typeName.Length > 0;
         }
 
         private static string NormalizeRoutineParameterName(string? name)
