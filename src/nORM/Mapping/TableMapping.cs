@@ -372,20 +372,22 @@ namespace nORM.Mapping
 
             foreach (var m2m in fluentConfig.ManyToManyRelationships)
             {
-                // Resolve the left PK column (this entity)
-                if (KeyColumns.Length == 0)
+                // Resolve the left PK column (this entity). The v1 UsingTable API
+                // accepts one left FK and one right FK, so composite-key M2M must
+                // fail closed instead of silently using the first key column.
+                if (KeyColumns.Length != 1)
                     throw new NormConfigurationException(
                         $"Many-to-many relationship on '{Type.Name}' requires a single-column primary key. " +
-                        "Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
+                        "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
                 var leftPkCol = KeyColumns[0];
 
-                // Resolve the right entity mapping and PK column
+                // Resolve the right entity mapping and PK column.
                 var rightMapping = ctx.GetMapping(m2m.RelatedType);
-                if (rightMapping.KeyColumns.Length == 0)
+                if (rightMapping.KeyColumns.Length != 1)
                     throw new NormConfigurationException(
-                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which has no " +
-                        "single-column primary key. Add a [Key] attribute or use HasKey() in OnModelCreating on the " +
-                        "related type.");
+                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which must have a " +
+                        "single-column primary key. Map composite-key join tables as explicit join entities, or use a " +
+                        "single-column surrogate key for skip-navigation many-to-many.");
                 var rightPkCol = rightMapping.KeyColumns[0];
 
                 // Resolve nav properties

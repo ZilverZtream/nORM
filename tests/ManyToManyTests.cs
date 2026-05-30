@@ -59,6 +59,29 @@ public class ManyToManyTests
         public string Title { get; set; } = string.Empty;
     }
 
+    private class CompositeStudent
+    {
+        public int TenantId { get; set; }
+        public int StudentId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public List<Course> Courses { get; set; } = new();
+    }
+
+    private class CompositeCourse
+    {
+        public int TenantId { get; set; }
+        public int CourseId { get; set; }
+        public string Title { get; set; } = string.Empty;
+    }
+
+    private class StudentWithCompositeCourses
+    {
+        [Key]
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public List<CompositeCourse> Courses { get; set; } = new();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private static SqliteConnection CreateOpenDb(string ddl)
@@ -202,6 +225,48 @@ public class ManyToManyTests
         using var ctx = CreateArticleContext(cn);
         var articleMap = ctx.GetMapping(typeof(Article));
         Assert.Single(articleMap.ManyToManyJoins);
+    }
+
+    [Fact]
+    public void M2M1_CompositeLeftKey_FailsClosed()
+    {
+        using var cn = CreateStudentCourseDb();
+        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<CompositeStudent>()
+                    .HasKey(s => new { s.TenantId, s.StudentId })
+                    .HasMany<Course>(s => s.Courses)
+                    .WithMany()
+                    .UsingTable("StudentCourse", "StudentId", "CourseId");
+            }
+        });
+
+        var ex = Assert.Throws<NormConfigurationException>(() => ctx.GetMapping(typeof(CompositeStudent)));
+        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("explicit join entities", ex.Message);
+    }
+
+    [Fact]
+    public void M2M1_CompositeRightKey_FailsClosed()
+    {
+        using var cn = CreateStudentCourseDb();
+        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<StudentWithCompositeCourses>()
+                    .HasMany<CompositeCourse>(s => s.Courses)
+                    .WithMany()
+                    .UsingTable("StudentCourse", "StudentId", "CourseId");
+                mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
+            }
+        });
+
+        var ex = Assert.Throws<NormConfigurationException>(() => ctx.GetMapping(typeof(StudentWithCompositeCourses)));
+        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("explicit join entities", ex.Message);
     }
 
     // ── M2M-2: Insert with join rows ──────────────────────────────────────

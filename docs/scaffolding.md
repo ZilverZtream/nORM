@@ -278,6 +278,12 @@ dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF111` | `index` | Filtered/partial index discovered. |
 | `SCF112` | `index` | Expression index discovered. |
 | `SCF113` | `index` | Included-column index discovered. |
+
+For v1 runtime mapping, `UsingTable` skip navigations are intentionally limited
+to one FK column per side. Composite-key junction tables are generated and
+loaded as explicit join entities instead; configuring `UsingTable` against a
+composite-key entity fails closed with `NormConfigurationException` rather than
+using only the first key column.
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |

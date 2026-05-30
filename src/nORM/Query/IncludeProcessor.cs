@@ -91,10 +91,10 @@ namespace nORM.Query
             var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
             var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
             // M2M requires single-column PK on both sides; guard early.
-            if (leftMapping.KeyColumns.Length == 0)
+            if (leftMapping.KeyColumns.Length != 1)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
-                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
+                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantActive;
 
@@ -141,10 +141,10 @@ namespace nORM.Query
                 rightParamNames.Add(pn);
             }
             // M2M requires single-column PK on the right side; guard early.
-            if (rightMapping.KeyColumns.Length == 0)
+            if (rightMapping.KeyColumns.Length != 1)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
-                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
+                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
             var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
@@ -265,10 +265,10 @@ namespace nORM.Query
             var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
             var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
             // M2M requires single-column PK on both sides; guard early.
-            if (leftMapping.KeyColumns.Length == 0)
+            if (leftMapping.KeyColumns.Length != 1)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
-                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
+                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
             var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantActive;
 
@@ -312,10 +312,10 @@ namespace nORM.Query
                 rightParamNames.Add(pn);
             }
             // M2M requires single-column PK on the right side; guard early.
-            if (rightMapping.KeyColumns.Length == 0)
+            if (rightMapping.KeyColumns.Length != 1)
                 throw new NormConfigurationException(
                     $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
-                    $"Add a [Key] attribute or use HasKey() in OnModelCreating to configure the primary key.");
+                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
             var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var rightInClause = $"({string.Join(", ", rightParamNames)})";
 
