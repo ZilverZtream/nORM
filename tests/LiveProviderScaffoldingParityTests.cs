@@ -996,6 +996,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(".HasCheckConstraint(", contextCode, StringComparison.Ordinal);
                 Assert.Contains(FeatureOwnedCheckName, contextCode, StringComparison.Ordinal);
                 Assert.Contains("HasComputedColumnSql(", contextCode, StringComparison.Ordinal);
+                Assert.Contains("HasCollation(", contextCode, StringComparison.Ordinal);
 
                 if (File.Exists(warningJsonPath))
                 {
@@ -1007,7 +1008,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                     Assert.DoesNotContain(providerOwned, item =>
                         item.GetProperty("table").GetString()!.Split('.').Last() == FeatureOwnedTable &&
-                        item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed");
+                        item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed" or "Collation");
                 }
 
                 AssertScaffoldOutputBuilds(dir);
@@ -1786,13 +1787,13 @@ public sealed class LiveProviderScaffoldingParityTests
         var createSql = kind switch
         {
             ProviderKind.SqlServer =>
-                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} AS (LEN({name})) PERSISTED, CONSTRAINT {checkName} CHECK (LEN({name}) > 0))",
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} COLLATE Latin1_General_BIN2 NOT NULL, {nameLength} AS (LEN({name})) PERSISTED, CONSTRAINT {checkName} CHECK (LEN({name}) > 0))",
             ProviderKind.Postgres =>
-                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} integer GENERATED ALWAYS AS (char_length({name})) STORED, CONSTRAINT {checkName} CHECK (char_length({name}) > 0))",
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} COLLATE \"C\" NOT NULL, {nameLength} integer GENERATED ALWAYS AS (char_length({name})) STORED, CONSTRAINT {checkName} CHECK (char_length({name}) > 0))",
             ProviderKind.MySql =>
-                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} INT GENERATED ALWAYS AS (CHAR_LENGTH({name})) STORED, CONSTRAINT {checkName} CHECK (CHAR_LENGTH({name}) > 0))",
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, {nameLength} INT GENERATED ALWAYS AS (CHAR_LENGTH({name})) STORED, CONSTRAINT {checkName} CHECK (CHAR_LENGTH({name}) > 0))",
             ProviderKind.Sqlite =>
-                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {nameLength} INTEGER GENERATED ALWAYS AS (length({name})) VIRTUAL, CONSTRAINT {checkName} CHECK (length({name}) > 0))",
+                $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} COLLATE NOCASE NOT NULL, {nameLength} INTEGER GENERATED ALWAYS AS (length({name})) VIRTUAL, CONSTRAINT {checkName} CHECK (length({name}) > 0))",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
         };
 

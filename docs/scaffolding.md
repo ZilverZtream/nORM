@@ -327,8 +327,9 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` proves opt-in view entity scaffolding
   emits compiling query artifacts and explicit missing-primary-key diagnostics
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers. It
-  also pins live promotion of provider CHECK constraints and computed/generated
-  column expressions into generated model configuration across those providers.
+  also pins live promotion of provider CHECK constraints, computed/generated
+  column expressions, and explicit column collations into generated model
+  configuration across those providers.
   The SQLite generated-column extractor is parser-based rather than regex-only,
   so quoted identifiers inside expressions do not cause computed metadata to be
   left behind as unresolved diagnostics. The same test class also pins
