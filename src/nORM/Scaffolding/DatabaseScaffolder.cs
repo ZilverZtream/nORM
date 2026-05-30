@@ -1649,7 +1649,7 @@ namespace nORM.Scaffolding
                     PrincipalTables = g.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
                     ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
                 })
-                .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
                 .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .ToArray();
@@ -1930,7 +1930,7 @@ namespace nORM.Scaffolding
                     PrincipalTables = g.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
                     ConstraintNames = g.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray()
                 })
-                .Where(g => g.PrincipalTables.Length == 2 && g.ConstraintNames.Length >= 2)
+                .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
                 .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .Select(g => new

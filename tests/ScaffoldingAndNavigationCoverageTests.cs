@@ -2023,6 +2023,47 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithUnsafeSelfJoinTable_EmitsManyToManyDiagnostic()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Person (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE PersonFriend (
+                PersonId INTEGER,
+                FriendId INTEGER,
+                PRIMARY KEY (PersonId, FriendId),
+                CONSTRAINT FK_PersonFriend_Person FOREIGN KEY (PersonId) REFERENCES Person(Id),
+                CONSTRAINT FK_PersonFriend_Friend FOREIGN KEY (FriendId) REFERENCES Person(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "UnsafeSelfJoinCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "PersonFriend.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "UnsafeSelfJoinCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain(".UsingTable(\"PersonFriend\"", contextCode);
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            Assert.Equal("PersonFriend", joinTables[0].GetProperty("table").GetString());
+            Assert.Single(joinTables[0].GetProperty("principalTables").EnumerateArray());
+            Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPureJoinTable_UsesJoinTableNameForNavigationDirection()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
