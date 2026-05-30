@@ -212,6 +212,7 @@ namespace nORM.Query
                 // whole projection as client-eval and SelectTranslator throws the dad1fec
                 // message even though SCV can actually emit valid SQL.
                 nameof(Enumerable.Select),
+                nameof(Enumerable.SelectMany),
                 nameof(Enumerable.Where)
             };
 

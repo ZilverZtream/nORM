@@ -932,7 +932,10 @@ namespace nORM.Query
                 var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
                 if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
                 {
-                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation);
+                    var hop2Filter = node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression hop2Predicate
+                        ? hop2Predicate
+                        : null;
+                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation, hop2Filter);
                     return node;
                 }
             }
@@ -1226,34 +1229,43 @@ namespace nORM.Query
             string methodName,
             TableMapping.Relation hop1Rel,
             TableMapping intermediateMapping,
-            TableMapping.Relation hop2Rel)
+            TableMapping.Relation hop2Rel,
+            LambdaExpression? hop2Filter)
         {
             var hop2DepMapping = _ctx!.GetMapping(hop2Rel.DependentType);
             var hop1EscTable  = intermediateMapping.EscTable;
             var hop1Alias     = _provider.Escape("__mhn1");
-            var hop1FkEscCol  = hop1Rel.ForeignKey.EscCol;
-            var hop1PkEscCol  = hop1Rel.PrincipalKey.EscCol;
             var hop2EscTable  = hop2DepMapping.EscTable;
             var hop2Alias     = _provider.Escape("__mhn2");
-            var hop2FkEscCol  = hop2Rel.ForeignKey.EscCol;
-            // The inner SELECT returns the PK on the intermediate table that hop2's FK points to.
-            var hop2PkEscCol  = hop2Rel.PrincipalKey.EscCol;
-
-            var innerSql = $"SELECT {hop1Alias}.{hop2PkEscCol} FROM {hop1EscTable} {hop1Alias}" +
-                           $" WHERE {hop1Alias}.{hop1FkEscCol} = {_outerAlias}.{hop1PkEscCol}";
+            var hop2FilterSql = hop2Filter != null
+                ? RenderNavigationFilter(hop2Filter, hop2Alias)
+                : null;
 
             if (methodName is nameof(Queryable.Any))
             {
                 sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
-                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
-                  .Append(" IN (").Append(innerSql).Append(')')
-                  .Append(") THEN 1 ELSE 0 END)");
+                  .Append(" WHERE ");
+                if (hop2FilterSql != null)
+                    sb.Append(hop2FilterSql).Append(" AND ");
+                sb.Append("EXISTS(SELECT 1 FROM ").Append(hop1EscTable).Append(' ').Append(hop1Alias)
+                  .Append(" WHERE ");
+                AppendNavigationRelationPredicate(sb, hop1Rel, hop1Alias, _outerAlias);
+                sb.Append(" AND ");
+                AppendNavigationRelationPredicate(sb, hop2Rel, hop2Alias, hop1Alias);
+                sb.Append(")) THEN 1 ELSE 0 END)");
             }
             else // Count / LongCount
             {
                 sb.Append("(SELECT COUNT(*) FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
-                  .Append(" WHERE ").Append(hop2Alias).Append('.').Append(hop2FkEscCol)
-                  .Append(" IN (").Append(innerSql).Append("))");
+                  .Append(" WHERE ");
+                if (hop2FilterSql != null)
+                    sb.Append(hop2FilterSql).Append(" AND ");
+                sb.Append("EXISTS(SELECT 1 FROM ").Append(hop1EscTable).Append(' ').Append(hop1Alias)
+                  .Append(" WHERE ");
+                AppendNavigationRelationPredicate(sb, hop1Rel, hop1Alias, _outerAlias);
+                sb.Append(" AND ");
+                AppendNavigationRelationPredicate(sb, hop2Rel, hop2Alias, hop1Alias);
+                sb.Append("))");
             }
         }
 

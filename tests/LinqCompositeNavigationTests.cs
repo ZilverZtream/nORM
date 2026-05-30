@@ -43,9 +43,18 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
                 Code TEXT NOT NULL,
                 PRIMARY KEY (TenantId, OrderId)
             );
+            CREATE TABLE LcnShipment (
+                TenantId INTEGER NOT NULL,
+                OrderId INTEGER NOT NULL,
+                LineNo INTEGER NOT NULL,
+                ShipmentId INTEGER NOT NULL,
+                Tracking TEXT NOT NULL,
+                PRIMARY KEY (TenantId, OrderId, LineNo, ShipmentId)
+            );
             INSERT INTO LcnOrder VALUES (1,100,'Alice'),(2,100,'Bob'),(1,101,'Cara');
             INSERT INTO LcnLine VALUES (1,100,1,10),(1,100,2,20),(2,100,1,999),(1,101,1,7);
             INSERT INTO LcnReceipt VALUES (1,100,'alice-receipt'),(2,100,'bob-receipt'),(1,101,'cara-receipt');
+            INSERT INTO LcnShipment VALUES (1,100,1,1,'a1'),(1,100,1,2,'a2'),(2,100,1,1,'b1'),(1,101,1,1,'c1');
             """;
         await cmd.ExecuteNonQueryAsync();
 
@@ -56,10 +65,15 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
                 mb.Entity<LcnOrder>().HasKey(o => new { o.TenantId, o.OrderId });
                 mb.Entity<LcnLine>().HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
                 mb.Entity<LcnReceipt>().HasKey(r => new { r.TenantId, r.OrderId });
+                mb.Entity<LcnShipment>().HasKey(s => new { s.TenantId, s.OrderId, s.LineNo, s.ShipmentId });
                 mb.Entity<LcnOrder>()
                     .HasMany(o => o.Lines)
                     .WithOne()
                     .HasForeignKey(l => new { l.TenantId, l.OrderId });
+                mb.Entity<LcnLine>()
+                    .HasMany(l => l.Shipments)
+                    .WithOne()
+                    .HasForeignKey(s => new { s.TenantId, s.OrderId, s.LineNo });
             }
         };
         _ctx = new DbContext(_cn, new SqliteProvider(), options);
@@ -194,6 +208,31 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         Assert.Equal("bob-receipt", bob.Receipt!.Code);
     }
 
+    [Fact]
+    public async Task Two_hop_navigation_count_uses_all_composite_key_columns()
+    {
+        var rows = (await _ctx.Query<LcnOrder>()
+            .Select(o => new
+            {
+                o.TenantId,
+                o.OrderId,
+                ShipmentCount = o.Lines.SelectMany(l => l.Shipments).Count(),
+                HasBobShipment = o.Lines.SelectMany(l => l.Shipments).Any(s => s.Tracking == "b1")
+            })
+            .ToListAsync())
+            .OrderBy(r => r.TenantId)
+            .ThenBy(r => r.OrderId)
+            .ToArray();
+
+        var alice = rows.Single(r => r.TenantId == 1 && r.OrderId == 100);
+        var bob = rows.Single(r => r.TenantId == 2 && r.OrderId == 100);
+
+        Assert.Equal(2, alice.ShipmentCount);
+        Assert.False(alice.HasBobShipment);
+        Assert.Equal(1, bob.ShipmentCount);
+        Assert.True(bob.HasBobShipment);
+    }
+
     [Table("LcnOrder")]
     public sealed class LcnOrder
     {
@@ -212,6 +251,7 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         public int OrderId { get; set; }
         public int LineNo { get; set; }
         public int Amount { get; set; }
+        public List<LcnShipment> Shipments { get; set; } = new();
     }
 
     [Table("LcnReceipt")]
@@ -220,5 +260,15 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         public int TenantId { get; set; }
         public int OrderId { get; set; }
         public string Code { get; set; } = string.Empty;
+    }
+
+    [Table("LcnShipment")]
+    public sealed class LcnShipment
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
+        public int ShipmentId { get; set; }
+        public string Tracking { get; set; } = string.Empty;
     }
 }
