@@ -28,6 +28,11 @@ var rows = await context.ExecuteStoredProcedureAsync<UserStats>(
     parameters: new { TenantId = tenantId, StartDate = startDate });
 ```
 
+Anonymous objects are the normal parameter shape. For provider-owned routines
+whose names cannot be represented as C# properties, pass an
+`IReadOnlyDictionary<string, object?>`/`Dictionary<string, object?>`; keys may
+be bare names (`TenantId`) or provider-prefixed names (`@TenantId`).
+
 The procedure body must use the tenant parameter in every read and write:
 
 ```sql

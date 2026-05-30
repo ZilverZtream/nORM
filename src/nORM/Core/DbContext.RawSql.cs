@@ -274,19 +274,7 @@ namespace nORM.Core
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
                 var paramDict = new Dictionary<string, object>();
-                if (parameters != null)
-                {
-                    var props = parameters.GetType().GetProperties();
-                    var span = new (string name, object value)[props.Length];
-                    for (int i = 0; i < props.Length; i++)
-                    {
-                        var pName = ctx._p.ParamPrefix + props[i].Name;
-                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                        span[i] = (pName, pValue);
-                        paramDict[pName] = pValue;
-                    }
-                    cmd.SetParametersFast(span);
-                }
+                SetStoredProcedureParameters(cmd, ctx._p, parameters, paramDict);
 
                 ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict);
 
@@ -320,19 +308,7 @@ namespace nORM.Core
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
             var paramDict = new Dictionary<string, object>();
-            if (parameters != null)
-            {
-                var props = parameters.GetType().GetProperties();
-                var span = new (string name, object value)[props.Length];
-                for (int i = 0; i < props.Length; i++)
-                {
-                    var pName = _p.ParamPrefix + props[i].Name;
-                    var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                    span[i] = (pName, pValue);
-                    paramDict[pName] = pValue;
-                }
-                cmd.SetParametersFast(span);
-            }
+            SetStoredProcedureParameters(cmd, _p, parameters, paramDict);
 
             ValidateStoredProcedureCommandText(procedureName, Provider, paramDict);
 
@@ -371,19 +347,7 @@ namespace nORM.Core
                 cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
 
                 var paramDict = new Dictionary<string, object>();
-                if (parameters != null)
-                {
-                    var props = parameters.GetType().GetProperties();
-                    var span = new (string name, object value)[props.Length];
-                    for (int i = 0; i < props.Length; i++)
-                    {
-                        var pName = ctx._p.ParamPrefix + props[i].Name;
-                        var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
-                        span[i] = (pName, pValue);
-                        paramDict[pName] = pValue;
-                    }
-                    cmd.SetParametersFast(span);
-                }
+                SetStoredProcedureParameters(cmd, ctx._p, parameters, paramDict);
 
                 var outputParamMap = new Dictionary<string, DbParameter>();
                 foreach (var op in outputParameters)
@@ -451,6 +415,61 @@ namespace nORM.Core
             }
 
             return null;
+        }
+
+        private static void SetStoredProcedureParameters(
+            DbCommand cmd,
+            Providers.DatabaseProvider provider,
+            object? parameters,
+            Dictionary<string, object> paramDict)
+        {
+            if (parameters is null)
+                return;
+
+            if (parameters is IEnumerable<KeyValuePair<string, object?>> pairs)
+            {
+                var values = new List<(string name, object value)>();
+                foreach (var pair in pairs)
+                {
+                    var pName = FormatStoredProcedureParameterName(provider, pair.Key);
+                    var pValue = pair.Value ?? DBNull.Value;
+                    values.Add((pName, pValue));
+                    paramDict[pName] = pValue;
+                }
+
+                cmd.SetParametersFast(values.ToArray());
+                return;
+            }
+
+            var props = parameters.GetType().GetProperties();
+            var span = new (string name, object value)[props.Length];
+            for (int i = 0; i < props.Length; i++)
+            {
+                var pName = provider.ParamPrefix + props[i].Name;
+                var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
+                span[i] = (pName, pValue);
+                paramDict[pName] = pValue;
+            }
+
+            cmd.SetParametersFast(span);
+        }
+
+        private static string FormatStoredProcedureParameterName(Providers.DatabaseProvider provider, string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new NormUsageException("Stored procedure dictionary parameter names cannot be null, empty, or whitespace.");
+
+            var trimmed = name.Trim();
+            if (trimmed.StartsWith(provider.ParamPrefix, StringComparison.Ordinal))
+                return trimmed;
+
+            if (trimmed[0] is '@' or ':' or '?')
+                trimmed = trimmed.TrimStart('@', ':', '?');
+
+            if (trimmed.Length == 0)
+                throw new NormUsageException("Stored procedure dictionary parameter names must contain a name after the provider prefix.");
+
+            return provider.ParamPrefix + trimmed;
         }
 
         internal static void ValidateStoredProcedureCommandText(

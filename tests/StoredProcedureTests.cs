@@ -66,6 +66,50 @@ public class StoredProcedureTests
         Assert.Equal("Delta", results[0].Name);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_BindsDictionaryParameters()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(7,'Eta'),(8,'Theta');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?> { ["id"] = 8 };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Theta", results[0].Name);
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_BindsPrefixedDictionaryParameters()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(9,'Iota');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?> { ["@id"] = 9 };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Iota", results[0].Name);
+    }
+
     /// <summary>
     /// ExecuteStoredProcedureAsAsyncEnumerable already correctly uses Provider.StoredProcedureCommandType.
     /// Verify all three overloads produce consistent results on SQLite.
