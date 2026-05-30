@@ -264,16 +264,20 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 schema-preserving table mapping, identifier cleanup, table filtering,
-preflighted overwrite protection, nullable-safe output, provider
+deterministic repeated output, preflighted overwrite protection, nullable-safe output, provider
 metadata-backed identity columns, computed/generated column metadata, SQL
 Server rowversion/timestamp metadata, single-column FK
-navigation generation with cascade/non-cascade delete behavior, pure
-many-to-many join mapping including schema-qualified join tables, and
+navigation generation with cascade/non-cascade delete behavior, role-based
+self-referencing FK and self-join names, pure many-to-many join mapping including
+schema-qualified join tables, and
 single-column/composite index metadata are
 supported, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name
 into the model.
+SQLite rowid integer primary keys are generated as non-null `long` properties,
+and dynamic `Query(string)` scaffolding mirrors static required/generated
+metadata for supported shapes.
 
 Unsupported composite foreign keys, payload join tables, provider-specific
 defaults, computed column expressions, check constraints, collations, provider
@@ -288,6 +292,9 @@ section counts, and suggested actions so CI can route scaffold follow-up without
 parsing prose.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
+Clean later scaffold runs remove stale warning reports when overwrite is
+allowed, or fail clearly when overwrite protection would leave stale reports in
+place.
 Composite FK navigation generation, payload join-table modeling, owned-type
 inference, inheritance inference, view entity generation, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding

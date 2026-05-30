@@ -669,11 +669,12 @@ Resolution note:
   the same contract: base-table entity scaffolding, schema preservation for SQL
   Server/PostgreSQL/SQLite attached databases, MySQL catalog-portable metadata,
   nullable-safe generated code, provider metadata-backed identity columns,
-  computed/generated and rowversion metadata, single-column FK navigations
-  only when the FK targets the generated principal primary key,
+  computed/generated and rowversion metadata, deterministic generated output,
+  SQLite rowid key normalization, static/dynamic required metadata parity,
+  single-column FK navigations only when the FK targets the generated principal primary key,
   cascade/non-cascade delete preservation, pure many-to-many join mappings
-  including schema-qualified join tables, index metadata, warning reports, and
-  `--fail-on-warnings`.
+  including schema-qualified and self-referencing role-named join tables, index
+  metadata, warning reports, and `--fail-on-warnings`.
 - Warning reports are structured evidence, not prose dumps: JSON rows include
   stable diagnostic codes, severity, category, suggested actions, section
   counts, and code/category summaries; stale warning reports are removed or
