@@ -276,7 +276,7 @@ namespace nORM.Navigation
         {
             var mapping = _context.GetMapping(entityType);
             if (!mapping.Relations.TryGetValue(propertyName, out var relation) ||
-                relation.PrincipalKey.Getter(entity) == null)
+                GetPrincipalKeyValue(relation, entity) == null)
             {
                 completed = Task.FromResult(new List<object>());
                 return true;
@@ -343,7 +343,7 @@ namespace nORM.Navigation
                     return;
                 }
 
-                var keys = entities.Select(e => relation.PrincipalKey.Getter(e.Entity))
+                var keys = entities.Select(e => GetPrincipalKeyValue(relation, e.Entity))
                                    .Where(k => k != null)
                                    .Distinct()
                                    .ToList();
@@ -356,7 +356,7 @@ namespace nORM.Navigation
                 }
 
                 var relatedData = await LoadRelatedDataBatch(relation, keys, ct).ConfigureAwait(false);
-                var grouped = relatedData.GroupBy(relation.ForeignKey.Getter)
+                var grouped = relatedData.GroupBy(entity => GetForeignKeyValue(relation, entity))
                                          .ToDictionary(g => g.Key!, g => g.ToList());
 
                 foreach (var (entity, tcs, callerCt) in entities)
@@ -366,7 +366,7 @@ namespace nORM.Navigation
                         tcs.TrySetCanceled(callerCt);
                         continue;
                     }
-                    var key = relation.PrincipalKey.Getter(entity);
+                    var key = GetPrincipalKeyValue(relation, entity);
                     var related = key != null && grouped.TryGetValue(key, out var list) ? list : new List<object>();
                     tcs.TrySetResult(related);
                 }
@@ -426,7 +426,8 @@ namespace nORM.Navigation
             // "too many variables" errors. SQLite allows ≤ 999 params, SQL Server ≤ 2100,
             // PostgreSQL ≤ 32767. Reserve 10 params for any ambient predicates (e.g. tenant).
             var maxParams = _context.RawProvider.MaxParameters;
-            var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, maxParams - 10);
+            var keyWidth = Math.Max(1, relation.ForeignKeys.Count);
+            var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, (maxParams - 10) / keyWidth);
 
             using var translator = Query.QueryTranslator.Rent(_context);
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
@@ -451,7 +452,8 @@ namespace nORM.Navigation
             _context.EnsureConnection();
 
             var maxParams = _context.RawProvider.MaxParameters;
-            var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, maxParams - 10);
+            var keyWidth = Math.Max(1, relation.ForeignKeys.Count);
+            var maxKeysPerChunk = maxParams == int.MaxValue ? keys.Count : Math.Max(1, (maxParams - 10) / keyWidth);
 
             using var translator = Query.QueryTranslator.Rent(_context);
             var materializer = translator.CreateMaterializer(mapping, relation.DependentType);
@@ -469,6 +471,53 @@ namespace nORM.Navigation
             return results;
         }
 
+        private static object? GetPrincipalKeyValue(TableMapping.Relation relation, object entity)
+            => GetRelationKeyValue(relation.PrincipalKeys, entity);
+
+        private static object? GetForeignKeyValue(TableMapping.Relation relation, object entity)
+            => GetRelationKeyValue(relation.ForeignKeys, entity);
+
+        private static object? GetRelationKeyValue(IReadOnlyList<Column> columns, object entity)
+        {
+            if (columns.Count == 1)
+                return columns[0].Getter(entity);
+
+            var values = new object?[columns.Count];
+            for (var i = 0; i < columns.Count; i++)
+            {
+                values[i] = columns[i].Getter(entity);
+                if (values[i] is null)
+                    return null;
+            }
+
+            return new RelationKey(values);
+        }
+
+        private string BuildNavigationWhereClause(DbCommand cmd, TableMapping.Relation relation, List<object?> chunk)
+        {
+            if (!relation.IsComposite)
+                return _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+
+            var clauses = new List<string>(chunk.Count);
+            for (var keyIndex = 0; keyIndex < chunk.Count; keyIndex++)
+            {
+                if (chunk[keyIndex] is not RelationKey key || key.Values.Length != relation.ForeignKeys.Count)
+                    throw new NormConfigurationException(
+                        $"Composite navigation load for '{relation.NavProp.Name}' expected {relation.ForeignKeys.Count} key values.");
+
+                var parts = new string[relation.ForeignKeys.Count];
+                for (var columnIndex = 0; columnIndex < relation.ForeignKeys.Count; columnIndex++)
+                {
+                    var paramName = $"{_context.RawProvider.ParamPrefix}nav{keyIndex}_{columnIndex}";
+                    cmd.AddParam(paramName, key.Values[columnIndex]!);
+                    parts[columnIndex] = $"{relation.ForeignKeys[columnIndex].EscCol} = {paramName}";
+                }
+                clauses.Add("(" + string.Join(" AND ", parts) + ")");
+            }
+
+            return clauses.Count == 0 ? "1 = 0" : "(" + string.Join(" OR ", clauses) + ")";
+        }
+
         /// <summary>
         /// Executes a single <c>WHERE IN</c> query for a chunk of foreign key values and
         /// materializes the results into tracked entities.
@@ -481,7 +530,7 @@ namespace nORM.Navigation
             CancellationToken ct)
         {
             using var cmd = _context.CreateCommand();
-            var where = _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+            var where = BuildNavigationWhereClause(cmd, relation, chunk);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
@@ -508,7 +557,7 @@ namespace nORM.Navigation
             CancellationToken ct)
         {
             using var cmd = _context.CreateCommand();
-            var where = _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+            var where = BuildNavigationWhereClause(cmd, relation, chunk);
             cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
@@ -526,6 +575,37 @@ namespace nORM.Navigation
                 results.Add(entity);
             }
             return results;
+        }
+
+        private sealed class RelationKey : IEquatable<RelationKey>
+        {
+            public object?[] Values { get; }
+
+            public RelationKey(object?[] values) => Values = values;
+
+            public bool Equals(RelationKey? other)
+            {
+                if (other is null || other.Values.Length != Values.Length)
+                    return false;
+
+                for (var i = 0; i < Values.Length; i++)
+                {
+                    if (!object.Equals(Values[i], other.Values[i]))
+                        return false;
+                }
+
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as RelationKey);
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var value in Values)
+                    hash.Add(value);
+                return hash.ToHashCode();
+            }
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Navigation;
 using nORM.Providers;
 using Xunit;
 
@@ -117,6 +118,23 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         Assert.Equal(new[] { 10, 20 }, rows.Where(r => r.Customer == "Alice").Select(r => r.Amount).ToArray());
         Assert.Equal(new[] { 999 }, rows.Where(r => r.Customer == "Bob").Select(r => r.Amount).ToArray());
         Assert.Equal(new[] { 7 }, rows.Where(r => r.Customer == "Cara").Select(r => r.Amount).ToArray());
+    }
+
+    [Fact]
+    public async Task Batched_navigation_loader_uses_all_composite_key_columns()
+    {
+        var orders = await _ctx.Query<LcnOrder>().ToListAsync();
+        using var loader = new BatchedNavigationLoader(_ctx);
+
+        var alice = orders.Single(o => o.TenantId == 1 && o.OrderId == 100);
+        var bob = orders.Single(o => o.TenantId == 2 && o.OrderId == 100);
+
+        var aliceTask = loader.LoadNavigationAsync(alice, nameof(LcnOrder.Lines));
+        var bobTask = loader.LoadNavigationAsync(bob, nameof(LcnOrder.Lines));
+        var loaded = await Task.WhenAll(aliceTask, bobTask);
+
+        Assert.Equal(new[] { 10, 20 }, loaded[0].Cast<LcnLine>().Select(l => l.Amount).OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { 999 }, loaded[1].Cast<LcnLine>().Select(l => l.Amount).ToArray());
     }
 
     [Table("LcnOrder")]
