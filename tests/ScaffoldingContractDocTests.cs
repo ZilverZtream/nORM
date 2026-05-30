@@ -230,6 +230,43 @@ public class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Docs_and_gate_pin_recent_scaffold_hardening_scope()
+    {
+        var doc = ReadDoc();
+        var rootReadme = ReadRepoFile("README.md");
+        var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
+        var releaseGates = ReadRepoFile("docs", "release-gates.md");
+        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        var dynamicSource = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs");
+
+        Assert.Contains("Repeated scaffolds of the same schema", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("ordered deterministically", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("stale `nORM.ScaffoldWarnings.*`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("role-based self-referencing FK and self-join navigations", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("SQLite rowid integer primary keys are generated as non-null `long`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("stale warning reports", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("SQLite rowid integer primary keys are normalized to non-null `long`", doc, StringComparison.Ordinal);
+        Assert.Contains("non-null reference-column `[Required]` parity", doc, StringComparison.Ordinal);
+        Assert.Contains("Self-referencing pure join tables", doc, StringComparison.Ordinal);
+
+        Assert.Contains("Scaffold_sqlite_output_builds_as_consumer_project", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("Scaffold_clean_run_removes_stale_warning_reports_without_printing_summary", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("LiveProviderScaffoldingParityTests", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("already-built `nORM.dll`", releaseGates, StringComparison.Ordinal);
+
+        Assert.Contains("NormalizeScaffoldClrType", source, StringComparison.Ordinal);
+        Assert.Contains("effectiveAllowNull", source, StringComparison.Ordinal);
+        Assert.Contains("isSelfRelationship", source, StringComparison.Ordinal);
+        Assert.Contains("isSelfJoin", source, StringComparison.Ordinal);
+        Assert.Contains("LeftCollectionNavigationName", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeScaffoldClrType", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("effectiveAllowNull", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("RequiredAttribute", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("BuildSchemaDescriptor", dynamicSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_and_source_pin_literal_dotted_identifier_scaffolding()
     {
         var doc = ReadDoc();
