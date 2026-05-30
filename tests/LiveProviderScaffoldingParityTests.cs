@@ -66,6 +66,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
+    private const string ProviderDescendingIndex = "IX_ScaffoldLiveProviderIndex_Descending";
     private const string ProviderPrefixIndex = "IX_ScaffoldLiveProviderIndex_Prefix";
     private const string SqlServerTemporalBaseTable = "ScaffoldLiveTemporalOrder";
     private const string SqlServerTemporalHistoryTable = "ScaffoldLiveTemporalOrderHistory";
@@ -1048,8 +1049,11 @@ public sealed class LiveProviderScaffoldingParityTests
                     : JsonDocument.Parse("{\"providerOwnedSchemaFeatures\":[]}");
 
                 Assert.Contains($"[Index(\"{ProviderPartialIndex}\", FilterSql = ", entityCode, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{ProviderDescendingIndex}\", IsDescending = true)]", entityCode, StringComparison.Ordinal);
                 Assert.DoesNotContain("PartialIndex", warnings, StringComparison.Ordinal);
                 Assert.DoesNotContain(ProviderPartialIndex, warnings, StringComparison.Ordinal);
+                Assert.DoesNotContain("DescendingIndex", warnings, StringComparison.Ordinal);
+                Assert.DoesNotContain(ProviderDescendingIndex, warnings, StringComparison.Ordinal);
 
                 if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
                 {
@@ -1074,6 +1078,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.DoesNotContain(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "IncludedColumnIndex" &&
                     item.GetProperty("name").GetString() == ProviderIncludedIndex);
+                Assert.DoesNotContain(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "DescendingIndex" &&
+                    item.GetProperty("name").GetString() == ProviderDescendingIndex);
             }
             finally
             {
@@ -1613,6 +1620,7 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection,
             $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL, {active} {activeType} NOT NULL, {includedValue} {IntType(kind)} NOT NULL)");
         await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPartialIndex)} ON {table} ({name}) WHERE {activePredicate}");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderDescendingIndex)} ON {table} ({name} DESC)");
 
         if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
             await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionIndex)} ON {table} (lower({name}))");
