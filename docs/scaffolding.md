@@ -181,6 +181,9 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in view entity scaffolding
   converts a SQLite view into a compiling query artifact while preserving the
   missing-primary-key diagnostic.
+- `LiveProviderScaffoldingParityTests` proves opt-in view entity scaffolding
+  emits compiling query artifacts and explicit missing-primary-key diagnostics
+  across configured SQLite, SQL Server, PostgreSQL, and MySQL providers.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, computed/identity/rowversion metadata in the dynamic cache key
@@ -218,14 +221,16 @@ must be reviewed and edited like handwritten model code.
   foreign keys do not target the generated primary keys. These are reported in
   scaffold diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
-  collations, column types, triggers, views, temporal tables, and keyless
-  tables. Defaults, computed/generated columns, check constraints, collations,
+  collations, column types, triggers, temporal tables, and keyless tables.
+  Defaults, computed/generated columns, check constraints, collations,
   provider-specific column types, non-default identity
   seed/increment settings, triggers, SQL Server provider-native temporal
-  tables, keyless tables, SQLite virtual tables and shadow tables, views,
-  routines, sequences, synonyms, materialized views, and events are discovered
-  and reported in scaffold diagnostics, but not converted into complete
-  provider-neutral model code.
+  tables, keyless tables, SQLite virtual tables and shadow tables, sequences,
+  synonyms, and events are discovered and reported in scaffold diagnostics, but
+  not converted into complete provider-neutral model code. Views and
+  materialized views can be emitted as opt-in query artifacts with explicit
+  keyless warnings, and routine wrappers can be emitted as opt-in provider-bound
+  call stubs.
   Routine diagnostics include provider metadata such as parameter counts,
   output-parameter counts where the provider exposes them, ordered parameter
   mode/type summaries, and result/data type hints so stored

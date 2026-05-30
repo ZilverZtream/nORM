@@ -435,6 +435,54 @@ public sealed class LiveProviderScaffoldingParityTests
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_emits_view_entities_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSkippedViewAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_view_entity_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldViewEntityContext",
+                    new ScaffoldOptions { Tables = new[] { WarningView }, EmitViewEntities = true, OverwriteFiles = false });
+
+                var viewCode = await File.ReadAllTextAsync(Path.Combine(dir, WarningView + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldViewEntityContext.cs"));
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+                Assert.Contains($"[Table(\"{WarningView}", viewCode, StringComparison.Ordinal);
+                Assert.Contains($"IQueryable<{WarningView}>", contextCode, StringComparison.Ordinal);
+                Assert.True(File.Exists(warningJsonPath));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
+                Assert.Empty(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray());
+                Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                    item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                    item.GetProperty("table").GetString()!.EndsWith(WarningView, StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSkippedViewAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_reports_provider_specific_index_diagnostics_on_live_provider(ProviderKind kind)
     {
