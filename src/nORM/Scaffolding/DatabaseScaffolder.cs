@@ -3186,9 +3186,13 @@ namespace nORM.Scaffolding
                     ? outputCount
                     : 0;
                 var inputParameters = GetRoutineInputParameters(metadata);
+                var outputParameters = GetRoutineOutputParameters(metadata);
                 var methodBase = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                 var parameterType = inputParameters.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
+                    : null;
+                var outputFactory = outputParameters.Count > 0
+                    ? MakeUnique("Create" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "OutputParameters", memberNames)
                     : null;
                 var procedureName = EscapeStringLiteral(QualifiedRoutineName(routine));
                 var parameterSummary = FormatRoutineParameterSummary(metadata);
@@ -3221,6 +3225,18 @@ namespace nORM.Scaffolding
                     sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>(\"{procedureName}\", ct, parameters, outputParameters);");
+
+                    if (outputFactory != null)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
+                        sb.AppendLine($"    public static OutputParameter[] {outputFactory}()");
+                        sb.AppendLine("        => new[]");
+                        sb.AppendLine("        {");
+                        foreach (var parameter in outputParameters)
+                            sb.AppendLine($"            new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}),");
+                        sb.AppendLine("        };");
+                    }
                 }
             }
         }
@@ -3285,6 +3301,46 @@ namespace nORM.Scaffolding
             return names.ToArray();
         }
 
+        private static IReadOnlyList<RoutineOutputParameter> GetRoutineOutputParameters(IReadOnlyDictionary<string, object?> metadata)
+        {
+            if (!metadata.TryGetValue("parameters", out var parametersValue)
+                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
+                || parameters.Count == 0)
+            {
+                return Array.Empty<RoutineOutputParameter>();
+            }
+
+            var names = new List<RoutineOutputParameter>();
+            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var parameter in parameters)
+            {
+                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
+                if (!string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(mode, "INOUT", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var rawName = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
+                var normalized = NormalizeRoutineParameterName(rawName);
+                if (string.IsNullOrWhiteSpace(normalized))
+                    return Array.Empty<RoutineOutputParameter>();
+
+                var escaped = EscapeCSharpIdentifier(normalized);
+                if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
+                    return Array.Empty<RoutineOutputParameter>();
+
+                if (!usedNames.Add(escaped))
+                    return Array.Empty<RoutineOutputParameter>();
+
+                var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
+                names.Add(new RoutineOutputParameter(escaped, GetRoutineParameterDbTypeName(dataType)));
+            }
+
+            return names.ToArray();
+        }
+
         private static string GetRoutineParameterTypeName(string? dataType)
         {
             if (string.IsNullOrWhiteSpace(dataType))
@@ -3325,6 +3381,49 @@ namespace nORM.Scaffolding
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
                 "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => "byte[]?",
                 _ => "object?"
+            };
+        }
+
+        private static string GetRoutineParameterDbTypeName(string? dataType)
+        {
+            if (string.IsNullOrWhiteSpace(dataType))
+                return nameof(DbType.Object);
+
+            var normalized = dataType.Trim().ToLowerInvariant();
+            var paren = normalized.IndexOf('(');
+            if (paren >= 0)
+                normalized = normalized[..paren].Trim();
+
+            normalized = normalized switch
+            {
+                "character varying" or "varying character" => "varchar",
+                "national character varying" => "nvarchar",
+                "character" => "char",
+                "double precision" => "double",
+                "timestamp without time zone" => "timestamp",
+                "timestamp with time zone" => "timestamptz",
+                "time without time zone" or "time with time zone" => "time",
+                _ => normalized
+            };
+
+            return normalized switch
+            {
+                "int" or "integer" or "int4" or "mediumint" => nameof(DbType.Int32),
+                "bigint" or "int8" => nameof(DbType.Int64),
+                "smallint" or "int2" => nameof(DbType.Int16),
+                "tinyint" => nameof(DbType.Byte),
+                "bit" or "bool" or "boolean" => nameof(DbType.Boolean),
+                "decimal" or "numeric" or "money" or "smallmoney" => nameof(DbType.Decimal),
+                "float" or "float8" or "double" => nameof(DbType.Double),
+                "real" or "float4" => nameof(DbType.Single),
+                "date" => nameof(DbType.Date),
+                "time" => nameof(DbType.Time),
+                "datetime" or "datetime2" or "smalldatetime" or "timestamp" => nameof(DbType.DateTime),
+                "datetimeoffset" or "timestamptz" => nameof(DbType.DateTimeOffset),
+                "uniqueidentifier" or "uuid" => nameof(DbType.Guid),
+                "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => nameof(DbType.String),
+                "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => nameof(DbType.Binary),
+                _ => nameof(DbType.Object)
             };
         }
 
@@ -3727,6 +3826,10 @@ namespace nORM.Scaffolding
         private readonly record struct RoutineStubParameter(
             string Name,
             string TypeName);
+
+        private readonly record struct RoutineOutputParameter(
+            string Name,
+            string DbType);
 
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,

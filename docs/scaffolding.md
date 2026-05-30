@@ -116,9 +116,11 @@ must be reviewed and edited like handwritten model code.
   discovered schema-qualified routine name. When provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
-  etc.) and falls back to `object?` only for unmapped provider types. XML
-  comments list the discovered parameter metadata. Routine bodies remain
-  provider-owned and are not translated across database engines.
+  etc.) and falls back to `object?` only for unmapped provider types. When safe
+  output parameter metadata is available, scaffolding also emits an
+  `OutputParameter[]` factory with mapped `DbType` values. XML comments list the
+  discovered parameter metadata. Routine bodies remain provider-owned and are
+  not translated across database engines.
 - Optional query-artifact view entities through
   `ScaffoldOptions.EmitViewEntities` and CLI `--emit-view-entities`.
   Generated view/materialized-view classes are intended for reads; scaffolding
