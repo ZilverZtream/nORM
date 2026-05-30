@@ -310,6 +310,8 @@ public class DocumentationContractTests
         Assert.Contains("privileged execution paths", contract, StringComparison.Ordinal);
         Assert.Contains("TenantId", contract, StringComparison.Ordinal);
         Assert.Contains("allowlisted", contract, StringComparison.Ordinal);
+        Assert.Contains("DbParameter", contract, StringComparison.Ordinal);
+        Assert.Contains("table-valued parameters", contract, StringComparison.Ordinal);
         Assert.Contains("docs/stored-procedure-security.md", tenantContract, StringComparison.Ordinal);
         Assert.Contains("ExecuteStoredProcedureAsync<UserStats>", tenantContract, StringComparison.Ordinal);
     }

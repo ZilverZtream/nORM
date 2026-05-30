@@ -32,6 +32,12 @@ Anonymous objects are the normal parameter shape. For provider-owned routines
 whose names cannot be represented as C# properties, pass an
 `IReadOnlyDictionary<string, object?>`/`Dictionary<string, object?>`; keys may
 be bare names (`TenantId`) or provider-prefixed names (`@TenantId`).
+Anonymous-object/DTO properties and dictionary values may also be explicit
+provider `DbParameter` instances for reviewed provider-owned inputs such as SQL
+Server table-valued parameters. In those cases the object property or
+dictionary key is authoritative for the parameter name, while the supplied
+`DbParameter` preserves provider-specific type, direction, size, precision, and
+structured-value metadata.
 
 The procedure body must use the tenant parameter in every read and write:
 
