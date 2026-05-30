@@ -155,7 +155,7 @@ namespace nORM.Scaffolding
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
                     && TryParseDecimalPrecision(feature.Detail, out _, out _));
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
@@ -2923,6 +2923,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
@@ -2951,15 +2952,27 @@ namespace nORM.Scaffolding
                     continue;
 
                 var fkColumnNames = fkGroups.SelectMany(rows => rows.Select(fk => fk.DependentColumn)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (joinColumns.Count != fkColumnNames.Count || joinColumns.Keys.Any(column => !fkColumnNames.Contains(column)))
-                    continue;
-
-                if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns)
-                    || joinPrimaryKeyColumns.Count != fkColumnNames.Count
-                    || joinPrimaryKeyColumns.Any(column => !fkColumnNames.Contains(column)))
+                if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns))
                 {
                     continue;
                 }
+
+                var hasExactBridgePrimaryKey = joinPrimaryKeyColumns.Count == fkColumnNames.Count
+                    && joinPrimaryKeyColumns.All(column => fkColumnNames.Contains(column));
+                var extraColumns = joinColumns.Keys.Where(column => !fkColumnNames.Contains(column)).ToArray();
+                var hasGeneratedSurrogatePrimaryKey = extraColumns.Length == 1
+                    && joinPrimaryKeyColumns.Count == 1
+                    && string.Equals(joinPrimaryKeyColumns[0], extraColumns[0], StringComparison.OrdinalIgnoreCase)
+                    && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
+                    && identityColumns.Contains(extraColumns[0])
+                    && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
+
+                if (!(joinColumns.Count == fkColumnNames.Count && joinColumns.Keys.All(column => fkColumnNames.Contains(column)))
+                    && !hasGeneratedSurrogatePrimaryKey)
+                    continue;
+
+                if (!hasExactBridgePrimaryKey && !hasGeneratedSurrogatePrimaryKey)
+                    continue;
 
                 if (!nonNullableColumnsByTable.TryGetValue(joinTableKey, out var nonNullableColumns)
                     || fkColumnNames.Any(column => !nonNullableColumns.Contains(column)))
@@ -3096,6 +3109,28 @@ namespace nORM.Scaffolding
             return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
                    && keyColumns.Count == columnNames.Count
                    && columnNames.All(keyColumns.Contains);
+        }
+
+        private static bool HasExactUniqueIndex(
+            IReadOnlyList<ScaffoldIndex> indexes,
+            string tableKey,
+            IReadOnlySet<string> columnNames)
+        {
+            return indexes
+                .Where(index => index.IsUnique
+                                && !index.IsIncluded
+                                && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
+                .Any(group =>
+                {
+                    var keyColumns = group
+                        .Where(index => !index.IsIncluded)
+                        .OrderBy(index => index.Ordinal)
+                        .Select(index => index.ColumnName)
+                        .ToArray();
+                    return keyColumns.Length == columnNames.Count
+                           && keyColumns.All(columnNames.Contains);
+                });
         }
 
         private static bool ReferencesPrimaryKey(

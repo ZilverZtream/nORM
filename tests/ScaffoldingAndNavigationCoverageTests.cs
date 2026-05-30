@@ -2403,6 +2403,48 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSurrogateKeyPureJoinTable_EmitsManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                UNIQUE (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SurrogateJoinCtx");
+
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SurrogateJoinCtx.cs"));
+            Assert.Contains("public List<Book> Books { get; set; } = new();", authorCode);
+            Assert.Contains("public List<Author> Authors { get; set; } = new();", bookCode);
+            Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorId\", \"BookId\");", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSchemaPureJoinTable_PreservesUsingTableSchema()
     {
         var auxFile = Path.Combine(Path.GetTempPath(), "san_scaffold_aux_" + Guid.NewGuid().ToString("N") + ".db");

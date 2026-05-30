@@ -72,7 +72,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Supported", doc, StringComparison.Ordinal);
         Assert.Contains("Not Yet Stable", doc, StringComparison.Ordinal);
         Assert.Contains("bridge columns are", doc, StringComparison.Ordinal);
-        Assert.Contains("nullable, missing a primary key made exactly from the FK columns", doc, StringComparison.Ordinal);
+        Assert.Contains("neither an exact FK-column primary key nor a generated surrogate key", doc, StringComparison.Ordinal);
+        Assert.Contains("exact FK-column unique index", doc, StringComparison.Ordinal);
     }
 
     [Fact]

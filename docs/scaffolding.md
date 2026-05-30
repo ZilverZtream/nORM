@@ -127,6 +127,10 @@ must be reviewed and edited like handwritten model code.
   generated SQL targets the qualified bridge table rather than a literal dotted
   table name. Self-referencing pure join tables receive distinct role-based
   navigations from the join FK columns and are consumer-build tested.
+  A generated single-column surrogate primary key is also allowed when the
+  table has no payload columns and an exact unique index covers the FK columns;
+  the generated `UsingTable` mapping writes only the FK columns and leaves the
+  surrogate key database-owned.
 - Payload bridge tables are emitted as explicit join entities with payload
   columns and normal FK navigations. They are also reported as possible
   many-to-many candidates so reviewers do not accidentally collapse domain data
@@ -309,9 +313,11 @@ must be reviewed and edited like handwritten model code.
   diagnostics.
 - Owned types and inheritance inference.
 - Payload bridge tables are modeled as explicit join entities, not skip
-  navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
-  target the generated primary keys are reported in scaffold diagnostics rather
-  than converted into unsafe fluent mappings.
+  navigations. Many-to-many joins whose bridge columns are nullable, whose key
+  shape is neither an exact FK-column primary key nor a generated surrogate key
+  plus exact FK-column unique index, or whose foreign keys do not target the
+  generated primary keys or exact unique indexes are reported in scaffold
+  diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
   Simple safe default literals/functions are emitted as migration metadata with
@@ -421,7 +427,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | Code | Category | Meaning |
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact unique index. |
-| `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column and composite-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-primary-key bridges stay as join entities until explicitly modeled. |
+| `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
