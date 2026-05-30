@@ -283,6 +283,8 @@ comparison/order semantics survive the scaffold into migration snapshots.
 SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
 SQL Server/MySQL expression-index shapes are kept on the safer generated-column
 path.
+Opt-in routine stubs include SQL Server scalar and table-valued functions as
+provider-bound `SELECT` wrappers instead of stored-procedure calls.
 SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name

@@ -126,8 +126,12 @@ must be reviewed and edited like handwritten model code.
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
 - Optional provider-bound routine wrappers through
   `ScaffoldOptions.EmitRoutineStubs` and CLI `--emit-routine-stubs`.
-  Generated context methods call nORM's stored-procedure APIs with the
-  discovered schema-qualified routine name. When provider metadata exposes safe
+  Stored procedure wrappers call nORM's stored-procedure APIs with the
+  discovered schema-qualified routine name. SQL Server scalar and table-valued
+  functions are discovered as routines and emitted as provider-bound `SELECT`
+  wrappers (`SELECT function(...) AS Value` for scalar functions and
+  `SELECT * FROM function(...)` for table-valued functions) instead of being
+  miscalled as stored procedures. When provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
   etc.) and falls back to `object?` only for unmapped provider types. When safe

@@ -214,6 +214,9 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     private static string InvokeScaffoldContextWithRoutineStub()
+        => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32)");
+
+    private static string InvokeScaffoldContextWithRoutine(string? schema, string name, string detail)
     {
         var scaffolder = typeof(DatabaseScaffolder);
         var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
@@ -221,23 +224,31 @@ public class DatabaseScaffolderPrivateMethodTests
         var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
         var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
         var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
         var routine = Activator.CreateInstance(
             skippedObjectType,
-            "dbo",
-            "GetRevenue",
+            schema,
+            name,
             "Routine",
-            "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32)")!;
+            detail)!;
         var relationships = Array.CreateInstance(relationshipType, 0);
         var manyToMany = Array.CreateInstance(manyToManyType, 0);
         var routines = Array.CreateInstance(skippedObjectType, 1);
         var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
         var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
         routines.SetValue(routine, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .Single(m => m.Name == "ScaffoldContextWithRelationships" && m.GetParameters().Length == 8);
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues })!;
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations })!;
     }
 
     // ── ToPascalCase ────────────────────────────────────────────────────────
@@ -703,6 +714,53 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     // ── ScaffoldAsync (public integration) ─────────────────────────────────
+
+    [Fact]
+    public void ScaffoldContext_WithSqlServerTableValuedFunction_EmitsSelectWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "GetRevenueRows",
+            "SQL Server table-valued function; parameters=1; outputParameters=0; callShape=table-valued-function; parameterModes=@tenantId:IN:int; dataType=TABLE");
+
+        Assert.Contains("Executes provider-bound table-valued function `dbo.GetRevenueRows`", code);
+        Assert.Contains("public sealed class GetRevenueRowsParameters", code);
+        Assert.Contains("public int? tenantId { get; init; }", code);
+        Assert.Contains("var args = parameters is null ? System.Array.Empty<object>() : new object[] { (object?)parameters.tenantId ?? System.DBNull.Value };", code);
+        Assert.Contains("Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenueRows\")", code);
+        Assert.Contains("SELECT * FROM ", code);
+        Assert.Contains("QueryUnchangedAsync<TResult>", code);
+        Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenueRows\"", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_tvf_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithSqlServerScalarFunction_EmitsValueProjectionWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "CalculateRisk",
+            "SQL Server scalar function; parameters=1; outputParameters=1; callShape=scalar-function; parameterModes=@customerId:IN:int,return:RETURN:int; dataType=int");
+
+        Assert.Contains("Executes provider-bound scalar function `dbo.CalculateRisk`", code);
+        Assert.Contains("public sealed class CalculateRiskParameters", code);
+        Assert.Contains("public int? customerId { get; init; }", code);
+        Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.Contains("QueryUnchangedAsync<TResult>", code);
+        Assert.DoesNotContain("WithOutputAsync", code);
+    }
 
     [Fact]
     public async Task ScaffoldAsync_NullConnection_ThrowsArgumentNullException()

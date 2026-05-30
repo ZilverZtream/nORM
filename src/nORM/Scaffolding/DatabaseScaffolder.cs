@@ -535,6 +535,50 @@ namespace nORM.Scaffolding
                     FROM sys.procedures p
                     WHERE p.is_ms_shipped = 0
                     UNION ALL
+                    SELECT SCHEMA_NAME(o.schema_id), o.name, 'Routine',
+                           CONCAT('SQL Server ',
+                                  CASE
+                                      WHEN o.type IN ('IF', 'TF') THEN 'table-valued function'
+                                      ELSE 'scalar function'
+                                  END,
+                                  '; parameters=',
+                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = o.object_id AND pa.parameter_id > 0),
+                                  '; outputParameters=',
+                                  CASE WHEN o.type = 'FN' THEN 1 ELSE 0 END,
+                                  '; callShape=',
+                                  CASE
+                                      WHEN o.type IN ('IF', 'TF') THEN 'table-valued-function'
+                                      ELSE 'scalar-function'
+                                  END,
+                                  '; parameterModes=',
+                                  COALESCE((
+                                      SELECT STRING_AGG(CONCAT(
+                                          pa.name, ':',
+                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
+                                          ':',
+                                          ty.name,
+                                          CASE
+                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
+                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
+                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
+                                              ELSE ''
+                                          END), ',')
+                                      FROM sys.parameters pa
+                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
+                                      WHERE pa.object_id = o.object_id
+                                  ), ''),
+                                  '; dataType=',
+                                  COALESCE((
+                                      SELECT TOP (1) ty.name
+                                      FROM sys.parameters pa
+                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
+                                      WHERE pa.object_id = o.object_id
+                                        AND pa.parameter_id = 0
+                                  ), CASE WHEN o.type IN ('IF', 'TF') THEN 'TABLE' ELSE '' END))
+                    FROM sys.objects o
+                    WHERE o.is_ms_shipped = 0
+                      AND o.type IN ('FN', 'IF', 'TF')
+                    UNION ALL
                     SELECT SCHEMA_NAME(s.schema_id), s.name, 'Sequence', 'SQL Server sequence'
                     FROM sys.sequences s
                     UNION ALL
@@ -2500,6 +2544,9 @@ namespace nORM.Scaffolding
             if (values.TryGetValue("dataType", out var dataType) && !string.IsNullOrWhiteSpace(dataType))
                 metadata["dataType"] = dataType;
 
+            if (values.TryGetValue("callShape", out var callShape) && !string.IsNullOrWhiteSpace(callShape))
+                metadata["callShape"] = callShape;
+
             if (values.TryGetValue("parameterModes", out var parameterModes))
                 metadata["parameters"] = ParseRoutineParameters(parameterModes);
 
@@ -4029,6 +4076,7 @@ namespace nORM.Scaffolding
             {
                 var metadata = BuildSkippedObjectMetadata(routine);
                 var routineType = Convert.ToString(metadata.TryGetValue("routineType", out var type) ? type : null) ?? "routine";
+                var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
                 var outputParameterCount = metadata.TryGetValue("outputParameterCount", out var outputCountValue) && outputCountValue is int outputCount
                     ? outputCount
                     : 0;
@@ -4061,10 +4109,17 @@ namespace nORM.Scaffolding
                 else
                     sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                 var parameterSignature = parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
-                sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>(\"{procedureName}\", ct, parameters);");
+                if (IsFunctionCallShape(callShape))
+                {
+                    AppendFunctionRoutineStub(sb, methodBase, routine, parameterSignature, parameterType, inputParameters, scalar: string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>(\"{procedureName}\", ct, parameters);");
+                }
 
-                if (outputParameterCount > 0)
+                if (outputParameterCount > 0 && !IsFunctionCallShape(callShape))
                 {
                     var outputMethod = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "WithOutputAsync", memberNames);
                     sb.AppendLine();
@@ -4088,6 +4143,52 @@ namespace nORM.Scaffolding
                     }
                 }
             }
+        }
+
+        private static bool IsFunctionCallShape(string? callShape)
+            => string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
+
+        private static void AppendFunctionRoutineStub(
+            StringBuilder sb,
+            string methodBase,
+            ScaffoldSkippedObject routine,
+            string parameterSignature,
+            string? parameterType,
+            IReadOnlyList<RoutineStubParameter> inputParameters,
+            bool scalar)
+        {
+            sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+            sb.AppendLine("    {");
+            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+            if (scalar)
+                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
+            else
+                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
+            sb.AppendLine("    }");
+        }
+
+        private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters)
+        {
+            if (parameterType is null || inputParameters.Count == 0)
+                return "        var args = System.Array.Empty<object>();";
+
+            var values = inputParameters
+                .Select(parameter => $"(object?)parameters.{parameter.Name} ?? System.DBNull.Value")
+                .ToArray();
+            return "        var args = parameters is null ? System.Array.Empty<object>() : new object[] { " + string.Join(", ", values) + " };";
+        }
+
+        private static string FormatProviderEscapedRoutineName(ScaffoldSkippedObject routine)
+        {
+            var name = EscapeStringLiteral(routine.Name);
+            if (string.IsNullOrWhiteSpace(routine.Schema))
+                return $"Provider.Escape(\"{name}\")";
+
+            var schema = EscapeStringLiteral(routine.Schema!);
+            return $"Provider.Escape(\"{schema}\") + \".\" + Provider.Escape(\"{name}\")";
         }
 
         private static string QualifiedRoutineName(ScaffoldSkippedObject routine)

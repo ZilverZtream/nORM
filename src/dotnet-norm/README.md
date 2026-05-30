@@ -80,6 +80,8 @@ Column collations are emitted as provider-bound fluent migration metadata with
 `HasCollation`.
 SQLite/PostgreSQL expression indexes are emitted as provider-bound fluent
 migration metadata with `HasExpressionIndex`.
+With `--emit-routine-stubs`, SQL Server scalar and table-valued functions are
+emitted as provider-bound `SELECT` wrappers instead of stored-procedure calls.
 When warnings are present, the CLI prints a compact summary with stable
 diagnostic codes and categories, for example `SCF100=1` and
 `schema-feature=1`, so CI logs can route scaffold follow-up without parsing the
