@@ -750,7 +750,8 @@ namespace nORM.Scaffolding
                                   (SELECT COUNT(*)
                                    FROM information_schema.parameters p
                                    WHERE p.specific_schema = r.routine_schema
-                                     AND p.specific_name = r.specific_name),
+                                     AND p.specific_name = r.specific_name
+                                     AND p.parameter_mode IS NOT NULL),
                                   '; outputParameters=',
                                   (SELECT COUNT(*)
                                    FROM information_schema.parameters p
@@ -772,7 +773,8 @@ namespace nORM.Scaffolding
                                                 END) ORDER BY p.ordinal_position SEPARATOR ',')
                                             FROM information_schema.parameters p
                                             WHERE p.specific_schema = r.routine_schema
-                                              AND p.specific_name = r.specific_name), ''),
+                                              AND p.specific_name = r.specific_name
+                                              AND p.parameter_mode IS NOT NULL), ''),
                                   '; callShape=',
                                   CASE
                                       WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'

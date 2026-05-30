@@ -207,7 +207,9 @@ must be reviewed and edited like handwritten model code.
   invocation, and stored-procedure wrappers with scaffolded input metadata fail
   with `NormConfigurationException` when the generated wrapper is called
   without the expected parameter object or dictionary shape. Function wrappers
-  whose provider parameter names cannot safely become C# DTO properties use
+  exclude provider metadata return rows from callable input counts; return
+  types are tracked separately through routine result/data type metadata. When
+  provider parameter names cannot safely become C# DTO properties, wrappers use
   positional `object?[]` arguments instead of silently dropping or misbinding
   required function arguments.
   Stored-procedure wrappers with such parameter names use
