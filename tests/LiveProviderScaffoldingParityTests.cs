@@ -61,6 +61,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
+    private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
+    private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
 
     [Theory]
@@ -545,6 +547,51 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownRoutineWithOutputAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerTableValuedParameterRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_tvp_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerTvpRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqlServerTvpRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routine = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Routine" &&
+                            item.GetProperty("name").GetString()!.EndsWith(RoutineTableValuedParameterName, StringComparison.Ordinal));
+                var metadata = routine.GetProperty("metadata");
+
+                Assert.Contains($"public sealed class {RoutineTableValuedParameterName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int? tenantId { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public DbParameter? items { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"table type (dbo.{RoutineTableTypeName})", contextCode, StringComparison.Ordinal);
+                Assert.Equal(2, metadata.GetProperty("parameterCount").GetInt32());
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerTableValuedParameterRoutineAsync(connection, provider);
             }
         }
     }
@@ -1191,6 +1238,16 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task SetupSqlServerTableValuedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerTableValuedParameterRoutineAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE TYPE {provider.Escape("dbo")}.{provider.Escape(RoutineTableTypeName)} AS TABLE ({provider.Escape("ProductId")} INT NOT NULL, {provider.Escape("Quantity")} INT NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineTableValuedParameterName)} @tenantId INT, @items {provider.Escape("dbo")}.{provider.Escape(RoutineTableTypeName)} READONLY AS SELECT @tenantId AS Id, COUNT(*) AS LineCount FROM @items");
+    }
+
     private static async Task SetupPostgresSetReturningRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownPostgresSetReturningRoutineAsync(connection, provider);
@@ -1473,6 +1530,21 @@ public sealed class LiveProviderScaffoldingParityTests
 
             if (!string.IsNullOrWhiteSpace(sql))
                 await ExecuteAsync(connection, sql);
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerTableValuedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{RoutineTableValuedParameterName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineTableValuedParameterName)}");
+            await ExecuteAsync(connection,
+                $"IF TYPE_ID(N'dbo.{RoutineTableTypeName}') IS NOT NULL DROP TYPE {provider.Escape("dbo")}.{provider.Escape(RoutineTableTypeName)}");
         }
         catch
         {
