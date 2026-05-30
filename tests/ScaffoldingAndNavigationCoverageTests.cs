@@ -1284,6 +1284,11 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("List<TenantOrderLine>", principalCode);
             Assert.DoesNotContain("public TenantOrder?", dependentCode);
             Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("[Key]", principalCode);
+            Assert.Contains("TenantId { get; set; }", principalCode);
+            Assert.Contains("OrderId { get; set; }", principalCode);
+            Assert.Contains("[Key]", dependentCode);
+            Assert.Contains("LineNo { get; set; }", dependentCode);
             Assert.Contains("Composite Foreign Keys", warnings);
             Assert.Contains("sqlite_fk_", warnings);
             Assert.Contains("TenantId, OrderId", warnings);
@@ -1297,6 +1302,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Equal("TenantOrder", compositeForeignKeys[0].GetProperty("principalTable").GetString());
             Assert.Equal("TenantId", compositeForeignKeys[0].GetProperty("dependentColumns")[0].GetString());
             Assert.Equal("OrderId", compositeForeignKeys[0].GetProperty("dependentColumns")[1].GetString());
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {

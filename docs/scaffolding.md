@@ -126,6 +126,7 @@ must be reviewed and edited like handwritten model code.
   deterministic repeated output, nullable initialization, SQLite FK navigation generation, and SQLite
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
+  composite primary-key source generation with consumer-build evidence,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
