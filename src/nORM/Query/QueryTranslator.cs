@@ -2116,11 +2116,11 @@ namespace nORM.Query
                     var current = relation.NavProp.GetValue(value) as System.Collections.IList;
                     if (current == null || current.Count == 0)
                     {
-                        var pk = relation.PrincipalKey.Getter(value);
+                        var pk = GetHydrationRelationKeyValue(relation.PrincipalKeys, value);
                         var loaded = CreateRuntimeList(relation.DependentType, 0);
                         foreach (var child in EnumerateQuery(ctx, relation.DependentType))
                         {
-                            var fk = relation.ForeignKey.Getter(child);
+                            var fk = GetHydrationRelationKeyValue(relation.ForeignKeys, child);
                             if (object.Equals(pk, fk))
                                 loaded.Add(child);
                         }
@@ -2197,6 +2197,50 @@ namespace nORM.Query
         {
             var queryMethod = typeof(NormQueryable).GetMethod(nameof(NormQueryable.Query))!.MakeGenericMethod(entityType);
             return (System.Collections.IEnumerable)queryMethod.Invoke(null, new object[] { ctx })!;
+        }
+        private static object? GetHydrationRelationKeyValue(IReadOnlyList<Column> columns, object entity)
+        {
+            if (columns.Count == 1)
+                return columns[0].Getter(entity);
+
+            var values = new object?[columns.Count];
+            for (var i = 0; i < columns.Count; i++)
+            {
+                values[i] = columns[i].Getter(entity);
+                if (values[i] == null)
+                    return null;
+            }
+
+            return new HydrationRelationKey(values);
+        }
+
+        private sealed class HydrationRelationKey : IEquatable<HydrationRelationKey>
+        {
+            private readonly object?[] _values;
+
+            public HydrationRelationKey(object?[] values) => _values = values;
+
+            public bool Equals(HydrationRelationKey? other)
+            {
+                if (other == null || other._values.Length != _values.Length)
+                    return false;
+                for (var i = 0; i < _values.Length; i++)
+                {
+                    if (!object.Equals(_values[i], other._values[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as HydrationRelationKey);
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var value in _values)
+                    hash.Add(value);
+                return hash.ToHashCode();
+            }
         }
         private sealed class PostMaterializeQuerySourceReplacer : ExpressionVisitor
         {
