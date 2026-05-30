@@ -120,6 +120,35 @@ public class DynamicTypeQueryTests
     }
 
     [Fact]
+    public void QueryString_WithCompositePrimaryKey_UsesProviderKeyOrdinalInMapping()
+    {
+        var dbName = $"dynamic_query_composite_pk_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CompositeOrders (
+                    TenantId INTEGER NOT NULL,
+                    LocalId INTEGER NOT NULL,
+                    Name TEXT NOT NULL,
+                    PRIMARY KEY (LocalId, TenantId)
+                );
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var type = ctx.Query("CompositeOrders").ElementType;
+        var mapping = ctx.GetMapping(type);
+
+        Assert.Equal(new[] { "LocalId", "TenantId" }, mapping.KeyColumns.Select(column => column.PropName).ToArray());
+    }
+
+    [Fact]
     public void QueryString_WithLiteralDottedTableName_MaterializesRowsFromOriginalTable()
     {
         var dbName = $"dynamic_query_dotted_{Guid.NewGuid():N}";
