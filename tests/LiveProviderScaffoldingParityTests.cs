@@ -47,6 +47,12 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string FilteredStudentCourseStudentFkName = "FK_ScaffoldLiveFilteredStudentCourse_Student";
     private const string FilteredStudentCourseCourseFkName = "FK_ScaffoldLiveFilteredStudentCourse_Course";
     private const string FilteredStudentCourseUniqueIndex = "UX_ScaffoldLiveFilteredStudentCourse_ActivePair";
+    private const string SchemaName = "scaffold_live_schema";
+    private const string SchemaAuthorTable = "ScaffoldLiveSchemaAuthor";
+    private const string SchemaBookTable = "ScaffoldLiveSchemaBook";
+    private const string SchemaAuthorBookTable = "ScaffoldLiveSchemaAuthorBook";
+    private const string SchemaAuthorBookAuthorFkName = "FK_ScaffoldLiveSchemaAuthorBook_Author";
+    private const string SchemaAuthorBookBookFkName = "FK_ScaffoldLiveSchemaAuthorBook_Book";
     private const string UniqueParentTable = "ScaffoldLiveUniqueParent";
     private const string UniqueChildTable = "ScaffoldLiveUniqueChild";
     private const string UniqueFkName = "FK_ScaffoldLiveUniqueChild_Parent";
@@ -371,6 +377,57 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownFilteredUniqueSurrogateJoinAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    public async Task ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSchemaQualifiedManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_schema_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSchemaManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[]
+                        {
+                            SchemaName + "." + SchemaAuthorTable,
+                            SchemaName + "." + SchemaBookTable,
+                            SchemaName + "." + SchemaAuthorBookTable
+                        },
+                        OverwriteFiles = false
+                    });
+
+                var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, SchemaAuthorTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSchemaManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, SchemaAuthorBookTable + ".cs")));
+                Assert.Contains($"[Table(\"{SchemaAuthorTable}\", Schema = \"{SchemaName}\")]", authorCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SchemaAuthorBookTable}\", \"AuthorId\", \"BookId\", schema: \"{SchemaName}\");", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSchemaQualifiedManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -1344,6 +1401,34 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE UNIQUE INDEX {provider.Escape(FilteredStudentCourseUniqueIndex)} ON {join} ({studentId}, {courseId}) WHERE {activePredicate}");
     }
 
+    private static async Task SetupSchemaQualifiedManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownSchemaQualifiedManyToManyAsync(connection, provider, kind);
+
+        if (kind == ProviderKind.SqlServer)
+            await ExecuteAsync(connection, $"IF SCHEMA_ID(N'{SchemaName}') IS NULL EXEC(N'CREATE SCHEMA {provider.Escape(SchemaName)}')");
+        else
+            await ExecuteAsync(connection, $"CREATE SCHEMA IF NOT EXISTS {provider.Escape(SchemaName)}");
+
+        var author = Qualified(provider, SchemaName, SchemaAuthorTable);
+        var book = Qualified(provider, SchemaName, SchemaBookTable);
+        var join = Qualified(provider, SchemaName, SchemaAuthorBookTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+        var authorId = provider.Escape("AuthorId");
+        var bookId = provider.Escape("BookId");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {author} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({authorId} {IntType(kind)} NOT NULL, {bookId} {IntType(kind)} NOT NULL, PRIMARY KEY ({authorId}, {bookId}), " +
+            $"CONSTRAINT {provider.Escape(SchemaAuthorBookAuthorFkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}), " +
+            $"CONSTRAINT {provider.Escape(SchemaAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
+    }
+
     private static async Task SetupCompositeUniqueAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, UniqueChildTable, provider.Escape(UniqueChildTable)));
@@ -1605,6 +1690,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private static string SqlServerQualified(DatabaseProvider provider, string tableName)
         => provider.Escape("dbo") + "." + provider.Escape(tableName);
 
+    private static string Qualified(DatabaseProvider provider, string schemaName, string tableName)
+        => provider.Escape(schemaName) + "." + provider.Escape(tableName);
+
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try
@@ -1681,6 +1769,24 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, FilteredStudentCourseTable, provider.Escape(FilteredStudentCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, FilteredCourseTable, provider.Escape(FilteredCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, FilteredStudentTable, provider.Escape(FilteredStudentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSchemaQualifiedManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaAuthorBookTable, Qualified(provider, SchemaName, SchemaAuthorBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaBookTable, Qualified(provider, SchemaName, SchemaBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaAuthorTable, Qualified(provider, SchemaName, SchemaAuthorTable)));
+            if (kind == ProviderKind.SqlServer)
+                await ExecuteAsync(connection, $"IF SCHEMA_ID(N'{SchemaName}') IS NOT NULL DROP SCHEMA {provider.Escape(SchemaName)}");
+            else
+                await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS {provider.Escape(SchemaName)}");
         }
         catch
         {
