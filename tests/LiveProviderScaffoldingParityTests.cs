@@ -46,6 +46,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
+    private const string RoutineName = "ScaffoldLiveGetRevenue";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -282,6 +283,54 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownDecimalPrecisionAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task ScaffoldAsync_emits_routine_stubs_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupRoutineAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRoutineContext.cs"));
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+                Assert.True(File.Exists(warningJsonPath));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
+                var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
+
+                Assert.Contains($"Task<List<TResult>> {RoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"ExecuteStoredProcedureAsync<TResult>(\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(RoutineName, contextCode, StringComparison.Ordinal);
+                Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", contextCode, StringComparison.Ordinal);
+                Assert.Contains(skippedObjects, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownRoutineAsync(connection, provider, kind);
             }
         }
     }
@@ -625,6 +674,29 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {amount} DECIMAL(28,6) NOT NULL)");
     }
 
+    private static async Task SetupRoutineAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownRoutineAsync(connection, provider, kind);
+
+        switch (kind)
+        {
+            case ProviderKind.SqlServer:
+                await ExecuteAsync(connection,
+                    $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineName)} @tenantId INT AS SELECT @tenantId AS Id, CAST('ok' AS nvarchar(20)) AS Name");
+                break;
+            case ProviderKind.Postgres:
+                await ExecuteAsync(connection,
+                    $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(RoutineName)}(tenantId integer) RETURNS TABLE(\"Id\" integer, \"Name\" text) LANGUAGE SQL AS $$ SELECT tenantId, 'ok'::text $$");
+                break;
+            case ProviderKind.MySql:
+                await ExecuteAsync(connection,
+                    $"CREATE PROCEDURE {provider.Escape(RoutineName)}(IN tenantId INT) SELECT tenantId AS Id, 'ok' AS Name");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Routine scaffolding live test only targets providers with routine support.");
+        }
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -748,6 +820,27 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(kind, DecimalPrecisionTable, provider.Escape(DecimalPrecisionTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownRoutineAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            var sql = kind switch
+            {
+                ProviderKind.SqlServer => $"IF OBJECT_ID(N'dbo.{RoutineName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineName)}",
+                ProviderKind.Postgres => $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(RoutineName)}(integer)",
+                ProviderKind.MySql => $"DROP PROCEDURE IF EXISTS {provider.Escape(RoutineName)}",
+                _ => ""
+            };
+
+            if (!string.IsNullOrWhiteSpace(sql))
+                await ExecuteAsync(connection, sql);
         }
         catch
         {
