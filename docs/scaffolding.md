@@ -88,9 +88,9 @@ must be reviewed and edited like handwritten model code.
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
   descending key order is preserved with `IndexAttribute.IsDescending`.
-  Provider-specific filtered/partial, expression, and included-column index
-  semantics are reported as diagnostics rather than emitted as portable
-  `[Index]` attributes.
+  SQL Server and PostgreSQL included-column indexes are preserved with
+  `IndexAttribute.IsIncluded`; filtered/partial and expression index semantics
+  remain diagnostics rather than portable `[Index]` attributes.
 - Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL
   `decimal`/`numeric` columns. Scaffolding emits
   `[Column(TypeName = "decimal(p,s)")]`; schema snapshots read that metadata,
@@ -262,10 +262,11 @@ must be reviewed and edited like handwritten model code.
   mode/type summaries, INOUT direction, output string/binary sizes where
   providers expose them, and result/data type hints so stored
   procedures/functions are not lost during provider-mobility review.
-- Provider-specific filtered/partial indexes, expression indexes, and
-  included-column indexes. These are discovered and reported for review; v1
-  scaffolding emits provider-neutral key-column indexes, including descending
-  key order for ordinary column indexes.
+- Provider-specific filtered/partial indexes and expression indexes. These are
+  discovered and reported for review; v1 scaffolding emits provider-neutral
+  key-column indexes, including descending key order for ordinary column
+  indexes, and provider-bound included-column index metadata for SQL Server and
+  PostgreSQL.
 
 ## v1 Guidance
 

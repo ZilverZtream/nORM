@@ -1012,6 +1012,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collection
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
 P:nORM.Configuration.IndexAttribute.IsDescending:System.Boolean
+P:nORM.Configuration.IndexAttribute.IsIncluded:System.Boolean
 P:nORM.Configuration.IndexAttribute.IsUnique:System.Boolean
 P:nORM.Configuration.IndexAttribute.Name:System.String
 P:nORM.Configuration.IndexAttribute.Order:System.Int32
@@ -1213,6 +1214,7 @@ P:nORM.Mapping.TableSplitAttribute.PrincipalType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ModelType:System.Type
 P:nORM.Mapping.ValueConverter{`0,`1}.ProviderType:System.Type
 P:nORM.Migration.ColumnIndexSchema.IsDescending:System.Boolean
+P:nORM.Migration.ColumnIndexSchema.IsIncluded:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.Name:System.String
 P:nORM.Migration.ColumnIndexSchema.Order:System.Nullable{System.Int32}

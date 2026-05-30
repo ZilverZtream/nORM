@@ -155,7 +155,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}");
                 }
             }
 
@@ -251,7 +251,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}");
                 }
             }
 
@@ -331,6 +331,11 @@ namespace nORM.Migration
         private static string FormatIndexColumns(string[] columnNames, bool[] descending)
             => string.Join(", ", columnNames.Select((name, index) =>
                 Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
+
+        private static string FormatIncludedColumns(string[] includedColumnNames)
+            => includedColumnNames.Length == 0
+                ? string.Empty
+                : " INCLUDE (" + string.Join(", ", includedColumnNames.Select(Esc)) + ")";
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.

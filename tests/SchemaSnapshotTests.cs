@@ -52,6 +52,16 @@ public class SchemaSnapshotTests
         public string Code { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotIncludedIndexedEntity")]
+    private class SnapshotIncludedIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("IX_SnapshotIncludedIndexedEntity_Code")]
+        public string Code { get; set; } = string.Empty;
+        [Index("IX_SnapshotIncludedIndexedEntity_Code", IsIncluded = true)]
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
     [Table("SnapshotCompositeIndexedEntity")]
     private class SnapshotCompositeIndexedEntity
     {
@@ -238,6 +248,18 @@ public class SchemaSnapshotTests
         var code = table.Columns.Single(c => c.Name == "Code");
         var index = Assert.Single(code.Indexes);
         Assert.True(index.IsDescending);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsIncludedIndexAttribute()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotIncludedIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotIncludedIndexedEntity");
+        var code = table.Columns.Single(c => c.Name == "Code");
+        var displayName = table.Columns.Single(c => c.Name == "DisplayName");
+
+        Assert.False(Assert.Single(code.Indexes).IsIncluded);
+        Assert.True(Assert.Single(displayName.Indexes).IsIncluded);
     }
 
     [Fact]

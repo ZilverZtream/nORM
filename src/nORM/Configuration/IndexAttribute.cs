@@ -38,5 +38,10 @@ namespace nORM.Configuration
         /// Gets or sets whether this key column is ordered descending within the index.
         /// </summary>
         public bool IsDescending { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether this column is an included, non-key column in the index.
+        /// </summary>
+        public bool IsIncluded { get; set; }
     }
 }

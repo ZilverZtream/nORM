@@ -71,6 +71,25 @@ public class SqlServerMigrationSqlGeneratorTests
     }
 
     [Fact]
+    public void CreateTable_WithIncludedIndexColumn_EmitsIncludeClause()
+    {
+        var name = new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = false };
+        name.Indexes.Add(new ColumnIndexSchema { Name = "IX_Users_Name", Order = 0 });
+        var email = new ColumnSchema { Name = "Email", ClrType = typeof(string).FullName!, IsNullable = false };
+        email.Indexes.Add(new ColumnIndexSchema { Name = "IX_Users_Name", IsIncluded = true });
+        var table = BuildTable("Users",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+            name,
+            email);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s == "CREATE INDEX [IX_Users_Name] ON [Users] ([Name]) INCLUDE ([Email])");
+    }
+
+    [Fact]
     public void CreateTable_WithoutConstraints_DoesNotEmitConstraintClauses()
     {
         var table = BuildTable("Plain",

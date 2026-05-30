@@ -120,6 +120,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
@@ -197,6 +198,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+                    EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
@@ -271,6 +273,12 @@ namespace nORM.Migration
         private static string FormatIndexColumns(string[] columnNames, bool[] descending)
             => string.Join(", ", columnNames.Select((name, index) =>
                 Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
+
+        private static void EnsureNoIncludedColumns(string[] includedColumnNames, string indexName)
+        {
+            if (includedColumnNames.Length > 0)
+                throw new NotSupportedException($"MySQL does not support INCLUDE columns for index '{indexName}'. Use key columns only or keep the covering-index tuning in provider-specific migration code.");
+        }
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.

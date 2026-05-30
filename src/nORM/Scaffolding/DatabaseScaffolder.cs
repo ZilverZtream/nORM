@@ -109,6 +109,7 @@ namespace nORM.Scaffolding
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
                 RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
+                RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
@@ -306,9 +307,10 @@ namespace nORM.Scaffolding
                             continue;
                         var safeIndexName = EscapeStringLiteral(index.IndexName);
                         var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
-                        var orderSuffix = index.ColumnCount > 1 ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
+                        var orderSuffix = index.ColumnCount > 1 && !index.IsIncluded ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
                         var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
-                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix})]");
+                        var includedSuffix = index.IsIncluded ? ", IsIncluded = true" : string.Empty;
+                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix})]");
                     }
                     if (clrType == typeof(decimal)
                         && decimalPrecisions is not null
@@ -937,7 +939,7 @@ namespace nORM.Scaffolding
                             continue;
 
                         foreach (var column in columns.OrderBy(static c => c.Ordinal))
-                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending));
+                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending, false));
                     }
                 }
 
@@ -953,9 +955,10 @@ namespace nORM.Scaffolding
                         c.name AS ColumnName,
                         i.name AS IndexName,
                         i.is_unique AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
-                        ic.key_ordinal - 1 AS Ordinal,
-                        ic.is_descending_key AS IsDescending
+                        SUM(CASE WHEN ic.is_included_column = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
+                        CASE WHEN ic.is_included_column = 1 THEN 2147483647 ELSE ic.key_ordinal - 1 END AS Ordinal,
+                        ic.is_descending_key AS IsDescending,
+                        ic.is_included_column AS IsIncluded
                     FROM sys.indexes i
                     INNER JOIN sys.tables t ON t.object_id = i.object_id
                     INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
@@ -964,16 +967,8 @@ namespace nORM.Scaffolding
                       AND i.is_primary_key = 0
                       AND i.is_hypothetical = 0
                       AND i.has_filter = 0
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM sys.index_columns included
-                          WHERE included.object_id = i.object_id
-                            AND included.index_id = i.index_id
-                            AND included.is_included_column = 1
-                      )
                       AND i.name IS NOT NULL
-                      AND ic.is_included_column = 0
-                    ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.key_ordinal
+                    ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
                     """).ConfigureAwait(false);
             }
 
@@ -986,9 +981,10 @@ namespace nORM.Scaffolding
                         att.attname AS ColumnName,
                         idx.relname AS IndexName,
                         ix.indisunique AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY ix.indexrelid) AS ColumnCount,
-                        key.ord - 1 AS Ordinal,
-                        CASE WHEN (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending
+                        ix.indnkeyatts AS ColumnCount,
+                        CASE WHEN key.ord > ix.indnkeyatts THEN 2147483647 ELSE key.ord - 1 END AS Ordinal,
+                        CASE WHEN key.ord <= ix.indnkeyatts AND (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending,
+                        CASE WHEN key.ord > ix.indnkeyatts THEN 1 ELSE 0 END AS IsIncluded
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -998,8 +994,6 @@ namespace nORM.Scaffolding
                     WHERE ix.indisprimary = false
                       AND ix.indpred IS NULL
                       AND ix.indexprs IS NULL
-                      AND ix.indnatts = ix.indnkeyatts
-                      AND key.ord <= ix.indnkeyatts
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
                     """).ConfigureAwait(false);
@@ -1054,7 +1048,9 @@ namespace nORM.Scaffolding
                     columnCount,
                     Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture),
                     ReaderHasColumn(reader, "IsDescending")
-                        && Convert.ToBoolean(reader["IsDescending"], System.Globalization.CultureInfo.InvariantCulture)));
+                        && Convert.ToBoolean(reader["IsDescending"], System.Globalization.CultureInfo.InvariantCulture),
+                    ReaderHasColumn(reader, "IsIncluded")
+                        && Convert.ToBoolean(reader["IsIncluded"], System.Globalization.CultureInfo.InvariantCulture)));
             }
 
             return indexes;
@@ -1746,6 +1742,20 @@ namespace nORM.Scaffolding
             features.RemoveAll(feature =>
                 string.Equals(feature.Kind, "DescendingIndex", StringComparison.OrdinalIgnoreCase)
                 && supportedDescending.Contains(feature.TableKey + "\u001f" + feature.Name));
+        }
+
+        private static void RemoveSupportedIncludedColumnIndexDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
+        {
+            var supportedIncluded = indexes
+                .Where(static index => index.IsIncluded)
+                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            features.RemoveAll(feature =>
+                string.Equals(feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
+                && supportedIncluded.Contains(feature.TableKey + "\u001f" + feature.Name));
         }
 
         private static void AddRelationshipPrincipalKeyDiagnostics(
@@ -2619,7 +2629,7 @@ namespace nORM.Scaffolding
 
             var principalColumns = rows.Select(row => row.PrincipalColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
             return indexes
-                .Where(index => index.IsUnique && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
+                .Where(index => index.IsUnique && !index.IsIncluded && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
                 .Any(group =>
                 {
@@ -4199,7 +4209,8 @@ namespace nORM.Scaffolding
             bool IsUnique,
             int ColumnCount,
             int Ordinal,
-            bool IsDescending);
+            bool IsDescending,
+            bool IsIncluded);
 
         private readonly record struct ScaffoldRelationship(
             string DependentTableKey,

@@ -588,15 +588,19 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
                 {
-                    Assert.DoesNotContain(ProviderIncludedIndex, entityCode, StringComparison.Ordinal);
-                    Assert.Contains("IncludedColumnIndex", warnings, StringComparison.Ordinal);
-                    Assert.Contains(ProviderIncludedIndex, warnings, StringComparison.Ordinal);
+                    Assert.Contains($"[Index(\"{ProviderIncludedIndex}\")]", entityCode, StringComparison.Ordinal);
+                    Assert.Contains($"[Index(\"{ProviderIncludedIndex}\", IsIncluded = true)]", entityCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain("IncludedColumnIndex", warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderIncludedIndex, warnings, StringComparison.Ordinal);
                 }
 
                 var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "PartialIndex" &&
                     item.GetProperty("name").GetString() == ProviderPartialIndex);
+                Assert.DoesNotContain(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "IncludedColumnIndex" &&
+                    item.GetProperty("name").GetString() == ProviderIncludedIndex);
             }
             finally
             {

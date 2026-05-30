@@ -120,6 +120,25 @@ public class PostgresMigrationSqlGeneratorTests
  // ─── Identifier escaping ──────────────────────────────────────────
 
     [Fact]
+    public void CreateTable_WithIncludedIndexColumn_EmitsIncludeClause()
+    {
+        var code = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false };
+        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", Order = 0 });
+        var name = new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = false };
+        name.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", IsIncluded = true });
+        var table = BuildTable("Product",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Product" },
+            code,
+            name);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\") INCLUDE (\"Name\")");
+    }
+
+    [Fact]
     public void CreateTable_EscapesTableNameWithDoubleQuote()
     {
         var table = BuildTable("He\"llo",

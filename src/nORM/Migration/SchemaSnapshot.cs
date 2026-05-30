@@ -125,6 +125,8 @@ namespace nORM.Migration
         public int? Order { get; set; }
         /// <summary>True when this index key column is ordered descending.</summary>
         public bool IsDescending { get; set; }
+        /// <summary>True when this column is an included, non-key column.</summary>
+        public bool IsIncluded { get; set; }
     }
 
     /// <summary>
@@ -274,7 +276,8 @@ namespace nORM.Migration
                             Name = indexAttr.Name,
                             IsUnique = indexAttr.IsUnique,
                             Order = indexAttr.Order,
-                            IsDescending = indexAttr.IsDescending
+                            IsDescending = indexAttr.IsDescending,
+                            IsIncluded = indexAttr.IsIncluded
                         });
                     }
                     table.Columns.Add(column);
@@ -729,7 +732,7 @@ namespace nORM.Migration
                 var oldIndexes = BuildIndexMap(oldTable);
                 var newIndexes = BuildIndexMap(newTable);
 
-                foreach (var (name, (isUnique, cols, descending)) in newIndexes)
+                foreach (var (name, (isUnique, cols, descending, included)) in newIndexes)
                 {
                     if (!oldIndexes.ContainsKey(name))
                     {
@@ -738,11 +741,12 @@ namespace nORM.Migration
                     else
                     {
                         // Index exists in both — check for definition changes
-                        var (oldIsUnique, oldCols, oldDescending) = oldIndexes[name];
+                        var (oldIsUnique, oldCols, oldDescending, oldIncluded) = oldIndexes[name];
                         // Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
                         var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         var directionChanged = !oldDescending.SequenceEqual(descending);
-                        if (oldIsUnique != isUnique || colsChanged || directionChanged)
+                        var includedChanged = !oldIncluded.SequenceEqual(included, StringComparer.OrdinalIgnoreCase);
+                        if (oldIsUnique != isUnique || colsChanged || directionChanged || includedChanged)
                         {
                             // Use oldTable for DroppedIndexes (the index existed on the OLD table).
                             diff.DroppedIndexes.Add((oldTable, name));
@@ -850,20 +854,20 @@ namespace nORM.Migration
             a.PrincipalColumns.Zip(b.PrincipalColumns, (x, y) =>
                 string.Equals(x, y, StringComparison.OrdinalIgnoreCase)).All(eq => eq);
 
-        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending)> GetExplicitIndexes(TableSchema table)
+        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
                 .Where(static index => !index.Key.StartsWith("__PK__", StringComparison.Ordinal) &&
                                        !index.Key.StartsWith("__UQ__", StringComparison.Ordinal))
-                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending))
+                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.IncludedColumnNames))
                 .ToArray();
 
         /// <summary>
         /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
         /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
         /// </summary>
-        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending)> BuildIndexMap(TableSchema table)
+        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)> BuildIndexMap(TableSchema table)
         {
-            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name, bool IsDescending)> Columns)>(StringComparer.OrdinalIgnoreCase);
+            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name, bool IsDescending)> Columns, List<(int Sequence, string Name)> IncludedColumns)>(StringComparer.OrdinalIgnoreCase);
             var sequence = 0;
             foreach (var col in table.Columns)
             {
@@ -874,9 +878,12 @@ namespace nORM.Migration
                         if (string.IsNullOrWhiteSpace(index.Name))
                             continue;
                         if (!intermediate.TryGetValue(index.Name, out var explicitEntry))
-                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name, bool IsDescending)>());
+                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>());
                         explicitEntry.IsUnique = explicitEntry.IsUnique || index.IsUnique;
-                        explicitEntry.Columns.Add((index.Order, sequence++, col.Name, index.IsDescending));
+                        if (index.IsIncluded)
+                            explicitEntry.IncludedColumns.Add((sequence++, col.Name));
+                        else
+                            explicitEntry.Columns.Add((index.Order, sequence++, col.Name, index.IsDescending));
                         intermediate[index.Name] = explicitEntry;
                     }
                 }
@@ -894,20 +901,27 @@ namespace nORM.Migration
                         continue;
                 }
                 if (!intermediate.TryGetValue(indexKey, out var entry))
-                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name, bool IsDescending)>());
+                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>());
                 entry.IsUnique = entry.IsUnique || col.IsUnique || col.IsPrimaryKey;
                 entry.Columns.Add((col.IndexOrder, sequence++, col.Name, false));
                 intermediate[indexKey] = entry;
             }
 
-            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, (isUnique, columns)) in intermediate)
+            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, (isUnique, columns, includedColumnsRaw)) in intermediate)
             {
                 var orderedColumns = columns
                     .OrderBy(static column => column.Order ?? int.MaxValue)
                     .ThenBy(static column => column.Sequence)
                     .ToArray();
-                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray());
+                if (orderedColumns.Length == 0)
+                    continue;
+
+                var includedColumns = includedColumnsRaw
+                    .OrderBy(static column => column.Sequence)
+                    .Select(static column => column.Name)
+                    .ToArray();
+                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), includedColumns);
             }
             return map;
         }
