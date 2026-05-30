@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Data;
+using nORM.Configuration;
 using nORM.Query;
 using nORM.Core;
 using nORM.Mapping;
@@ -312,8 +313,7 @@ namespace nORM.Navigation
 
         private static async Task LoadRelationshipAsync(object entity, PropertyInfo property, TableMapping.Relation relation, NavigationContext context, CancellationToken ct)
         {
-            if (relation.PrincipalKey == null) return;
-            var principalKeyValue = relation.PrincipalKey.Getter(entity);
+            var principalKeyValue = GetRelationKeyValue(relation.PrincipalKeys, entity);
             if (principalKeyValue == null) return;
 
             if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
@@ -335,7 +335,7 @@ namespace nORM.Navigation
             {
                 // Reference navigation property (one-to-one)
                 var dependentMapping = context.DbContext.GetMapping(relation.DependentType);
-                var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKey, principalKeyValue, relation.DependentType, ct).ConfigureAwait(false);
+                var result = await ExecuteSingleQueryAsync(context.DbContext, dependentMapping, relation.ForeignKeys, principalKeyValue, relation.DependentType, ct).ConfigureAwait(false);
 
                 if (property.PropertyType.IsGenericType &&
                     property.PropertyType.GetGenericTypeDefinition() == typeof(LazyNavigationReference<>))
@@ -452,15 +452,14 @@ namespace nORM.Navigation
             }
         }
 
-        private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, Column foreignKey, object keyValue, Type entityType, CancellationToken ct)
+        private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, IReadOnlyList<Column> foreignKeys, object keyValue, Type entityType, CancellationToken ct)
         {
             await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = context.CreateCommand();
 
-            var paramName = context.RawProvider.ParamPrefix + "fk";
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {foreignKey.EscCol} = {paramName}";
+            var where = BuildSingleQueryWhere(context, cmd, foreignKeys, keyValue);
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
             cmd.CommandTimeout = ToSecondsClamped(context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText));
-            cmd.AddParam(paramName, keyValue);
 
             // Apply LIMIT 1 for single result
             using (var sb = new OptimizedSqlBuilder(cmd.CommandText.Length + 20))
@@ -487,6 +486,75 @@ namespace nORM.Navigation
             }
             
             return null;
+        }
+
+        private static object? GetRelationKeyValue(IReadOnlyList<Column> columns, object entity)
+        {
+            if (columns.Count == 1)
+                return columns[0].Getter(entity);
+
+            var values = new object?[columns.Count];
+            for (var i = 0; i < columns.Count; i++)
+            {
+                values[i] = columns[i].Getter(entity);
+                if (values[i] == null)
+                    return null;
+            }
+
+            return new RelationKey(values);
+        }
+
+        private static string BuildSingleQueryWhere(DbContext context, System.Data.Common.DbCommand cmd, IReadOnlyList<Column> foreignKeys, object keyValue)
+        {
+            if (foreignKeys.Count == 1)
+            {
+                var paramName = context.RawProvider.ParamPrefix + "fk";
+                cmd.AddParam(paramName, keyValue);
+                return $"{foreignKeys[0].EscCol} = {paramName}";
+            }
+
+            if (keyValue is not RelationKey key || key.Values.Length != foreignKeys.Count)
+                throw new NormConfigurationException(
+                    $"Composite reference navigation load expected {foreignKeys.Count} key values.");
+
+            var parts = new string[foreignKeys.Count];
+            for (var i = 0; i < foreignKeys.Count; i++)
+            {
+                var paramName = context.RawProvider.ParamPrefix + "fk" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                cmd.AddParam(paramName, key.Values[i]!);
+                parts[i] = $"{foreignKeys[i].EscCol} = {paramName}";
+            }
+
+            return string.Join(" AND ", parts);
+        }
+
+        private sealed class RelationKey : IEquatable<RelationKey>
+        {
+            public RelationKey(object?[] values) => Values = values;
+
+            public object?[] Values { get; }
+
+            public bool Equals(RelationKey? other)
+            {
+                if (other == null || other.Values.Length != Values.Length)
+                    return false;
+                for (var i = 0; i < Values.Length; i++)
+                {
+                    if (!object.Equals(Values[i], other.Values[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as RelationKey);
+
+            public override int GetHashCode()
+            {
+                var hash = 17;
+                foreach (var value in Values)
+                    hash = (hash * 23) + (value?.GetHashCode() ?? 0);
+                return hash;
+            }
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Navigation;
 using nORM.Providers;
 using Xunit;
@@ -36,8 +37,15 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
                 Amount INTEGER NOT NULL,
                 PRIMARY KEY (TenantId, OrderId, LineNo)
             );
+            CREATE TABLE LcnReceipt (
+                TenantId INTEGER NOT NULL,
+                OrderId INTEGER NOT NULL,
+                Code TEXT NOT NULL,
+                PRIMARY KEY (TenantId, OrderId)
+            );
             INSERT INTO LcnOrder VALUES (1,100,'Alice'),(2,100,'Bob'),(1,101,'Cara');
             INSERT INTO LcnLine VALUES (1,100,1,10),(1,100,2,20),(2,100,1,999),(1,101,1,7);
+            INSERT INTO LcnReceipt VALUES (1,100,'alice-receipt'),(2,100,'bob-receipt'),(1,101,'cara-receipt');
             """;
         await cmd.ExecuteNonQueryAsync();
 
@@ -47,6 +55,7 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
             {
                 mb.Entity<LcnOrder>().HasKey(o => new { o.TenantId, o.OrderId });
                 mb.Entity<LcnLine>().HasKey(l => new { l.TenantId, l.OrderId, l.LineNo });
+                mb.Entity<LcnReceipt>().HasKey(r => new { r.TenantId, r.OrderId });
                 mb.Entity<LcnOrder>()
                     .HasMany(o => o.Lines)
                     .WithOne()
@@ -160,6 +169,31 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         Assert.Equal(new[] { 999 }, bob.Lines.Select(l => l.Amount).ToArray());
     }
 
+    [Fact]
+    public async Task Explicit_reference_load_uses_all_composite_key_columns()
+    {
+        var orderMap = _ctx.GetMapping(typeof(LcnOrder));
+        var receiptMap = _ctx.GetMapping(typeof(LcnReceipt));
+        var navProp = typeof(LcnOrder).GetProperty(nameof(LcnOrder.Receipt))!;
+        var principalKeys = orderMap.Columns
+            .Where(c => c.PropName is nameof(LcnOrder.TenantId) or nameof(LcnOrder.OrderId))
+            .OrderBy(c => c.PropName == nameof(LcnOrder.TenantId) ? 0 : 1)
+            .ToArray();
+        var foreignKeys = receiptMap.Columns
+            .Where(c => c.PropName is nameof(LcnReceipt.TenantId) or nameof(LcnReceipt.OrderId))
+            .OrderBy(c => c.PropName == nameof(LcnReceipt.TenantId) ? 0 : 1)
+            .ToArray();
+        orderMap.Relations[navProp.Name] = new TableMapping.Relation(navProp, typeof(LcnReceipt), principalKeys, foreignKeys);
+
+        var bob = new LcnOrder { TenantId = 2, OrderId = 100, Customer = "Bob" };
+        NavigationPropertyExtensions._navigationContexts.AddOrUpdate(bob, new NavigationContext(_ctx, typeof(LcnOrder)));
+
+        await bob.LoadAsync(o => o.Receipt);
+
+        Assert.NotNull(bob.Receipt);
+        Assert.Equal("bob-receipt", bob.Receipt!.Code);
+    }
+
     [Table("LcnOrder")]
     public sealed class LcnOrder
     {
@@ -167,6 +201,8 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         public int OrderId { get; set; }
         public string Customer { get; set; } = string.Empty;
         public List<LcnLine> Lines { get; set; } = new();
+        [NotMapped]
+        public LcnReceipt? Receipt { get; set; }
     }
 
     [Table("LcnLine")]
@@ -176,5 +212,13 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         public int OrderId { get; set; }
         public int LineNo { get; set; }
         public int Amount { get; set; }
+    }
+
+    [Table("LcnReceipt")]
+    public sealed class LcnReceipt
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public string Code { get; set; } = string.Empty;
     }
 }
