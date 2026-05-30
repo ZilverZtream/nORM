@@ -4631,7 +4631,8 @@ namespace nORM.Scaffolding
             var normalized = dataType.Split('(', 2)[0].Trim().ToLowerInvariant();
             return normalized switch
             {
-                "tinyint" or "smallint" => typeof(short),
+                "tinyint" => typeof(byte),
+                "smallint" => typeof(short),
                 "int" or "integer" => typeof(int),
                 "bigint" => typeof(long),
                 "decimal" or "numeric" => typeof(decimal),

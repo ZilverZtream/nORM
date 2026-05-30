@@ -1066,6 +1066,20 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithSqlServerTinyIntSequence_EmitsByteWrapper()
+    {
+        var code = InvokeScaffoldContextWithSequence(
+            "dbo",
+            "TinyOrderNo",
+            "SQL Server sequence; dataType=tinyint");
+
+        Assert.Contains("private sealed class TinyOrderNoSequenceValue", code);
+        Assert.Contains("public byte Value { get; set; }", code);
+        Assert.Contains("public async Task<byte> NextTinyOrderNoValueAsync(CancellationToken ct = default)", code);
+        Assert.Contains("QueryUnchangedAsync<TinyOrderNoSequenceValue>", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithPostgresSequence_EmitsRegclassWrapper()
     {
         var code = InvokeScaffoldContextWithSequence(
