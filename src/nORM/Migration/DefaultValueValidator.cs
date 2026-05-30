@@ -16,7 +16,7 @@ namespace nORM.Migration
     ///   <item>SQL NULL literal</item>
     ///   <item>Boolean keywords: TRUE, FALSE</item>
     ///   <item>Integer and decimal numeric literals (optional leading minus)</item>
-    ///   <item>Single-quoted ANSI string literals with SQL-escaped interior quotes</item>
+    ///   <item>Single-quoted ANSI/Unicode string literals with SQL-escaped interior quotes</item>
     ///   <item>Standard SQL no-argument functions: CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME,
     ///         LOCALTIME, LOCALTIMESTAMP, CURRENT_USER,
     ///         NOW(), GETDATE(), GETUTCDATE(), NEWID(), NEWSEQUENTIALID(), UUID(),
@@ -35,7 +35,7 @@ namespace nORM.Migration
             @"null" +                                                   // SQL NULL
             @"|true|false" +                                            // boolean keywords
             @"|-?[0-9]+(?:\.[0-9]+)?" +                                 // numeric literal (int or decimal)
-            @"|'(?:[^']|'')*'" +                                        // single-quoted ANSI string literal
+            @"|n?'(?:[^']|'')*'" +                                       // single-quoted ANSI/Unicode string literal
             @"|current_timestamp|current_date|current_time" +           // ANSI standard date/time functions
             @"|localtime|localtimestamp" +                              // H: ANSI local date/time keywords
             @"|current_user" +                                          // H: ANSI current user keyword
@@ -71,7 +71,7 @@ namespace nORM.Migration
             if (!_safe.IsMatch(trimmed))
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
-                    "Only numeric literals, single-quoted strings, boolean literals (TRUE/FALSE), NULL, " +
+                    "Only numeric literals, single-quoted ANSI/Unicode strings, boolean literals (TRUE/FALSE), NULL, " +
                     "and standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), NEWID(), UUID(), etc.) are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
 

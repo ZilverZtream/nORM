@@ -55,7 +55,7 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
-  boolean, `NULL`, single-quoted string literals, and known no-argument
+  boolean, `NULL`, single-quoted ANSI/Unicode string literals, and known no-argument
   date/time/UUID functions) are emitted in generated context configuration via
   `Property(...).HasDefaultValueSql(...)` so schema snapshots and migration
   generators can round-trip the default metadata. This is DDL metadata only:

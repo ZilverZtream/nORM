@@ -22,7 +22,7 @@ namespace nORM.Tests;
 /// (e.g., from a mis-configured schema diff) to inject arbitrary SQL into migration scripts.
 ///
 /// Fix: <c>DefaultValueValidator.Validate()</c> checks the value against a strict allowlist
-/// (numeric literals, single-quoted strings, boolean literals, NULL, and a fixed set of
+/// (numeric literals, single-quoted ANSI/Unicode strings, boolean literals, NULL, and a fixed set of
 /// standard SQL no-argument functions) and throws <see cref="ArgumentException"/> on
 /// anything else. All 9 interpolation points across the 4 generators now call it.
 /// </summary>
@@ -119,6 +119,8 @@ public class DefaultValueValidatorTests
         new object[] { "false" },
         new object[] { "'hello'" },
         new object[] { "'it''s ok'" },
+        new object[] { "N'hello'" },
+        new object[] { "n'it''s ok'" },
         new object[] { "''" },
         new object[] { "CURRENT_TIMESTAMP" },
         new object[] { "current_timestamp" },
