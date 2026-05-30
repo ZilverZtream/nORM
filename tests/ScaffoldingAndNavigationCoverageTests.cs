@@ -673,7 +673,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Executes provider-bound stored procedure `dbo.GetRevenue`", code);
         Assert.Contains("Parameters discovered at scaffold time: @tenantId IN int, @total OUT decimal", code);
         Assert.Contains("public sealed class GetRevenueParameters", code);
-        Assert.Contains("public object? tenantId { get; init; }", code);
+        Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);

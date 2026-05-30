@@ -3162,7 +3162,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    public sealed class {parameterType}");
                     sb.AppendLine("    {");
                     foreach (var parameter in inputParameters)
-                        sb.AppendLine($"        public object? {parameter} {{ get; init; }}");
+                        sb.AppendLine($"        public {parameter.TypeName} {parameter.Name} {{ get; init; }}");
                     sb.AppendLine("    }");
                 }
 
@@ -3209,16 +3209,17 @@ namespace nORM.Scaffolding
             }));
         }
 
-        private static IReadOnlyList<string> GetRoutineInputParameters(IReadOnlyDictionary<string, object?> metadata)
+        private static IReadOnlyList<RoutineStubParameter> GetRoutineInputParameters(IReadOnlyDictionary<string, object?> metadata)
         {
             if (!metadata.TryGetValue("parameters", out var parametersValue)
                 || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
                 || parameters.Count == 0)
             {
-                return Array.Empty<string>();
+                return Array.Empty<RoutineStubParameter>();
             }
 
-            var names = new List<string>();
+            var names = new List<RoutineStubParameter>();
+            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var parameter in parameters)
             {
                 var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
@@ -3231,16 +3232,63 @@ namespace nORM.Scaffolding
                 var rawName = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
                 var normalized = NormalizeRoutineParameterName(rawName);
                 if (string.IsNullOrWhiteSpace(normalized))
-                    return Array.Empty<string>();
+                    return Array.Empty<RoutineStubParameter>();
 
                 var escaped = EscapeCSharpIdentifier(normalized);
                 if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
-                    return Array.Empty<string>();
+                    return Array.Empty<RoutineStubParameter>();
 
-                names.Add(escaped);
+                if (!usedNames.Add(escaped))
+                    return Array.Empty<RoutineStubParameter>();
+
+                var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
+                names.Add(new RoutineStubParameter(escaped, GetRoutineParameterTypeName(dataType)));
             }
 
-            return names.Distinct(StringComparer.Ordinal).ToArray();
+            return names.ToArray();
+        }
+
+        private static string GetRoutineParameterTypeName(string? dataType)
+        {
+            if (string.IsNullOrWhiteSpace(dataType))
+                return "object?";
+
+            var normalized = dataType.Trim().ToLowerInvariant();
+            var paren = normalized.IndexOf('(');
+            if (paren >= 0)
+                normalized = normalized[..paren].Trim();
+
+            normalized = normalized switch
+            {
+                "character varying" or "varying character" => "varchar",
+                "national character varying" => "nvarchar",
+                "character" => "char",
+                "double precision" => "double",
+                "timestamp without time zone" => "timestamp",
+                "timestamp with time zone" => "timestamptz",
+                "time without time zone" or "time with time zone" => "time",
+                _ => normalized
+            };
+
+            return normalized switch
+            {
+                "int" or "integer" or "int4" or "mediumint" => "int?",
+                "bigint" or "int8" => "long?",
+                "smallint" or "int2" => "short?",
+                "tinyint" => "byte?",
+                "bit" or "bool" or "boolean" => "bool?",
+                "decimal" or "numeric" or "money" or "smallmoney" => "decimal?",
+                "float" or "float8" or "double" => "double?",
+                "real" or "float4" => "float?",
+                "date" => "DateOnly?",
+                "time" => "TimeOnly?",
+                "datetime" or "datetime2" or "smalldatetime" or "timestamp" => "DateTime?",
+                "datetimeoffset" or "timestamptz" => "DateTimeOffset?",
+                "uniqueidentifier" or "uuid" => "Guid?",
+                "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
+                "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => "byte[]?",
+                _ => "object?"
+            };
         }
 
         private static string NormalizeRoutineParameterName(string? name)
@@ -3638,6 +3686,10 @@ namespace nORM.Scaffolding
             string Name,
             string Kind,
             string Detail);
+
+        private readonly record struct RoutineStubParameter(
+            string Name,
+            string TypeName);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,
