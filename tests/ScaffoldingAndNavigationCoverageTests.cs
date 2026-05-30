@@ -1758,6 +1758,39 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCompositePrimaryKey_UsesDeclaredKeyOrder()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE OrderedKeyItem (
+                TenantId INTEGER NOT NULL,
+                LocalId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (LocalId, TenantId)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "OrderedKeyCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "OrderedKeyCtx.cs"));
+
+            Assert.Contains("mb.Entity<OrderedKeyItem>().HasKey(e => new { e.LocalId, e.TenantId });", contextCode);
+            Assert.DoesNotContain("mb.Entity<OrderedKeyItem>().HasKey(e => new { e.TenantId, e.LocalId });", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCompositeForeignKeyToUniqueIndex_EmitsNavigationAndModelConfig()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

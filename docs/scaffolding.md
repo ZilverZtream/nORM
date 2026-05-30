@@ -40,8 +40,8 @@ must be reviewed and edited like handwritten model code.
   schema diagnostics because SQL Server/MySQL/SQLite do not share native array
   DDL.
   Composite primary keys are also emitted in generated context configuration
-  with `HasKey(e => new { ... })` so the reverse-engineered model carries the
-  full key shape explicitly.
+  with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
+  the reverse-engineered model carries the full key shape explicitly.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
