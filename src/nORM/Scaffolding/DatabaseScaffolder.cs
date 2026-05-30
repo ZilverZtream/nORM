@@ -3154,7 +3154,7 @@ namespace nORM.Scaffolding
         {
             return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
                    && keyColumns.Count == columnNames.Count
-                   && columnNames.All(keyColumns.Contains);
+                   && keyColumns.SequenceEqual(columnNames, StringComparer.OrdinalIgnoreCase);
         }
 
         private static bool HasExactUniqueIndex(
@@ -3188,9 +3188,10 @@ namespace nORM.Scaffolding
                 return false;
 
             var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
+            var principalColumns = rows.Select(row => row.PrincipalColumn).ToArray();
             return primaryKeyColumnsByTable.TryGetValue(principalKey, out var keyColumns)
                    && keyColumns.Count == rows.Length
-                   && rows.All(row => keyColumns.Contains(row.PrincipalColumn));
+                   && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
         }
 
         private static bool ReferencesScaffoldablePrincipalKey(
@@ -3249,16 +3250,20 @@ namespace nORM.Scaffolding
                 return false;
             }
 
-            var principalColumns = rows.Select(row => row.PrincipalColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var principalColumns = rows.Select(row => row.PrincipalColumn).ToArray();
             return indexes
                 .Where(index => index.IsUnique && !index.IsIncluded && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
                 .Any(group =>
                 {
-                    var cols = group.ToArray();
-                    return cols.Length == rows.Count
-                           && cols.All(col => col.ColumnCount == rows.Count)
-                           && cols.All(col => principalColumns.Contains(col.ColumnName));
+                    var keyColumns = group
+                        .Where(index => !index.IsIncluded)
+                        .OrderBy(index => index.Ordinal)
+                        .Select(index => index.ColumnName)
+                        .ToArray();
+                    return keyColumns.Length == rows.Count
+                           && group.All(col => col.ColumnCount == rows.Count)
+                           && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
                 });
         }
 

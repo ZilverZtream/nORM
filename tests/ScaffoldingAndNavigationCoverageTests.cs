@@ -2452,6 +2452,54 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithForeignKeyToReorderedUniqueIndex_DoesNotEmitUnsafeNavigation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Principal (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                Code TEXT NOT NULL,
+                UNIQUE (Code, TenantId)
+            );
+            CREATE TABLE Dependent (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                Code TEXT NOT NULL,
+                CONSTRAINT FK_Dependent_Principal
+                    FOREIGN KEY (TenantId, Code) REFERENCES Principal(TenantId, Code)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ReorderedUniqueRelCtx");
+
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "Dependent.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ReorderedUniqueRelCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain("[ForeignKey(", dependentCode);
+            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("RelationshipPrincipalKey", warnings);
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
+                item.GetProperty("name").GetString() == "sqlite_fk_0");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_FailOnWarnings_WritesDiagnosticsThenThrows()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
