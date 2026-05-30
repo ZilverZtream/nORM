@@ -96,7 +96,10 @@ SQL Server and PostgreSQL standalone sequences; sequence DDL and allocation
 semantics remain provider-owned.
 With `--emit-routine-stubs`, SQL Server scalar/table-valued functions plus
 PostgreSQL and MySQL functions are emitted as provider-bound `SELECT` wrappers
-instead of stored-procedure calls.
+instead of stored-procedure calls. Stored-procedure stubs with discovered output
+metadata include a convenience overload that uses the scaffolded
+`OutputParameter` definitions plus an explicit-output overload for reviewed
+signature changes.
 With `--emit-query-artifacts`, views, materialized views, SQLite virtual
 tables, and SQL Server synonyms whose local base object resolves as a table or
 view can be emitted as read-oriented entities; non-query, remote, or unresolved

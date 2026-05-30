@@ -4366,6 +4366,12 @@ namespace nORM.Scaffolding
                     if (outputFactory != null)
                     {
                         sb.AppendLine();
+                        sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters discovered at scaffold time.</summary>");
+                        sb.AppendLine("    /// <remarks>Use this overload when the scaffolded output parameter metadata still matches the database routine. Pass explicit output parameters to the overload with <c>params OutputParameter[]</c> after routine signature changes.</remarks>");
+                        sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>(\"{procedureName}\", ct, parameters, {outputFactory}());");
+
+                        sb.AppendLine();
                         sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
                         sb.AppendLine($"    public static OutputParameter[] {outputFactory}()");
                         sb.AppendLine("        => new[]");

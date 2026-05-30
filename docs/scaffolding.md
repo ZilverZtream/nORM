@@ -155,8 +155,11 @@ must be reviewed and edited like handwritten model code.
   output parameter metadata is available, scaffolding also emits an
   `OutputParameter[]` factory with mapped `DbType` values, discovered
   string/binary sizes where providers expose them, and `InputOutput` direction
-  for INOUT parameters. XML comments list the discovered parameter metadata,
-  including sized types such as `nvarchar(32)` and `decimal(18,2)`. Routine
+  for INOUT parameters. The generated output wrapper includes a convenience
+  overload that uses the scaffold-discovered output definitions, plus an
+  explicit `params OutputParameter[]` overload for reviewed routine signature
+  changes. XML comments list the discovered parameter metadata, including sized
+  types such as `nvarchar(32)` and `decimal(18,2)`. Routine
   bodies remain provider-owned and are not translated across database engines.
 - Optional provider-bound standalone sequence wrappers through
   `ScaffoldOptions.EmitSequenceStubs` and CLI `--emit-sequence-stubs`.

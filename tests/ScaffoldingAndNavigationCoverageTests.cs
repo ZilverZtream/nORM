@@ -843,6 +843,8 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
+        Assert.Contains("output parameters discovered at scaffold time", code);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, CreateGetRevenueOutputParameters())", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
         Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
         Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", code);
