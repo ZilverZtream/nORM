@@ -39,14 +39,17 @@ The scaffolder emits nullable-enabled entity classes, `[Table]`/`[Column]`/
 deterministic C# identifier cleanup, de-duplicated generated names,
 `IQueryable<T>` context properties backed by nORM's query provider,
 single-column FK navigations with cascade/non-cascade delete behavior
-preserved, pure many-to-many join mappings including schema-qualified join
-tables, and single-column/composite index
+preserved, role-based self-referencing FK and self-join navigations, pure
+many-to-many join mappings including schema-qualified join tables, and single-column/composite index
 metadata, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL uses the current database for discovery without emitting
 the database/catalog name as a model schema. `--no-overwrite` preflights all
 target files before writing, so a collision does not leave a half-generated
 model.
+Repeated scaffolds of the same schema are ordered deterministically for
+reviewable diffs. Clean later runs remove stale `nORM.ScaffoldWarnings.*`
+reports when overwrite is allowed, so old warnings do not leak into CI logs.
 
 `--tables` accepts bare table names and schema-qualified names. Literal dotted
 table names are supported, but if a literal dotted table name collides with the
