@@ -119,7 +119,7 @@ must be reviewed and edited like handwritten model code.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   non-null foreign-key constraints, no payload columns, a join-table primary
   key made exactly from those FK columns, and both references targeting the
-  exact generated primary keys or exact unique indexes. Single-column,
+  exact generated primary keys or exact ordered unique indexes. Single-column,
   composite-key, shared-column tenant, and alternate-key pure junction tables
   are supported. Both entity sides receive collection navigations, and the join
   table is emitted as fluent `HasMany().WithMany(inverse).UsingTable(...)`
@@ -227,7 +227,7 @@ must be reviewed and edited like handwritten model code.
   discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys that
-  do not target the generated principal primary key or an exact unique index
+  do not target the generated principal primary key or an exact ordered unique index
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
   unsafe/provider-specific defaults that fail the safe default allowlist,
@@ -236,7 +236,7 @@ must be reviewed and edited like handwritten model code.
   SQL Server rowversion/timestamp columns,
   unparsed provider-specific identity strategy metadata, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
-  exact unique index,
+  exact ordered unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
   are reported as provider-owned schema; tables without primary keys are emitted
   as read-only generated types and still reported so reviewers know writes and
@@ -261,7 +261,7 @@ must be reviewed and edited like handwritten model code.
   schema snapshots, and migration SQL generators,
   SQL Server identity seed/increment emission through generated
   `HasIdentityOptions(...)` configuration,
-  composite alternate-key FK generation when the target is an exact unique index,
+  composite alternate-key FK generation when the target is an exact ordered unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
@@ -315,9 +315,9 @@ must be reviewed and edited like handwritten model code.
 
 ## Not Yet Stable
 
-- Relationship generation beyond primary keys and exact unique indexes.
+- Relationship generation beyond primary keys and exact ordered unique indexes.
   Single-column and composite FK constraints that target the exact generated
-  primary key or an exact unique index are emitted as navigations and fluent
+  primary key or an exact ordered unique index are emitted as navigations and fluent
   model configuration. FKs that target keyless or non-unique alternate columns
   are discovered and reported in scaffold diagnostics.
 - FK referential-action modeling outside the common provider action set.
@@ -330,7 +330,7 @@ must be reviewed and edited like handwritten model code.
   navigations. Many-to-many joins whose bridge columns are nullable, whose key
   shape is neither an exact FK-column primary key nor a generated surrogate key
   plus exact FK-column unique index, or whose foreign keys do not target the
-  generated primary keys or exact unique indexes are reported in scaffold
+  generated primary keys or exact ordered unique indexes are reported in scaffold
   diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
@@ -440,7 +440,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 | Code | Category | Meaning |
 | --- | --- | --- |
-| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact unique index. |
+| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
@@ -448,7 +448,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` are scaffolded as supported scalar storage; provider-specific declarations such as `GEOMETRY` remain diagnostics. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
-| `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact unique index. |
+| `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics. |
 | `SCF110` | `database-object` | Trigger discovered. |
@@ -471,7 +471,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 For v1 runtime mapping, `UsingTable` skip navigations support single-column,
 composite-key, shared-column tenant, and alternate-key pure junction tables when
-both sides reference either the generated primary keys or exact unique indexes.
+both sides reference either the generated primary keys or exact ordered unique indexes.
 Unsafe bridge shapes remain explicit join entities.
 
 The report is additive: new fields may be added in later versions, but v1 tools
