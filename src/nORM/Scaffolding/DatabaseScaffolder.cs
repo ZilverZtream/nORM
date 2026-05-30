@@ -235,17 +235,18 @@ namespace nORM.Scaffolding
                     var propName = columnPropertyNames is not null && columnPropertyNames.TryGetValue(colName, out var mappedProperty)
                         ? mappedProperty
                         : EscapeCSharpIdentifier(ToPascalCase(colName));
-                    var clrType = (Type)row["DataType"]!;
                     var allowNull = row["AllowDBNull"] is bool b && b;
-
-                    // Decide C# type name with correct nullability for value OR reference types
-                    var typeName = GetTypeName(clrType, allowNull);
 
                     var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                     var isAuto = (row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
                         || identityColumns?.Contains(colName) == true;
                     var isComputed = computedColumns?.Contains(colName) == true;
                     var isRowVersion = rowVersionColumns?.Contains(colName) == true;
+                    var effectiveAllowNull = allowNull && !isKey;
+                    var clrType = NormalizeScaffoldClrType(provider, (Type)row["DataType"]!, effectiveAllowNull, isKey, isAuto);
+
+                    // Decide C# type name with correct nullability for value OR reference types
+                    var typeName = GetTypeName(clrType, effectiveAllowNull);
 
                     // String length if available
                     int? maxLength = null;
@@ -268,7 +269,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
                     if (maxLength.HasValue)
                         sb.AppendLine($"    [MaxLength({maxLength.Value})]");
-                    if (!clrType.IsValueType && !allowNull)
+                    if (!clrType.IsValueType && !effectiveAllowNull)
                         sb.AppendLine("    [Required]");
                     foreach (var index in (indexes ?? Array.Empty<ScaffoldIndex>())
                         .Where(i => string.Equals(i.ColumnName, colName, StringComparison.Ordinal))
@@ -283,7 +284,7 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
                     }
                     sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
-                    var initializer = !clrType.IsValueType && !allowNull ? " = default!;" : string.Empty;
+                    var initializer = !clrType.IsValueType && !effectiveAllowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
                     sb.AppendLine();
                 }
@@ -2318,6 +2319,35 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
         {
+            if (provider is SqliteProvider)
+            {
+                var sqliteResult = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var table in tables)
+                {
+                    await using var cmd = connection.CreateCommand();
+                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
+                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    var keyColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        if (!ReaderHasColumn(reader, "name")
+                            || !ReaderHasColumn(reader, "pk")
+                            || Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture) <= 0)
+                        {
+                            continue;
+                        }
+
+                        var name = Convert.ToString(reader["name"]);
+                        if (!string.IsNullOrWhiteSpace(name))
+                            keyColumns.Add(name);
+                    }
+
+                    sqliteResult[TableKey(table.Schema, table.Name)] = keyColumns;
+                }
+
+                return ToReadOnlySetDictionary(sqliteResult);
+            }
+
             var result = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var table in tables)
             {
@@ -2663,6 +2693,22 @@ namespace nORM.Scaffolding
             }
 
             return name;
+        }
+
+        private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto)
+        {
+            if (provider is SqliteProvider
+                && isKey
+                && isAuto
+                && !allowNull
+                && clrType == typeof(int))
+            {
+                // SQLite INTEGER PRIMARY KEY aliases the 64-bit rowid even when
+                // provider schema metadata reports Int32 for small test values.
+                return typeof(long);
+            }
+
+            return clrType;
         }
 
         /// <summary>

@@ -257,6 +257,7 @@ public class SchemaSignatureTests
         Assert.NotEqual(sig1, sig2);
         Assert.NotNull(generated);
         Assert.Equal(DatabaseGeneratedOption.Identity, generated.DatabaseGeneratedOption);
+        Assert.Equal(typeof(long), type.GetProperty("Id")!.PropertyType);
     }
 
     [Fact]

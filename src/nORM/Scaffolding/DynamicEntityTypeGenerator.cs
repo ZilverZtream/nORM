@@ -322,15 +322,14 @@ namespace nORM.Scaffolding
                 if (row["DataType"] is not Type clrType)
                     continue;
                 var allowNull = row["AllowDBNull"] is bool b && b;
-
-                var propertyType = GetPropertyType(clrType, allowNull);
-
                 var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
                 var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
                     || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
                     || computedColumns.Contains(colName);
                 var isRowVersion = rowVersionColumns.Contains(colName);
+                var effectiveAllowNull = allowNull && !isKey;
+                var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto), effectiveAllowNull);
 
                 int? maxLength = null;
                 if (clrType == typeof(string) && schema.Columns.Contains("ColumnSize") && row["ColumnSize"] != DBNull.Value)
@@ -627,6 +626,22 @@ namespace nORM.Scaffolding
                 return typeof(Nullable<>).MakeGenericType(type);
 
             return type;
+        }
+
+        private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto)
+        {
+            if (connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase)
+                && isKey
+                && isAuto
+                && !allowNull
+                && clrType == typeof(int))
+            {
+                // SQLite INTEGER PRIMARY KEY aliases the 64-bit rowid even when
+                // provider schema metadata reports Int32 for small test values.
+                return typeof(long);
+            }
+
+            return clrType;
         }
 
         private static string ToPascalCase(string name)

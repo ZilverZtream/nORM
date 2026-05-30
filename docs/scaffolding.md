@@ -21,6 +21,8 @@ must be reviewed and edited like handwritten model code.
   when provider metadata exposes them. SQLite rowid integer primary keys,
   SQL Server identity columns, PostgreSQL identity/serial columns, and MySQL
   `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.
+  SQLite rowid integer primary keys are normalized to non-null `long` properties
+  even when provider schema metadata reports nullable `int`.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
   Computed/generated columns are marked
