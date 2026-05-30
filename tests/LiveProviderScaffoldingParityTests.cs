@@ -319,6 +319,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
 
                 Assert.Contains($"Task<List<TResult>> {RoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {RoutineName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int? tenantId { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"ExecuteStoredProcedureAsync<TResult>(\"", contextCode, StringComparison.Ordinal);
                 Assert.Contains(RoutineName, contextCode, StringComparison.Ordinal);
                 Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", contextCode, StringComparison.Ordinal);
