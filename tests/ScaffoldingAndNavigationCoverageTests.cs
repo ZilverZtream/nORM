@@ -485,6 +485,18 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("JSON", true)]
+    [InlineData("GEOMETRY", true)]
+    [InlineData("UUID", true)]
+    [InlineData("TEXT", false)]
+    [InlineData("INTEGER", false)]
+    public void IsSqliteProviderSpecificDeclaredType_FlagsProviderShapedTypes(string declaredType, bool expected)
+    {
+        var m = GetMethod("IsSqliteProviderSpecificDeclaredType", new[] { typeof(string) });
+        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { declaredType })!);
+    }
+
+    [Theory]
     [InlineData(typeof(sbyte), "sbyte")]
     [InlineData(typeof(uint), "uint")]
     [InlineData(typeof(ulong), "ulong")]
@@ -1410,6 +1422,51 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("code").GetString() == "SCF200" && item.GetProperty("category").GetString() == "query-object");
             Assert.All(skippedObjects.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(skippedObjects.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSqliteProviderSpecificDeclaredTypes_EmitsDiagnostics()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE ProviderTyped (
+                Id INTEGER PRIMARY KEY,
+                Payload JSON NOT NULL,
+                Shape GEOMETRY NULL,
+                PortableText TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ProviderTypedCtx");
+
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            Assert.Contains("ProviderSpecificColumnType", warnings);
+            Assert.Contains("Payload", warnings);
+            Assert.Contains("Shape", warnings);
+            Assert.DoesNotContain("PortableText |", warnings);
+
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                item.GetProperty("name").GetString() == "Payload" &&
+                item.GetProperty("code").GetString() == "SCF104");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                item.GetProperty("name").GetString() == "Shape" &&
+                item.GetProperty("category").GetString() == "schema-feature");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {

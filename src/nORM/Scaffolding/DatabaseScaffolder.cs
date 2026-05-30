@@ -1129,12 +1129,15 @@ namespace nORM.Scaffolding
                     while (await reader.ReadAsync().ConfigureAwait(false))
                     {
                         var name = Convert.ToString(reader["name"]) ?? string.Empty;
+                        var declaredType = Convert.ToString(reader["type"]);
                         var defaultValue = Convert.ToString(reader["dflt_value"]);
                         var hidden = Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture);
                         if (!string.IsNullOrWhiteSpace(defaultValue))
                             features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Default", name, defaultValue));
                         if (hidden is 2 or 3)
                             features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Computed", name, "SQLite generated column"));
+                        if (IsSqliteProviderSpecificDeclaredType(declaredType))
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ProviderSpecificColumnType", name, declaredType!));
                     }
                 }
 
@@ -1601,6 +1604,27 @@ namespace nORM.Scaffolding
                    createTableSql,
                    @"\bCOLLATE\s+(?:""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)",
                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        private static bool IsSqliteProviderSpecificDeclaredType(string? declaredType)
+        {
+            if (string.IsNullOrWhiteSpace(declaredType))
+                return false;
+
+            var normalized = declaredType.Trim().ToUpperInvariant();
+            return normalized.Contains("JSON", StringComparison.Ordinal)
+                   || normalized.Contains("XML", StringComparison.Ordinal)
+                   || normalized.Contains("GEOMETRY", StringComparison.Ordinal)
+                   || normalized.Contains("GEOGRAPHY", StringComparison.Ordinal)
+                   || normalized.Contains("HIERARCHYID", StringComparison.Ordinal)
+                   || normalized.Contains("SQL_VARIANT", StringComparison.Ordinal)
+                   || normalized.Contains("UUID", StringComparison.Ordinal)
+                   || normalized.Contains("INET", StringComparison.Ordinal)
+                   || normalized.Contains("CIDR", StringComparison.Ordinal)
+                   || normalized.Contains("MACADDR", StringComparison.Ordinal)
+                   || normalized.StartsWith("ENUM", StringComparison.Ordinal)
+                   || normalized.StartsWith("SET", StringComparison.Ordinal)
+                   || normalized.EndsWith("[]", StringComparison.Ordinal);
+        }
 
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
