@@ -125,11 +125,12 @@ must be reviewed and edited like handwritten model code.
   `OutputParameter[]` factory with mapped `DbType` values. XML comments list the
   discovered parameter metadata. Routine bodies remain provider-owned and are
   not translated across database engines.
-- Optional query-artifact view entities through
+- Optional query-artifact entities through
   `ScaffoldOptions.EmitViewEntities` and CLI `--emit-view-entities`.
-  Generated view/materialized-view classes are intended for reads; scaffolding
-  still reports missing primary keys where the database does not expose one, and
-  nORM does not infer provider-neutral write semantics for views.
+  Generated view/materialized-view/SQLite virtual-table classes are intended
+  for reads; scaffolding still reports missing primary keys where the database
+  does not expose one, and nORM does not infer provider-neutral write semantics
+  for query artifacts.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
@@ -182,9 +183,9 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
   output compiles as a consumer project and keeps the provider-bound routine
   warning/metadata contract explicit.
-- `ScaffoldingAndNavigationCoverageTests` proves opt-in view entity scaffolding
-  converts a SQLite view into a compiling query artifact while preserving the
-  missing-primary-key diagnostic.
+- `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
+  scaffolding converts SQLite views and SQLite virtual tables into compiling
+  query artifacts while preserving missing-primary-key/shadow-table diagnostics.
 - `LiveProviderScaffoldingParityTests` proves opt-in view entity scaffolding
   emits compiling query artifacts and explicit missing-primary-key diagnostics
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers.
@@ -229,12 +230,12 @@ must be reviewed and edited like handwritten model code.
   Defaults, computed/generated columns, check constraints, collations,
   provider-specific column types, non-default identity
   seed/increment settings, triggers, SQL Server provider-native temporal
-  tables, keyless tables, SQLite virtual tables and shadow tables, sequences,
+  tables, keyless tables, SQLite virtual-table shadow tables, sequences,
   synonyms, and events are discovered and reported in scaffold diagnostics, but
   not converted into complete provider-neutral model code. Views and
-  materialized views can be emitted as opt-in query artifacts with explicit
-  keyless warnings, and routine wrappers can be emitted as opt-in provider-bound
-  call stubs.
+  materialized views and SQLite virtual tables can be emitted as opt-in query
+  artifacts with explicit keyless warnings, and routine wrappers can be emitted
+  as opt-in provider-bound call stubs.
   Routine diagnostics include provider metadata such as parameter counts,
   output-parameter counts where the provider exposes them, ordered parameter
   mode/type summaries, and result/data type hints so stored

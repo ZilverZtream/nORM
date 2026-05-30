@@ -298,9 +298,10 @@ allowed, or fail clearly when overwrite protection would leave stale reports in
 place.
 Opt-in scaffold switches can emit provider-bound routine wrappers
 (`--emit-routine-stubs`) and read-oriented view entities
-(`--emit-view-entities`); both remain explicitly bounded and are not provider
-mobility proof by themselves. Payload bridge tables scaffold as explicit join
-entities with payload columns and FK navigations.
+(`--emit-view-entities`, also used for SQLite virtual-table query artifacts);
+both remain explicitly bounded and are not provider mobility proof by
+themselves. Payload bridge tables scaffold as explicit join entities with
+payload columns and FK navigations.
 Owned-type inference, inheritance inference, view write semantics, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding
 Contract](docs/scaffolding.md).

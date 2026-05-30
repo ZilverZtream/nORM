@@ -83,7 +83,7 @@ namespace nORM.Scaffolding
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
                 var emittedViewObjects = options.EmitViewEntities
-                    ? discoveredSkippedObjects.Where(IsViewLikeObject).ToArray()
+                    ? discoveredSkippedObjects.Where(IsQueryArtifactObject).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
                 var discoveredTablesAndViews = discoveredTables
                     .Concat(emittedViewObjects.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
@@ -92,7 +92,8 @@ namespace nORM.Scaffolding
                 EnsureNoTableKeyCollisions(tables);
                 var skippedObjects = FilterSkippedObjects(
                     discoveredSkippedObjects.Where(obj => !emittedViewObjects.Contains(obj)).ToArray(),
-                    options);
+                    options,
+                    emittedViewObjects);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
@@ -742,24 +743,41 @@ namespace nORM.Scaffolding
                 ". Rename one table or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names.");
         }
 
-        private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(IReadOnlyList<ScaffoldSkippedObject> skippedObjects, ScaffoldOptions options)
+        private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(
+            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
+            ScaffoldOptions options,
+            IReadOnlyList<ScaffoldSkippedObject>? emittedQueryArtifacts = null)
         {
             var requested = GetRequestedTableFilters(options);
             if (requested.Length == 0)
                 return skippedObjects;
 
+            var emittedVirtualTables = (emittedQueryArtifacts ?? Array.Empty<ScaffoldSkippedObject>())
+                .Where(obj => string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
             return skippedObjects
-                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(obj, request)))
+                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(obj, request))
+                              || IsShadowOfEmittedVirtualTable(obj, emittedVirtualTables))
                 .ToArray();
         }
+
+        private static bool IsShadowOfEmittedVirtualTable(
+            ScaffoldSkippedObject obj,
+            IReadOnlyList<ScaffoldSkippedObject> emittedVirtualTables)
+            => string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase)
+               && emittedVirtualTables.Any(vt =>
+                   string.Equals(vt.Schema ?? string.Empty, obj.Schema ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                   && obj.Name.StartsWith(vt.Name + "_", StringComparison.OrdinalIgnoreCase));
 
         private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObject obj, string requested)
             => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsViewLikeObject(ScaffoldSkippedObject obj)
+        private static bool IsQueryArtifactObject(ScaffoldSkippedObject obj)
             => string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase);
+               || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase);
 
         private static string[] GetRequestedTableFilters(ScaffoldOptions options)
         {

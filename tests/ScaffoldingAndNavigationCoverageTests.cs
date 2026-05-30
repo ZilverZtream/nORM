@@ -1675,6 +1675,58 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithEmitViewEntities_GeneratesSqliteVirtualTableQueryArtifact()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE VIRTUAL TABLE SearchDocs USING fts5(Body);
+            """;
+        try
+        {
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException ex)
+        {
+            if (Skip.If(true, $"SQLite FTS5 virtual tables are not available in this build: {ex.Message}")) return;
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "VirtualQueryCtx",
+                new ScaffoldOptions { Tables = new[] { "SearchDocs" }, EmitViewEntities = true });
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "SearchDocs.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "VirtualQueryCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[Table(\"SearchDocs\")]", entityCode);
+            Assert.Contains("Body { get; set; }", entityCode);
+            Assert.Contains("IQueryable<SearchDocs> SearchDocs", contextCode);
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsData", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsIdx", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "VirtualTable" &&
+                item.GetProperty("name").GetString() == "SearchDocs");
+            Assert.Contains(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
+                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCheckInIdentifierName_DoesNotEmitCheckConstraintDiagnostic()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
