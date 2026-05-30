@@ -331,9 +331,9 @@ must be reviewed and edited like handwritten model code.
   provider-native temporal history read-only scaffolds, SQL Server
   table-valued-parameter routine stubs, PostgreSQL array/UUID routine parameter
   stubs, SQL Server local-table synonym query artifacts, and live
-  alternate-key/self-referencing many-to-many junction-table mappings, including
-  filtered-unique surrogate join tables that must remain explicit entities
-  instead of unsafe skip navigations.
+  alternate-key/self-referencing/schema-qualified many-to-many junction-table
+  mappings, including filtered-unique surrogate join tables that must remain
+  explicit entities instead of unsafe skip navigations.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
