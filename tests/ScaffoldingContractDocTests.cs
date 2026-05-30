@@ -126,6 +126,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("parameterModes", source, StringComparison.Ordinal);
         Assert.Contains("WITHIN GROUP (ORDER BY pa.parameter_id)", source, StringComparison.Ordinal);
         Assert.Contains("ty.name", source, StringComparison.Ordinal);
+        Assert.Contains("base_ty.name", source, StringComparison.Ordinal);
         Assert.Contains("p.data_type", source, StringComparison.Ordinal);
         Assert.Contains("domain_name", source, StringComparison.Ordinal);
         Assert.Contains("domain_schema", source, StringComparison.Ordinal);

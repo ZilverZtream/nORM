@@ -674,6 +674,7 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData("enum('draft','paid','cancelled')", false)]
     [InlineData("set('read','write','admin')", false)]
     [InlineData("DOMAIN (public.email_address -> character varying)", false)]
+    [InlineData("user-defined type (dbo.EmailAddress -> nvarchar)", false)]
     public void IsScaffoldableProviderSpecificColumnType_PromotesSafeScalarStorage(string detail, bool expected)
     {
         var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });

@@ -1668,10 +1668,25 @@ namespace nORM.Scaffolding
                       AND c.collation_name IS NOT NULL
                       AND c.collation_name <> CONVERT(sysname, DATABASEPROPERTYEX(DB_NAME(), 'Collation'))
                     UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'ProviderSpecificColumnType', ty.name
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'ProviderSpecificColumnType',
+                        CASE
+                            WHEN ty.is_user_defined = 1
+                            THEN CONCAT(
+                                'user-defined type (',
+                                SCHEMA_NAME(ty.schema_id),
+                                '.',
+                                ty.name,
+                                CASE WHEN base_ty.name IS NULL THEN '' ELSE CONCAT(' -> ', base_ty.name) END,
+                                ')')
+                            ELSE ty.name
+                        END
                     FROM sys.columns c
                     INNER JOIN sys.tables t ON t.object_id = c.object_id
                     INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                    LEFT JOIN sys.types base_ty
+                      ON ty.is_user_defined = 1
+                     AND base_ty.user_type_id = ty.system_type_id
+                     AND base_ty.is_user_defined = 0
                     WHERE t.is_ms_shipped = 0
                       AND (ty.is_user_defined = 1 OR ty.name IN ('geography', 'geometry', 'hierarchyid', 'sql_variant', 'xml'))
                     UNION ALL

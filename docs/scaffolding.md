@@ -42,6 +42,9 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL domain columns are reported with the domain schema/name and
   underlying provider type so reviewers can preserve or remodel domain-owned
   constraints before claiming provider mobility.
+  SQL Server alias/user-defined column types are reported with schema/name and
+  base system type when available so reviewers can preserve or remodel
+  provider-owned type semantics.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
   the reverse-engineered model carries the full key shape explicitly.
