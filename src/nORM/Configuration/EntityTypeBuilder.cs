@@ -603,6 +603,16 @@ namespace nORM.Configuration
                     => UsingTable(joinTable, leftFk, rightFk, schema: null);
 
                 /// <summary>
+                /// Specifies a join table with ordered composite FK columns for this entity and the related entity.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's key.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns)
+                    => UsingTable(joinTable, leftFkColumns, rightFkColumns, schema: null);
+
+                /// <summary>
                 /// Specifies the schema-qualified join table, left FK column (this entity's PK) and right FK column (related entity's PK).
                 /// </summary>
                 /// <param name="joinTable">Name of the join table without schema qualification.</param>
@@ -637,9 +647,55 @@ namespace nORM.Configuration
                         rightFk,
                         _inverseNavName)
                     {
-                        JoinTableSchema = schema
+                        JoinTableSchema = schema,
+                        LeftFkColumns = new[] { leftFk },
+                        RightFkColumns = new[] { rightFk }
                     });
                     return _parent;
+                }
+
+                /// <summary>
+                /// Specifies a schema-qualified join table with ordered composite FK columns for both sides.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's key.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, string? schema)
+                {
+                    if (string.IsNullOrWhiteSpace(joinTable))
+                        throw new ArgumentException("Join table name cannot be null or whitespace.", nameof(joinTable));
+                    if (schema is not null && string.IsNullOrWhiteSpace(schema))
+                        throw new ArgumentException("Join table schema cannot be whitespace.", nameof(schema));
+                    ValidateCompositeFkColumns(leftFkColumns, nameof(leftFkColumns));
+                    ValidateCompositeFkColumns(rightFkColumns, nameof(rightFkColumns));
+                    if (leftFkColumns.Any(left => rightFkColumns.Any(right => string.Equals(left, right, StringComparison.OrdinalIgnoreCase))))
+                        throw new ArgumentException("Left and right FK column sets in a many-to-many join table must not overlap.", nameof(rightFkColumns));
+
+                    _parent._config.AddManyToMany(new ManyToManyConfiguration(
+                        _principalNavigation.Name,
+                        typeof(TDependent),
+                        joinTable,
+                        leftFkColumns[0],
+                        rightFkColumns[0],
+                        _inverseNavName)
+                    {
+                        JoinTableSchema = schema,
+                        LeftFkColumns = leftFkColumns.ToArray(),
+                        RightFkColumns = rightFkColumns.ToArray()
+                    });
+                    return _parent;
+                }
+
+                private static void ValidateCompositeFkColumns(IReadOnlyList<string>? columns, string paramName)
+                {
+                    if (columns is null || columns.Count == 0)
+                        throw new ArgumentException("At least one FK column must be supplied.", paramName);
+                    if (columns.Any(string.IsNullOrWhiteSpace))
+                        throw new ArgumentException("FK column names cannot be null or whitespace.", paramName);
+                    if (columns.Distinct(StringComparer.OrdinalIgnoreCase).Count() != columns.Count)
+                        throw new ArgumentException("FK column names must be unique within each side of a many-to-many join table.", paramName);
                 }
             }
 

@@ -661,33 +661,26 @@ namespace nORM.Core
         private async Task ExecuteJoinTableSyncAsync(object entity, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
         {
             var map = entry.Mapping;
-            // Build tenant subquery fragment once if multi-tenancy is active on the left entity.
-            // This ensures join table DELETE operations are scoped to rows whose left FK belongs to
-            // the current tenant, preventing cross-tenant join row modification when different tenants
-            // share the same PK space.
             var tenantId = Options.TenantProvider != null ? GetRequiredTenantId(map, "many-to-many sync") : null;
             var leftTenantCol = Options.TenantProvider != null ? RequireTenantColumn(map, "many-to-many sync") : null;
-            var leftPkCol = map.KeyColumns.Length > 0 ? map.KeyColumns[0] : null;
-            var hasTenantFilter = Options.TenantProvider != null && leftPkCol != null;
+            var hasTenantFilter = Options.TenantProvider != null && map.KeyColumns.Length > 0;
 
             foreach (var jtm in map.ManyToManyJoins)
             {
-                var leftPk = jtm.LeftPkGetter(entity);
+                var leftKeyValues = jtm.GetLeftKeyValues(entity);
+                if (leftKeyValues == null) continue;
+                var leftPk = jtm.CreateLeftKeyFromValues(leftKeyValues);
                 if (leftPk == null) continue;
-
-                // Tenant-scoped subquery: ensures the left FK belongs to the current tenant
-                var tenantFilter = hasTenantFilter
-                    ? $" AND {jtm.EscLeftFkColumn} IN (SELECT {leftPkCol!.EscCol} FROM {map.EscTable} WHERE {leftPkCol.EscCol} = {_p.ParamPrefix}lpk AND {leftTenantCol!.EscCol} = {_p.ParamPrefix}jtenant)"
-                    : "";
 
                 await using var cmdScope = new CommandScope(RawConnection, transaction);
                 await using var cmd = cmdScope.CreateCommand();
 
                 if (entry.State == EntityState.Deleted)
                 {
-                    // Delete all join rows for this entity, scoped to current tenant
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lpk{tenantFilter}";
-                    cmd.AddParam($"{_p.ParamPrefix}lpk", leftPk);
+                    cmd.Parameters.Clear();
+                    var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lpk", leftKeyValues);
+                    var tenantFilter = BuildJoinTenantFilter(map, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)}{tenantFilter}";
                     if (hasTenantFilter)
                         cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
@@ -699,16 +692,20 @@ namespace nORM.Core
                 var collection = jtm.LeftCollectionGetter(entity);
                 var currentSet = new HashSet<object>();
                 var rightEntityByPk = new Dictionary<object, object>();
+                var rightKeyValuesByPk = new Dictionary<object, object?[]>();
                 if (collection != null)
                 {
                     foreach (var item in collection)
                     {
                         if (item == null) continue;
-                        var rpk = jtm.RightPkGetter(item);
+                        var rightValues = jtm.GetRightKeyValues(item);
+                        if (rightValues == null) continue;
+                        var rpk = jtm.CreateRightKeyFromValues(rightValues);
                         if (rpk != null)
                         {
                             currentSet.Add(rpk);
                             rightEntityByPk[rpk] = item;
+                            rightKeyValuesByPk[rpk] = rightValues;
                         }
                     }
                 }
@@ -730,18 +727,17 @@ namespace nORM.Core
                 var toAdd = currentSet.Except(snapshot).ToList();
                 var toRemove = snapshot.Except(currentSet).ToList();
 
-                // Tenant filter for individual deletes uses the same lpk param name
-                var tenantFilterIndiv = hasTenantFilter
-                    ? $" AND {jtm.EscLeftFkColumn} IN (SELECT {leftPkCol!.EscCol} FROM {map.EscTable} WHERE {leftPkCol.EscCol} = {_p.ParamPrefix}lp AND {leftTenantCol!.EscCol} = {_p.ParamPrefix}jtenant)"
-                    : "";
-
                 // DELETE removed join rows, scoped to current tenant
                 foreach (var removedPk in toRemove)
                 {
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} = {_p.ParamPrefix}lp AND {jtm.EscRightFkColumn} = {_p.ParamPrefix}rp{tenantFilterIndiv}";
+                    var removedValues = jtm.GetRightKeyValuesFromKey(removedPk);
+                    if (removedValues == null) continue;
+
                     cmd.Parameters.Clear();
-                    cmd.AddParam($"{_p.ParamPrefix}lp", leftPk);
-                    cmd.AddParam($"{_p.ParamPrefix}rp", removedPk);
+                    var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lp", leftKeyValues);
+                    var rightParamNames = AddKeyParams(cmd, _p.ParamPrefix, "rp", removedValues);
+                    var tenantFilter = BuildJoinTenantFilter(map, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
+                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)} AND {BuildJoinTablePredicate(jtm.EscRightFkColumns, rightParamNames)}{tenantFilter}";
                     if (hasTenantFilter)
                         cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
@@ -750,6 +746,9 @@ namespace nORM.Core
                 // INSERT new join rows (idempotent / ignore duplicates)
                 foreach (var addedPk in toAdd)
                 {
+                    if (!rightKeyValuesByPk.TryGetValue(addedPk, out var addedRightValues))
+                        continue;
+
                     // SEC1: Validate right entity tenant before inserting the join row to prevent
                     // cross-tenant join-table contamination when tenancy is active on the left side.
                     if (Options.TenantProvider != null && rightEntityByPk.TryGetValue(addedPk, out var rightEntity))
@@ -768,15 +767,59 @@ namespace nORM.Core
                     }
 
                     cmd.Parameters.Clear();
-                    var p1 = $"{_p.ParamPrefix}lp";
-                    var p2 = $"{_p.ParamPrefix}rp";
-                    cmd.CommandText = Provider.GetInsertOrIgnoreSql(
-                        jtm.EscTableName, jtm.EscLeftFkColumn, jtm.EscRightFkColumn, p1, p2);
-                    cmd.AddParam(p1, leftPk);
-                    cmd.AddParam(p2, addedPk);
+                    var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lp", leftKeyValues);
+                    var rightParamNames = AddKeyParams(cmd, _p.ParamPrefix, "rp", addedRightValues);
+                    cmd.CommandText = BuildJoinTableInsertIfMissingSql(jtm, leftParamNames, rightParamNames);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
             }
+        }
+
+        private static string[] AddKeyParams(DbCommand cmd, string prefix, string baseName, IReadOnlyList<object?> values)
+        {
+            var names = new string[values.Count];
+            for (var i = 0; i < values.Count; i++)
+            {
+                names[i] = $"{prefix}{baseName}{i}";
+                cmd.AddParam(names[i], values[i]!);
+            }
+
+            return names;
+        }
+
+        private static string BuildJoinTablePredicate(IReadOnlyList<string> escapedColumns, IReadOnlyList<string> parameterNames)
+        {
+            if (escapedColumns.Count != parameterNames.Count)
+                throw new NormConfigurationException(
+                    $"Many-to-many join predicate expected {escapedColumns.Count} parameters but received {parameterNames.Count}.");
+
+            var sb = new StringBuilder();
+            for (var i = 0; i < escapedColumns.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(" AND ");
+                sb.Append(escapedColumns[i]).Append(" = ").Append(parameterNames[i]);
+            }
+
+            return sb.ToString();
+        }
+
+        private static string BuildJoinTenantFilter(TableMapping map, Column? tenantColumn, IReadOnlyList<string> leftParameterNames, string tenantParameterName)
+        {
+            if (tenantColumn == null)
+                return "";
+
+            var entityKeyPredicate = BuildJoinTablePredicate(map.KeyColumns.Select(c => c.EscCol).ToArray(), leftParameterNames);
+            return $" AND EXISTS (SELECT 1 FROM {map.EscTable} WHERE {entityKeyPredicate} AND {tenantColumn.EscCol} = {tenantParameterName})";
+        }
+
+        private static string BuildJoinTableInsertIfMissingSql(JoinTableMapping jtm, IReadOnlyList<string> leftParameterNames, IReadOnlyList<string> rightParameterNames)
+        {
+            var columns = jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns).ToArray();
+            var parameters = leftParameterNames.Concat(rightParameterNames).ToArray();
+            var predicate = BuildJoinTablePredicate(columns, parameters);
+
+            return $"INSERT INTO {jtm.EscTableName} ({string.Join(", ", columns)}) SELECT {string.Join(", ", parameters)} WHERE NOT EXISTS (SELECT 1 FROM {jtm.EscTableName} WHERE {predicate})";
         }
 
         /// <summary>

@@ -27,6 +27,11 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string CompositeParentTable = "ScaffoldLiveCompositeParent";
     private const string CompositeChildTable = "ScaffoldLiveCompositeChild";
     private const string CompositeFkName = "FK_ScaffoldLiveCompositeChild_Parent";
+    private const string CompositeStudentTable = "ScaffoldLiveCompositeStudent";
+    private const string CompositeCourseTable = "ScaffoldLiveCompositeCourse";
+    private const string CompositeStudentCourseTable = "ScaffoldLiveCompositeStudentCourse";
+    private const string CompositeStudentCourseStudentFkName = "FK_ScaffoldLiveCompositeStudentCourse_Student";
+    private const string CompositeStudentCourseCourseFkName = "FK_ScaffoldLiveCompositeStudentCourse_Course";
     private const string UniqueParentTable = "ScaffoldLiveUniqueParent";
     private const string UniqueChildTable = "ScaffoldLiveUniqueChild";
     private const string UniqueFkName = "FK_ScaffoldLiveUniqueChild_Parent";
@@ -142,6 +147,56 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownCompositeAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_composite_many_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupCompositeManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_composite_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldCompositeManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { CompositeStudentTable, CompositeCourseTable, CompositeStudentCourseTable },
+                        OverwriteFiles = false
+                    });
+
+                var studentCode = await File.ReadAllTextAsync(Path.Combine(dir, CompositeStudentTable + ".cs"));
+                var courseCode = await File.ReadAllTextAsync(Path.Combine(dir, CompositeCourseTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldCompositeManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, CompositeStudentCourseTable + ".cs")));
+                Assert.Contains($"public List<{CompositeCourseTable}> {CompositeCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{CompositeStudentTable}> {CompositeStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{CompositeStudentCourseTable}\", new[] {{ \"StudentTenantId\", \"StudentId\" }}, new[] {{ \"CourseTenantId\", \"CourseId\" }});", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownCompositeManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -509,6 +564,34 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(CompositeFkName)} FOREIGN KEY ({tenantId}, {orderNo}) REFERENCES {parent} ({tenantId}, {orderNo}))");
     }
 
+    private static async Task SetupCompositeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, CompositeStudentCourseTable, provider.Escape(CompositeStudentCourseTable)));
+        await ExecuteAsync(connection, DropTable(kind, CompositeCourseTable, provider.Escape(CompositeCourseTable)));
+        await ExecuteAsync(connection, DropTable(kind, CompositeStudentTable, provider.Escape(CompositeStudentTable)));
+
+        var student = provider.Escape(CompositeStudentTable);
+        var course = provider.Escape(CompositeCourseTable);
+        var join = provider.Escape(CompositeStudentCourseTable);
+        var tenantId = provider.Escape("TenantId");
+        var studentId = provider.Escape("StudentId");
+        var courseId = provider.Escape("CourseId");
+        var studentTenantId = provider.Escape("StudentTenantId");
+        var courseTenantId = provider.Escape("CourseTenantId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {student} ({tenantId} {IntType(kind)} NOT NULL, {studentId} {IntType(kind)} NOT NULL, {name} {TextType(kind, 80)} NOT NULL, PRIMARY KEY ({tenantId}, {studentId}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {course} ({tenantId} {IntType(kind)} NOT NULL, {courseId} {IntType(kind)} NOT NULL, {title} {TextType(kind, 80)} NOT NULL, PRIMARY KEY ({tenantId}, {courseId}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({studentTenantId} {IntType(kind)} NOT NULL, {studentId} {IntType(kind)} NOT NULL, {courseTenantId} {IntType(kind)} NOT NULL, {courseId} {IntType(kind)} NOT NULL, " +
+            $"PRIMARY KEY ({studentTenantId}, {studentId}, {courseTenantId}, {courseId}), " +
+            $"CONSTRAINT {provider.Escape(CompositeStudentCourseStudentFkName)} FOREIGN KEY ({studentTenantId}, {studentId}) REFERENCES {student} ({tenantId}, {studentId}), " +
+            $"CONSTRAINT {provider.Escape(CompositeStudentCourseCourseFkName)} FOREIGN KEY ({courseTenantId}, {courseId}) REFERENCES {course} ({tenantId}, {courseId}))");
+    }
+
     private static async Task SetupCompositeUniqueAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, UniqueChildTable, provider.Escape(UniqueChildTable)));
@@ -626,6 +709,20 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(kind, CompositeChildTable, provider.Escape(CompositeChildTable)));
             await ExecuteAsync(connection, DropTable(kind, CompositeParentTable, provider.Escape(CompositeParentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownCompositeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, CompositeStudentCourseTable, provider.Escape(CompositeStudentCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, CompositeCourseTable, provider.Escape(CompositeCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, CompositeStudentTable, provider.Escape(CompositeStudentTable)));
         }
         catch
         {

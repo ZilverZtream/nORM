@@ -64,7 +64,7 @@ public class ManyToManyTests
         public int TenantId { get; set; }
         public int StudentId { get; set; }
         public string Name { get; set; } = string.Empty;
-        public List<Course> Courses { get; set; } = new();
+        public List<CompositeCourse> Courses { get; set; } = new();
     }
 
     private class CompositeCourse
@@ -112,6 +112,20 @@ public class ManyToManyTests
         ");
     }
 
+    private static SqliteConnection CreateCompositeStudentCourseDb()
+    {
+        return CreateOpenDb(@"
+            CREATE TABLE CompositeStudent (TenantId INTEGER NOT NULL, StudentId INTEGER NOT NULL, Name TEXT NOT NULL, PRIMARY KEY (TenantId, StudentId));
+            CREATE TABLE CompositeCourse (TenantId INTEGER NOT NULL, CourseId INTEGER NOT NULL, Title TEXT NOT NULL, PRIMARY KEY (TenantId, CourseId));
+            CREATE TABLE StudentCourse (
+                StudentTenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                CourseTenantId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                PRIMARY KEY (StudentTenantId, StudentId, CourseTenantId, CourseId));
+        ");
+    }
+
     private static DbContext CreateArticleContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
     {
         OnModelCreating = mb =>
@@ -131,6 +145,22 @@ public class ManyToManyTests
               .HasMany<Course>(s => s.Courses)
               .WithMany()
               .UsingTable("StudentCourse", "StudentId", "CourseId");
+        }
+    });
+
+    private static DbContext CreateCompositeStudentContext(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<CompositeStudent>()
+              .HasKey(s => new { s.TenantId, s.StudentId })
+              .HasMany<CompositeCourse>(s => s.Courses)
+              .WithMany()
+              .UsingTable(
+                  "StudentCourse",
+                  new[] { "StudentTenantId", "StudentId" },
+                  new[] { "CourseTenantId", "CourseId" });
+            mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
         }
     });
 
@@ -228,45 +258,39 @@ public class ManyToManyTests
     }
 
     [Fact]
-    public void M2M1_CompositeLeftKey_FailsClosed()
+    public void M2M1_CompositeKeys_UsingTable_RegistersJoinMapping()
     {
-        using var cn = CreateStudentCourseDb();
+        using var cn = CreateCompositeStudentCourseDb();
+        using var ctx = CreateCompositeStudentContext(cn);
+
+        var map = ctx.GetMapping(typeof(CompositeStudent));
+        var jtm = Assert.Single(map.ManyToManyJoins);
+
+        Assert.Equal(new[] { "StudentTenantId", "StudentId" }, jtm.LeftFkColumns);
+        Assert.Equal(new[] { "CourseTenantId", "CourseId" }, jtm.RightFkColumns);
+        Assert.Equal(new[] { "\"StudentTenantId\"", "\"StudentId\"" }, jtm.EscLeftFkColumns);
+        Assert.Equal(new[] { "\"CourseTenantId\"", "\"CourseId\"" }, jtm.EscRightFkColumns);
+    }
+
+    [Fact]
+    public void M2M1_CompositeUsingTable_RejectsMismatchedColumnCounts()
+    {
+        using var cn = CreateCompositeStudentCourseDb();
         using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
         {
             OnModelCreating = mb =>
             {
                 mb.Entity<CompositeStudent>()
                     .HasKey(s => new { s.TenantId, s.StudentId })
-                    .HasMany<Course>(s => s.Courses)
-                    .WithMany()
-                    .UsingTable("StudentCourse", "StudentId", "CourseId");
-            }
-        });
-
-        var ex = Assert.Throws<NormConfigurationException>(() => ctx.GetMapping(typeof(CompositeStudent)));
-        Assert.Contains("single-column primary key", ex.Message);
-        Assert.Contains("explicit join entities", ex.Message);
-    }
-
-    [Fact]
-    public void M2M1_CompositeRightKey_FailsClosed()
-    {
-        using var cn = CreateStudentCourseDb();
-        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
-        {
-            OnModelCreating = mb =>
-            {
-                mb.Entity<StudentWithCompositeCourses>()
                     .HasMany<CompositeCourse>(s => s.Courses)
                     .WithMany()
-                    .UsingTable("StudentCourse", "StudentId", "CourseId");
+                    .UsingTable("StudentCourse", new[] { "StudentId" }, new[] { "CourseTenantId", "CourseId" });
                 mb.Entity<CompositeCourse>().HasKey(c => new { c.TenantId, c.CourseId });
             }
         });
 
-        var ex = Assert.Throws<NormConfigurationException>(() => ctx.GetMapping(typeof(StudentWithCompositeCourses)));
-        Assert.Contains("single-column primary key", ex.Message);
-        Assert.Contains("explicit join entities", ex.Message);
+        var ex = Assert.Throws<NormConfigurationException>(() => ctx.GetMapping(typeof(CompositeStudent)));
+        Assert.Contains("declares 1 left FK columns", ex.Message);
     }
 
     // ── M2M-2: Insert with join rows ──────────────────────────────────────
@@ -639,6 +663,96 @@ public class ManyToManyTests
 
         Assert.Single(students);
         Assert.Equal(2, students[0].Courses.Count);
+    }
+
+    [Fact]
+    public async Task M2M6_CompositeKeys_Add_InsertsCompositeJoinRows()
+    {
+        using var cn = CreateCompositeStudentCourseDb();
+        using var ctx = CreateCompositeStudentContext(cn);
+
+        var c1 = new CompositeCourse { TenantId = 7, CourseId = 10, Title = "Math" };
+        var c2 = new CompositeCourse { TenantId = 7, CourseId = 20, Title = "Physics" };
+        ctx.Add(c1);
+        ctx.Add(c2);
+        await ctx.SaveChangesAsync();
+
+        var student = new CompositeStudent
+        {
+            TenantId = 7,
+            StudentId = 1,
+            Name = "Alice",
+            Courses = new List<CompositeCourse> { c1, c2 }
+        };
+        ctx.Add(student);
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM StudentCourse WHERE StudentTenantId = 7 AND StudentId = 1";
+        var count = (long)cmd.ExecuteScalar()!;
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task M2M6_CompositeKeys_Query_Include_LoadsCourses()
+    {
+        using var cn = CreateCompositeStudentCourseDb();
+        using var ctx = CreateCompositeStudentContext(cn);
+
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = @"
+                INSERT INTO CompositeStudent (TenantId, StudentId, Name) VALUES (7, 1, 'Alice'), (8, 1, 'Bob');
+                INSERT INTO CompositeCourse (TenantId, CourseId, Title) VALUES (7, 10, 'Math'), (7, 20, 'Physics'), (8, 10, 'Chemistry');
+                INSERT INTO StudentCourse (StudentTenantId, StudentId, CourseTenantId, CourseId) VALUES
+                    (7, 1, 7, 10),
+                    (7, 1, 7, 20),
+                    (8, 1, 8, 10);";
+            cmd.ExecuteNonQuery();
+        }
+
+        var students = await ((INormQueryable<CompositeStudent>)ctx.Query<CompositeStudent>())
+            .Include(s => s.Courses)
+            .ToListAsync();
+
+        Assert.Equal(2, students.Count);
+        var alice = students.Single(s => s.TenantId == 7 && s.StudentId == 1);
+        var bob = students.Single(s => s.TenantId == 8 && s.StudentId == 1);
+        Assert.Equal(new[] { "Math", "Physics" }, alice.Courses.Select(c => c.Title).OrderBy(t => t));
+        Assert.Single(bob.Courses);
+        Assert.Equal("Chemistry", bob.Courses[0].Title);
+    }
+
+    [Fact]
+    public async Task M2M6_CompositeKeys_Update_RemovesOnlyTargetCompositeJoinRow()
+    {
+        using var cn = CreateCompositeStudentCourseDb();
+        using var ctx = CreateCompositeStudentContext(cn);
+
+        var c1 = new CompositeCourse { TenantId = 7, CourseId = 10, Title = "Math" };
+        var c2 = new CompositeCourse { TenantId = 7, CourseId = 20, Title = "Physics" };
+        ctx.Add(c1);
+        ctx.Add(c2);
+        await ctx.SaveChangesAsync();
+
+        var student = new CompositeStudent
+        {
+            TenantId = 7,
+            StudentId = 1,
+            Name = "Alice",
+            Courses = new List<CompositeCourse> { c1, c2 }
+        };
+        ctx.Add(student);
+        await ctx.SaveChangesAsync();
+
+        student.Courses.Remove(c1);
+        ctx.Update(student);
+        await ctx.SaveChangesAsync();
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT CourseId FROM StudentCourse WHERE StudentTenantId = 7 AND StudentId = 1";
+        var remaining = (long)cmd.ExecuteScalar()!;
+        Assert.Equal(20, remaining);
     }
 
     // ── M2M-7: Snapshot-based change detection ─────────────────────────────

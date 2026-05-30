@@ -1988,7 +1988,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithCompositeKeyPureJoinTable_EmitsManyToManyDiagnosticAndKeepsJoinEntity()
+    public async Task ScaffoldAsync_WithCompositeKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -2025,20 +2025,24 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeJoinCtx");
 
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeJoinCtx.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var warningsPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
+            var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
 
-            Assert.True(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
-            Assert.DoesNotContain(".UsingTable(\"StudentCourse\"", contextCode);
-            Assert.Contains("possible many-to-many", warnings, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("Composite Foreign Keys", warnings);
+            Assert.False(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
+            Assert.Contains(".UsingTable(\"StudentCourse\", new[] { \"StudentTenantId\", \"StudentId\" }, new[] { \"CourseTenantId\", \"CourseId\" });", contextCode);
+            if (File.Exists(warningsPath))
+            {
+                var warnings = File.ReadAllText(warningsPath);
+                Assert.DoesNotContain("possible many-to-many", warnings, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("Composite Foreign Keys", warnings);
+            }
 
-            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
-            var join = Assert.Single(joinTables.EnumerateArray());
-            Assert.Equal("StudentCourse", join.GetProperty("table").GetString());
-            Assert.Equal(2, join.GetProperty("constraints").GetArrayLength());
-            Assert.Contains(join.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "composite-foreign-key");
-            Assert.Contains(join.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "principal-key-not-single-column-primary-key");
+            if (File.Exists(warningJsonPath))
+            {
+                using var warningJson = JsonDocument.Parse(File.ReadAllText(warningJsonPath));
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+                Assert.Empty(joinTables.EnumerateArray());
+            }
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

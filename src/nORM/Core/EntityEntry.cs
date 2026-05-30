@@ -107,7 +107,7 @@ namespace nORM.Core
                     foreach (var item in collection)
                     {
                         if (item == null) continue;
-                        var pk = jtm.RightPkGetter(item);
+                        var pk = jtm.GetRightKey(item);
                         if (pk != null) snapshot.Add(pk);
                     }
                 }

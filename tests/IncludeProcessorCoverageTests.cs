@@ -1168,7 +1168,7 @@ public class IncludeProcessorCoverageTests
 
         var ex = await Assert.ThrowsAsync<NormConfigurationException>(async () =>
             await ctx.Query<IpcKlessLeft>().ToListAsync());
-        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("requires a primary key", ex.Message);
     }
 
     [Fact]
@@ -1189,7 +1189,7 @@ public class IncludeProcessorCoverageTests
 
         var ex = await Assert.ThrowsAsync<NormConfigurationException>(async () =>
             await ctx.Query<IpcKlessHost>().ToListAsync());
-        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("must have a primary key", ex.Message);
     }
 
     [Fact]
@@ -1210,7 +1210,7 @@ public class IncludeProcessorCoverageTests
 
         var ex = Assert.Throws<NormConfigurationException>(() =>
             ctx.Query<IpcKlessLeft>().ToList());
-        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("requires a primary key", ex.Message);
     }
 
     [Fact]
@@ -1231,7 +1231,7 @@ public class IncludeProcessorCoverageTests
 
         var ex = Assert.Throws<NormConfigurationException>(() =>
             ctx.Query<IpcKlessHost>().ToList());
-        Assert.Contains("single-column primary key", ex.Message);
+        Assert.Contains("must have a primary key", ex.Message);
     }
 }
 

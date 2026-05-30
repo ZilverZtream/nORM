@@ -2258,32 +2258,31 @@ namespace nORM.Scaffolding
             var joins = new List<ScaffoldManyToManyJoin>();
 
             foreach (var group in foreignKeys
-                .Where(fk => fk.ColumnCount == 1)
                 .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase))
             {
                 var joinTableKey = group.Key;
                 if (!tableKeys.Contains(joinTableKey))
                     continue;
 
-                var fkRows = OrderManyToManyForeignKeys(
+                var fkGroups = OrderManyToManyForeignKeyGroups(
                     GetUnqualifiedName(joinTableKey),
                     group
                     .GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
+                    .Select(g => g.ToArray())
                     .ToArray());
 
-                if (fkRows.Length != 2)
+                if (fkGroups.Length != 2 || fkGroups.Any(rows => rows.Length == 0 || rows.Any(row => row.ColumnCount != rows.Length)))
                     continue;
 
                 if (!columnPropertiesByTable.TryGetValue(joinTableKey, out var joinColumns))
                     continue;
 
-                var fkColumnNames = fkRows.Select(fk => fk.DependentColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (joinColumns.Count != 2 || joinColumns.Keys.Any(column => !fkColumnNames.Contains(column)))
+                var fkColumnNames = fkGroups.SelectMany(rows => rows.Select(fk => fk.DependentColumn)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (joinColumns.Count != fkColumnNames.Count || joinColumns.Keys.Any(column => !fkColumnNames.Contains(column)))
                     continue;
 
                 if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns)
-                    || joinPrimaryKeyColumns.Count != 2
+                    || joinPrimaryKeyColumns.Count != fkColumnNames.Count
                     || joinPrimaryKeyColumns.Any(column => !fkColumnNames.Contains(column)))
                 {
                     continue;
@@ -2295,8 +2294,10 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                var left = fkRows[0];
-                var right = fkRows[1];
+                var leftGroup = fkGroups[0];
+                var rightGroup = fkGroups[1];
+                var left = leftGroup[0];
+                var right = rightGroup[0];
                 var leftTableKey = TableKey(left.PrincipalSchema, left.PrincipalTable);
                 var rightTableKey = TableKey(right.PrincipalSchema, right.PrincipalTable);
                 if (!entityByTable.TryGetValue(leftTableKey, out var leftEntity)
@@ -2305,8 +2306,10 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                if (!HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, leftTableKey, left.PrincipalColumn)
-                    || !HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, rightTableKey, right.PrincipalColumn))
+                var leftPrincipalColumns = leftGroup.Select(fk => fk.PrincipalColumn).ToArray();
+                var rightPrincipalColumns = rightGroup.Select(fk => fk.PrincipalColumn).ToArray();
+                if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, leftTableKey, leftPrincipalColumns)
+                    || !HasPrimaryKeyColumns(primaryKeyColumnsByTable, rightTableKey, rightPrincipalColumns))
                 {
                     continue;
                 }
@@ -2332,8 +2335,8 @@ namespace nORM.Scaffolding
                     left.DependentSchema,
                     leftEntity,
                     rightEntity,
-                    left.DependentColumn,
-                    right.DependentColumn,
+                    leftGroup.Select(fk => fk.DependentColumn).ToArray(),
+                    rightGroup.Select(fk => fk.DependentColumn).ToArray(),
                     leftCollectionName,
                     rightCollectionName));
             }
@@ -2375,6 +2378,15 @@ namespace nORM.Scaffolding
                 .ToArray();
         }
 
+        private static ScaffoldForeignKey[][] OrderManyToManyForeignKeyGroups(string joinTableName, ScaffoldForeignKey[][] foreignKeyGroups)
+        {
+            return foreignKeyGroups
+                .OrderBy(group => PrincipalNamePosition(joinTableName, group[0].PrincipalTable))
+                .ThenBy(group => PrincipalNamePosition(joinTableName, TrimIdSuffix(group[0].DependentColumn)))
+                .ThenBy(group => group[0].DependentColumn, StringComparer.Ordinal)
+                .ToArray();
+        }
+
         private static int PrincipalNamePosition(string joinTableName, string principalTable)
         {
             var position = joinTableName.IndexOf(principalTable, StringComparison.OrdinalIgnoreCase);
@@ -2389,6 +2401,16 @@ namespace nORM.Scaffolding
             return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
                    && keyColumns.Count == 1
                    && keyColumns.Contains(columnName);
+        }
+
+        private static bool HasPrimaryKeyColumns(
+            IReadOnlyDictionary<string, IReadOnlySet<string>> primaryKeyColumnsByTable,
+            string tableKey,
+            IReadOnlyList<string> columnNames)
+        {
+            return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
+                   && keyColumns.Count == columnNames.Count
+                   && columnNames.All(keyColumns.Contains);
         }
 
         private static bool ReferencesPrimaryKey(
@@ -3049,15 +3071,29 @@ namespace nORM.Scaffolding
                         var inverseCollection = EscapeCSharpIdentifier(join.RightCollectionNavigationName);
                         var joinTable = EscapeStringLiteral(join.JoinTableName);
                         var joinSchema = join.JoinTableSchema is null ? null : EscapeStringLiteral(join.JoinTableSchema);
-                        var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
-                        var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
                         sb.AppendLine($"            mb.Entity<{left}>()");
                         sb.AppendLine($"                .HasMany<{right}>(p => p.{collection})");
                         sb.AppendLine($"                .WithMany(p => p.{inverseCollection})");
-                        if (joinSchema is null)
+                        if (joinSchema is null && !join.IsComposite)
+                        {
+                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
+                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
                             sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
-                        else
+                        }
+                        else if (joinSchema is null)
+                        {
+                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)});");
+                        }
+                        else if (!join.IsComposite)
+                        {
+                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
+                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
                             sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\", schema: \"{joinSchema}\");");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, schema: \"{joinSchema}\");");
+                        }
                     }
                     sb.AppendLine("        };");
                     sb.AppendLine("        return configuredOptions;");
@@ -3081,6 +3117,9 @@ namespace nORM.Scaffolding
 
             return $"{parameterName} => new {{ {string.Join(", ", propertyNames.Select(name => parameterName + "." + EscapeCSharpIdentifier(name)))} }}";
         }
+
+        private static string FormatStringArrayLiteral(IReadOnlyList<string> values)
+            => "new[] { " + string.Join(", ", values.Select(value => "\"" + EscapeStringLiteral(value) + "\"")) + " }";
 
         /// <summary>
         /// Returns a C# type name with correct nullability for value or reference types.
@@ -3505,10 +3544,17 @@ namespace nORM.Scaffolding
             string? JoinTableSchema,
             string LeftEntityName,
             string RightEntityName,
-            string LeftForeignKeyColumn,
-            string RightForeignKeyColumn,
+            string[] LeftForeignKeyColumns,
+            string[] RightForeignKeyColumns,
             string LeftCollectionNavigationName,
-            string RightCollectionNavigationName);
+            string RightCollectionNavigationName)
+        {
+            public string LeftForeignKeyColumn => LeftForeignKeyColumns[0];
+
+            public string RightForeignKeyColumn => RightForeignKeyColumns[0];
+
+            public bool IsComposite => LeftForeignKeyColumns.Length > 1 || RightForeignKeyColumns.Length > 1;
+        }
 
         private readonly record struct ScaffoldPossibleJoinTableDiagnostic(
             string TableKey,

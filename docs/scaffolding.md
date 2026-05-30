@@ -85,9 +85,10 @@ must be reviewed and edited like handwritten model code.
   and provider migration generators round-trip it instead of falling back to
   `DECIMAL(18,2)`. SQLite remains on its provider-neutral `NUMERIC` mapping.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
-  non-null single-column foreign keys, no payload columns, a join-table primary
-  key made exactly from those two FK columns, and both references targeting
-  single-column primary keys. Both entity sides receive collection navigations, and the join table is emitted as fluent
+  non-null foreign-key constraints, no payload columns, a join-table primary
+  key made exactly from those FK columns, and both references targeting the
+  exact generated primary keys. Single-column and composite-key pure junction
+  tables are supported. Both entity sides receive collection navigations, and the join table is emitted as fluent
   `HasMany().WithMany(inverse).UsingTable(...)` configuration instead of a join
   entity. Schema-qualified join tables use the schema-aware `UsingTable`
   overload so generated SQL targets the qualified bridge table rather than a
@@ -149,6 +150,7 @@ must be reviewed and edited like handwritten model code.
   generated safely, schema-qualified many-to-many join table preservation,
   self-referencing FK role-based navigation naming,
   self-referencing pure many-to-many join scaffolding,
+  composite-key pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column/descending index diagnostics,
   unsafe composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
@@ -187,10 +189,8 @@ must be reviewed and edited like handwritten model code.
   scaffold diagnostics; provider DDL remains the source of truth.
 - Owned types and inheritance inference.
 - Payload join-table modeling and many-to-many joins whose bridge columns are
-  nullable, missing a composite primary key, or whose foreign keys do not target
-  single-column primary keys. Pure composite-key junction tables are discovered
-  as possible many-to-many shapes, but the join entity is kept because v1
-  `UsingTable` accepts single bridge columns only. These are reported in
+  nullable, missing a primary key made exactly from the FK columns, or whose
+  foreign keys do not target the generated primary keys. These are reported in
   scaffold diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, views, temporal tables, and keyless
@@ -282,7 +282,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | Code | Category | Meaning |
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact unique index. |
-| `SCF002` | `many-to-many` | Possible many-to-many table discovered. Single-column pure bridges can be generated as `UsingTable`; composite-key or payload-capable bridges should stay as join entities until explicitly modeled. |
+| `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column and composite-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-primary-key bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
 | `SCF102` | `schema-feature` | Check constraint discovered. |
@@ -297,11 +297,9 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF112` | `index` | Expression index discovered. |
 | `SCF113` | `index` | Included-column index discovered. |
 
-For v1 runtime mapping, `UsingTable` skip navigations are intentionally limited
-to one FK column per side. Composite-key junction tables are generated and
-loaded as explicit join entities instead; configuring `UsingTable` against a
-composite-key entity fails closed with `NormConfigurationException` rather than
-using only the first key column.
+For v1 runtime mapping, `UsingTable` skip navigations support single-column and
+composite-key pure junction tables when both sides reference the generated
+primary keys. Unsafe bridge shapes remain explicit join entities.
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |

@@ -72,7 +72,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Supported", doc, StringComparison.Ordinal);
         Assert.Contains("Not Yet Stable", doc, StringComparison.Ordinal);
         Assert.Contains("bridge columns are", doc, StringComparison.Ordinal);
-        Assert.Contains("nullable, missing a composite primary key", doc, StringComparison.Ordinal);
+        Assert.Contains("nullable, missing a primary key made exactly from the FK columns", doc, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -269,8 +269,8 @@ public class ScaffoldingContractDocTests
         var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
 
         Assert.Contains("Both entity sides receive collection navigations", doc, StringComparison.Ordinal);
-        Assert.Contains("non-null single-column foreign keys", doc, StringComparison.Ordinal);
-        Assert.Contains("key made exactly from those two FK columns", doc, StringComparison.Ordinal);
+        Assert.Contains("non-null foreign-key constraints", doc, StringComparison.Ordinal);
+        Assert.Contains("Single-column and composite-key pure junction", doc, StringComparison.Ordinal);
         Assert.Contains("WithMany(inverse)", doc, StringComparison.Ordinal);
         Assert.Contains("schema-aware `UsingTable`", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables receive distinct", doc, StringComparison.Ordinal);

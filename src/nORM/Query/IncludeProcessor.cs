@@ -43,21 +43,20 @@ namespace nORM.Query
             if (parents.Count == 0) return;
             var jtm = plan.JoinTable;
 
-            // Collect left PKs
-            var parentByPk = new Dictionary<object, List<object>>();
+            var parentKeyValues = new Dictionary<object, object?[]>();
             foreach (var p in parents.Cast<object>())
             {
-                var pk = jtm.LeftPkGetter(p);
+                var keyValues = jtm.GetLeftKeyValues(p);
+                if (keyValues == null) continue;
+                var pk = jtm.CreateLeftKeyFromValues(keyValues);
                 if (pk == null) continue;
-                if (!parentByPk.TryGetValue(pk, out var list))
-                    parentByPk[pk] = list = new List<object>();
-                list.Add(p);
+                parentKeyValues.TryAdd(pk, keyValues);
             }
-            if (parentByPk.Count == 0) return;
+            if (parentKeyValues.Count == 0) return;
 
             // Build a query: SELECT right_fk, right_pk FROM join_table INNER JOIN right_table ON ... WHERE left_fk IN (...)
             // Simpler: SELECT right_fk FROM join_table WHERE left_fk IN (...) → then load right entities
-            var pkeys = parentByPk.Keys.ToArray();
+            var leftKeyGroups = parentKeyValues.Values.ToList();
             var rightMapping = _ctx.GetMapping(jtm.RightType);
 
             // Reset/initialize empty collections on all parents.
@@ -73,16 +72,6 @@ namespace nORM.Query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
 
-            // Build IN clause params for the join table query
-            var paramNames = new List<string>();
-            for (int i = 0; i < pkeys.Length; i++)
-            {
-                var pn = $"{_ctx.RawProvider.ParamPrefix}jlfk{i}";
-                cmd.AddParam(pn, pkeys[i]!);
-                paramNames.Add(pn);
-            }
-            var inClause = $"({string.Join(", ", paramNames)})";
-
             // Determine tenant filtering for the join table query and right entity query.
             // When multi-tenancy is active on the left entity, scope the join table query to
             // only return rows whose left FK belongs to the current tenant.
@@ -90,41 +79,45 @@ namespace nORM.Query
             var tenantActive = _ctx.Options.TenantProvider != null;
             var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
             var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
-            // M2M requires single-column PK on both sides; guard early.
-            if (leftMapping.KeyColumns.Length != 1)
-                throw new NormConfigurationException(
-                    $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
-                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
-            var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantActive;
+            var leftPredicate = BuildColumnValuePredicate(cmd, _ctx.RawProvider.ParamPrefix, "jlfk", "jt", jtm.EscLeftFkColumns, leftKeyGroups);
+            var selectedJoinColumns = string.Join(", ", jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns).Select(c => "jt." + c));
 
             // Query: SELECT jt.left_fk, jt.right_fk FROM join_table jt [INNER JOIN left_table lt ON ...] WHERE jt.left_fk IN (...)
             if (hasTenantFilter)
             {
                 var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
-                cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
+                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", leftMapping.KeyColumns);
+                cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON {leftJoinPredicate} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND {leftPredicate}";
                 cmd.AddParam(tp, tenantId!);
             }
             else
             {
-                cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+                cmd.CommandText = $"SELECT {string.Join(", ", jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns))} FROM {jtm.EscTableName} jt WHERE {leftPredicate}";
             }
             cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
             // Read all join rows: leftPk → list of rightPks
             var joinRows = new Dictionary<object, List<object>>();
             var allRightPks = new HashSet<object>();
+            var rightKeyValues = new Dictionary<object, object?[]>();
+            var leftKeyWidth = jtm.LeftFkColumns.Count;
+            var rightKeyWidth = jtm.RightFkColumns.Count;
             await using (var jReader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false))
             {
                 while (await jReader.ReadAsync(ct).ConfigureAwait(false))
                 {
-                    if (jReader.IsDBNull(0) || jReader.IsDBNull(1)) continue;
-                    var lPk = jReader.GetValue(0);
-                    var rPk = jReader.GetValue(1);
+                    var leftValues = ReadKeyValues(jReader, 0, leftKeyWidth);
+                    var rightValues = ReadKeyValues(jReader, leftKeyWidth, rightKeyWidth);
+                    if (leftValues == null || rightValues == null) continue;
+                    var lPk = jtm.CreateLeftKeyFromValues(leftValues);
+                    var rPk = jtm.CreateRightKeyFromValues(rightValues);
+                    if (lPk == null || rPk == null) continue;
                     if (!joinRows.TryGetValue(lPk, out var rList))
                         joinRows[lPk] = rList = new List<object>();
                     rList.Add(rPk);
                     allRightPks.Add(rPk);
+                    rightKeyValues.TryAdd(rPk, rightValues);
                 }
             }
 
@@ -132,21 +125,7 @@ namespace nORM.Query
 
             // Load related (right) entities in a single query
             await using var cmd2 = _ctx.CreateCommand();
-            var rightParamNames = new List<string>();
-            var allRightPkList = allRightPks.ToList();
-            for (int i = 0; i < allRightPkList.Count; i++)
-            {
-                var pn = $"{_ctx.RawProvider.ParamPrefix}jrpk{i}";
-                cmd2.AddParam(pn, allRightPkList[i]!);
-                rightParamNames.Add(pn);
-            }
-            // M2M requires single-column PK on the right side; guard early.
-            if (rightMapping.KeyColumns.Length != 1)
-                throw new NormConfigurationException(
-                    $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
-                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
-            var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
-            var rightInClause = $"({string.Join(", ", rightParamNames)})";
+            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, rightMapping.KeyColumns, rightKeyValues.Values.ToList());
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;
@@ -154,12 +133,12 @@ namespace nORM.Query
             {
                 rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many include right side");
                 var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
-                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate} AND {rightTenantCol.EscCol} = {rtp}";
                 cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many include right side"));
             }
             else
             {
-                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}";
             }
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
@@ -176,7 +155,7 @@ namespace nORM.Query
                         rightEntity = entry.Entity!;
                         NavigationPropertyExtensions.EnableLazyLoading(rightEntity, _ctx);
                     }
-                    var rpk = rightPkCol.Getter(rightEntity);
+                    var rpk = jtm.GetRightKey(rightEntity);
                     if (rpk != null)
                         rightEntitiesByPk[rpk] = rightEntity;
                 }
@@ -185,7 +164,7 @@ namespace nORM.Query
             // Assign collections to parents
             foreach (var p in parents.Cast<object>())
             {
-                var leftPk = jtm.LeftPkGetter(p);
+                var leftPk = jtm.GetLeftKey(p);
                 if (leftPk == null) continue;
 
                 var collection = jtm.LeftCollectionGetter(p);
@@ -226,18 +205,18 @@ namespace nORM.Query
             if (parents.Count == 0) return;
             var jtm = plan.JoinTable;
 
-            var parentByPk = new Dictionary<object, List<object>>();
+            var parentKeyValues = new Dictionary<object, object?[]>();
             foreach (var p in parents.Cast<object>())
             {
-                var pk = jtm.LeftPkGetter(p);
+                var keyValues = jtm.GetLeftKeyValues(p);
+                if (keyValues == null) continue;
+                var pk = jtm.CreateLeftKeyFromValues(keyValues);
                 if (pk == null) continue;
-                if (!parentByPk.TryGetValue(pk, out var list))
-                    parentByPk[pk] = list = new List<object>();
-                list.Add(p);
+                parentKeyValues.TryAdd(pk, keyValues);
             }
-            if (parentByPk.Count == 0) return;
+            if (parentKeyValues.Count == 0) return;
 
-            var pkeys = parentByPk.Keys.ToArray();
+            var leftKeyGroups = parentKeyValues.Values.ToList();
             var rightMapping = _ctx.GetMapping(jtm.RightType);
 
             // Reset collections to fresh empty lists before populating.
@@ -250,74 +229,55 @@ namespace nORM.Query
             _ctx.EnsureConnection();
             using var cmd = _ctx.CreateCommand();
 
-            var paramNames = new List<string>();
-            for (int i = 0; i < pkeys.Length; i++)
-            {
-                var pn = $"{_ctx.RawProvider.ParamPrefix}jlfk{i}";
-                cmd.AddParam(pn, pkeys[i]!);
-                paramNames.Add(pn);
-            }
-            var inClause = $"({string.Join(", ", paramNames)})";
-
             // Determine tenant filtering for the join table query and right entity query.
             var leftMapping = _ctx.GetMapping(jtm.LeftType);
             var tenantActive = _ctx.Options.TenantProvider != null;
             var tenantId = tenantActive ? _ctx.GetRequiredTenantId(leftMapping, "many-to-many include") : null;
             var leftTenantCol = tenantActive ? _ctx.RequireTenantColumn(leftMapping, "many-to-many include left side") : null;
-            // M2M requires single-column PK on both sides; guard early.
-            if (leftMapping.KeyColumns.Length != 1)
-                throw new NormConfigurationException(
-                    $"Many-to-many Include on '{leftMapping.Type.Name}' requires a single-column primary key. " +
-                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
-            var leftPkCol = leftMapping.KeyColumns[0]; // single-PK required for M2M join table queries
             var hasTenantFilter = tenantActive;
+            var leftPredicate = BuildColumnValuePredicate(cmd, _ctx.RawProvider.ParamPrefix, "jlfk", "jt", jtm.EscLeftFkColumns, leftKeyGroups);
+            var selectedJoinColumns = string.Join(", ", jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns).Select(c => "jt." + c));
 
             if (hasTenantFilter)
             {
                 var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
-                cmd.CommandText = $"SELECT jt.{jtm.EscLeftFkColumn}, jt.{jtm.EscRightFkColumn} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON jt.{jtm.EscLeftFkColumn} = lt.{leftPkCol!.EscCol} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND jt.{jtm.EscLeftFkColumn} IN {inClause}";
+                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", leftMapping.KeyColumns);
+                cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON {leftJoinPredicate} WHERE lt.{leftTenantCol!.EscCol} = {tp} AND {leftPredicate}";
                 cmd.AddParam(tp, tenantId!);
             }
             else
             {
-                cmd.CommandText = $"SELECT {jtm.EscLeftFkColumn}, {jtm.EscRightFkColumn} FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN {inClause}";
+                cmd.CommandText = $"SELECT {string.Join(", ", jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns))} FROM {jtm.EscTableName} jt WHERE {leftPredicate}";
             }
             cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
             var joinRows = new Dictionary<object, List<object>>();
             var allRightPks = new HashSet<object>();
+            var rightKeyValues = new Dictionary<object, object?[]>();
+            var leftKeyWidth = jtm.LeftFkColumns.Count;
+            var rightKeyWidth = jtm.RightFkColumns.Count;
             using (var jReader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default))
             {
                 while (jReader.Read())
                 {
-                    if (jReader.IsDBNull(0) || jReader.IsDBNull(1)) continue;
-                    var lPk = jReader.GetValue(0);
-                    var rPk = jReader.GetValue(1);
+                    var leftValues = ReadKeyValues(jReader, 0, leftKeyWidth);
+                    var rightValues = ReadKeyValues(jReader, leftKeyWidth, rightKeyWidth);
+                    if (leftValues == null || rightValues == null) continue;
+                    var lPk = jtm.CreateLeftKeyFromValues(leftValues);
+                    var rPk = jtm.CreateRightKeyFromValues(rightValues);
+                    if (lPk == null || rPk == null) continue;
                     if (!joinRows.TryGetValue(lPk, out var rList))
                         joinRows[lPk] = rList = new List<object>();
                     rList.Add(rPk);
                     allRightPks.Add(rPk);
+                    rightKeyValues.TryAdd(rPk, rightValues);
                 }
             }
 
             if (allRightPks.Count == 0) return;
 
             using var cmd2 = _ctx.CreateCommand();
-            var rightParamNames = new List<string>();
-            var allRightPkList = allRightPks.ToList();
-            for (int i = 0; i < allRightPkList.Count; i++)
-            {
-                var pn = $"{_ctx.RawProvider.ParamPrefix}jrpk{i}";
-                cmd2.AddParam(pn, allRightPkList[i]!);
-                rightParamNames.Add(pn);
-            }
-            // M2M requires single-column PK on the right side; guard early.
-            if (rightMapping.KeyColumns.Length != 1)
-                throw new NormConfigurationException(
-                    $"Many-to-many Include on '{rightMapping.Type.Name}' requires a single-column primary key. " +
-                    "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
-            var rightPkCol = rightMapping.KeyColumns[0]; // single-PK required for M2M join table queries
-            var rightInClause = $"({string.Join(", ", rightParamNames)})";
+            var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, rightMapping.KeyColumns, rightKeyValues.Values.ToList());
 
             // If the right entity table also has a tenant column, filter right entities by tenant
             var rightTenantCol = rightMapping.TenantColumn;
@@ -325,12 +285,12 @@ namespace nORM.Query
             {
                 rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many include right side");
                 var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
-                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause} AND {rightTenantCol.EscCol} = {rtp}";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate} AND {rightTenantCol.EscCol} = {rtp}";
                 cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many include right side"));
             }
             else
             {
-                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPkCol.EscCol} IN {rightInClause}";
+                cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}";
             }
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
@@ -347,7 +307,7 @@ namespace nORM.Query
                         rightEntity = entry.Entity!;
                         NavigationPropertyExtensions.EnableLazyLoading(rightEntity, _ctx);
                     }
-                    var rpk = rightPkCol.Getter(rightEntity);
+                    var rpk = jtm.GetRightKey(rightEntity);
                     if (rpk != null)
                         rightEntitiesByPk[rpk] = rightEntity;
                 }
@@ -355,7 +315,7 @@ namespace nORM.Query
 
             foreach (var p in parents.Cast<object>())
             {
-                var leftPk = jtm.LeftPkGetter(p);
+                var leftPk = jtm.GetLeftKey(p);
                 if (leftPk == null) continue;
 
                 var collection = jtm.LeftCollectionGetter(p);
@@ -636,6 +596,98 @@ namespace nORM.Query
 
         private static object?[] GetKeyValues(object key)
             => key is RelationKey composite ? composite.Values : new object?[] { key };
+
+        private static object?[]? ReadKeyValues(DbDataReader reader, int offset, int count)
+        {
+            var values = new object?[count];
+            for (var i = 0; i < count; i++)
+            {
+                if (reader.IsDBNull(offset + i))
+                    return null;
+                values[i] = reader.GetValue(offset + i);
+            }
+
+            return values;
+        }
+
+        private static string BuildColumnValuePredicate(
+            DbCommand cmd,
+            string paramPrefix,
+            string paramBaseName,
+            string? tableAlias,
+            IReadOnlyList<string> escapedColumns,
+            IReadOnlyList<object?[]> keyGroups)
+        {
+            if (keyGroups.Count == 0)
+                return "1 = 0";
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append('(');
+            for (var groupIndex = 0; groupIndex < keyGroups.Count; groupIndex++)
+            {
+                if (groupIndex > 0)
+                    sb.Append(" OR ");
+
+                var values = keyGroups[groupIndex];
+                if (values.Length != escapedColumns.Count)
+                    throw new NormConfigurationException(
+                        $"Many-to-many key predicate expected {escapedColumns.Count} values but received {values.Length}.");
+
+                sb.Append('(');
+                for (var columnIndex = 0; columnIndex < escapedColumns.Count; columnIndex++)
+                {
+                    if (columnIndex > 0)
+                        sb.Append(" AND ");
+
+                    var parameterName = $"{paramPrefix}{paramBaseName}{groupIndex}_{columnIndex}";
+                    if (!string.IsNullOrEmpty(tableAlias))
+                        sb.Append(tableAlias).Append('.');
+                    sb.Append(escapedColumns[columnIndex]).Append(" = ").Append(parameterName);
+                    cmd.AddParam(parameterName, values[columnIndex]!);
+                }
+                sb.Append(')');
+            }
+            sb.Append(')');
+            return sb.ToString();
+        }
+
+        private static string BuildColumnValuePredicate(
+            DbCommand cmd,
+            string paramPrefix,
+            string paramBaseName,
+            string? tableAlias,
+            IReadOnlyList<Column> columns,
+            IReadOnlyList<object?[]> keyGroups)
+            => BuildColumnValuePredicate(
+                cmd,
+                paramPrefix,
+                paramBaseName,
+                tableAlias,
+                columns.Select(c => c.EscCol).ToArray(),
+                keyGroups);
+
+        private static string BuildColumnJoinPredicate(
+            string leftAlias,
+            IReadOnlyList<string> leftEscColumns,
+            string rightAlias,
+            IReadOnlyList<Column> rightColumns)
+        {
+            if (leftEscColumns.Count != rightColumns.Count)
+                throw new NormConfigurationException(
+                    $"Many-to-many join table key width {leftEscColumns.Count} does not match mapped entity key width {rightColumns.Count}.");
+
+            var sb = new System.Text.StringBuilder();
+            for (var i = 0; i < leftEscColumns.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(" AND ");
+                sb.Append(leftAlias).Append('.').Append(leftEscColumns[i])
+                  .Append(" = ")
+                  .Append(rightAlias).Append('.').Append(rightColumns[i].EscCol);
+            }
+
+            return sb.ToString();
+        }
 
         private static void AppendCompositeKeyPredicate(System.Text.StringBuilder sb, TableMapping.Relation relation, string tableAlias, List<string[]> paramGroups)
         {

@@ -372,23 +372,26 @@ namespace nORM.Mapping
 
             foreach (var m2m in fluentConfig.ManyToManyRelationships)
             {
-                // Resolve the left PK column (this entity). The v1 UsingTable API
-                // accepts one left FK and one right FK, so composite-key M2M must
-                // fail closed instead of silently using the first key column.
-                if (KeyColumns.Length != 1)
+                var leftPkColumns = KeyColumns;
+                if (leftPkColumns.Length == 0)
                     throw new NormConfigurationException(
-                        $"Many-to-many relationship on '{Type.Name}' requires a single-column primary key. " +
-                        "Map composite-key join tables as explicit join entities, or use a single-column surrogate key for skip-navigation many-to-many.");
-                var leftPkCol = KeyColumns[0];
+                        $"Many-to-many relationship on '{Type.Name}' requires a primary key.");
 
-                // Resolve the right entity mapping and PK column.
-                var rightMapping = ctx.GetMapping(m2m.RelatedType);
-                if (rightMapping.KeyColumns.Length != 1)
+                if (m2m.LeftFkColumns.Count != leftPkColumns.Length)
                     throw new NormConfigurationException(
-                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which must have a " +
-                        "single-column primary key. Map composite-key join tables as explicit join entities, or use a " +
-                        "single-column surrogate key for skip-navigation many-to-many.");
-                var rightPkCol = rightMapping.KeyColumns[0];
+                        $"Many-to-many relationship on '{Type.Name}' declares {m2m.LeftFkColumns.Count} left FK columns " +
+                        $"but the entity key has {leftPkColumns.Length} columns.");
+
+                var rightMapping = ctx.GetMapping(m2m.RelatedType);
+                var rightPkColumns = rightMapping.KeyColumns;
+                if (rightPkColumns.Length == 0)
+                    throw new NormConfigurationException(
+                        $"Many-to-many relationship on '{Type.Name}' references '{m2m.RelatedType.Name}' which must have a primary key.");
+
+                if (m2m.RightFkColumns.Count != rightPkColumns.Length)
+                    throw new NormConfigurationException(
+                        $"Many-to-many relationship on '{Type.Name}' declares {m2m.RightFkColumns.Count} right FK columns " +
+                        $"but related entity '{m2m.RelatedType.Name}' has {rightPkColumns.Length} key columns.");
 
                 // Resolve nav properties
                 var leftNavProp = Type.GetProperty(m2m.NavPropertyName)
@@ -402,14 +405,14 @@ namespace nORM.Mapping
                 ManyToManyJoins.Add(new JoinTableMapping(
                     m2m.JoinTableName,
                     m2m.JoinTableSchema,
-                    m2m.LeftFkColumn,
-                    m2m.RightFkColumn,
+                    m2m.LeftFkColumns,
+                    m2m.RightFkColumns,
                     Type,
                     m2m.RelatedType,
                     m2m.NavPropertyName,
                     m2m.RelatedNavPropertyName,
-                    leftPkCol,
-                    rightPkCol,
+                    leftPkColumns,
+                    rightPkColumns,
                     leftNavProp,
                     rightNavProp,
                     p));

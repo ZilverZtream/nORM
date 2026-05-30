@@ -156,5 +156,11 @@ namespace nORM.Configuration
     {
         /// <summary>Optional schema containing the join table.</summary>
         public string? JoinTableSchema { get; init; }
+
+        /// <summary>Ordered join-table columns referencing this entity's key.</summary>
+        public IReadOnlyList<string> LeftFkColumns { get; init; } = new[] { LeftFkColumn };
+
+        /// <summary>Ordered join-table columns referencing the related entity's key.</summary>
+        public IReadOnlyList<string> RightFkColumns { get; init; } = new[] { RightFkColumn };
     }
 }

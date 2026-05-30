@@ -269,7 +269,7 @@ metadata-backed identity columns, computed/generated column metadata, SQL
 Server rowversion/timestamp metadata, single-column FK
 navigation generation with cascade/non-cascade delete behavior, role-based
 self-referencing FK and self-join names, pure many-to-many join mapping including
-schema-qualified join tables, and
+schema-qualified and composite-key junction tables, and
 single-column/composite index metadata are
 supported, including columns that participate in multiple indexes. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
@@ -279,9 +279,10 @@ SQLite rowid integer primary keys are generated as non-null `long` properties,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 
-Unsupported composite foreign keys, payload join tables, provider-specific
+Unsupported composite foreign keys that do not target generated primary keys or
+exact unique indexes, payload join tables, provider-specific
 defaults, computed column expressions, check constraints, collations, provider
-column types, numeric precision/scale, non-default identity settings,
+column types, non-default identity settings,
 non-default FK referential actions, triggers, SQL Server provider-native
 temporal tables, tables without primary keys, SQLite virtual tables and shadow
 tables, skipped views, routines, sequences, synonyms, materialized views, and
@@ -295,7 +296,7 @@ scaffolds fail in CI after the warning report is written.
 Clean later scaffold runs remove stale warning reports when overwrite is
 allowed, or fail clearly when overwrite protection would leave stale reports in
 place.
-Composite FK navigation generation, payload join-table modeling, owned-type
+Payload join-table modeling, owned-type
 inference, inheritance inference, view entity generation, and provider-specific
 schema semantics remain explicit post-processing. See [Scaffolding
 Contract](docs/scaffolding.md).
