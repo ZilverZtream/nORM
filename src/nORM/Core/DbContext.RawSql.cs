@@ -426,20 +426,8 @@ namespace nORM.Core
             if (parameters is null)
                 return;
 
-            if (parameters is IEnumerable<KeyValuePair<string, object?>> pairs)
-            {
-                var values = new List<(string name, object value)>();
-                foreach (var pair in pairs)
-                {
-                    var pName = FormatStoredProcedureParameterName(provider, pair.Key);
-                    var pValue = pair.Value ?? DBNull.Value;
-                    values.Add((pName, pValue));
-                    paramDict[pName] = pValue;
-                }
-
-                cmd.SetParametersFast(values.ToArray());
+            if (TrySetStoredProcedureDictionaryParameters(cmd, provider, parameters, paramDict))
                 return;
-            }
 
             var props = parameters.GetType().GetProperties();
             var span = new (string name, object value)[props.Length];
@@ -452,6 +440,45 @@ namespace nORM.Core
             }
 
             cmd.SetParametersFast(span);
+        }
+
+        private static bool TrySetStoredProcedureDictionaryParameters(
+            DbCommand cmd,
+            Providers.DatabaseProvider provider,
+            object parameters,
+            Dictionary<string, object> paramDict)
+        {
+            var parameterType = parameters.GetType();
+            var kvpEnumerable = parameterType
+                .GetInterfaces()
+                .Concat(new[] { parameterType })
+                .FirstOrDefault(type =>
+                    type.IsGenericType
+                    && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                    && type.GetGenericArguments()[0].IsGenericType
+                    && type.GetGenericArguments()[0].GetGenericTypeDefinition() == typeof(KeyValuePair<,>)
+                    && type.GetGenericArguments()[0].GetGenericArguments()[0] == typeof(string));
+            if (kvpEnumerable is null || parameters is not System.Collections.IEnumerable enumerable)
+                return false;
+
+            var keyValueType = kvpEnumerable.GetGenericArguments()[0];
+            var keyProperty = keyValueType.GetProperty(nameof(KeyValuePair<string, object?>.Key))!;
+            var valueProperty = keyValueType.GetProperty(nameof(KeyValuePair<string, object?>.Value))!;
+            var values = new List<(string name, object value)>();
+            foreach (var item in enumerable)
+            {
+                if (item is null)
+                    continue;
+
+                var key = (string?)keyProperty.GetValue(item);
+                var pName = FormatStoredProcedureParameterName(provider, key ?? string.Empty);
+                var pValue = valueProperty.GetValue(item) ?? DBNull.Value;
+                values.Add((pName, pValue));
+                paramDict[pName] = pValue;
+            }
+
+            cmd.SetParametersFast(values.ToArray());
+            return true;
         }
 
         private static string FormatStoredProcedureParameterName(Providers.DatabaseProvider provider, string name)

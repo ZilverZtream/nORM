@@ -110,6 +110,28 @@ public class StoredProcedureTests
         Assert.Equal("Iota", results[0].Name);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_BindsStronglyTypedDictionaryParameters()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(10,'Kappa'),(11,'Lambda');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, string> { ["name"] = "Lambda" };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Name = @name",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal(11, results[0].Id);
+    }
+
     /// <summary>
     /// ExecuteStoredProcedureAsAsyncEnumerable already correctly uses Provider.StoredProcedureCommandType.
     /// Verify all three overloads produce consistent results on SQLite.
