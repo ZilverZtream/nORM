@@ -126,8 +126,9 @@ must be reviewed and edited like handwritten model code.
   discovered parameter metadata. Routine bodies remain provider-owned and are
   not translated across database engines.
 - Optional query-artifact entities through
-  `ScaffoldOptions.EmitViewEntities` and CLI `--emit-view-entities` or
-  `--emit-query-artifacts`.
+  `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
+  `EmitViewEntities`) and CLI `--emit-query-artifacts` or
+  `--emit-view-entities`.
   Generated view/materialized-view/SQLite virtual-table classes are intended
   for reads; scaffolding still reports missing primary keys where the database
   does not expose one, and nORM does not infer provider-neutral write semantics

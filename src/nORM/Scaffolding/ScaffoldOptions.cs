@@ -46,5 +46,13 @@ namespace nORM.Scaffolding
         /// for them.
         /// </summary>
         public bool EmitViewEntities { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether supported provider query artifacts
+        /// (views/materialized views and SQLite virtual tables) should be emitted
+        /// as query-only entity classes. This is the preferred API name;
+        /// <see cref="EmitViewEntities"/> remains an equivalent compatibility alias.
+        /// </summary>
+        public bool EmitQueryArtifacts { get; init; }
     }
 }

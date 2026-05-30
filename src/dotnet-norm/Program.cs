@@ -66,7 +66,8 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
             OverwriteFiles = !result.GetValue(noOverwriteOpt),
             FailOnWarnings = result.GetValue(failOnWarningsOpt),
             EmitRoutineStubs = result.GetValue(emitRoutineStubsOpt),
-            EmitViewEntities = result.GetValue(emitViewEntitiesOpt) || result.GetValue(emitQueryArtifactsOpt)
+            EmitViewEntities = result.GetValue(emitViewEntitiesOpt),
+            EmitQueryArtifacts = result.GetValue(emitQueryArtifactsOpt)
         };
         try
         {

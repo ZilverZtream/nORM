@@ -82,7 +82,8 @@ namespace nORM.Scaffolding
                 Directory.CreateDirectory(outputDirectory);
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-                var emittedViewObjects = options.EmitViewEntities
+                var emitQueryArtifacts = options.EmitViewEntities || options.EmitQueryArtifacts;
+                var emittedViewObjects = emitQueryArtifacts
                     ? discoveredSkippedObjects.Where(IsQueryArtifactObject).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
                 var discoveredTablesAndViews = discoveredTables
