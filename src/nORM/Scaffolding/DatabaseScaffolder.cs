@@ -2501,8 +2501,12 @@ namespace nORM.Scaffolding
             foreach (var fk in constraints.Select(g => g.First()))
             {
                 var principalTableKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                if (!HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, principalTableKey, fk.PrincipalColumn))
-                    reasons.Add("principal-key-not-single-column-primary-key");
+                var principalColumns = foreignKeys
+                    .Where(row => string.Equals(row.ConstraintName, fk.ConstraintName, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.PrincipalColumn)
+                    .ToArray();
+                if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTableKey, principalColumns))
+                    reasons.Add("principal-key-not-primary-key");
             }
 
             if (reasons.Count == 0)
@@ -2526,7 +2530,7 @@ namespace nORM.Scaffolding
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
         private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe single-column pure join table, verify both FK columns are NOT NULL with a composite primary key over them and use the generated UsingTable mapping. Keep composite-key, payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
+            => "If this is a safe pure join table over principal primary keys, verify all FK columns are NOT NULL with a primary key over them and use the generated UsingTable mapping. Keep alternate-key, payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
 
         private static string ScaffoldDiagnosticSeverity()
             => "Warning";

@@ -2501,6 +2501,56 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithAlternateKeyPureJoinTable_EmitsExplicitJoinEntityAndDiagnostic()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (
+                Id INTEGER PRIMARY KEY,
+                Code TEXT NOT NULL UNIQUE,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE Book (
+                Id INTEGER PRIMARY KEY,
+                Isbn TEXT NOT NULL UNIQUE,
+                Title TEXT NOT NULL
+            );
+            CREATE TABLE AuthorBook (
+                AuthorCode TEXT NOT NULL,
+                BookIsbn TEXT NOT NULL,
+                PRIMARY KEY (AuthorCode, BookIsbn),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorCode) REFERENCES Author(Code),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookIsbn) REFERENCES Book(Isbn)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "AlternateKeyJoinCtx");
+
+            Assert.True(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "AlternateKeyJoinCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain(".UsingTable(\"AuthorBook\"", contextCode);
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            var joinTable = Assert.Single(joinTables.EnumerateArray());
+            Assert.Equal("AuthorBook", joinTable.GetProperty("table").GetString());
+            Assert.Contains(joinTable.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "principal-key-not-primary-key");
+            Assert.Contains("primary keys", joinTable.GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSharedTenantCompositeKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

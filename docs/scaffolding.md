@@ -392,7 +392,7 @@ Each row also includes stable diagnostic metadata:
   why the bridge was not emitted as `UsingTable`, for example
   `payload-columns`, `nullable-foreign-key`, `composite-foreign-key`,
   `missing-primary-key`, `primary-key-not-exact-bridge-columns`, or
-  `principal-key-not-single-column-primary-key`.
+  `principal-key-not-primary-key`.
 
 Use `code` and `category` for CI baselines, owner routing, and remediation
 dashboards. Use routine `metadata` for stored procedure/function migration
