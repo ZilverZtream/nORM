@@ -183,7 +183,9 @@ namespace nORM.Scaffolding
                     rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
                     identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
                     decimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions).ConfigureAwait(false);
+                    var isReadOnlyEntity = !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
+                        || primaryKeyColumns.Count == 0;
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
@@ -241,6 +243,7 @@ namespace nORM.Scaffolding
         /// <param name="rowVersionColumns">Column names known to be database-managed rowversion/timestamp tokens.</param>
         /// <param name="identityColumns">Column names known to be database-generated identity/auto-increment values.</param>
         /// <param name="decimalPrecisions">Decimal precision/scale metadata keyed by database column name.</param>
+        /// <param name="isReadOnlyEntity">Whether the generated type should reject nORM write operations.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -257,7 +260,8 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? computedColumns = null,
             IReadOnlySet<string>? rowVersionColumns = null,
             IReadOnlySet<string>? identityColumns = null,
-            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null)
+            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null,
+            bool isReadOnlyEntity = false)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -268,7 +272,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("using System.Collections.Generic;");
                 sb.AppendLine("using System.ComponentModel.DataAnnotations;");
                 sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
-                if (indexes?.Count > 0)
+                if ((indexes?.Count > 0) || isReadOnlyEntity)
                     sb.AppendLine("using nORM.Configuration;");
                 sb.AppendLine();
                 sb.AppendLine($"namespace {namespaceName};");
@@ -279,6 +283,8 @@ namespace nORM.Scaffolding
                     ? $"[Table(\"{safeTableName}\", Schema = \"{EscapeStringLiteral(schemaName)}\")]"
                     : $"[Table(\"{safeTableName}\")]";
                 sb.AppendLine(tableAttr);
+                if (isReadOnlyEntity)
+                    sb.AppendLine("[ReadOnlyEntity]");
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(entityName)}");
                 sb.AppendLine("{");
 
@@ -2501,7 +2507,7 @@ namespace nORM.Scaffolding
                 "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
                 "DescendingIndex" => "Review this descending index shape; ordinary column-key descending indexes are generated, but this one was not safe to map as provider-neutral index metadata.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
-                "MissingPrimaryKey" => "Add a primary key or configure the generated type as a read-only/query artifact before using writes or navigations.",
+                "MissingPrimaryKey" => "Generated code marks this type with [ReadOnlyEntity] so query materialization works but nORM writes are rejected; add a primary key before using generated writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."
             };
 

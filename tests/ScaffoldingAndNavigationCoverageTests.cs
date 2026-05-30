@@ -81,6 +81,14 @@ public class SanRowVersionGenerated
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }
 
+[Table("SAN_ReadOnlyReport")]
+[ReadOnlyEntity]
+public class SanReadOnlyReport
+{
+    public string ExternalId { get; set; } = string.Empty;
+    public string Payload { get; set; } = string.Empty;
+}
+
 [Table("SchemaParent", Schema = "aux")]
 [Xunit.Trait("Category", "Fast")]
 public class SanSchemaParent
@@ -1871,6 +1879,8 @@ public class DatabaseScaffolderPrivateMethodTests
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
+            Assert.Contains("using nORM.Configuration;", entityCode);
+            Assert.Contains("[ReadOnlyEntity]", entityCode);
             Assert.DoesNotContain("[Key]", entityCode);
             Assert.Contains("MissingPrimaryKey", warnings);
             Assert.Contains("KeylessImport", warnings);
@@ -1878,12 +1888,32 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "KeylessImport" &&
-                item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
+                item.GetProperty("suggestedAction").GetString()!.Contains("read-only", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task ReadOnlyEntity_WritePathsThrowBeforeSqlGeneration()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var item = new SanReadOnlyReport { ExternalId = "ext-1", Payload = "payload" };
+
+        var add = Assert.Throws<NormUnsupportedFeatureException>(() => ctx.Add(item));
+        Assert.Contains("read-only", add.Message, StringComparison.OrdinalIgnoreCase);
+
+        var update = Assert.Throws<NormUnsupportedFeatureException>(() => ctx.Update(item));
+        Assert.Contains("read-only", update.Message, StringComparison.OrdinalIgnoreCase);
+
+        var remove = Assert.Throws<NormUnsupportedFeatureException>(() => ctx.Remove(item));
+        Assert.Contains("read-only", remove.Message, StringComparison.OrdinalIgnoreCase);
+
+        var insert = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => ctx.InsertAsync(item));
+        Assert.Contains("read-only", insert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

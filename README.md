@@ -298,13 +298,17 @@ exact unique indexes, payload join tables, complex/provider-specific
 defaults that fail the migration default allowlist, provider column types,
 non-default identity settings,
 unrecognized FK referential actions, triggers, SQL Server provider-native
-temporal tables, tables without primary keys, SQLite virtual tables and shadow
-tables, skipped views, routines, sequences, synonyms, materialized views, and
-events are reported in `nORM.ScaffoldWarnings.md` and
+temporal tables, SQLite virtual tables and shadow tables, skipped views,
+routines, sequences, synonyms, materialized views, and events are reported in
+`nORM.ScaffoldWarnings.md` and
 `nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
 model code. The JSON report includes stable diagnostic codes, categories,
 section counts, and suggested actions so CI can route scaffold follow-up without
 parsing prose.
+Tables and query artifacts without primary keys are emitted as
+`[ReadOnlyEntity]` types: they can be queried, but nORM rejects generated
+insert/update/delete and tracked `SaveChanges` writes before SQL generation
+until the model has a real key.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
 Clean later scaffold runs remove stale warning reports when overwrite is

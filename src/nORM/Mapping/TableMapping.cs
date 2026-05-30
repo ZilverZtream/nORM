@@ -38,6 +38,9 @@ namespace nORM.Mapping
         /// <summary>Gets the columns that form the primary key.</summary>
         public Column[] KeyColumns { get; }
 
+        /// <summary>Gets whether this mapping is query-only and rejects writes.</summary>
+        public bool IsReadOnly { get; }
+
         /// <summary>Gets the timestamp column used for concurrency, if any.</summary>
         public Column? TimestampColumn { get; }
 
@@ -175,6 +178,9 @@ namespace nORM.Mapping
                     }
                 }
             }
+
+            IsReadOnly = (fluentConfig?.IsReadOnly ?? false)
+                || t.GetCustomAttribute<ReadOnlyEntityAttribute>(inherit: true) != null;
 
             Columns = cols.ToArray();
             ColumnsByName = Columns.ToDictionary(c => c.Prop.Name, StringComparer.Ordinal);

@@ -32,6 +32,7 @@ namespace nORM.Core
             // Fast-path for the common case: no transaction, no retry policy, no tenant, cached prepared command.
             // This avoids 4 async state machine allocations by inlining the entire chain.
             var map = GetMapping(typeof(T));
+            EnsureWritableMapping(map, "InsertAsync");
             var tx = CurrentTransaction;
             if (tx == null && Options.TenantProvider == null && Options.RetryPolicy == null
                 && System.Transactions.Transaction.Current == null)
@@ -159,6 +160,7 @@ namespace nORM.Core
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             var map = GetMapping(typeof(T));
+            EnsureWritableMapping(map, operation.ToString());
             ValidateTenantContext(entity, map, operation);
             var tx = transaction ?? CurrentTransaction;
             var ambientTransaction = tx == null ? System.Transactions.Transaction.Current : null;

@@ -25,6 +25,12 @@ namespace nORM.Configuration
         IReadOnlyList<PropertyInfo> KeyProperties { get; }
 
         /// <summary>
+        /// Gets a value indicating whether the mapped type is query-only and
+        /// should reject generated write operations.
+        /// </summary>
+        bool IsReadOnly { get; }
+
+        /// <summary>
         /// Gets a mapping of property infos to explicit column names.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, string> ColumnNames { get; }

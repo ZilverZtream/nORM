@@ -147,8 +147,9 @@ must be reviewed and edited like handwritten model code.
   `--emit-view-entities`.
   Generated view/materialized-view/SQLite virtual-table classes are intended
   for reads; scaffolding still reports missing primary keys where the database
-  does not expose one, and nORM does not infer provider-neutral write semantics
-  for query artifacts.
+  does not expose one. Keyless generated types are marked with
+  `[ReadOnlyEntity]`, so nORM can materialize them through queries but rejects
+  insert/update/delete and tracked `SaveChanges` writes before SQL generation.
 - Warning reports are deterministic per run: if a later scaffold produces no
   diagnostics, stale `nORM.ScaffoldWarnings.*` files are removed when overwrite
   is allowed, or reported as an error when overwrite protection is enabled.
@@ -169,7 +170,9 @@ must be reviewed and edited like handwritten model code.
   relationships that do not target the generated principal primary key or an
   exact unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
-  and tables without primary keys are reported as provider-owned schema; views,
+  are reported as provider-owned schema; tables without primary keys are emitted
+  as read-only generated types and still reported so reviewers know writes and
+  navigations require a real key; views,
   PostgreSQL materialized views, SQLite virtual tables, routines, sequences,
   SQL Server synonyms, SQLite virtual-table shadow tables, and MySQL events are
   discovered and reported as skipped database objects unless an explicit

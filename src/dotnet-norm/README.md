@@ -64,14 +64,17 @@ payload join tables, composite-key pure junction tables that exceed v1
 defaults, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
 non-default identity seed/increment, non-default FK referential actions,
-triggers, SQL Server provider-native temporal tables, tables without primary
-keys, SQLite virtual tables/shadow tables, skipped views, routines, sequences,
-synonyms, materialized views, and events are reported in
+triggers, SQL Server provider-native temporal tables, SQLite virtual
+tables/shadow tables, skipped views, routines, sequences, synonyms,
+materialized views, and events are reported in
 `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`. Composite FK
 navigation generation beyond the safe primary-key subset, payload join-table
 modeling, owned-type inference, inheritance inference, view entity generation, and provider-specific schema
 semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
+Tables and query artifacts without primary keys are generated with
+`[ReadOnlyEntity]`, so they remain queryable but generated writes are rejected
+before SQL generation until the model has a real key.
 Table CHECK constraints are emitted as provider-bound fluent migration metadata
 with `HasCheckConstraint` instead of being dropped into the warning report.
 Computed/generated column expressions are emitted as provider-bound fluent

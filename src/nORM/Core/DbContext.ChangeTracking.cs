@@ -35,7 +35,9 @@ namespace nORM.Core
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
-            return ChangeTracker.Track(entity, EntityState.Added, GetMapping(typeof(T)));
+            var map = GetMapping(typeof(T));
+            EnsureWritableMapping(map, "Add");
+            return ChangeTracker.Track(entity, EntityState.Added, map);
         }
 
         /// <summary>
@@ -66,7 +68,9 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
-            return ChangeTracker.Track(entity, EntityState.Modified, GetMapping(typeof(T)));
+            var map = GetMapping(typeof(T));
+            EnsureWritableMapping(map, "Update");
+            return ChangeTracker.Track(entity, EntityState.Modified, map);
         }
 
         /// <summary>
@@ -80,7 +84,9 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
-            return ChangeTracker.Track(entity, EntityState.Deleted, GetMapping(typeof(T)));
+            var map = GetMapping(typeof(T));
+            EnsureWritableMapping(map, "Remove");
+            return ChangeTracker.Track(entity, EntityState.Deleted, map);
         }
         /// <summary>
         /// Returns the <see cref="EntityEntry"/> for the supplied entity if it is already being tracked.
@@ -308,6 +314,8 @@ namespace nORM.Core
                         continue;
                     var map = group.Key.Mapping;
                     var state = group.Key.State;
+                    if (state is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                        EnsureWritableMapping(map, $"SaveChanges {state}");
 
                     // Guard against re-inserting entities whose DB-generated key was already
                     // assigned by a previous SaveChanges call (e.g. inside a committed external
@@ -773,6 +781,16 @@ namespace nORM.Core
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 }
             }
+        }
+
+        private static void EnsureWritableMapping(TableMapping map, string operation)
+        {
+            if (!map.IsReadOnly)
+                return;
+
+            throw new NormUnsupportedFeatureException(
+                $"{operation} for '{map.Type.Name}' is not supported because the entity is configured as read-only/query-only. " +
+                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.");
         }
 
         private static string[] AddKeyParams(DbCommand cmd, string prefix, string baseName, IReadOnlyList<object?> values)

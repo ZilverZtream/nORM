@@ -20,6 +20,7 @@ namespace nORM.Configuration
         internal class MappingConfiguration : IEntityTypeConfiguration
         {
             public string? TableName { get; private set; }
+            public bool IsReadOnly { get; private set; }
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
@@ -35,6 +36,7 @@ namespace nORM.Configuration
 
             // Explicit interface implementations for read-only surface of IEntityTypeConfiguration.
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
+            bool IEntityTypeConfiguration.IsReadOnly => IsReadOnly;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.Collations => CollationValues;
@@ -74,6 +76,15 @@ namespace nORM.Configuration
                 ArgumentNullException.ThrowIfNull(prop);
                 if (!KeyProperties.Contains(prop))
                     KeyProperties.Add(prop);
+            }
+
+            /// <summary>
+            /// Marks the entity as query-only so generated write operations are
+            /// rejected before SQL is generated.
+            /// </summary>
+            public void SetReadOnly()
+            {
+                IsReadOnly = true;
             }
 
             /// <summary>
@@ -324,6 +335,16 @@ namespace nORM.Configuration
                 var prop = GetProperty(keyExpression.Body);
                 _config.AddKey(prop);
             }
+            return this;
+        }
+
+        /// <summary>
+        /// Marks this entity as query-only. nORM can materialize it from queries,
+        /// but insert, update, delete, and tracked SaveChanges writes are rejected.
+        /// </summary>
+        public EntityTypeBuilder<TEntity> IsReadOnly()
+        {
+            _config.SetReadOnly();
             return this;
         }
 
