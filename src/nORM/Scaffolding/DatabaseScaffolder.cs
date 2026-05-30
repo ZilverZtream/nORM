@@ -4520,6 +4520,7 @@ namespace nORM.Scaffolding
                     : 0;
                 var inputParameters = GetRoutineInputParameters(metadata);
                 var outputParameters = GetRoutineOutputParameters(metadata);
+                var discoveredInputParameterCount = GetRoutineInputParameterCount(metadata);
                 var methodBase = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                 var parameterType = inputParameters.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
@@ -4548,7 +4549,12 @@ namespace nORM.Scaffolding
                     sb.AppendLine($"    /// <remarks>Parameters discovered at scaffold time: {EscapeXmlDocumentation(parameterSummary)}. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                 else
                     sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                var parameterSignature = parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
+                var requiresPositionalFunctionArguments = isFunctionCallShape
+                    && discoveredInputParameterCount > 0
+                    && inputParameters.Count == 0;
+                var parameterSignature = requiresPositionalFunctionArguments
+                    ? "object?[]? arguments = null"
+                    : parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
                 if (isFunctionCallShape)
                 {
                     var streamMethod = isScalarFunction
@@ -4560,7 +4566,7 @@ namespace nORM.Scaffolding
                     var scalarValueType = isScalarFunction
                         ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueResult", memberNames)
                         : null;
-                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, scalarValueMethod, scalarValueType, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction);
+                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, scalarValueMethod, scalarValueType, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction, usePositionalArguments: requiresPositionalFunctionArguments);
                 }
                 else
                 {
@@ -4688,11 +4694,12 @@ namespace nORM.Scaffolding
             string parameterSignature,
             string? parameterType,
             IReadOnlyList<RoutineStubParameter> inputParameters,
-            bool scalar)
+            bool scalar,
+            bool usePositionalArguments)
         {
             sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
-            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
             sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             if (scalar)
@@ -4713,7 +4720,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("    /// <remarks>The routine body is provider-owned and is not translated by nORM.</remarks>");
                 sb.AppendLine($"    public async Task<TValue?> {scalarValueMethod}<TValue>({parameterSignature}, CancellationToken ct = default)");
                 sb.AppendLine("    {");
-                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
                 sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
                 sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
@@ -4729,7 +4736,7 @@ namespace nORM.Scaffolding
             sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
             sb.AppendLine($"    public async IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
-            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
             sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
@@ -4738,8 +4745,11 @@ namespace nORM.Scaffolding
             sb.AppendLine("    }");
         }
 
-        private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters)
+        private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters, bool usePositionalArguments = false)
         {
+            if (usePositionalArguments)
+                return "        var args = arguments is null ? System.Array.Empty<object>() : System.Array.ConvertAll(arguments, value => (object)(value ?? System.DBNull.Value));";
+
             if (parameterType is null || inputParameters.Count == 0)
                 return "        var args = System.Array.Empty<object>();";
 
@@ -4830,6 +4840,29 @@ namespace nORM.Scaffolding
             }
 
             return names.ToArray();
+        }
+
+        private static int GetRoutineInputParameterCount(IReadOnlyDictionary<string, object?> metadata)
+        {
+            if (!metadata.TryGetValue("parameters", out var parametersValue)
+                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
+                || parameters.Count == 0)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            foreach (var parameter in parameters)
+            {
+                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
+                if (!string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static IReadOnlyList<RoutineOutputParameter> GetRoutineOutputParameters(IReadOnlyDictionary<string, object?> metadata)

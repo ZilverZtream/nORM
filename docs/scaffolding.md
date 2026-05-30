@@ -175,7 +175,10 @@ must be reviewed and edited like handwritten model code.
   system type; SQL Server table-valued parameters remain `object?` because they
   require reviewed provider-specific structured-parameter binding. MySQL
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
-  `ushort?`, `byte?`) when the provider exposes the modifier.
+  `ushort?`, `byte?`) when the provider exposes the modifier. Function
+  wrappers whose provider parameter names cannot safely become C# DTO
+  properties use positional `object?[]` arguments instead of silently dropping
+  required function arguments.
   Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper
   and a streaming `IAsyncEnumerable<TResult>` wrapper for large result sets.
   When safe

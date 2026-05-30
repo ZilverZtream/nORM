@@ -1067,6 +1067,33 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithFunctionParametersThatCannotBecomeDto_UsesPositionalArguments()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=2; outputParameters=0; parameterModes=tenant-id:IN:integer,search text:IN:text; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("var args = arguments is null ? System.Array.Empty<object>() : System.Array.ConvertAll(arguments, value => (object)(value ?? System.DBNull.Value));", code);
+        Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_positional_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithPostgresTableFunction_EmitsSelectStarInvocationWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(
