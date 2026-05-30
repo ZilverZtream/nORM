@@ -132,6 +132,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("outputParameters", source, StringComparison.Ordinal);
         Assert.Contains("parameterModes", source, StringComparison.Ordinal);
+        Assert.Contains("pa.is_output = 1 THEN 'INOUT'", source, StringComparison.Ordinal);
+        Assert.Contains("SQL Server `OUTPUT` parameters", doc, StringComparison.Ordinal);
         Assert.Contains("WITHIN GROUP (ORDER BY pa.parameter_id)", source, StringComparison.Ordinal);
         Assert.Contains("ty.name", source, StringComparison.Ordinal);
         Assert.Contains("base_ty.name", source, StringComparison.Ordinal);

@@ -215,8 +215,8 @@ must be reviewed and edited like handwritten model code.
   output parameter metadata is available, scaffolding also emits an
   `OutputParameter[]` factory with mapped `DbType` values, discovered
   string/binary sizes where providers expose them, and `InputOutput` direction
-  for INOUT parameters and `ReturnValue` direction for provider return-value
-  metadata. The generated output wrapper includes a convenience overload that
+  for INOUT parameters and SQL Server `OUTPUT` parameters, plus `ReturnValue`
+  direction for provider return-value metadata. The generated output wrapper includes a convenience overload that
   uses the scaffold-discovered output definitions, plus an explicit
   `params OutputParameter[]` overload for reviewed routine signature changes.
   Scalar-function stubs also include a direct `Task<TValue?> ...ValueAsync`

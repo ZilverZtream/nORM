@@ -561,7 +561,7 @@ namespace nORM.Scaffolding
                                   '; parameterModes=',
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
-                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
+                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'INOUT' ELSE 'IN' END, ':',
                                           CASE
                                               WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
                                               ELSE COALESCE(base_ty.name, ty.name)
@@ -604,7 +604,7 @@ namespace nORM.Scaffolding
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
                                           pa.name, ':',
-                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
+                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'INOUT' ELSE 'IN' END,
                                           ':',
                                           CASE
                                               WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
