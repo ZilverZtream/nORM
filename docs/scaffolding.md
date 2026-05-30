@@ -329,8 +329,9 @@ must be reviewed and edited like handwritten model code.
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers. It
   also pins PostgreSQL materialized-view query artifacts, SQL Server
   provider-native temporal history read-only scaffolds, SQL Server
-  table-valued-parameter routine stubs, and live alternate-key/self-referencing
-  many-to-many junction-table mappings.
+  table-valued-parameter routine stubs, SQL Server local-table synonym query
+  artifacts, and live alternate-key/self-referencing many-to-many junction-table
+  mappings.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
