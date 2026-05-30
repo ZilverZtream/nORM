@@ -166,8 +166,14 @@ must be reviewed and edited like handwritten model code.
   callers can consume large provider-owned rowsets without buffering. When
   provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
-  scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
-  etc.) and falls back to `object?` only for unmapped provider types.
+  scalar types (`int?`, `decimal?`, `DateTime?`, `DateTimeOffset?`,
+  `DateOnly?`, `TimeOnly?`, `TimeSpan?`, `Guid?`, `string?`, `byte[]?`,
+  etc.) and falls back to `object?` only for unmapped provider types. PostgreSQL
+  routine parameters preserve common array metadata (`int[]?`, `string[]?`,
+  `Guid[]?`, temporal arrays, etc.) and known user-defined textual types such
+  as `citext`. SQL Server scalar alias types are mapped through their base
+  system type; SQL Server table-valued parameters remain `object?` because they
+  require reviewed provider-specific structured-parameter binding.
   Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper
   and a streaming `IAsyncEnumerable<TResult>` wrapper for large result sets.
   When safe

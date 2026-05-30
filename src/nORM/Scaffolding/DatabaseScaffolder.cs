@@ -558,15 +558,24 @@ namespace nORM.Scaffolding
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
                                           pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
-                                          ty.name,
                                           CASE
-                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
-                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
-                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
+                                              WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
+                                              ELSE COALESCE(base_ty.name, ty.name)
+                                          END,
+                                          CASE
+                                              WHEN ty.is_table_type = 1 THEN ''
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
                                               ELSE ''
                                           END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
                                       FROM sys.parameters pa
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
+                                      LEFT JOIN sys.types base_ty
+                                        ON ty.is_user_defined = 1
+                                       AND ty.is_table_type = 0
+                                       AND base_ty.user_type_id = ty.system_type_id
+                                       AND base_ty.is_user_defined = 0
                                       WHERE pa.object_id = p.object_id
                                   ), ''))
                     FROM sys.procedures p
@@ -593,15 +602,24 @@ namespace nORM.Scaffolding
                                           pa.name, ':',
                                           CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
                                           ':',
-                                          ty.name,
                                           CASE
-                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
-                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
-                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
+                                              WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
+                                              ELSE COALESCE(base_ty.name, ty.name)
+                                          END,
+                                          CASE
+                                              WHEN ty.is_table_type = 1 THEN ''
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
+                                              WHEN COALESCE(base_ty.name, ty.name) IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
                                               ELSE ''
                                           END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
                                       FROM sys.parameters pa
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
+                                      LEFT JOIN sys.types base_ty
+                                        ON ty.is_user_defined = 1
+                                       AND ty.is_table_type = 0
+                                       AND base_ty.user_type_id = ty.system_type_id
+                                       AND base_ty.is_user_defined = 0
                                       WHERE pa.object_id = o.object_id
                                   ), ''),
                                   '; dataType=',
@@ -4946,6 +4964,7 @@ namespace nORM.Scaffolding
                 "datetime" or "datetime2" or "smalldatetime" or "timestamp" => "DateTime?",
                 "datetimeoffset" or "timestamptz" => "DateTimeOffset?",
                 "uniqueidentifier" or "uuid" => "Guid?",
+                "sysname" => "string?",
                 "bpchar" => "string?",
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
                 "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => "byte[]?",
@@ -4989,6 +5008,7 @@ namespace nORM.Scaffolding
                 "datetime" or "datetime2" or "smalldatetime" or "timestamp" => nameof(DbType.DateTime),
                 "datetimeoffset" or "timestamptz" => nameof(DbType.DateTimeOffset),
                 "uniqueidentifier" or "uuid" => nameof(DbType.Guid),
+                "sysname" => nameof(DbType.String),
                 "bpchar" => nameof(DbType.String),
                 "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => nameof(DbType.String),
                 "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => nameof(DbType.Binary),

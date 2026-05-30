@@ -898,6 +898,33 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithSqlServerAliasAndTableValuedRoutineParameters_EmitsBestEffortTypes()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "ImportLines",
+            "SQL Server stored procedure; parameters=3; outputParameters=0; parameterModes=@email:IN:nvarchar(320),@login:IN:sysname,@items:IN:table type (dbo.LineItemList)");
+
+        Assert.Contains("public string? email { get; init; }", code);
+        Assert.Contains("public string? login { get; init; }", code);
+        Assert.Contains("public object? items { get; init; }", code);
+        Assert.Contains("Parameters discovered at scaffold time: @email IN nvarchar(320), @login IN sysname, @items IN table type (dbo.LineItemList)", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_sqlserver_alias_routine_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithQuotedStoredProcedureName_UsesProviderEscapedInvocationName()
     {
         var code = InvokeScaffoldContextWithRoutine(
