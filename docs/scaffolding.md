@@ -152,7 +152,9 @@ must be reviewed and edited like handwritten model code.
   when runtime-generated table or column mappings contain literal dotted
   identifiers.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
-  scaffolding, composite-FK diagnostic shape for unsupported relationships, provider-owned/default and
+  scaffolding, composite-FK relationship generation when the FK targets the
+  generated primary key, composite-FK diagnostics for unsupported relationship
+  shapes, provider-owned/default and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 - `RelationshipConfigurationTests` covers generated non-cascade relationship
