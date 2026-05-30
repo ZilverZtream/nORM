@@ -43,6 +43,8 @@ constraint targets the generated principal primary key, with cascade/non-cascade
 delete behavior preserved, role-based self-referencing FK and self-join navigations, pure
 many-to-many join mappings including schema-qualified join tables, and single-column/composite index
 metadata, including columns that participate in multiple indexes. SQL Server
+`IDENTITY(seed, increment)` metadata is emitted as `HasIdentityOptions(...)`
+configuration for SQL Server migration round-trips. SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL uses the current database for discovery without emitting
 the database/catalog name as a model schema. `--no-overwrite` preflights all
@@ -63,7 +65,7 @@ payload join tables, composite-key pure junction tables that exceed v1
 `UsingTable` support, provider-specific
 defaults, provider
 column types, numeric precision/scale, SQL Server rowversion/timestamp DDL,
-non-default identity seed/increment, non-default FK referential actions,
+unparsed provider-specific identity strategies, non-default FK referential actions,
 triggers, SQL Server provider-native temporal tables, SQLite virtual
 tables/shadow tables, skipped views, routines, sequences, synonyms,
 materialized views, and events are reported in

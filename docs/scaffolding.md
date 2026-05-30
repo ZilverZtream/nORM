@@ -21,6 +21,10 @@ must be reviewed and edited like handwritten model code.
   when provider metadata exposes them. SQLite rowid integer primary keys,
   SQL Server identity columns, PostgreSQL identity/serial columns, and MySQL
   `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.
+  SQL Server `IDENTITY(seed, increment)` metadata is emitted into generated
+  context configuration with `Property(...).HasIdentityOptions(...)`, and SQL
+  Server migration SQL uses the captured seed/increment when creating or
+  rebuilding the table.
   SQLite rowid integer primary keys are normalized to non-null `long` properties
   even when provider schema metadata reports nullable `int`.
   SQLite declared `UUID` columns scaffold as `Guid`, while declared `JSON` and
@@ -178,7 +182,7 @@ must be reviewed and edited like handwritten model code.
   provider-specific column types that cannot be represented as safe scalar
   storage,
   SQL Server rowversion/timestamp columns,
-  non-default SQL Server identity seed/increment settings, unrecognized FK referential actions,
+  unparsed provider-specific identity strategy metadata, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
   exact unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
@@ -203,6 +207,8 @@ must be reviewed and edited like handwritten model code.
   composite primary-key source generation with consumer-build evidence,
   decimal precision/scale preservation across generated `[Column(TypeName)]`,
   schema snapshots, and migration SQL generators,
+  SQL Server identity seed/increment emission through generated
+  `HasIdentityOptions(...)` configuration,
   composite alternate-key FK generation when the target is an exact unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
@@ -245,6 +251,9 @@ must be reviewed and edited like handwritten model code.
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
 - `RelationshipConfigurationTests` covers generated non-cascade relationship
   metadata and proves the public fluent API keeps cascade behavior explicit.
+- `MigrationFluentSnapshotTests` and `MigrationDefaultsIdentityTests` prove
+  fluent identity options flow into schema snapshots and SQL Server
+  `IDENTITY(seed, increment)` migration DDL.
 - `UpdateNoMutableColumnsTests` covers generated/computed-column exclusion from
   insert and update column sets.
 - `PublicApiSnapshotTests` and `PublicApiClassificationTests` keep scaffold
@@ -275,8 +284,10 @@ must be reviewed and edited like handwritten model code.
   expressions are emitted as provider-bound migration metadata with
   `HasComputedColumnSql`; column collations are emitted as provider-bound
   migration metadata with `HasCollation`; complex/provider-specific defaults
-  that fail the allowlist remain diagnostics. Provider-specific column types, non-default identity
-  seed/increment settings, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
+  that fail the allowlist remain diagnostics. Parsed SQL Server
+  `IDENTITY(seed, increment)` metadata is emitted with
+  `HasIdentityOptions`; provider-specific column types, unparsed identity
+  strategies, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,
   synonyms, and events are discovered and reported in scaffold diagnostics, but
   not converted into complete provider-neutral model code. Views and
@@ -373,11 +384,11 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
-| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
+| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML` are scaffolded as supported scalar storage; provider-specific declarations such as `GEOMETRY` remain diagnostics. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
-| `SCF109` | `schema-feature` | Non-default identity strategy discovered. |
+| `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics. |
 | `SCF110` | `database-object` | Trigger discovered. |
 | `SCF111` | `index` | Filtered/partial index discovered. |
 | `SCF112` | `index` | Expression index discovered but not emitted. SQLite/PostgreSQL expression indexes are emitted as `HasExpressionIndex`. |

@@ -151,7 +151,7 @@ namespace nORM.Migration
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
-                    var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
+                    var identityPart = FormatIdentityPart(c);
                     return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
 
@@ -285,7 +285,7 @@ namespace nORM.Migration
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
-                    var identityPart = c.IsIdentity ? " IDENTITY(1,1)" : "";
+                    var identityPart = FormatIdentityPart(c);
                     return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -427,6 +427,19 @@ namespace nORM.Migration
 
         private static string FormatFilter(string? filterSql)
             => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
+
+        private static string FormatIdentityPart(ColumnSchema column)
+        {
+            if (!column.IsIdentity)
+                return string.Empty;
+
+            var seed = column.IdentitySeed ?? 1;
+            var increment = column.IdentityIncrement ?? 1;
+            if (increment == 0)
+                throw new InvalidOperationException($"Identity increment for column '{column.Name}' cannot be zero.");
+
+            return $" IDENTITY({seed.ToString(System.Globalization.CultureInfo.InvariantCulture)},{increment.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        }
 
         private static void EnsureNoExpressionIndexes(IReadOnlyList<ExpressionIndexSchema> expressionIndexes, string tableName)
         {

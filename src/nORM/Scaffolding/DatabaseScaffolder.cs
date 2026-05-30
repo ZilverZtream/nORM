@@ -163,6 +163,12 @@ namespace nORM.Scaffolding
                     memberNamesByTable);
                 var compositePrimaryKeys = BuildCompositePrimaryKeys(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
                 var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, defaultValuesByTable);
+                var identityOptionConfigurations = BuildIdentityOptionConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "IdentityStrategy", StringComparison.OrdinalIgnoreCase)
+                    && identityOptionConfigurations.Any(identity =>
+                        string.Equals(identity.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(identity.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var generatedFiles = new List<(string Path, string Content)>();
 
                 foreach (var table in tables)
@@ -199,7 +205,7 @@ namespace nORM.Scaffolding
                 var sequenceStubs = options.EmitSequenceStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -2548,7 +2554,7 @@ namespace nORM.Scaffolding
                 "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
                 "RelationshipPrincipalKey" => "Add a primary key or exact unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
-                "IdentityStrategy" => "Keep non-default identity seed/increment settings in provider migrations; scaffolded code marks the column as identity but does not recreate provider-specific seed metadata.",
+                "IdentityStrategy" => "Parsed SQL Server IDENTITY(seed, increment) metadata is scaffolded into HasIdentityOptions; review any unparsed provider-specific identity strategy manually.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
                 "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
                 "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
@@ -3302,8 +3308,38 @@ namespace nORM.Scaffolding
                 foreach (var (columnName, defaultValueSql) in defaults)
                 {
                     if (properties.TryGetValue(columnName, out var propertyName))
-                        result.Add(new ScaffoldDefaultValueConfiguration(entityName, propertyName, defaultValueSql));
+                        result.Add(new ScaffoldDefaultValueConfiguration(tableKey, entityName, columnName, propertyName, defaultValueSql));
                 }
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyList<ScaffoldIdentityOptionConfiguration> BuildIdentityOptionConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldIdentityOptionConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "IdentityStrategy", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || !TryParseIdentityOptions(feature.Detail, out var seed, out var increment)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.TryGetValue(feature.Name, out var propertyName))
+                {
+                    continue;
+                }
+
+                result.Add(new ScaffoldIdentityOptionConfiguration(
+                    feature.TableKey,
+                    entityName,
+                    feature.Name,
+                    propertyName,
+                    seed,
+                    increment));
             }
 
             return result;
@@ -3655,11 +3691,29 @@ namespace nORM.Scaffolding
                 return false;
             }
 
-            return int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out precision)
-                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out scale)
+            return int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), NumberStyles.None, CultureInfo.InvariantCulture, out precision)
+                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), NumberStyles.None, CultureInfo.InvariantCulture, out scale)
                 && precision > 0
                 && scale >= 0
                 && scale <= precision;
+        }
+
+        private static bool TryParseIdentityOptions(string? detail, out long seed, out long increment)
+        {
+            seed = 0;
+            increment = 0;
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var open = detail.IndexOf('(');
+            var comma = detail.IndexOf(',', open + 1);
+            var close = detail.IndexOf(')', comma + 1);
+            if (open < 0 || comma < 0 || close < 0)
+                return false;
+
+            return long.TryParse(detail.AsSpan(open + 1, comma - open - 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out seed)
+                && long.TryParse(detail.AsSpan(comma + 1, close - comma - 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out increment)
+                && increment != 0;
         }
 
         private static HashSet<string> GetOrCreateMemberNames(
@@ -3928,7 +3982,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
             IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
             IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null,
-            IReadOnlyList<ScaffoldSkippedObject>? sequenceStubs = null)
+            IReadOnlyList<ScaffoldSkippedObject>? sequenceStubs = null,
+            IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
@@ -3937,6 +3992,7 @@ namespace nORM.Scaffolding
             expressionIndexConfigurations ??= Array.Empty<ScaffoldExpressionIndexConfiguration>();
             collationConfigurations ??= Array.Empty<ScaffoldCollationConfiguration>();
             sequenceStubs ??= Array.Empty<ScaffoldSkippedObject>();
+            identityOptionConfigurations ??= Array.Empty<ScaffoldIdentityOptionConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3960,7 +4016,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0 && collationConfigurations.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0 && collationConfigurations.Count == 0 && identityOptionConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3987,7 +4043,7 @@ namespace nORM.Scaffolding
                     AppendSequenceStubs(sb, sequenceStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0 || collationConfigurations.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0 || collationConfigurations.Count > 0 || identityOptionConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -4011,6 +4067,14 @@ namespace nORM.Scaffolding
                         var property = EscapeCSharpIdentifier(defaultValue.PropertyName);
                         var sql = EscapeStringLiteral(defaultValue.DefaultValueSql);
                         sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\");");
+                    }
+                    foreach (var identity in identityOptionConfigurations
+                        .OrderBy(i => i.EntityName, StringComparer.Ordinal)
+                        .ThenBy(i => i.PropertyName, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(identity.EntityName);
+                        var property = EscapeCSharpIdentifier(identity.PropertyName);
+                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasIdentityOptions({identity.Seed.ToString(CultureInfo.InvariantCulture)}, {identity.Increment.ToString(CultureInfo.InvariantCulture)});");
                     }
                     foreach (var check in checkConstraintConfigurations
                         .OrderBy(c => c.EntityName, StringComparer.Ordinal)
@@ -4994,9 +5058,19 @@ namespace nORM.Scaffolding
             string[] PropertyNames);
 
         private readonly record struct ScaffoldDefaultValueConfiguration(
+            string TableKey,
             string EntityName,
+            string ColumnName,
             string PropertyName,
             string DefaultValueSql);
+
+        private readonly record struct ScaffoldIdentityOptionConfiguration(
+            string TableKey,
+            string EntityName,
+            string ColumnName,
+            string PropertyName,
+            long Seed,
+            long Increment);
 
         private readonly record struct ScaffoldCheckConstraintConfiguration(
             string TableKey,

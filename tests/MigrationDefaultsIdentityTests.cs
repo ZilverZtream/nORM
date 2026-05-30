@@ -201,6 +201,34 @@ public class MigrationDefaultsIdentityTests
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
+    public void SqlServer_CreateTable_IncludesConfiguredIdentitySeedAndIncrement()
+    {
+        var table = MakeTable("Products",
+            new ColumnSchema
+            {
+                Name = "Id",
+                ClrType = typeof(int).FullName!,
+                IsNullable = false,
+                IsPrimaryKey = true,
+                IsUnique = true,
+                IndexName = "PK_Products",
+                IsIdentity = true,
+                IdentitySeed = 1000,
+                IdentityIncrement = 25
+            },
+            Col("Name", nullable: false)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("IDENTITY(1000,25)", createSql);
+        Assert.DoesNotContain("IDENTITY(1,1)", createSql);
+    }
+
+    [Fact]
     public void MySql_CreateTable_IncludesAutoIncrement()
     {
         var table = MakeTable("Products",

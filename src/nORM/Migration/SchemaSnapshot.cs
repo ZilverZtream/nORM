@@ -142,6 +142,10 @@ namespace nORM.Migration
         public string? Collation { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
         public bool IsIdentity { get; set; }
+        /// <summary>Optional provider identity seed/start value.</summary>
+        public long? IdentitySeed { get; set; }
+        /// <summary>Optional provider identity increment value.</summary>
+        public long? IdentityIncrement { get; set; }
         /// <summary>Provider SQL expression for a computed/generated column.</summary>
         public string? ComputedColumnSql { get; set; }
         /// <summary>True when a computed/generated column should be physically stored where supported.</summary>
@@ -424,6 +428,8 @@ namespace nORM.Migration
                     var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
                     ComputedColumnConfiguration? computedColumn = null;
                     map.FluentConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
+                    IdentityOptionsConfiguration? identityOptions = null;
+                    map.FluentConfiguration?.IdentityOptions.TryGetValue(col.Prop, out identityOptions);
                     string? collation = null;
                     map.FluentConfiguration?.Collations.TryGetValue(col.Prop, out collation);
                     var dbGenerated = col.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
@@ -443,6 +449,8 @@ namespace nORM.Migration
                         IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
                         IndexOrder   = null,
                         IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity,
+                        IdentitySeed = identityOptions?.Seed,
+                        IdentityIncrement = identityOptions?.Increment,
                         ComputedColumnSql = computedColumn?.Sql
                             ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
                         IsStoredComputedColumn = computedColumn?.Stored == true,
@@ -804,6 +812,8 @@ namespace nORM.Migration
                         || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
                         || !string.Equals(oldCol.Collation, col.Collation, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsIdentity != col.IsIdentity
+                        || oldCol.IdentitySeed != col.IdentitySeed
+                        || oldCol.IdentityIncrement != col.IdentityIncrement
                         || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn)
                         diff.AlteredColumns.Add((newTable, col, oldCol));

@@ -280,6 +280,9 @@ Computed/generated column expressions are emitted with
 `HasComputedColumnSql` and marked as database-generated for runtime writes.
 Column collations are emitted with `HasCollation` so DB-first string
 comparison/order semantics survive the scaffold into migration snapshots.
+SQL Server `IDENTITY(seed, increment)` metadata is emitted with
+`HasIdentityOptions(...)` and preserved in SQL Server migration create/rebuild
+DDL.
 SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
 SQL Server/MySQL expression-index shapes are kept on the safer generated-column
 path.
@@ -300,7 +303,7 @@ metadata for supported shapes.
 Unsupported composite foreign keys that do not target generated primary keys or
 exact unique indexes, payload join tables, complex/provider-specific
 defaults that fail the migration default allowlist, provider column types,
-non-default identity settings,
+unparsed provider-specific identity strategies,
 unrecognized FK referential actions, triggers, SQL Server provider-native
 temporal tables, SQLite virtual tables and shadow tables, skipped views,
 routines, sequences, synonyms, materialized views, and events are reported in

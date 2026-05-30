@@ -236,6 +236,7 @@ public class DatabaseScaffolderPrivateMethodTests
         var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
         var routine = Activator.CreateInstance(
             skippedObjectType,
             schema,
@@ -252,12 +253,13 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
         routines.SetValue(routine, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences })!;
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
     }
 
     private static string InvokeScaffoldContextWithSequence(string? schema, string name, string detail)
@@ -272,6 +274,7 @@ public class DatabaseScaffolderPrivateMethodTests
         var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
         var sequence = Activator.CreateInstance(
             skippedObjectType,
             schema,
@@ -288,12 +291,53 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 1);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
         sequences.SetValue(sequence, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences })!;
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
+    }
+
+    private static string InvokeScaffoldContextWithIdentityOptions()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var identity = Activator.CreateInstance(
+            identityOptionType,
+            "dbo.Users",
+            "User",
+            "Id",
+            "Id",
+            1000L,
+            25L)!;
+        var relationships = Array.CreateInstance(relationshipType, 0);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 0);
+        var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
+        var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 1);
+        identityOptions.SetValue(identity, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
+
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
     }
 
     // ── ToPascalCase ────────────────────────────────────────────────────────
@@ -851,6 +895,15 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("SELECT nextval('", code);
         Assert.Contains("::regclass) AS ", code);
         Assert.Contains("(Provider.Escape(\"public\") + \".\" + Provider.Escape(\"invoice_no\")).Replace(\"'\", \"''\")", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithIdentityOptions_EmitsFluentSeedAndIncrement()
+    {
+        var code = InvokeScaffoldContextWithIdentityOptions();
+
+        Assert.Contains("mb.Entity<User>().Property(e => e.Id).HasIdentityOptions(1000, 25);", code);
+        Assert.Contains("ConfigureOptions(options)", code);
     }
 
     [Fact]

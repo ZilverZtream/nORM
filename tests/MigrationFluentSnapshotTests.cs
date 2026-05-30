@@ -31,6 +31,16 @@ public class MigrationFluentSnapshotTests
         public string Email { get; set; } = string.Empty;
     }
 
+    [Table("identity_orders")]
+    [Xunit.Trait("Category", "Fast")]
+    public class FluentIdentityOrder
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Number { get; set; } = string.Empty;
+    }
+
     // ── Entity with [Table]+[Key] for attribute baseline ─────────────────────
 
     [Table("attr_widgets")]
@@ -238,5 +248,21 @@ public class MigrationFluentSnapshotTests
         Assert.Null(asmSnapshot.Tables.FirstOrDefault(t => t.Name == "fluent_users"));
         // But visible through context snapshot via fluent registration
         Assert.NotNull(ctxSnapshot.Tables.FirstOrDefault(t => t.Name == "fluent_users"));
+    }
+
+    [Fact]
+    public void M1_Build_DbContext_Captures_Fluent_IdentityOptions()
+    {
+        using var ctx = CreateCtx(mb =>
+            mb.Entity<FluentIdentityOrder>()
+              .Property(o => o.Id).HasIdentityOptions(1000, 25));
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+        var table = snapshot.Tables.First(t => t.Name == "identity_orders");
+        var id = table.Columns.First(c => c.Name == "Id");
+
+        Assert.True(id.IsIdentity);
+        Assert.Equal(1000, id.IdentitySeed);
+        Assert.Equal(25, id.IdentityIncrement);
     }
 }

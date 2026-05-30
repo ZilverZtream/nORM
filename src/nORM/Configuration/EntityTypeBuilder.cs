@@ -24,6 +24,7 @@ namespace nORM.Configuration
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
+            public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
             public Dictionary<PropertyInfo, string> CollationValues { get; } = new();
             public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
             public Dictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumns { get; } = new();
@@ -39,6 +40,7 @@ namespace nORM.Configuration
             bool IEntityTypeConfiguration.IsReadOnly => IsReadOnly;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
+            IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.Collations => CollationValues;
             IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
             IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> IEntityTypeConfiguration.ComputedColumnSql => ComputedColumns;
@@ -117,6 +119,17 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
                 DefaultValues[prop] = sql.Trim();
+            }
+
+            /// <summary>
+            /// Sets provider identity seed/increment metadata for the specified property.
+            /// </summary>
+            public void SetIdentityOptions(PropertyInfo prop, long seed, long increment)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (increment == 0)
+                    throw new ArgumentException("Identity increment cannot be zero.", nameof(increment));
+                IdentityOptionValues[prop] = new IdentityOptionsConfiguration(seed, increment);
             }
 
             /// <summary>
@@ -601,6 +614,17 @@ namespace nORM.Configuration
             public PropertyBuilder HasDefaultValueSql(string sql)
             {
                 _parent._config.SetDefaultValueSql(_property, sql);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures provider identity seed/increment metadata for migration
+            /// generation. Providers without matching identity DDL may ignore or reject
+            /// the metadata during migration SQL generation.
+            /// </summary>
+            public PropertyBuilder HasIdentityOptions(long seed, long increment)
+            {
+                _parent._config.SetIdentityOptions(_property, seed, increment);
                 return this;
             }
 

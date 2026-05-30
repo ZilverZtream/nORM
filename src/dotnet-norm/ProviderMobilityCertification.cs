@@ -455,6 +455,7 @@ public static class ProviderMobilitySourceScanner
         ("HasColumnType", "provider-specific-column-type", "Use CLR type mapping and nORM migrations for provider-mobile schema. Provider-specific column type strings must stay outside strict certification."),
         ("HasDefaultValueSql", "schema-provider-specific-default", "Replace provider SQL defaults with application-stamped values, simple literals, or explicit provider-specific migrations outside strict certification."),
         ("HasComputedColumnSql", "schema-provider-specific-default", "Computed column SQL is provider language. Replace with generated/application logic or keep as provider-specific migration work."),
+        ("HasIdentityOptions", "schema-provider-specific-default", "Identity seed/increment metadata is provider DDL. Keep it as reviewed provider-specific migration work outside strict certification."),
         ("UseCollation(", "schema-provider-specific-default", "Inventory provider-specific collation choices and replace them with provider-neutral comparison semantics or reviewed per-provider migration work."),
         ("HasCollation(", "schema-provider-specific-default", "Inventory provider-specific collation choices and replace them with provider-neutral comparison semantics or reviewed per-provider migration work."),
         ("Annotation(\"SqlServer:", "schema-provider-specific-default", "Inventory SQL Server-specific EF migration annotations and replace them with provider-neutral nORM schema metadata where possible."),

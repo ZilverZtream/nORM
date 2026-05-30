@@ -189,6 +189,7 @@ public sealed class ProviderMobilityCertificationRunnerTests
                     {
                         modelBuilder.Entity<Row>().Property(r => r.Name).HasDefaultValueSql("GETDATE()");
                         modelBuilder.Entity<Row>().Property(r => r.Code).HasComputedColumnSql("LOWER([Name])");
+                        modelBuilder.Entity<Row>().Property(r => r.Id).HasIdentityOptions(1000, 10);
                         modelBuilder.UseCollation("SQL_Latin1_General_CP1_CI_AS");
                         modelBuilder.Entity<Row>().Property(r => r.Name).UseCollation("Latin1_General_100_BIN2");
                     }

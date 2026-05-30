@@ -43,6 +43,11 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
 
         /// <summary>
+        /// Gets provider identity seed/increment metadata configured for database-generated properties.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptions { get; }
+
+        /// <summary>
         /// Gets database collation names configured for string/comparable text properties.
         /// Collation names are provider identifiers and are emitted by migration generators.
         /// </summary>
@@ -125,6 +130,11 @@ namespace nORM.Configuration
     /// <param name="Sql">Provider SQL expression used to compute the column.</param>
     /// <param name="Stored">Whether the generated value should be physically stored when the provider supports that choice.</param>
     public record ComputedColumnConfiguration(string Sql, bool Stored = false);
+
+    /// <summary>
+    /// Describes provider identity seed/increment metadata for migration generation.
+    /// </summary>
+    public record IdentityOptionsConfiguration(long Seed, long Increment);
 
     /// <summary>
     /// Describes a provider-specific index over a SQL expression rather than a mapped property.

@@ -176,6 +176,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.HasComputedColumnSql(System.String,Sy
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasConversion(nORM.Mapping.IValueConverter):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasDefaultValueSql(System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasExpressionIndex(System.String,System.String,System.Boolean,System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.HasIdentityOptions(System.Int64,System.Int64):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0,`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.IsReadOnly():nORM.Configuration.EntityTypeBuilder{`0}
@@ -193,6 +194,13 @@ M:nORM.Configuration.ExpressionIndexConfiguration.Equals(System.Object):System.B
 M:nORM.Configuration.ExpressionIndexConfiguration.Equals(nORM.Configuration.ExpressionIndexConfiguration):System.Boolean
 M:nORM.Configuration.ExpressionIndexConfiguration.GetHashCode():System.Int32
 M:nORM.Configuration.ExpressionIndexConfiguration.ToString():System.String
+M:nORM.Configuration.IdentityOptionsConfiguration.#ctor(System.Int64,System.Int64)
+M:nORM.Configuration.IdentityOptionsConfiguration.<Clone>$():nORM.Configuration.IdentityOptionsConfiguration
+M:nORM.Configuration.IdentityOptionsConfiguration.Deconstruct(System.Int64&,System.Int64&):System.Void
+M:nORM.Configuration.IdentityOptionsConfiguration.Equals(System.Object):System.Boolean
+M:nORM.Configuration.IdentityOptionsConfiguration.Equals(nORM.Configuration.IdentityOptionsConfiguration):System.Boolean
+M:nORM.Configuration.IdentityOptionsConfiguration.GetHashCode():System.Int32
+M:nORM.Configuration.IdentityOptionsConfiguration.ToString():System.String
 M:nORM.Configuration.IndexAttribute.#ctor(System.String)
 M:nORM.Configuration.ManyToManyConfiguration.#ctor(System.String,System.Type,System.String,System.String,System.String,System.String)
 M:nORM.Configuration.ManyToManyConfiguration.<Clone>$():nORM.Configuration.ManyToManyConfiguration
@@ -1044,6 +1052,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql:System.Collectio
 P:nORM.Configuration.IEntityTypeConfiguration.Converters:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ExpressionIndexes:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ExpressionIndexConfiguration}
+P:nORM.Configuration.IEntityTypeConfiguration.IdentityOptions:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.IdentityOptionsConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.IsReadOnly:System.Boolean
 P:nORM.Configuration.IEntityTypeConfiguration.KeyProperties:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
 P:nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ManyToManyConfiguration}
@@ -1053,6 +1062,8 @@ P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.G
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
+P:nORM.Configuration.IdentityOptionsConfiguration.Increment:System.Int64
+P:nORM.Configuration.IdentityOptionsConfiguration.Seed:System.Int64
 P:nORM.Configuration.IndexAttribute.FilterSql:System.String
 P:nORM.Configuration.IndexAttribute.IsDescending:System.Boolean
 P:nORM.Configuration.IndexAttribute.IsIncluded:System.Boolean
@@ -1269,6 +1280,8 @@ P:nORM.Migration.ColumnSchema.ClrType:System.String
 P:nORM.Migration.ColumnSchema.Collation:System.String
 P:nORM.Migration.ColumnSchema.ComputedColumnSql:System.String
 P:nORM.Migration.ColumnSchema.DefaultValue:System.String
+P:nORM.Migration.ColumnSchema.IdentityIncrement:System.Nullable{System.Int64}
+P:nORM.Migration.ColumnSchema.IdentitySeed:System.Nullable{System.Int64}
 P:nORM.Migration.ColumnSchema.IndexName:System.String
 P:nORM.Migration.ColumnSchema.IndexOrder:System.Nullable{System.Int32}
 P:nORM.Migration.ColumnSchema.Indexes:System.Collections.Generic.List{nORM.Migration.ColumnIndexSchema}
@@ -1414,6 +1427,7 @@ T:nORM.Configuration.EntityTypeBuilder{`0,`1}
 T:nORM.Configuration.EntityTypeBuilder{`0}
 T:nORM.Configuration.ExpressionIndexConfiguration
 T:nORM.Configuration.IEntityTypeConfiguration
+T:nORM.Configuration.IdentityOptionsConfiguration
 T:nORM.Configuration.IndexAttribute
 T:nORM.Configuration.ManyToManyConfiguration
 T:nORM.Configuration.ModelBuilder

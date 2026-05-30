@@ -74,6 +74,7 @@ configuration, client-evaluation opt-ins, `.sql` stored procedure definitions,
 obvious provider-specific SQL syntax, and common migration-source risks from EF
 Core or Dapper such as `FromSqlRaw`, `ExecuteSqlRaw`, `UseSqlServer`,
 `UseNpgsql`, `HasDefaultValueSql`, `HasComputedColumnSql`,
+`HasIdentityOptions`,
 `UseCollation`, `HasCollation`, `migrationBuilder.Sql`, provider-specific EF migration annotations and value-generation annotations,
 `using Dapper`, `SqlMapper` calls, Dapper/EF/provider `PackageReference` rows,
 direct provider ADO.NET command/data-adapter objects, and constrained LINQ
