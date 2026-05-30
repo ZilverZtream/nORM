@@ -241,6 +241,40 @@ Each row also includes stable diagnostic metadata:
 Use `code` and `category` for CI baselines, owner routing, and remediation
 dashboards. Do not parse `detail` or `suggestedAction` text as a stable API.
 
+### Diagnostic Code Catalog
+
+| Code | Category | Meaning |
+| --- | --- | --- |
+| `SCF001` | `relationship` | Composite foreign key discovered; scalar columns are generated, but no navigation is emitted. |
+| `SCF002` | `many-to-many` | Possible payload many-to-many table discovered; review whether to keep the entity or hand-write `UsingTable`. |
+| `SCF100` | `schema-feature` | Database default expression discovered. |
+| `SCF101` | `schema-feature` | Computed/generated column expression discovered. |
+| `SCF102` | `schema-feature` | Check constraint discovered. |
+| `SCF103` | `schema-feature` | Provider/database collation discovered. |
+| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
+| `SCF105` | `schema-feature` | Numeric precision/scale discovered. |
+| `SCF106` | `relationship` | Non-default FK referential action discovered. |
+| `SCF107` | `relationship` | FK targets a principal key that is not the generated primary key. |
+| `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
+| `SCF109` | `schema-feature` | Non-default identity strategy discovered. |
+| `SCF110` | `database-object` | Trigger discovered. |
+| `SCF111` | `index` | Filtered/partial index discovered. |
+| `SCF112` | `index` | Expression index discovered. |
+| `SCF113` | `index` | Included-column index discovered. |
+| `SCF114` | `index` | Descending index key discovered. |
+| `SCF115` | `database-object` | Provider-native temporal table discovered. |
+| `SCF116` | `table-shape` | Table has no primary key. |
+| `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
+| `SCF200` | `query-object` | View discovered and skipped. |
+| `SCF201` | `routine` | Routine/stored procedure/function discovered and skipped. |
+| `SCF202` | `key-generation` | Standalone sequence discovered and skipped. |
+| `SCF203` | `database-object` | SQL Server synonym discovered and skipped. |
+| `SCF204` | `query-object` | PostgreSQL materialized view discovered and skipped. |
+| `SCF205` | `routine` | MySQL event discovered and skipped. |
+| `SCF206` | `virtual-table` | SQLite virtual table discovered and skipped. |
+| `SCF207` | `virtual-table` | SQLite virtual-table shadow table discovered and skipped. |
+| `SCF299` | `database-object` | Unknown skipped database object. |
+
 The report is additive: new fields may be added in later versions, but v1 tools
 should tolerate unknown fields and should not treat an empty diagnostics file as
 provider-mobility evidence.

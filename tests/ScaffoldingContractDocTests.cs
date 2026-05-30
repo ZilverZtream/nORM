@@ -126,6 +126,7 @@ public class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         Assert.Contains("Warning Report Shape", doc, StringComparison.Ordinal);
+        Assert.Contains("Diagnostic Code Catalog", doc, StringComparison.Ordinal);
         Assert.Contains("nORM.ScaffoldWarnings.json", doc, StringComparison.Ordinal);
         Assert.Contains("summary", doc, StringComparison.Ordinal);
         Assert.Contains("totalWarnings", doc, StringComparison.Ordinal);
@@ -147,6 +148,26 @@ public class ScaffoldingContractDocTests
         Assert.Contains("sectionCounts = new", source, StringComparison.Ordinal);
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_catalogs_all_scaffold_diagnostic_codes()
+    {
+        var doc = ReadDoc();
+        var expectedCodes = new[]
+        {
+            "SCF001", "SCF002",
+            "SCF100", "SCF101", "SCF102", "SCF103", "SCF104", "SCF105", "SCF106", "SCF107",
+            "SCF108", "SCF109", "SCF110", "SCF111", "SCF112", "SCF113", "SCF114", "SCF115",
+            "SCF116", "SCF199",
+            "SCF200", "SCF201", "SCF202", "SCF203", "SCF204", "SCF205", "SCF206", "SCF207",
+            "SCF299"
+        };
+
+        foreach (var code in expectedCodes)
+            Assert.Contains($"`{code}`", doc, StringComparison.Ordinal);
+
+        Assert.Contains("SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID`", doc, StringComparison.Ordinal);
     }
 
     [Fact]
