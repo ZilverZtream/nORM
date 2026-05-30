@@ -138,6 +138,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
                 Assert.Contains($"public {CompositeParentTable}? {CompositeParentTable} {{ get; set; }}", childCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{CompositeChildTable}> {CompositeChildTable}s {{ get; set; }} = new();", parentCode, StringComparison.Ordinal);
+                Assert.Contains($"mb.Entity<{CompositeParentTable}>().HasKey(e => new {{ e.TenantId, e.OrderNo }});", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"mb.Entity<{CompositeChildTable}>().HasKey(e => new {{ e.TenantId, e.OrderNo, e.LineNo }});", contextCode, StringComparison.Ordinal);
                 Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderNo }, p => new { p.TenantId, p.OrderNo }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
