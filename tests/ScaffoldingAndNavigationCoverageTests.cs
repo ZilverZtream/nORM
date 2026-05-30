@@ -1759,7 +1759,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithForeignKeyReferentialActions_PreservesCascadeDeleteFlag()
+    public async Task ScaffoldAsync_WithForeignKeyReferentialActions_GeneratesExplicitActions()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1775,7 +1775,12 @@ public class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE RestrictChild (
                 Id INTEGER PRIMARY KEY,
                 ParentId INTEGER NOT NULL,
-                CONSTRAINT FK_Restrict_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id) ON DELETE RESTRICT
+                CONSTRAINT FK_Restrict_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id) ON DELETE RESTRICT ON UPDATE CASCADE
+            );
+            CREATE TABLE SetNullChild (
+                Id INTEGER PRIMARY KEY,
+                ParentId INTEGER NULL,
+                CONSTRAINT FK_SetNull_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id) ON DELETE SET NULL
             );
             """;
         cmd.ExecuteNonQuery();
@@ -1786,16 +1791,12 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FkActionCtx");
 
             var contextCode = File.ReadAllText(Path.Combine(dir, "FkActionCtx.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
 
             Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id);", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode);
-            Assert.Contains("ReferentialAction", warnings);
-            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "ReferentialAction" &&
-                item.GetProperty("detail").GetString()!.Contains("RESTRICT", StringComparison.Ordinal));
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.NoAction);", contextCode);
+            Assert.False(File.Exists(warningPath), "Valid referential actions should scaffold into fluent configuration rather than warning-only diagnostics.");
         }
         finally
         {

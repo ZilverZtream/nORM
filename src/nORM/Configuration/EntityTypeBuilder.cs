@@ -763,6 +763,50 @@ namespace nORM.Configuration
                     Expression<Func<TEntity, object>>? principalKeyExpression = null,
                     bool cascadeDelete = true)
                 {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        cascadeDelete));
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity and the database
+                /// referential actions emitted for migration snapshots and provider DDL.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="onDelete">Database action for principal deletes.</param>
+                /// <param name="onUpdate">Database action for principal key updates.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    ReferentialAction onDelete,
+                    ReferentialAction onUpdate)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        onDelete,
+                        onUpdate));
+                    return _parent;
+                }
+
+                private (IReadOnlyList<PropertyInfo> PrincipalKeys, IReadOnlyList<PropertyInfo> ForeignKeys) ResolveForeignKeyProperties(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression)
+                {
                     ArgumentNullException.ThrowIfNull(foreignKeyExpression);
                     var fkProps = _parent.GetProperties(foreignKeyExpression);
                     IReadOnlyList<PropertyInfo> principalKeys;
@@ -783,14 +827,7 @@ namespace nORM.Configuration
                         throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
                             $"Relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name} has {principalKeys.Count} principal key properties but {fkProps.Count} foreign key properties."));
 
-                    _parent._config.AddRelationship(new RelationshipConfiguration(
-                        _principalNavigation,
-                        typeof(TDependent),
-                        _dependentNavigation,
-                        principalKeys,
-                        fkProps,
-                        cascadeDelete));
-                    return _parent;
+                    return (principalKeys, fkProps);
                 }
             }
         }

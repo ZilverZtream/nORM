@@ -1222,6 +1222,31 @@ namespace nORM.Scaffolding
             return action.Replace('_', ' ').Trim().ToUpperInvariant();
         }
 
+        private static bool TryParseReferentialAction(string? action, out ReferentialAction referentialAction)
+        {
+            switch (NormalizeReferentialAction(action))
+            {
+                case "CASCADE":
+                    referentialAction = ReferentialAction.Cascade;
+                    return true;
+                case "SET NULL":
+                    referentialAction = ReferentialAction.SetNull;
+                    return true;
+                case "RESTRICT":
+                    referentialAction = ReferentialAction.Restrict;
+                    return true;
+                case "SET DEFAULT":
+                    referentialAction = ReferentialAction.SetDefault;
+                    return true;
+                case "NO ACTION":
+                    referentialAction = ReferentialAction.NoAction;
+                    return true;
+                default:
+                    referentialAction = ReferentialAction.NoAction;
+                    return false;
+            }
+        }
+
         private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
@@ -1664,17 +1689,9 @@ namespace nORM.Scaffolding
                 var fk = group.First();
                 var onDelete = NormalizeReferentialAction(fk.OnDelete);
                 var onUpdate = NormalizeReferentialAction(fk.OnUpdate);
-                if (string.Equals(onDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                {
+                if (TryParseReferentialAction(onDelete, out _)
+                    && TryParseReferentialAction(onUpdate, out _))
                     continue;
-                }
-
-                if (string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
 
                 features.Add(new ScaffoldUnsupportedFeature(
                     TableKey(fk.DependentSchema, fk.DependentTable),
@@ -2048,7 +2065,7 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
-                "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
+                "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
                 "RelationshipPrincipalKey" => "Add a primary key or exact unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Keep non-default identity seed/increment settings in provider migrations; scaffolded code marks the column as identity but does not recreate provider-specific seed metadata.",
@@ -2607,7 +2624,9 @@ namespace nORM.Scaffolding
                     principalKeyProperty,
                     referenceName,
                     collectionName,
-                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase))
+                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase),
+                    NormalizeReferentialAction(foreignKey.OnDelete),
+                    NormalizeReferentialAction(foreignKey.OnUpdate))
                 {
                     ForeignKeyPropertyNames = foreignKeyProperties,
                     PrincipalKeyPropertyNames = principalKeyProperties
@@ -2862,6 +2881,26 @@ namespace nORM.Scaffolding
                 pair => pair.Key,
                 pair => (IReadOnlySet<string>)pair.Value,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool IsLegacyCascadeShape(ScaffoldRelationship relationship)
+            => (string.Equals(relationship.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(relationship.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
+               && string.Equals(relationship.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase);
+
+        private static string FormatReferentialAction(string action)
+        {
+            if (!TryParseReferentialAction(action, out var referentialAction))
+                referentialAction = ReferentialAction.NoAction;
+
+            return referentialAction switch
+            {
+                ReferentialAction.Cascade => "ReferentialAction.Cascade",
+                ReferentialAction.SetNull => "ReferentialAction.SetNull",
+                ReferentialAction.Restrict => "ReferentialAction.Restrict",
+                ReferentialAction.SetDefault => "ReferentialAction.SetDefault",
+                _ => "ReferentialAction.NoAction"
+            };
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
@@ -3270,8 +3309,15 @@ namespace nORM.Scaffolding
                         sb.AppendLine($"            mb.Entity<{principal}>()");
                         sb.AppendLine($"                .HasMany(p => p.{collection})");
                         sb.AppendLine($"                .WithOne(d => d.{reference})");
-                        var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
-                        sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}{cascadeSuffix});");
+                        if (IsLegacyCascadeShape(relationship))
+                        {
+                            var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
+                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}{cascadeSuffix});");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {FormatReferentialAction(relationship.OnDelete)}, {FormatReferentialAction(relationship.OnUpdate)});");
+                        }
                     }
                     foreach (var join in manyToManyJoins
                         .OrderBy(j => j.LeftEntityName, StringComparer.Ordinal)
@@ -4020,7 +4066,9 @@ namespace nORM.Scaffolding
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
             string CollectionNavigationName,
-            bool CascadeDelete)
+            bool CascadeDelete,
+            string OnDelete,
+            string OnUpdate)
         {
             public IReadOnlyList<string> ForeignKeyPropertyNames { get; init; } = new[] { ForeignKeyPropertyName };
 

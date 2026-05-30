@@ -100,7 +100,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("owned sequences are treated as", doc, StringComparison.Ordinal);
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
-        Assert.Contains("non-default FK referential actions", doc, StringComparison.Ordinal);
+        Assert.Contains("unrecognized FK referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("relationships that do not target the generated principal primary key or an", doc, StringComparison.Ordinal);
         Assert.Contains("exact unique index", doc, StringComparison.Ordinal);
         Assert.Contains("ReferencesScaffoldablePrincipalKey", source, StringComparison.Ordinal);

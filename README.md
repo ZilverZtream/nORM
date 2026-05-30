@@ -268,7 +268,7 @@ deterministic repeated output, preflighted overwrite protection, nullable-safe o
 metadata-backed identity columns, computed/generated column metadata, SQL
 Server rowversion/timestamp metadata, safe SQL default metadata via generated
 `HasDefaultValueSql(...)` configuration, single-column FK
-navigation generation with cascade/non-cascade delete behavior, role-based
+navigation generation with supported delete/update referential actions, role-based
 self-referencing FK and self-join names, pure many-to-many join mapping including
 schema-qualified and composite-key junction tables, and
 single-column/composite index metadata are
@@ -284,7 +284,7 @@ Unsupported composite foreign keys that do not target generated primary keys or
 exact unique indexes, payload join tables, complex/provider-specific
 defaults that fail the migration default allowlist, computed column expressions, check constraints, collations, provider
 column types, non-default identity settings,
-non-default FK referential actions, triggers, SQL Server provider-native
+unrecognized FK referential actions, triggers, SQL Server provider-native
 temporal tables, tables without primary keys, SQLite virtual tables and shadow
 tables, skipped views, routines, sequences, synonyms, materialized views, and
 events are reported in `nORM.ScaffoldWarnings.md` and

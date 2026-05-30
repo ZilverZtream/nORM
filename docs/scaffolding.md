@@ -74,8 +74,9 @@ must be reviewed and edited like handwritten model code.
   composite references are wired through ordered fluent `HasForeignKey`
   selectors. The generated `DbContext` preserves caller-supplied model
   configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
-  cascade behavior; non-cascade delete actions are generated with
-  `cascadeDelete: false`. Relationships are emitted when the FK targets the
+  cascade behavior; valid database referential actions (`NO ACTION`,
+  `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
+  fluent configuration, including `ON UPDATE` actions. Relationships are emitted when the FK targets the
   generated principal primary key or an exact unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
   reference the exact generated composite primary key or an exact unique index;
@@ -156,7 +157,7 @@ must be reviewed and edited like handwritten model code.
   unsafe/provider-specific defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
   SQL Server rowversion/timestamp columns,
-  non-default SQL Server identity seed/increment settings, non-default FK referential actions,
+  non-default SQL Server identity seed/increment settings, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
   exact unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
@@ -229,9 +230,11 @@ must be reviewed and edited like handwritten model code.
   primary key or an exact unique index are emitted as navigations and fluent
   model configuration. FKs that target keyless or non-unique alternate columns
   are discovered and reported in scaffold diagnostics.
-- Full FK referential-action modeling beyond tracked-graph cascade on/off.
-  Non-cascade delete actions and update actions are discovered and reported in
-  scaffold diagnostics; provider DDL remains the source of truth.
+- FK referential-action modeling outside the common provider action set.
+  `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` are emitted
+  into generated fluent configuration for delete/update actions. Unknown
+  provider-specific action tokens are discovered and reported in scaffold
+  diagnostics.
 - Owned types and inheritance inference.
 - Payload bridge tables are modeled as explicit join entities, not skip
   navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
@@ -243,7 +246,7 @@ must be reviewed and edited like handwritten model code.
   `HasDefaultValueSql`; complex/provider-specific defaults that fail the
   allowlist remain diagnostics. Computed/generated columns, check constraints, collations,
   provider-specific column types, non-default identity
-  seed/increment settings, triggers, SQL Server provider-native temporal
+  seed/increment settings, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual-table shadow tables, sequences,
   synonyms, and events are discovered and reported in scaffold diagnostics, but
   not converted into complete provider-neutral model code. Views and

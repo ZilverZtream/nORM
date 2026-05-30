@@ -93,7 +93,7 @@ namespace nORM.Configuration
     /// <param name="DependentNavigation">Optional navigation property on the dependent entity.</param>
     /// <param name="PrincipalKey">Key property on the principal entity.</param>
     /// <param name="ForeignKey">Foreign key property on the dependent entity.</param>
-    /// <param name="CascadeDelete">Whether dependent entities should be cascade deleted.</param>
+    /// <param name="CascadeDelete">Whether dependent entities should be cascade deleted through the tracked object graph.</param>
     public record RelationshipConfiguration(PropertyInfo PrincipalNavigation, Type DependentType,
         PropertyInfo? DependentNavigation, PropertyInfo? PrincipalKey, PropertyInfo ForeignKey, bool CascadeDelete = true)
     {
@@ -103,6 +103,12 @@ namespace nORM.Configuration
 
         /// <summary>Ordered foreign key properties on the dependent entity.</summary>
         public IReadOnlyList<PropertyInfo> ForeignKeys { get; init; } = new[] { ForeignKey };
+
+        /// <summary>Database referential action to emit for principal deletes.</summary>
+        public ReferentialAction OnDelete { get; init; } = CascadeDelete ? ReferentialAction.Cascade : ReferentialAction.NoAction;
+
+        /// <summary>Database referential action to emit for principal key updates.</summary>
+        public ReferentialAction OnUpdate { get; init; } = ReferentialAction.NoAction;
 
         /// <summary>Creates a relationship configuration backed by multiple key columns.</summary>
         public RelationshipConfiguration(
@@ -129,6 +135,27 @@ namespace nORM.Configuration
 
             PrincipalKeys = principalKeys.ToArray();
             ForeignKeys = foreignKeys.ToArray();
+        }
+
+        /// <summary>Creates a relationship configuration backed by multiple key columns and explicit database referential actions.</summary>
+        public RelationshipConfiguration(
+            PropertyInfo principalNavigation,
+            Type dependentType,
+            PropertyInfo? dependentNavigation,
+            IReadOnlyList<PropertyInfo> principalKeys,
+            IReadOnlyList<PropertyInfo> foreignKeys,
+            ReferentialAction onDelete,
+            ReferentialAction onUpdate)
+            : this(
+                principalNavigation,
+                dependentType,
+                dependentNavigation,
+                principalKeys,
+                foreignKeys,
+                cascadeDelete: onDelete == ReferentialAction.Cascade)
+        {
+            OnDelete = onDelete;
+            OnUpdate = onUpdate;
         }
     }
 

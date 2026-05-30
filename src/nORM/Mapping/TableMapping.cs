@@ -262,7 +262,11 @@ namespace nORM.Mapping
                         rel.DependentType,
                         principalKeys,
                         foreignKeys,
-                        rel.CascadeDelete);
+                        rel.CascadeDelete)
+                    {
+                        OnDelete = rel.OnDelete,
+                        OnUpdate = rel.OnUpdate
+                    };
                 }
             }
 
@@ -429,7 +433,7 @@ namespace nORM.Mapping
         /// <param name="DependentType">The CLR type of the dependent entity.</param>
         /// <param name="PrincipalKey">The key column on the principal entity used as the relationship principal.</param>
         /// <param name="ForeignKey">The foreign key column on the dependent entity referencing the principal key.</param>
-        /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade to dependents.</param>
+        /// <param name="CascadeDelete">Specifies whether deletes on the principal entity cascade through the tracked object graph.</param>
         public record Relation(PropertyInfo NavProp, Type DependentType, Column PrincipalKey, Column ForeignKey, bool CascadeDelete = true)
         {
             /// <summary>Ordered principal key columns participating in the relationship.</summary>
@@ -437,6 +441,12 @@ namespace nORM.Mapping
 
             /// <summary>Ordered foreign key columns participating in the relationship.</summary>
             public IReadOnlyList<Column> ForeignKeys { get; init; } = new[] { ForeignKey };
+
+            /// <summary>Database referential action emitted for principal deletes.</summary>
+            public ReferentialAction OnDelete { get; init; } = CascadeDelete ? ReferentialAction.Cascade : ReferentialAction.NoAction;
+
+            /// <summary>Database referential action emitted for principal key updates.</summary>
+            public ReferentialAction OnUpdate { get; init; } = ReferentialAction.NoAction;
 
             /// <summary>Gets whether the relationship spans more than one key column.</summary>
             public bool IsComposite => PrincipalKeys.Count > 1 || ForeignKeys.Count > 1;

@@ -423,14 +423,24 @@ namespace nORM.Migration
                         DependentColumns = rel.ForeignKeys.Select(c => c.Name).ToArray(),
                         PrincipalTable   = map.TableName,
                         PrincipalColumns = rel.PrincipalKeys.Select(c => c.Name).ToArray(),
-                        OnDelete         = rel.CascadeDelete ? "CASCADE" : "NO ACTION",
-                        OnUpdate         = "NO ACTION",
+                        OnDelete         = ToForeignKeyActionSql(rel.OnDelete),
+                        OnUpdate         = ToForeignKeyActionSql(rel.OnUpdate),
                     });
                 }
             }
 
             return snapshot;
         }
+
+        private static string ToForeignKeyActionSql(ReferentialAction action)
+            => action switch
+            {
+                ReferentialAction.Cascade => "CASCADE",
+                ReferentialAction.SetNull => "SET NULL",
+                ReferentialAction.Restrict => "RESTRICT",
+                ReferentialAction.SetDefault => "SET DEFAULT",
+                _ => "NO ACTION"
+            };
 
         /// <summary>
         /// Returns entity candidate types from the assembly: non-abstract classes (including

@@ -77,6 +77,20 @@ public class SchemaSnapshotTests
         public string Status { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotFkParent")]
+    private class SnapshotFkParent
+    {
+        [Key] public int Id { get; set; }
+        public List<SnapshotFkChild> Children { get; set; } = new();
+    }
+
+    [Table("SnapshotFkChild")]
+    private class SnapshotFkChild
+    {
+        [Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+    }
+
  // Helper: build a single-type snapshot using the assembly of the test type
     private static SchemaSnapshot BuildFor(params System.Type[] types)
     {
@@ -173,6 +187,28 @@ public class SchemaSnapshotTests
         var table = snapshot.Tables.Single(t => t.Name == "SnapshotDefaultEntity");
         var status = table.Columns.Single(c => c.Name == "Status");
         Assert.Equal("'new'", status.DefaultValue);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesExplicitReferentialActions()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotFkParent>()
+                    .HasMany(p => p.Children)
+                    .WithOne()
+                    .HasForeignKey(c => c.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.Restrict)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var child = snapshot.Tables.Single(t => t.Name == "SnapshotFkChild");
+        var fk = Assert.Single(child.ForeignKeys);
+        Assert.Equal("SET NULL", fk.OnDelete);
+        Assert.Equal("RESTRICT", fk.OnUpdate);
     }
 
     [Fact]

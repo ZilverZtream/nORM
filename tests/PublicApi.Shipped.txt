@@ -91,6 +91,12 @@ F:nORM.Configuration.ProviderMobilitySupport.Portable:nORM.Configuration.Provide
 F:nORM.Configuration.ProviderMobilitySupport.ProviderBound:nORM.Configuration.ProviderMobilitySupport
 F:nORM.Configuration.ProviderMobilitySupport.Unsupported:nORM.Configuration.ProviderMobilitySupport
 F:nORM.Configuration.ProviderMobilitySupport.value__:System.Int32
+F:nORM.Configuration.ReferentialAction.Cascade:nORM.Configuration.ReferentialAction
+F:nORM.Configuration.ReferentialAction.NoAction:nORM.Configuration.ReferentialAction
+F:nORM.Configuration.ReferentialAction.Restrict:nORM.Configuration.ReferentialAction
+F:nORM.Configuration.ReferentialAction.SetDefault:nORM.Configuration.ReferentialAction
+F:nORM.Configuration.ReferentialAction.SetNull:nORM.Configuration.ReferentialAction
+F:nORM.Configuration.ReferentialAction.value__:System.Int32
 F:nORM.Configuration.TemporalStorageMode.NormManaged:nORM.Configuration.TemporalStorageMode
 F:nORM.Configuration.TemporalStorageMode.ProviderNative:nORM.Configuration.TemporalStorageMode
 F:nORM.Configuration.TemporalStorageMode.value__:System.Int32
@@ -141,6 +147,7 @@ M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configurati
 M:nORM.Configuration.DbContextOptions.Validate():System.Void
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasConversion``1(nORM.Mapping.ValueConverter{`1,`0}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
@@ -195,6 +202,7 @@ M:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.Stri
 M:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(System.String):System.Version
 M:nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(System.String,nORM.Configuration.ProviderMobilityTranslationDecision&):System.Boolean
 M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)
+M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction)
 M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Boolean)
 M:nORM.Configuration.RelationshipConfiguration.<Clone>$():nORM.Configuration.RelationshipConfiguration
 M:nORM.Configuration.RelationshipConfiguration.Deconstruct(System.Reflection.PropertyInfo&,System.Type&,System.Reflection.PropertyInfo&,System.Reflection.PropertyInfo&,System.Reflection.PropertyInfo&,System.Boolean&):System.Void
@@ -1038,6 +1046,8 @@ P:nORM.Configuration.RelationshipConfiguration.DependentNavigation:System.Reflec
 P:nORM.Configuration.RelationshipConfiguration.DependentType:System.Type
 P:nORM.Configuration.RelationshipConfiguration.ForeignKey:System.Reflection.PropertyInfo
 P:nORM.Configuration.RelationshipConfiguration.ForeignKeys:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+P:nORM.Configuration.RelationshipConfiguration.OnDelete:nORM.Configuration.ReferentialAction
+P:nORM.Configuration.RelationshipConfiguration.OnUpdate:nORM.Configuration.ReferentialAction
 P:nORM.Configuration.RelationshipConfiguration.PrincipalKey:System.Reflection.PropertyInfo
 P:nORM.Configuration.RelationshipConfiguration.PrincipalKeys:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
 P:nORM.Configuration.RelationshipConfiguration.PrincipalNavigation:System.Reflection.PropertyInfo
@@ -1180,6 +1190,8 @@ P:nORM.Mapping.TableMapping.Relation.ForeignKey:nORM.Mapping.Column
 P:nORM.Mapping.TableMapping.Relation.ForeignKeys:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.Relation.IsComposite:System.Boolean
 P:nORM.Mapping.TableMapping.Relation.NavProp:System.Reflection.PropertyInfo
+P:nORM.Mapping.TableMapping.Relation.OnDelete:nORM.Configuration.ReferentialAction
+P:nORM.Mapping.TableMapping.Relation.OnUpdate:nORM.Configuration.ReferentialAction
 P:nORM.Mapping.TableMapping.Relation.PrincipalKey:nORM.Mapping.Column
 P:nORM.Mapping.TableMapping.Relation.PrincipalKeys:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.Relations:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.TableMapping.Relation}
@@ -1341,6 +1353,7 @@ T:nORM.Configuration.ProviderMobilityProviderFeature
 T:nORM.Configuration.ProviderMobilitySupport
 T:nORM.Configuration.ProviderMobilityTranslationDecision
 T:nORM.Configuration.ProviderMobilityTranslator
+T:nORM.Configuration.ReferentialAction
 T:nORM.Configuration.RelationshipConfiguration
 T:nORM.Configuration.ShadowPropertyConfiguration
 T:nORM.Configuration.TemporalStorageMode
