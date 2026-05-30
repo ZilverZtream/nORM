@@ -4491,7 +4491,13 @@ namespace nORM.Scaffolding
                     var streamMethod = isScalarFunction
                         ? null
                         : MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
-                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction);
+                    var scalarValueMethod = isScalarFunction
+                        ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueAsync", memberNames)
+                        : null;
+                    var scalarValueType = isScalarFunction
+                        ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueResult", memberNames)
+                        : null;
+                    AppendFunctionRoutineStub(sb, methodBase, streamMethod, scalarValueMethod, scalarValueType, routine, parameterSignature, parameterType, inputParameters, scalar: isScalarFunction);
                 }
                 else
                 {
@@ -4612,12 +4618,35 @@ namespace nORM.Scaffolding
             StringBuilder sb,
             string methodBase,
             string? streamMethod,
+            string? scalarValueMethod,
+            string? scalarValueType,
             ScaffoldSkippedObject routine,
             string parameterSignature,
             string? parameterType,
             IReadOnlyList<RoutineStubParameter> inputParameters,
             bool scalar)
         {
+            if (scalar && scalarValueType != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"    private sealed class {scalarValueType}<TValue>");
+                sb.AppendLine("    {");
+                sb.AppendLine("        public TValue? Value { get; set; }");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+                sb.AppendLine($"    /// <summary>Executes provider-bound scalar function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and returns its single value.</summary>");
+                sb.AppendLine("    /// <remarks>The routine body is provider-owned and is not translated by nORM.</remarks>");
+                sb.AppendLine($"    public async Task<TValue?> {scalarValueMethod}<TValue>({parameterSignature}, CancellationToken ct = default)");
+                sb.AppendLine("    {");
+                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));
+                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+                sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
+                sb.AppendLine("        return rows.Count == 0 ? default : rows[0].Value;");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+            }
+
             sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
             sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters));

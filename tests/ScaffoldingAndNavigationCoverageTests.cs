@@ -941,9 +941,26 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Executes provider-bound scalar function `dbo.CalculateRisk`", code);
         Assert.Contains("public sealed class CalculateRiskParameters", code);
         Assert.Contains("public int? customerId { get; init; }", code);
+        Assert.Contains("private sealed class CalculateRiskValueResult<TValue>", code);
+        Assert.Contains("Task<TValue?> CalculateRiskValueAsync<TValue>(CalculateRiskParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("QueryUnchangedAsync<CalculateRiskValueResult<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args)", code);
+        Assert.Contains("return rows.Count == 0 ? default : rows[0].Value;", code);
         Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
         Assert.Contains("QueryUnchangedAsync<TResult>", code);
         Assert.DoesNotContain("WithOutputAsync", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_scalar_fn_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]
@@ -956,6 +973,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
         Assert.Contains("Executes provider-bound function `public.calculate_risk`", code);
         Assert.Contains("public int? customer_id { get; init; }", code);
+        Assert.Contains("Task<TValue?> CalculateRiskValueAsync<TValue>(CalculateRiskParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
     }
@@ -982,6 +1000,7 @@ public class DatabaseScaffolderPrivateMethodTests
             "MySQL FUNCTION; parameters=1; outputParameters=0; parameterModes=customer_id:IN:int; dataType=int");
 
         Assert.Contains("Executes provider-bound FUNCTION `calculate_risk`", code);
+        Assert.Contains("Task<TValue?> CalculateRiskValueAsync<TValue>(CalculateRiskParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
     }

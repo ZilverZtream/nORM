@@ -174,6 +174,9 @@ must be reviewed and edited like handwritten model code.
   metadata. The generated output wrapper includes a convenience overload that
   uses the scaffold-discovered output definitions, plus an explicit
   `params OutputParameter[]` overload for reviewed routine signature changes.
+  Scalar-function stubs also include a direct `Task<TValue?> ...ValueAsync`
+  convenience wrapper so callers do not need to hand-author a one-column
+  result DTO for the generated `Value` projection.
   XML comments list the discovered parameter metadata, including sized types
   such as `nvarchar(32)` and `decimal(18,2)`. Routine
   bodies remain provider-owned and are not translated across database engines.
