@@ -1143,6 +1143,20 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithPostgresSetReturningFunction_EmitsSelectStarInvocationWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "customer_ids",
+            "PostgreSQL function; parameters=1; outputParameters=0; callShape=table-valued-function; parameterModes=tenant_id:IN:integer; dataType=integer");
+
+        Assert.Contains("Executes provider-bound function `public.customer_ids`", code);
+        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
+        Assert.Contains("IAsyncEnumerable<TResult> StreamCustomerIdsAsync<TResult>", code);
+        Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithMySqlFunction_EmitsSelectInvocationWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(

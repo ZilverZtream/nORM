@@ -48,6 +48,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
+    private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -335,6 +336,44 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownRoutineAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Postgres)]
+    public async Task ScaffoldAsync_emits_postgres_set_returning_function_as_table_valued_wrapper(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresSetReturningRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_setof_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresSetReturningContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresSetReturningContext.cs"));
+                Assert.Contains($"Task<List<TResult>> {PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<TResult> Stream{PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresSetReturningRoutineAsync(connection, provider);
             }
         }
     }
@@ -841,6 +880,14 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task SetupPostgresSetReturningRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresSetReturningRoutineAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresSetReturningRoutineName)}(tenantId integer) RETURNS SETOF integer LANGUAGE SQL AS $$ SELECT tenantId $$");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -1005,6 +1052,19 @@ public sealed class LiveProviderScaffoldingParityTests
 
             if (!string.IsNullOrWhiteSpace(sql))
                 await ExecuteAsync(connection, sql);
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresSetReturningRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresSetReturningRoutineName)}(integer)");
         }
         catch
         {

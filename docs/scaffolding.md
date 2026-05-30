@@ -172,9 +172,10 @@ must be reviewed and edited like handwritten model code.
   functions, PostgreSQL functions, and MySQL functions are discovered as
   routines and emitted as provider-bound `SELECT` wrappers (`SELECT
   function(...) AS Value` for scalar functions and `SELECT * FROM
-  function(...)` for table-valued functions) instead of being miscalled as
-  stored procedures. Table-valued functions also receive a streaming wrapper so
-  callers can consume large provider-owned rowsets without buffering. When
+  function(...)` for table-valued and PostgreSQL set-returning functions)
+  instead of being miscalled as stored procedures. Table-valued functions also
+  receive a streaming wrapper so callers can consume large provider-owned
+  rowsets without buffering. When
   provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `DateTimeOffset?`,

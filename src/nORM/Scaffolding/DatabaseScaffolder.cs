@@ -715,6 +715,14 @@ namespace nORM.Scaffolding
                            ), '') ||
                            '; callShape=' ||
                            CASE
+                               WHEN UPPER(r.routine_type) = 'FUNCTION' AND EXISTS (
+                                   SELECT 1
+                                   FROM pg_proc routine_proc
+                                   INNER JOIN pg_namespace routine_ns ON routine_ns.oid = routine_proc.pronamespace
+                                   WHERE routine_ns.nspname = r.specific_schema
+                                     AND routine_proc.proname = r.routine_name
+                                     AND routine_proc.proretset
+                               ) THEN 'table-valued-function'
                                WHEN UPPER(r.routine_type) = 'FUNCTION' AND LOWER(COALESCE(r.data_type, '')) IN ('record', 'table') THEN 'table-valued-function'
                                WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
                                ELSE ''
