@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.IO;
@@ -279,6 +280,26 @@ public class SchemaSignatureTests
 
         Assert.Contains("FirstName", propertyNames);
         Assert.Contains("FirstName2", propertyNames);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithNonNullableReferenceColumn_AddsRequiredAttribute()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicRequired (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                Notes TEXT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "DynamicRequired");
+
+        Assert.NotEmpty(type.GetProperty("Name")!.GetCustomAttributes(typeof(RequiredAttribute), inherit: false));
+        Assert.Empty(type.GetProperty("Notes")!.GetCustomAttributes(typeof(RequiredAttribute), inherit: false));
     }
 
     [Fact]

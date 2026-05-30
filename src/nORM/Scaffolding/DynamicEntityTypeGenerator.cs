@@ -204,6 +204,13 @@ namespace nORM.Scaffolding
                         propertyBuilder.SetCustomAttribute(maxLenAttr);
                     }
 
+                    if (!propertyType.IsValueType && !col.AllowsNull)
+                    {
+                        var requiredAttrCtor = typeof(RequiredAttribute).GetConstructor(Type.EmptyTypes)!;
+                        var requiredAttr = new CustomAttributeBuilder(requiredAttrCtor, Array.Empty<object>());
+                        propertyBuilder.SetCustomAttribute(requiredAttr);
+                    }
+
                     // Define getter
                     var getMethod = typeBuilder.DefineMethod(
                         $"get_{col.PropertyName}",
