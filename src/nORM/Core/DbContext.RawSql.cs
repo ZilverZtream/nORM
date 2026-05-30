@@ -431,12 +431,37 @@ namespace nORM.Core
 
             var props = parameters.GetType().GetProperties();
             var span = new (string name, object value)[props.Length];
+            var hasProviderParameters = false;
             for (int i = 0; i < props.Length; i++)
             {
                 var pName = provider.ParamPrefix + props[i].Name;
                 var pValue = props[i].GetValue(parameters) ?? DBNull.Value;
                 span[i] = (pName, pValue);
                 paramDict[pName] = pValue;
+                hasProviderParameters |= pValue is DbParameter;
+            }
+
+            if (hasProviderParameters)
+            {
+                cmd.Parameters.Clear();
+                foreach (var (name, value) in span)
+                {
+                    if (value is DbParameter providerParameter)
+                    {
+                        providerParameter.ParameterName = name;
+                        cmd.Parameters.Add(providerParameter);
+                        paramDict[name] = providerParameter.Value ?? DBNull.Value;
+                    }
+                    else
+                    {
+                        var parameter = cmd.CreateParameter();
+                        parameter.ParameterName = name;
+                        nORM.Query.ParameterAssign.AssignValue(parameter, value);
+                        cmd.Parameters.Add(parameter);
+                    }
+                }
+
+                return;
             }
 
             cmd.SetParametersFast(span);

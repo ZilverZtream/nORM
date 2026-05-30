@@ -182,6 +182,56 @@ public class StoredProcedureTests
         Assert.Equal("Omicron", results[0].Name);
     }
 
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_BindsDbParameterObjectProperties()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(16,'Pi'),(17,'Rho');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new
+        {
+            id = new SqliteParameter { Value = 17 }
+        };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Rho", results[0].Name);
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureAsync_ObjectPropertyNameOverridesDbParameterName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(18,'Sigma'),(19,'Tau');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new
+        {
+            id = new SqliteParameter("@wrong", 19)
+        };
+
+        var results = await ctx.ExecuteStoredProcedureAsync<Item>(
+            "SELECT Id, Name FROM Item WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Single(results);
+        Assert.Equal("Tau", results[0].Name);
+    }
+
     /// <summary>
     /// ExecuteStoredProcedureAsAsyncEnumerable already correctly uses Provider.StoredProcedureCommandType.
     /// Verify all three overloads produce consistent results on SQLite.
