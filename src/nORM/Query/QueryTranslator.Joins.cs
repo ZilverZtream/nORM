@@ -714,8 +714,14 @@ namespace nORM.Query
                     _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
                 var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
                 _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
-                _sql.Append("ON ").Append(outerAlias).Append('.').Append(relation.PrincipalKey.EscCol)
-                    .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKey.EscCol);
+                _sql.Append("ON ");
+                for (var keyIndex = 0; keyIndex < relation.PrincipalKeys.Count; keyIndex++)
+                {
+                    if (keyIndex > 0)
+                        _sql.Append(" AND ");
+                    _sql.Append(outerAlias).Append('.').Append(relation.PrincipalKeys[keyIndex].EscCol)
+                        .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKeys[keyIndex].EscCol);
+                }
 
                 // Apply filter predicate if present
                 if (filterPredicate != null)

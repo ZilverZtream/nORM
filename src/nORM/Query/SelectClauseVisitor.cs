@@ -1173,8 +1173,6 @@ namespace nORM.Query
             // [Table] attribute or type name; columns from property names escaped by provider).
             var depTable = GetTableName(depType);
             var depAlias = _provider.Escape("__nav");
-            var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
-            var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
             // Outer alias / table-name reference for parent columns — set via SCV ctor.
             var outerAlias = _outerAlias;
             var extraFilterSql = extraFilter != null
@@ -1188,14 +1186,16 @@ namespace nORM.Query
             if (node.Method.Name is nameof(Queryable.Any))
             {
                 sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+                  .Append(" WHERE ");
+                AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
                 sb.Append(") THEN 1 ELSE 0 END");
             }
             else if (node.Method.Name is nameof(Queryable.All))
             {
                 sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+                  .Append(" WHERE ");
+                AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 // All(p) ≡ NOT EXISTS(row matching NOT p) — invert the extra filter, not AND it.
                 if (extraFilterSql != null) sb.Append(" AND NOT (").Append(extraFilterSql).Append(')');
                 sb.Append(") THEN 1 ELSE 0 END");
@@ -1203,10 +1203,22 @@ namespace nORM.Query
             else
             {
                 sb.Append("COUNT(*) FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(outerAlias).Append('.').Append(pkCol);
+                  .Append(" WHERE ");
+                AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
             }
             sb.Append(')');
+        }
+
+        private void AppendNavigationRelationPredicate(StringBuilder sb, TableMapping.Relation relation, string dependentAlias, string principalAlias)
+        {
+            for (var i = 0; i < relation.ForeignKeys.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(" AND ");
+                sb.Append(dependentAlias).Append('.').Append(_provider.Escape(relation.ForeignKeys[i].Prop.Name))
+                  .Append(" = ").Append(principalAlias).Append('.').Append(_provider.Escape(relation.PrincipalKeys[i].Prop.Name));
+            }
         }
 
         private void EmitTwoHopNavigationCountSubquery(
@@ -1352,8 +1364,6 @@ namespace nORM.Query
             var depType = relation.DependentType;
             var depTable = GetTableName(depType);
             var depAlias = _provider.Escape("__nav");
-            var fkCol = _provider.Escape(relation.ForeignKey.Prop.Name);
-            var pkCol = _provider.Escape(relation.PrincipalKey.Prop.Name);
 
             // Resolve the selector to a column name. Only a simple member access is supported
             // here (matching efba58f scope) — `c => c.X` not `c => c.X + 1`.
@@ -1395,7 +1405,8 @@ namespace nORM.Query
 
             sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
               .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
-              .Append(" WHERE ").Append(depAlias).Append('.').Append(fkCol).Append(" = ").Append(_outerAlias).Append('.').Append(pkCol);
+              .Append(" WHERE ");
+            AppendNavigationRelationPredicate(sb, relation, depAlias, _outerAlias);
             if (extraFilter != null)
             {
                 var filterSql = RenderNavigationFilter(extraFilter, depAlias);

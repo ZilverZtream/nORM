@@ -3096,13 +3096,23 @@ namespace nORM.Query
             var selectorSql = subVisitor.Translate(selectorLambda.Body);
             _paramIndex = subVisitor.ParamIndex;
 
-            var fkCol = relation.ForeignKey.EscCol;
-            var pkCol = relation.PrincipalKey.EscCol;
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
                 .Append(" FROM ").Append(childMapping.EscTable).Append(' ').Append(_provider.Escape(subAlias))
-                .Append(" WHERE ").Append(_provider.Escape(subAlias)).Append('.').Append(fkCol)
-                .Append(" = ").Append(parentInfo.Alias).Append('.').Append(pkCol)
-                .Append(')');
+                .Append(" WHERE ");
+            AppendRelationPredicate(_sql, relation, _provider.Escape(subAlias), parentInfo.Alias);
+            _sql.Append(')');
+        }
+
+        private static void AppendRelationPredicate(OptimizedSqlBuilder sql, TableMapping.Relation relation, string childAlias, string parentAlias)
+        {
+            for (var i = 0; i < relation.ForeignKeys.Count; i++)
+            {
+                if (i > 0)
+                    sql.Append(" AND ");
+                sql.Append(childAlias).Append('.').Append(relation.ForeignKeys[i].EscCol)
+                    .Append(" = ")
+                    .Append(parentAlias).Append('.').Append(relation.PrincipalKeys[i].EscCol);
+            }
         }
 
         private MethodCallExpression RewriteNavigationAggregate(
@@ -3124,17 +3134,24 @@ namespace nORM.Query
 
             // Build the FK = PK predicate against the dependent's property.
             var childParam = Expression.Parameter(depType, "__nav_" + Guid.NewGuid().ToString("N").Substring(0, 8));
-            Expression fkAccess = Expression.Property(childParam, relation.ForeignKey.Prop);
-            Expression pkAccess = Expression.Property(parentParam, relation.PrincipalKey.Prop);
-            // Promote nullable mismatches so Expression.Equal type-checks (e.g. nullable FK
-            // referring to a non-nullable PK).
-            if (fkAccess.Type != pkAccess.Type)
+            Expression? predicateBody = null;
+            for (var i = 0; i < relation.ForeignKeys.Count; i++)
             {
-                var common = Nullable.GetUnderlyingType(fkAccess.Type) ?? fkAccess.Type;
-                if (fkAccess.Type != common) fkAccess = Expression.Convert(fkAccess, common);
-                if (pkAccess.Type != common) pkAccess = Expression.Convert(pkAccess, common);
+                Expression fkAccess = Expression.Property(childParam, relation.ForeignKeys[i].Prop);
+                Expression pkAccess = Expression.Property(parentParam, relation.PrincipalKeys[i].Prop);
+                // Promote nullable mismatches so Expression.Equal type-checks (e.g. nullable FK
+                // referring to a non-nullable PK).
+                if (fkAccess.Type != pkAccess.Type)
+                {
+                    var common = Nullable.GetUnderlyingType(fkAccess.Type) ?? fkAccess.Type;
+                    if (fkAccess.Type != common) fkAccess = Expression.Convert(fkAccess, common);
+                    if (pkAccess.Type != common) pkAccess = Expression.Convert(pkAccess, common);
+                }
+
+                var equality = Expression.Equal(fkAccess, pkAccess);
+                predicateBody = predicateBody is null ? equality : Expression.AndAlso(predicateBody, equality);
             }
-            var fkPredicate = Expression.Lambda(Expression.Equal(fkAccess, pkAccess), childParam);
+            var fkPredicate = Expression.Lambda(predicateBody!, childParam);
 
             sourceExpr = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
                 new[] { depType }, sourceExpr, Expression.Quote(fkPredicate));
