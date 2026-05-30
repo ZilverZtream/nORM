@@ -2369,7 +2369,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Possible Many-To-Many Join Tables");
                     sb.AppendLine();
-                    sb.AppendLine("These tables have two single-column foreign key constraints. They are scaffolded as normal entities; review them if you want nORM fluent many-to-many mapping instead.");
+                    sb.AppendLine("These tables look like join-table candidates but were scaffolded as normal entities because at least one safe `UsingTable` requirement was not met.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Table | Principal Tables | Constraints | Reason Codes | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");

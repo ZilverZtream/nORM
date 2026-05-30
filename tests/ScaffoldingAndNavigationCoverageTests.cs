@@ -2627,12 +2627,15 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositePayloadJoinCtx");
 
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositePayloadJoinCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
             var reasons = joinTables[0].GetProperty("reasons").EnumerateArray().Select(item => item.GetString()).ToArray();
 
             Assert.True(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
             Assert.DoesNotContain(".UsingTable(\"StudentCourse\"", contextCode);
+            Assert.Contains("at least one safe `UsingTable` requirement was not met", warnings);
+            Assert.DoesNotContain("two single-column foreign key constraints", warnings);
             Assert.Contains("payload-columns", reasons);
             Assert.DoesNotContain("composite-foreign-key", reasons);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
