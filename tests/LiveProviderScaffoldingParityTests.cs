@@ -48,6 +48,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
     private const string WarningView = "ScaffoldLiveWarningView";
+    private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
@@ -804,6 +805,54 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_emits_sqlserver_local_table_synonym_as_read_only_query_artifact()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerSynonymAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_synonym_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerSynonymContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { "dbo." + SqlServerWarningSynonym },
+                        EmitQueryArtifacts = true,
+                        OverwriteFiles = false
+                    });
+
+                var synonymCode = await File.ReadAllTextAsync(Path.Combine(dir, SqlServerWarningSynonym + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqlServerSynonymContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+                Assert.Contains("[ReadOnlyEntity]", synonymCode, StringComparison.Ordinal);
+                Assert.Contains($"[Table(\"{SqlServerWarningSynonym}", synonymCode, StringComparison.Ordinal);
+                Assert.Contains($"IQueryable<{SqlServerWarningSynonym}>", contextCode, StringComparison.Ordinal);
+                Assert.Empty(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray());
+                Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                    item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                    item.GetProperty("table").GetString() == "dbo." + SqlServerWarningSynonym);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerSynonymAsync(connection, provider);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
@@ -1306,6 +1355,20 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE MATERIALIZED VIEW {matView} AS SELECT {id}, {status} FROM {warning}");
     }
 
+    private static async Task SetupSqlServerSynonymAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerSynonymAsync(connection, provider);
+
+        var warning = SqlServerQualified(provider, WarningTable);
+        var synonym = SqlServerQualified(provider, SqlServerWarningSynonym);
+        var id = provider.Escape("Id");
+        var status = provider.Escape("Status");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {warning} ({id} {IntType(ProviderKind.SqlServer)} NOT NULL PRIMARY KEY, {status} {TextType(ProviderKind.SqlServer, 32)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE SYNONYM {synonym} FOR {warning}");
+    }
+
     private static async Task SetupProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
@@ -1597,6 +1660,20 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, $"DROP MATERIALIZED VIEW IF EXISTS {provider.Escape(PostgresMaterializedView)}");
             await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerSynonymAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{SqlServerWarningSynonym}', N'SN') IS NOT NULL DROP SYNONYM {SqlServerQualified(provider, SqlServerWarningSynonym)}");
+            await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, WarningTable, SqlServerQualified(provider, WarningTable)));
         }
         catch
         {
