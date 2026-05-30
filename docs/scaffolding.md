@@ -151,7 +151,10 @@ must be reviewed and edited like handwritten model code.
   stored procedures. When provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `Guid?`, `string?`, `byte[]?`,
-  etc.) and falls back to `object?` only for unmapped provider types. When safe
+  etc.) and falls back to `object?` only for unmapped provider types.
+  Stored-procedure stubs include both a buffered `Task<List<TResult>>` wrapper
+  and a streaming `IAsyncEnumerable<TResult>` wrapper for large result sets.
+  When safe
   output parameter metadata is available, scaffolding also emits an
   `OutputParameter[]` factory with mapped `DbType` values, discovered
   string/binary sizes where providers expose them, and `InputOutput` direction

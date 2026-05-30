@@ -841,6 +841,9 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public string? message { get; init; }", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
+        Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(\"dbo.GetRevenue\", ct, parameters)", code);
+        Assert.Contains("without buffering the full result set", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
         Assert.Contains("output parameters discovered at scaffold time", code);

@@ -4352,6 +4352,13 @@ namespace nORM.Scaffolding
                 {
                     sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>(\"{procedureName}\", ct, parameters);");
+
+                    var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
+                    sb.AppendLine();
+                    sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
+                    sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
+                    sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>(\"{procedureName}\", ct, parameters);");
                 }
 
                 if (outputParameterCount > 0 && !IsFunctionCallShape(callShape))
