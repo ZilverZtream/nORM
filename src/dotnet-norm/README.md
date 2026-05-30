@@ -89,7 +89,8 @@ SQLite `UUID` declared columns scaffold as `Guid`; declared `JSON` and `XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `json`/`jsonb`/`xml`/`uuid`, and MySQL `json` columns also scaffold as safe
 scalar CLR storage while native JSON/XML query semantics remain explicit
-provider-bound work.
+provider-bound work. PostgreSQL arrays over safe scalar elements scaffold as
+CLR arrays while remaining provider-specific diagnostics.
 Use `--emit-sequence-stubs` to generate provider-bound next-value wrappers for
 SQL Server and PostgreSQL standalone sequences; sequence DDL and allocation
 semantics remain provider-owned.

@@ -624,6 +624,13 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("byte[]?", InvokeGetTypeName(typeof(byte[]), true));
     }
 
+    [Fact]
+    public void GetTypeName_ScalarArray_ReturnsCSharpArrayName()
+    {
+        Assert.Equal("int[]", InvokeGetTypeName(typeof(int[]), false));
+        Assert.Equal("Guid[]?", InvokeGetTypeName(typeof(Guid[]), true));
+    }
+
     // ── GetUnqualifiedName ──────────────────────────────────────────────────
 
     [Theory]
@@ -664,6 +671,31 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });
         Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+    }
+
+    [Theory]
+    [InlineData("ARRAY (_int4)", typeof(int[]))]
+    [InlineData("ARRAY (_text)", typeof(string[]))]
+    [InlineData("ARRAY (_uuid)", typeof(Guid[]))]
+    [InlineData("ARRAY (_timestamptz)", typeof(DateTimeOffset[]))]
+    public void TryMapPostgresArrayType_MapsSafeScalarArrays(string detail, Type expected)
+    {
+        var m = GetMethod("TryMapPostgresArrayType", new[] { typeof(string), typeof(Type).MakeByRefType() });
+        object?[] args = { detail, null };
+
+        Assert.True((bool)m.Invoke(null, args)!);
+        Assert.Equal(expected, args[1]);
+    }
+
+    [Theory]
+    [InlineData("ARRAY (_inet)")]
+    [InlineData("USER-DEFINED (my_enum)")]
+    public void TryMapPostgresArrayType_RejectsProviderSpecificElementArrays(string detail)
+    {
+        var m = GetMethod("TryMapPostgresArrayType", new[] { typeof(string), typeof(Type).MakeByRefType() });
+        object?[] args = { detail, null };
+
+        Assert.False((bool)m.Invoke(null, args)!);
     }
 
     [Theory]

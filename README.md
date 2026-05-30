@@ -300,6 +300,8 @@ SQLite `UUID` columns scaffold as `Guid`, and SQLite declared `JSON`/`XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `json`/`jsonb`/`xml`/`uuid`, and MySQL `json` columns also scaffold as safe
 scalar CLR storage while native JSON/XML operator semantics stay provider-bound,
+and PostgreSQL arrays over safe scalar elements scaffold as CLR arrays while
+remaining provider-specific diagnostics,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 

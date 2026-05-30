@@ -117,6 +117,7 @@ namespace nORM.Scaffolding
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
                 RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
                 unsupportedFeatures.RemoveAll(feature =>
@@ -194,9 +195,10 @@ namespace nORM.Scaffolding
                     identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
                     decimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
                     sqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
+                    providerSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
                     var isReadOnlyEntity = !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
                         || primaryKeyColumns.Count == 0;
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity, sqliteDeclaredTypes).ConfigureAwait(false);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
@@ -259,6 +261,7 @@ namespace nORM.Scaffolding
         /// <param name="decimalPrecisions">Decimal precision/scale metadata keyed by database column name.</param>
         /// <param name="isReadOnlyEntity">Whether the generated type should reject nORM write operations.</param>
         /// <param name="sqliteDeclaredTypes">SQLite declared column type names keyed by database column name.</param>
+        /// <param name="providerSpecificColumnTypes">Provider-specific column type details keyed by database column name.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -277,7 +280,8 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? identityColumns = null,
             IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null,
             bool isReadOnlyEntity = false,
-            IReadOnlyDictionary<string, string>? sqliteDeclaredTypes = null)
+            IReadOnlyDictionary<string, string>? sqliteDeclaredTypes = null,
+            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -325,7 +329,9 @@ namespace nORM.Scaffolding
                     var effectiveAllowNull = allowNull && !isKey;
                     string? declaredType = null;
                     sqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
-                    var clrType = NormalizeScaffoldClrType(provider, (Type)row["DataType"]!, effectiveAllowNull, isKey, isAuto, declaredType);
+                    string? providerSpecificType = null;
+                    providerSpecificColumnTypes?.TryGetValue(colName, out providerSpecificType);
+                    var clrType = NormalizeScaffoldClrType(provider, (Type)row["DataType"]!, effectiveAllowNull, isKey, isAuto, declaredType, providerSpecificType);
 
                     // Decide C# type name with correct nullability for value OR reference types
                     var typeName = GetTypeName(clrType, effectiveAllowNull);
@@ -3683,6 +3689,36 @@ namespace nORM.Scaffolding
                 StringComparer.OrdinalIgnoreCase);
         }
 
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildFeatureDetailMap(
+            IEnumerable<ScaffoldUnsupportedFeature> features,
+            params string[] kinds)
+        {
+            var kindSet = kinds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in features)
+            {
+                if (!kindSet.Contains(feature.Kind)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || string.IsNullOrWhiteSpace(feature.Detail))
+                {
+                    continue;
+                }
+
+                if (!result.TryGetValue(feature.TableKey, out var table))
+                {
+                    table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    result[feature.TableKey] = table;
+                }
+
+                table[feature.Name] = feature.Detail;
+            }
+
+            return result.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyDictionary<string, string>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         private static bool IsLegacyCascadeShape(ScaffoldRelationship relationship)
             => (string.Equals(relationship.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(relationship.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
@@ -4724,7 +4760,9 @@ namespace nORM.Scaffolding
         /// </summary>
         private static string GetTypeName(Type type, bool allowNull)
         {
-            string name = type == typeof(byte[]) ? "byte[]" : type switch
+            string name = type.IsArray && type != typeof(byte[])
+                ? GetTypeName(type.GetElementType()!, allowNull: false) + "[]"
+                : type == typeof(byte[]) ? "byte[]" : type switch
             {
                 var t when t == typeof(int) => "int",
                 var t when t == typeof(long) => "long",
@@ -4771,10 +4809,16 @@ namespace nORM.Scaffolding
                 : null;
         }
 
-        private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
+        private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null, string? providerSpecificColumnType = null)
         {
             if (provider is SqliteProvider && IsSqliteUuidDeclaredType(declaredType))
                 return typeof(Guid);
+
+            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
+                && TryMapPostgresArrayType(providerSpecificColumnType, out var arrayType))
+            {
+                return arrayType;
+            }
 
             if (provider is SqliteProvider
                 && isKey
@@ -4788,6 +4832,47 @@ namespace nORM.Scaffolding
             }
 
             return clrType;
+        }
+
+        private static bool TryMapPostgresArrayType(string? detail, out Type arrayType)
+        {
+            arrayType = typeof(object[]);
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var normalized = detail.Trim().ToLowerInvariant();
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+                return false;
+
+            var open = normalized.IndexOf('(');
+            var close = normalized.IndexOf(')', open + 1);
+            var element = open >= 0 && close > open
+                ? normalized.Substring(open + 1, close - open - 1).Trim()
+                : string.Empty;
+            element = element.TrimStart('_');
+
+            var elementType = element switch
+            {
+                "int2" or "smallint" => typeof(short),
+                "int4" or "integer" => typeof(int),
+                "int8" or "bigint" => typeof(long),
+                "float4" or "real" => typeof(float),
+                "float8" or "double precision" => typeof(double),
+                "numeric" or "decimal" => typeof(decimal),
+                "bool" or "boolean" => typeof(bool),
+                "uuid" => typeof(Guid),
+                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" => typeof(string),
+                "date" => typeof(DateOnly),
+                "timestamp" or "timestamp without time zone" => typeof(DateTime),
+                "timestamptz" or "timestamp with time zone" => typeof(DateTimeOffset),
+                _ => null
+            };
+
+            if (elementType is null)
+                return false;
+
+            arrayType = elementType.MakeArrayType();
+            return true;
         }
 
         private static bool IsSqliteUuidDeclaredType(string? declaredType)

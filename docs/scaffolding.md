@@ -35,6 +35,10 @@ must be reviewed and edited like handwritten model code.
   columns likewise scaffold as safe scalar CLR storage instead of warning-only
   provider-specific type rows; native JSON/XML operator semantics remain
   provider-bound.
+  PostgreSQL arrays over safe scalar elements scaffold as CLR arrays so the
+  model compiles and materializes with Npgsql; they remain provider-specific
+  schema diagnostics because SQL Server/MySQL/SQLite do not share native array
+  DDL.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` so the reverse-engineered model carries the
   full key shape explicitly.
@@ -292,7 +296,9 @@ must be reviewed and edited like handwritten model code.
   migration metadata with `HasCollation`; complex/provider-specific defaults
   that fail the allowlist remain diagnostics. Safe scalar JSON/XML/UUID storage
   types are promoted into generated CLR properties where provider metadata
-  exposes them; native JSON/XML operators remain provider-bound. Parsed SQL Server
+  exposes them; native JSON/XML operators remain provider-bound. PostgreSQL
+  arrays over safe scalar elements are emitted as CLR arrays but kept in
+  diagnostics as provider-specific schema. Parsed SQL Server
   `IDENTITY(seed, increment)` metadata is emitted with
   `HasIdentityOptions`; provider-specific column types, unparsed identity
   strategies, unrecognized FK referential actions, triggers, SQL Server provider-native temporal
