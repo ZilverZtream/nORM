@@ -69,6 +69,8 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         Assert.Contains("Supported", doc, StringComparison.Ordinal);
         Assert.Contains("Not Yet Stable", doc, StringComparison.Ordinal);
+        Assert.Contains("bridge columns are", doc, StringComparison.Ordinal);
+        Assert.Contains("nullable, missing a composite primary key", doc, StringComparison.Ordinal);
     }
 
     [Fact]

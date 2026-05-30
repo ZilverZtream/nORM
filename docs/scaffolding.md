@@ -168,9 +168,10 @@ must be reviewed and edited like handwritten model code.
   Non-cascade delete actions and update actions are discovered and reported in
   scaffold diagnostics; provider DDL remains the source of truth.
 - Owned types and inheritance inference.
-- Payload join-table modeling and many-to-many joins whose foreign keys do not
-  target single-column primary keys. These are discovered and reported in
-  scaffold diagnostics rather than converted into unsafe fluent mappings.
+- Payload join-table modeling and many-to-many joins whose bridge columns are
+  nullable, missing a composite primary key, or whose foreign keys do not target
+  single-column primary keys. These are discovered and reported in scaffold
+  diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, views, temporal tables, and keyless
   tables. Defaults, computed/generated columns, check constraints, collations,
