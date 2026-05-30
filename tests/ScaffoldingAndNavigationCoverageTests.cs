@@ -1997,7 +1997,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithPayloadJoinTable_EmitsManyToManyDiagnostics()
+    public async Task ScaffoldAsync_WithPayloadJoinTable_EmitsExplicitJoinEntityAndDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -2023,8 +2023,21 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinCtx");
 
             Assert.True(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
+            var joinCode = File.ReadAllText(Path.Combine(dir, "AuthorBook.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "JoinCtx.cs"));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("CreatedAt { get; set; }", joinCode);
+            Assert.Contains("public Author?", joinCode);
+            Assert.Contains("public Book?", joinCode);
+            Assert.Contains("public List<AuthorBook>", authorCode);
+            Assert.Contains("public List<AuthorBook>", bookCode);
+            Assert.Contains(".HasMany(p => p.AuthorBooks)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BookId, p => p.Id, cascadeDelete: false);", contextCode);
             Assert.Contains("Possible Many-To-Many Join Tables", warnings);
             Assert.Contains("AuthorBook", warnings);
             Assert.Contains("Author", warnings);

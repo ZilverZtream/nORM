@@ -97,6 +97,10 @@ must be reviewed and edited like handwritten model code.
   overload so generated SQL targets the qualified bridge table rather than a
   literal dotted table name. Self-referencing pure join tables receive distinct
   role-based navigations from the join FK columns and are consumer-build tested.
+- Payload bridge tables are emitted as explicit join entities with payload
+  columns and normal FK navigations. They are also reported as possible
+  many-to-many candidates so reviewers do not accidentally collapse domain data
+  into a payload-free skip navigation.
 - Optional table filtering through `ScaffoldOptions.Tables` and CLI
   `--tables`; null or blank API filters are treated as empty rather than
   producing raw runtime exceptions. Bare table-name filters fail with an
@@ -216,10 +220,10 @@ must be reviewed and edited like handwritten model code.
   Non-cascade delete actions and update actions are discovered and reported in
   scaffold diagnostics; provider DDL remains the source of truth.
 - Owned types and inheritance inference.
-- Payload join-table modeling and many-to-many joins whose bridge columns are
-  nullable, missing a primary key made exactly from the FK columns, or whose
-  foreign keys do not target the generated primary keys. These are reported in
-  scaffold diagnostics rather than converted into unsafe fluent mappings.
+- Payload bridge tables are modeled as explicit join entities, not skip
+  navigations. Many-to-many joins whose bridge columns are nullable, missing a primary key made exactly from the FK columns, or whose foreign keys do not
+  target the generated primary keys are reported in scaffold diagnostics rather
+  than converted into unsafe fluent mappings.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, temporal tables, and keyless tables.
   Defaults, computed/generated columns, check constraints, collations,
