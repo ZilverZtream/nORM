@@ -2480,8 +2480,8 @@ namespace nORM.Scaffolding
 
             if (constraints.Length != 2)
                 reasons.Add("not-two-foreign-keys");
-            if (constraints.Any(g => g.Count() != 1 || g.Any(fk => fk.ColumnCount != 1)))
-                reasons.Add("composite-foreign-key");
+            if (constraints.Any(g => g.Count() == 0 || g.Any(fk => fk.ColumnCount != g.Count())))
+                reasons.Add("foreign-key-metadata-incomplete");
 
             if (columnPropertiesByTable.TryGetValue(tableKey, out var columns)
                 && (columns.Count != fkColumns.Count || columns.Keys.Any(column => !fkColumns.Contains(column))))

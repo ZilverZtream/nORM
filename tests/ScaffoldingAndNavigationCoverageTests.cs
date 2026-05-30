@@ -2589,6 +2589,61 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithCompositeKeyPayloadJoinTable_ReportsPayloadNotCompositeUnsupported()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Student (
+                TenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                PRIMARY KEY (TenantId, StudentId)
+            );
+            CREATE TABLE Course (
+                TenantId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                PRIMARY KEY (TenantId, CourseId)
+            );
+            CREATE TABLE StudentCourse (
+                StudentTenantId INTEGER NOT NULL,
+                StudentId INTEGER NOT NULL,
+                CourseTenantId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                EnrolledAt TEXT NOT NULL,
+                PRIMARY KEY (StudentTenantId, StudentId, CourseTenantId, CourseId),
+                CONSTRAINT FK_StudentCourse_Student FOREIGN KEY (StudentTenantId, StudentId) REFERENCES Student(TenantId, StudentId),
+                CONSTRAINT FK_StudentCourse_Course FOREIGN KEY (CourseTenantId, CourseId) REFERENCES Course(TenantId, CourseId)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositePayloadJoinCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositePayloadJoinCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+            var reasons = joinTables[0].GetProperty("reasons").EnumerateArray().Select(item => item.GetString()).ToArray();
+
+            Assert.True(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
+            Assert.DoesNotContain(".UsingTable(\"StudentCourse\"", contextCode);
+            Assert.Contains("payload-columns", reasons);
+            Assert.DoesNotContain("composite-foreign-key", reasons);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithAlternateKeyPureJoinTable_EmitsManyToManyMapping()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

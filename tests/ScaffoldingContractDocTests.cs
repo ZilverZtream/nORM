@@ -159,6 +159,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("reasons", doc, StringComparison.Ordinal);
         Assert.Contains("payload-columns", doc, StringComparison.Ordinal);
         Assert.Contains("nullable-foreign-key", doc, StringComparison.Ordinal);
+        Assert.Contains("foreign-key-metadata-incomplete", doc, StringComparison.Ordinal);
         Assert.Contains("primary-key-not-exact-bridge-columns", doc, StringComparison.Ordinal);
         Assert.Contains("parameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("outputParameterCount", doc, StringComparison.Ordinal);
