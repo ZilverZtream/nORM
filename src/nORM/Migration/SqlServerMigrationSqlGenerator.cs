@@ -283,6 +283,9 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
+            if (IsDecimalWithPrecision(column))
+                return $"DECIMAL({column.Precision!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{column.Scale!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -298,8 +301,16 @@ namespace nORM.Migration
             return sql;
         }
 
+        private static bool IsDecimalWithPrecision(ColumnSchema column)
+            => string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
+            && column.Precision is > 0
+            && column.Scale is >= 0
+            && column.Scale <= column.Precision;
+
         private static bool ColumnDefinitionChanged(ColumnSchema oldCol, ColumnSchema newCol) =>
             !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
+            || oldCol.Precision != newCol.Precision
+            || oldCol.Scale != newCol.Scale
             || oldCol.IsNullable != newCol.IsNullable;
 
         // M1/X1: Allowlist for FK referential action tokens.

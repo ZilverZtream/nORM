@@ -99,6 +99,10 @@ namespace nORM.Scaffolding
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
+                unsupportedFeatures.RemoveAll(static feature =>
+                    string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
+                    && TryParseDecimalPrecision(feature.Detail, out _, out _));
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, nonNullableColumnsByTable, memberNamesByTable);
@@ -132,7 +136,8 @@ namespace nORM.Scaffolding
                     computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
                     rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
                     identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns).ConfigureAwait(false);
+                    decimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
@@ -186,6 +191,7 @@ namespace nORM.Scaffolding
         /// <param name="computedColumns">Column names known to be database-computed/generated.</param>
         /// <param name="rowVersionColumns">Column names known to be database-managed rowversion/timestamp tokens.</param>
         /// <param name="identityColumns">Column names known to be database-generated identity/auto-increment values.</param>
+        /// <param name="decimalPrecisions">Decimal precision/scale metadata keyed by database column name.</param>
         /// <returns>A string containing the generated C# code.</returns>
         private static async Task<string> ScaffoldEntityAsync(
             DbConnection connection,
@@ -201,7 +207,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null,
             IReadOnlySet<string>? computedColumns = null,
             IReadOnlySet<string>? rowVersionColumns = null,
-            IReadOnlySet<string>? identityColumns = null)
+            IReadOnlySet<string>? identityColumns = null,
+            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null)
         {
             var sb = _stringBuilderPool.Get();
             try
@@ -279,7 +286,16 @@ namespace nORM.Scaffolding
                         var orderSuffix = index.ColumnCount > 1 ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
                         sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix})]");
                     }
-                    sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
+                    if (clrType == typeof(decimal)
+                        && decimalPrecisions is not null
+                        && decimalPrecisions.TryGetValue(colName, out var decimalPrecision))
+                    {
+                        sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\", TypeName = \"decimal({decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})\")]");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
+                    }
                     var initializer = !clrType.IsValueType && !effectiveAllowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
                     sb.AppendLine();
@@ -1758,7 +1774,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, numeric precision/scale, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, computed/generated columns, check constraints, collations, provider-specific column types, rowversion/timestamp columns, non-default identity seed/increment settings, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -1934,7 +1950,6 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "SCF102",
                 "Collation" => "SCF103",
                 "ProviderSpecificColumnType" => "SCF104",
-                "PrecisionScale" => "SCF105",
                 "ReferentialAction" => "SCF106",
                 "RelationshipPrincipalKey" => "SCF107",
                 "RowVersion" => "SCF108",
@@ -1991,7 +2006,6 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "Keep the CHECK constraint in provider migrations and duplicate critical validation in application code or explicit model configuration.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
-                "PrecisionScale" => "Preserve numeric precision/scale intentionally in migrations or add explicit validation/tests before relying on regenerated decimal columns.",
                 "ReferentialAction" => "Review generated relationship cascade behavior and keep non-default FK referential actions in provider migrations or explicit model configuration.",
                 "RelationshipPrincipalKey" => "Add a primary key or exact unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
@@ -2642,6 +2656,61 @@ namespace nORM.Scaffolding
                 pair => pair.Key,
                 pair => (IReadOnlySet<string>)pair.Value,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new Dictionary<string, Dictionary<string, ScaffoldDecimalPrecision>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || !TryParseDecimalPrecision(feature.Detail, out var precision, out var scale))
+                {
+                    continue;
+                }
+
+                if (!result.TryGetValue(feature.TableKey, out var table))
+                {
+                    table = new Dictionary<string, ScaffoldDecimalPrecision>(StringComparer.OrdinalIgnoreCase);
+                    result[feature.TableKey] = table;
+                }
+
+                table[feature.Name] = new ScaffoldDecimalPrecision(precision, scale);
+            }
+
+            return result.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyDictionary<string, ScaffoldDecimalPrecision>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool TryParseDecimalPrecision(string? typeName, out int precision, out int scale)
+        {
+            precision = 0;
+            scale = 0;
+            if (string.IsNullOrWhiteSpace(typeName))
+                return false;
+
+            var open = typeName.IndexOf('(');
+            var comma = typeName.IndexOf(',', open + 1);
+            var close = typeName.IndexOf(')', comma + 1);
+            if (open < 0 || comma < 0 || close < 0)
+                return false;
+
+            var baseName = typeName[..open].Trim();
+            if (!baseName.EndsWith("decimal", StringComparison.OrdinalIgnoreCase)
+                && !baseName.EndsWith("numeric", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out precision)
+                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out scale)
+                && precision > 0
+                && scale >= 0
+                && scale <= precision;
         }
 
         private static HashSet<string> GetOrCreateMemberNames(
@@ -3450,6 +3519,10 @@ namespace nORM.Scaffolding
         private readonly record struct ScaffoldManyToManyNavigation(
             string TargetEntityName,
             string CollectionNavigationName);
+
+        private readonly record struct ScaffoldDecimalPrecision(
+            int Precision,
+            int Scale);
 
         private readonly record struct ScaffoldUnsupportedFeature(
             string TableKey,

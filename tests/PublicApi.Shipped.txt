@@ -1194,7 +1194,9 @@ P:nORM.Migration.ColumnSchema.IsNullable:System.Boolean
 P:nORM.Migration.ColumnSchema.IsPrimaryKey:System.Boolean
 P:nORM.Migration.ColumnSchema.IsUnique:System.Boolean
 P:nORM.Migration.ColumnSchema.Name:System.String
+P:nORM.Migration.ColumnSchema.Precision:System.Nullable{System.Int32}
 P:nORM.Migration.ColumnSchema.PreviousName:System.String
+P:nORM.Migration.ColumnSchema.Scale:System.Nullable{System.Int32}
 P:nORM.Migration.ForeignKeySchema.ConstraintName:System.String
 P:nORM.Migration.ForeignKeySchema.DependentColumns:System.String[]
 P:nORM.Migration.ForeignKeySchema.OnDelete:System.String

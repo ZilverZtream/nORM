@@ -79,6 +79,11 @@ must be reviewed and edited like handwritten model code.
   filtered/partial, expression, included-column, and descending-key index
   semantics are reported as diagnostics rather than emitted as portable
   `[Index]` attributes.
+- Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL
+  `decimal`/`numeric` columns. Scaffolding emits
+  `[Column(TypeName = "decimal(p,s)")]`; schema snapshots read that metadata,
+  and provider migration generators round-trip it instead of falling back to
+  `DECIMAL(18,2)`. SQLite remains on its provider-neutral `NUMERIC` mapping.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   non-null single-column foreign keys, no payload columns, a join-table primary
   key made exactly from those two FK columns, and both references targeting
@@ -116,7 +121,7 @@ must be reviewed and edited like handwritten model code.
   single-column navigations;
   defaults, computed/generated columns, check
   constraints, provider-specific collations, provider-specific column types,
-  decimal precision/scale, SQL Server rowversion/timestamp columns,
+  SQL Server rowversion/timestamp columns,
   non-default SQL Server identity seed/increment settings, non-default FK referential actions,
   relationships that do not target the generated principal primary key or an
   exact unique index,
@@ -136,6 +141,8 @@ must be reviewed and edited like handwritten model code.
   single-column/composite index generation and columns that participate in
   multiple indexes, plus role-based naming for duplicate relationships,
   composite primary-key source generation with consumer-build evidence,
+  decimal precision/scale preservation across generated `[Column(TypeName)]`,
+  schema snapshots, and migration SQL generators,
   composite alternate-key FK generation when the target is an exact unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
@@ -188,7 +195,7 @@ must be reviewed and edited like handwritten model code.
 - Provider-specific computed columns, default constraints, check constraints,
   collations, column types, triggers, views, temporal tables, and keyless
   tables. Defaults, computed/generated columns, check constraints, collations,
-  provider-specific column types, decimal precision/scale, non-default identity
+  provider-specific column types, non-default identity
   seed/increment settings, triggers, SQL Server provider-native temporal
   tables, keyless tables, SQLite virtual tables and shadow tables, views,
   routines, sequences, synonyms, materialized views, and events are discovered
@@ -281,7 +288,6 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF102` | `schema-feature` | Check constraint discovered. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite custom declarations such as `JSON`, `GEOMETRY`, and `UUID` are included here. |
-| `SCF105` | `schema-feature` | Numeric precision/scale discovered. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |

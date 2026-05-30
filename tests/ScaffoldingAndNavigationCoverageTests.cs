@@ -449,6 +449,22 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("decimal", InvokeGetTypeName(typeof(decimal), false));
     }
 
+    [Theory]
+    [InlineData("decimal(28,6)", true, 28, 6)]
+    [InlineData("numeric(19,4)", true, 19, 4)]
+    [InlineData("varchar(20)", false, 0, 0)]
+    public void TryParseDecimalPrecision_ParsesProviderNumericDeclarations(string typeName, bool expected, int expectedPrecision, int expectedScale)
+    {
+        var method = GetMethod("TryParseDecimalPrecision", new[] { typeof(string), typeof(int).MakeByRefType(), typeof(int).MakeByRefType() });
+        var args = new object[] { typeName, 0, 0 };
+
+        var result = (bool)method.Invoke(null, args)!;
+
+        Assert.Equal(expected, result);
+        Assert.Equal(expectedPrecision, (int)args[1]);
+        Assert.Equal(expectedScale, (int)args[2]);
+    }
+
     [Fact]
     public void GetTypeName_Double_NotNull_ReturnsDouble()
     {

@@ -44,6 +44,33 @@ public class MigrationTypeMapParityTests
         return diff;
     }
 
+    private static SchemaDiff MakeDecimalPrecisionDiff()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(new TableSchema
+        {
+            Name = "TestTable",
+            Columns = new List<ColumnSchema>
+            {
+                new ColumnSchema
+                {
+                    Name = "Id",
+                    ClrType = typeof(int).FullName!,
+                    IsPrimaryKey = true
+                },
+                new ColumnSchema
+                {
+                    Name = "Amount",
+                    ClrType = typeof(decimal).FullName!,
+                    Precision = 28,
+                    Scale = 6,
+                    IsNullable = true
+                }
+            }
+        });
+        return diff;
+    }
+
     private static string ExtractColType(MigrationSqlStatements result, string colName)
     {
         // The CREATE TABLE statement contains column definitions; extract the type for the named column.
@@ -65,6 +92,27 @@ public class MigrationTypeMapParityTests
         var typeEnd = createSql.IndexOf(" NULL", afterName, StringComparison.OrdinalIgnoreCase);
         if (typeEnd < 0) throw new Exception($"Could not find NULL marker after type in: {createSql}");
         return createSql.Substring(afterName, typeEnd - afterName).Trim();
+    }
+
+    [Theory]
+    [InlineData("sqlite", "NUMERIC")]
+    [InlineData("sqlserver", "DECIMAL(28,6)")]
+    [InlineData("mysql", "DECIMAL(28,6)")]
+    [InlineData("postgres", "DECIMAL(28,6)")]
+    public void Decimal_precision_metadata_is_emitted_by_migration_generators(string kind, string expected)
+    {
+        IMigrationSqlGenerator gen = kind switch
+        {
+            "sqlite" => new SqliteMigrationSqlGenerator(),
+            "sqlserver" => new SqlServerMigrationSqlGenerator(),
+            "mysql" => new MySqlMigrationSqlGenerator(),
+            "postgres" => new PostgresMigrationSqlGenerator(),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+
+        var result = gen.GenerateSql(MakeDecimalPrecisionDiff());
+        var colType = ExtractColType(result, "Amount");
+        Assert.Equal(expected, colType);
     }
 
     // ── byte[] ──────────────────────────────────────────────────────────────

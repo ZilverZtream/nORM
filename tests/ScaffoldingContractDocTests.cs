@@ -93,7 +93,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("tables without primary keys", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific collations", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific column types", doc, StringComparison.Ordinal);
-        Assert.Contains("decimal precision/scale", doc, StringComparison.Ordinal);
+        Assert.Contains("decimal precision/scale preservation", doc, StringComparison.Ordinal);
+        Assert.Contains("Column(TypeName", doc, StringComparison.Ordinal);
         Assert.Contains("provider metadata-backed identity", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL identity/serial", doc, StringComparison.Ordinal);
         Assert.Contains("owned sequences are treated as", doc, StringComparison.Ordinal);
@@ -211,7 +212,7 @@ public class ScaffoldingContractDocTests
         var expectedCodes = new[]
         {
             "SCF001", "SCF002",
-            "SCF100", "SCF101", "SCF102", "SCF103", "SCF104", "SCF105", "SCF106", "SCF107",
+            "SCF100", "SCF101", "SCF102", "SCF103", "SCF104", "SCF106", "SCF107",
             "SCF108", "SCF109", "SCF110", "SCF111", "SCF112", "SCF113", "SCF114", "SCF115",
             "SCF116", "SCF199",
             "SCF200", "SCF201", "SCF202", "SCF203", "SCF204", "SCF205", "SCF206", "SCF207",

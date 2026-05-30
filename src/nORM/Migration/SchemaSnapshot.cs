@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using nORM.Configuration;
@@ -89,6 +90,10 @@ namespace nORM.Migration
         // comparisons in SchemaDiffer.Diff do not require extra null guards. If ClrType is empty
         // on a ColumnSchema produced by external code, treat it as a configuration concern.
         public string ClrType { get; set; } = string.Empty;
+        /// <summary>Optional decimal/numeric precision for providers that support fixed-precision decimals.</summary>
+        public int? Precision { get; set; }
+        /// <summary>Optional decimal/numeric scale for providers that support fixed-precision decimals.</summary>
+        public int? Scale { get; set; }
         /// <summary>Indicates whether the column allows <c>null</c> values.</summary>
         public bool IsNullable { get; set; }
         /// <summary>True when the column is (part of) the table's primary key.</summary>
@@ -228,6 +233,7 @@ namespace nORM.Migration
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var renameAttr = prop.GetCustomAttribute<RenameColumnAttr>();
+                    var (precision, scale) = TryParseDecimalPrecision(colAttr?.TypeName, clr);
                     var indexAttrs = indexAttributesByProperty[prop];
                     var firstIndexAttr = indexAttrs.FirstOrDefault();
                     var hasSingleColumnUniqueIndex = indexAttrs.Any(attr =>
@@ -241,6 +247,8 @@ namespace nORM.Migration
                         // full generic form (e.g. "System.Collections.Generic.List`1[System.Int32]")
                         // which is unambiguous, unlike Name which gives just "List`1".
                         ClrType = clr.FullName ?? clr.ToString(),
+                        Precision = precision,
+                        Scale = scale,
                         IsNullable = !prop.PropertyType.IsValueType || Nullable.GetUnderlyingType(prop.PropertyType) != null,
                         // Populate PK / index metadata from attributes or convention.
                         // IsUnique is only set for single-column PKs; composite PKs must NOT
@@ -368,12 +376,16 @@ namespace nORM.Migration
                     var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
                     var isNullable = !col.Prop.PropertyType.IsValueType
                                   || Nullable.GetUnderlyingType(col.Prop.PropertyType) != null;
+                    var columnAttr = col.Prop.GetCustomAttribute<ColumnAttribute>();
+                    var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
                     table.Columns.Add(new ColumnSchema
                     {
                         Name         = col.Name,
                         // Use ToString() as fallback: for constructed generic types it returns the
                         // full generic form, which is unambiguous, unlike Name which gives just "List`1".
                         ClrType      = clrType.FullName ?? clrType.ToString(),
+                        Precision    = precision,
+                        Scale        = scale,
                         IsNullable   = isNullable,
                         IsPrimaryKey = col.IsKey,
                         // Only mark IsUnique for single-column PKs; composite PKs must NOT
@@ -477,6 +489,36 @@ namespace nORM.Migration
                 : tableAttribute.Schema + "." + tableAttribute.Name;
         }
 
+        private static (int? Precision, int? Scale) TryParseDecimalPrecision(string? typeName, Type clrType)
+        {
+            if (clrType != typeof(decimal) || string.IsNullOrWhiteSpace(typeName))
+                return (null, null);
+
+            var open = typeName.IndexOf('(');
+            var comma = typeName.IndexOf(',', open + 1);
+            var close = typeName.IndexOf(')', comma + 1);
+            if (open < 0 || comma < 0 || close < 0)
+                return (null, null);
+
+            var baseName = typeName[..open].Trim();
+            if (!baseName.EndsWith("decimal", StringComparison.OrdinalIgnoreCase)
+                && !baseName.EndsWith("numeric", StringComparison.OrdinalIgnoreCase))
+            {
+                return (null, null);
+            }
+
+            if (int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var precision)
+                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var scale)
+                && precision > 0
+                && scale >= 0
+                && scale <= precision)
+            {
+                return (precision, scale);
+            }
+
+            return (null, null);
+        }
+
         /// <summary>
         /// Emits a debug diagnostic when a FK's dependent type is not registered in the current
         /// context's mappings and must be silently skipped during snapshot construction.
@@ -562,6 +604,8 @@ namespace nORM.Migration
                     .Select(x => x.Column)
                     .FirstOrDefault(x =>
                         string.Equals(x.ClrType, column.ClrType, StringComparison.OrdinalIgnoreCase) &&
+                        x.Precision == column.Precision &&
+                        x.Scale == column.Scale &&
                         x.IsNullable == column.IsNullable);
 
                 var message = $"Drop column '{table.Name}.{column.Name}' will remove data in that column.";
@@ -642,6 +686,8 @@ namespace nORM.Migration
                     if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
                     else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
+                        || oldCol.Precision != col.Precision
+                        || oldCol.Scale != col.Scale
                         || oldCol.IsNullable != col.IsNullable
                         || oldCol.IsPrimaryKey != col.IsPrimaryKey
                         || oldCol.IsUnique != col.IsUnique

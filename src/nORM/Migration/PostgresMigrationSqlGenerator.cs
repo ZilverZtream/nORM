@@ -84,7 +84,7 @@ namespace nORM.Migration
             // PostgreSQL requires separate ALTER COLUMN statements for type and nullability changes.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                if (ColumnTypeChanged(oldCol, newCol))
                     up.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(newCol.Name)} TYPE {GetSqlType(newCol)} USING {Esc(newCol.Name)}::{GetCastType(newCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     up.Add(newCol.IsNullable
@@ -165,7 +165,7 @@ namespace nORM.Migration
             // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
-                if (!string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal))
+                if (ColumnTypeChanged(oldCol, newCol))
                     down.Add($"ALTER TABLE {Esc(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} TYPE {GetSqlType(oldCol)} USING {Esc(oldCol.Name)}::{GetCastType(oldCol)}");
                 if (oldCol.IsNullable != newCol.IsNullable)
                     down.Add(oldCol.IsNullable
@@ -291,6 +291,9 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
+            if (IsDecimalWithPrecision(column))
+                return $"DECIMAL({column.Precision!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{column.Scale!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {
@@ -305,6 +308,17 @@ namespace nORM.Migration
             }
             return sql;
         }
+
+        private static bool IsDecimalWithPrecision(ColumnSchema column)
+            => string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
+            && column.Precision is > 0
+            && column.Scale is >= 0
+            && column.Scale <= column.Precision;
+
+        private static bool ColumnTypeChanged(ColumnSchema oldCol, ColumnSchema newCol)
+            => !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
+            || oldCol.Precision != newCol.Precision
+            || oldCol.Scale != newCol.Scale;
 
         // Allowlist for FK referential action tokens (NO ACTION, CASCADE, SET NULL, RESTRICT, SET DEFAULT).
         // NOTE: Identical copy exists in the other three migration generators. If a shared base class is introduced, consolidate here.

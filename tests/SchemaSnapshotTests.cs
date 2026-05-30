@@ -59,6 +59,14 @@ public class SchemaSnapshotTests
         public string Name { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotPrecisionEntity")]
+    private class SnapshotPrecisionEntity
+    {
+        [Key] public int Id { get; set; }
+        [Column(TypeName = "decimal(28,6)")]
+        public decimal Amount { get; set; }
+    }
+
  // Helper: build a single-type snapshot using the assembly of the test type
     private static SchemaSnapshot BuildFor(params System.Type[] types)
     {
@@ -748,6 +756,54 @@ public class SchemaSnapshotTests
         Assert.Empty(diff.AlteredColumns);
         Assert.Empty(diff.AddedColumns);
         Assert.Empty(diff.DroppedColumns);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsDecimalPrecisionFromColumnTypeName()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotPrecisionEntity).Assembly);
+        var table = Assert.Single(snapshot.Tables.Where(t => t.Name == "SnapshotPrecisionEntity"));
+        var amount = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotPrecisionEntity.Amount)));
+
+        Assert.Equal(28, amount.Precision);
+        Assert.Equal(6, amount.Scale);
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsDecimalPrecisionChange()
+    {
+        var oldSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = "Invoice",
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Amount", ClrType = typeof(decimal).FullName!, Precision = 18, Scale = 2, IsNullable = false }
+                    }
+                }
+            }
+        };
+        var newSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = "Invoice",
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Amount", ClrType = typeof(decimal).FullName!, Precision = 28, Scale = 6, IsNullable = false }
+                    }
+                }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+        var altered = Assert.Single(diff.AlteredColumns);
+        Assert.Equal("Amount", altered.NewColumn.Name);
     }
 
  // ── Read-only / init-only / computed property mapping ──────────────
