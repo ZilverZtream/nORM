@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -490,7 +491,15 @@ namespace nORM.Scaffolding
                                   (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
                                   '; parameterModes=',
                                   COALESCE((
-                                      SELECT STRING_AGG(CONCAT(pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':', ty.name), ',')
+                                      SELECT STRING_AGG(CONCAT(
+                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
+                                          ty.name,
+                                          CASE
+                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
+                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
+                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
+                                              ELSE ''
+                                          END), ',')
                                       FROM sys.parameters pa
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                                       WHERE pa.object_id = p.object_id
@@ -550,7 +559,15 @@ namespace nORM.Scaffolding
                            ), 0)::text ||
                            '; parameterModes=' ||
                            COALESCE((
-                               SELECT string_agg(COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' || COALESCE(p.data_type, ''), ',' ORDER BY p.ordinal_position)
+                               SELECT string_agg(
+                                   COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' ||
+                                   COALESCE(p.data_type, '') ||
+                                   CASE
+                                       WHEN p.character_maximum_length IS NOT NULL THEN '(' || p.character_maximum_length::text || ')'
+                                       WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN '(' || p.numeric_precision::text || ',' || p.numeric_scale::text || ')'
+                                       ELSE ''
+                                   END,
+                                   ',' ORDER BY p.ordinal_position)
                                FROM information_schema.parameters p
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
@@ -582,7 +599,14 @@ namespace nORM.Scaffolding
                                      AND p.specific_name = r.specific_name
                                      AND p.parameter_mode IN ('OUT', 'INOUT')),
                                   '; parameterModes=',
-                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':', COALESCE(p.data_type, '')) ORDER BY p.ordinal_position SEPARATOR ',')
+                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(
+                                                COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':',
+                                                COALESCE(p.data_type, ''),
+                                                CASE
+                                                    WHEN p.character_maximum_length IS NOT NULL THEN CONCAT('(', p.character_maximum_length, ')')
+                                                    WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN CONCAT('(', p.numeric_precision, ',', p.numeric_scale, ')')
+                                                    ELSE ''
+                                                END) ORDER BY p.ordinal_position SEPARATOR ',')
                                             FROM information_schema.parameters p
                                             WHERE p.specific_schema = r.routine_schema
                                               AND p.specific_name = r.specific_name), ''),
@@ -2176,8 +2200,7 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(parameterModes))
                 return Array.Empty<IReadOnlyDictionary<string, object?>>();
 
-            return parameterModes
-                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            return SplitRoutineParameterModes(parameterModes)
                 .Select(raw =>
                 {
                     var parts = raw.Split(':', 3);
@@ -2191,6 +2214,40 @@ namespace nORM.Scaffolding
                     return (IReadOnlyDictionary<string, object?>)parameter;
                 })
                 .ToArray();
+        }
+
+        private static IReadOnlyList<string> SplitRoutineParameterModes(string parameterModes)
+        {
+            var parts = new List<string>();
+            var start = 0;
+            var depth = 0;
+            for (var i = 0; i < parameterModes.Length; i++)
+            {
+                var ch = parameterModes[i];
+                if (ch == '(')
+                {
+                    depth++;
+                }
+                else if (ch == ')' && depth > 0)
+                {
+                    depth--;
+                }
+                else if (ch == ',' && depth == 0)
+                {
+                    AddRoutineParameterModePart(parts, parameterModes[start..i]);
+                    start = i + 1;
+                }
+            }
+
+            AddRoutineParameterModePart(parts, parameterModes[start..]);
+            return parts;
+        }
+
+        private static void AddRoutineParameterModePart(List<string> parts, string value)
+        {
+            var trimmed = value.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed))
+                parts.Add(trimmed);
         }
 
         private static string ScaffoldDiagnosticsJson(
@@ -3454,7 +3511,12 @@ namespace nORM.Scaffolding
                         sb.AppendLine("        => new[]");
                         sb.AppendLine("        {");
                         foreach (var parameter in outputParameters)
-                            sb.AppendLine($"            new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}),");
+                        {
+                            var sizeArgument = parameter.Size.HasValue
+                                ? ", " + parameter.Size.Value.ToString(CultureInfo.InvariantCulture)
+                                : string.Empty;
+                            sb.AppendLine($"            new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}{sizeArgument}),");
+                        }
                         sb.AppendLine("        };");
                     }
                 }
@@ -3555,10 +3617,41 @@ namespace nORM.Scaffolding
                     return Array.Empty<RoutineOutputParameter>();
 
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                names.Add(new RoutineOutputParameter(escaped, GetRoutineParameterDbTypeName(dataType)));
+                names.Add(new RoutineOutputParameter(escaped, GetRoutineParameterDbTypeName(dataType), GetRoutineParameterSize(dataType)));
             }
 
             return names.ToArray();
+        }
+
+        private static int? GetRoutineParameterSize(string? dataType)
+        {
+            if (string.IsNullOrWhiteSpace(dataType))
+                return null;
+
+            var trimmed = dataType.Trim();
+            var open = trimmed.IndexOf('(');
+            if (open < 0)
+                return null;
+
+            var close = trimmed.IndexOf(')', open + 1);
+            if (close < 0)
+                return null;
+
+            var normalized = trimmed[..open].Trim().ToLowerInvariant();
+            if (normalized is "character varying" or "varying character")
+                normalized = "varchar";
+            else if (normalized is "national character varying")
+                normalized = "nvarchar";
+            else if (normalized is "character")
+                normalized = "char";
+
+            if (normalized is not ("char" or "varchar" or "nchar" or "nvarchar" or "binary" or "varbinary"))
+                return null;
+
+            var value = trimmed.Substring(open + 1, close - open - 1).Trim();
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var size) && size > 0
+                ? size
+                : null;
         }
 
         private static string GetRoutineParameterTypeName(string? dataType)
@@ -4049,7 +4142,8 @@ namespace nORM.Scaffolding
 
         private readonly record struct RoutineOutputParameter(
             string Name,
-            string DbType);
+            string DbType,
+            int? Size);
 
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,

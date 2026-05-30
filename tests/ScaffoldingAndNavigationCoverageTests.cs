@@ -220,22 +220,24 @@ public class DatabaseScaffolderPrivateMethodTests
         var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
         var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
         var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
         var routine = Activator.CreateInstance(
             skippedObjectType,
             "dbo",
             "GetRevenue",
             "Routine",
-            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal")!;
+            "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:OUT:nvarchar(32)")!;
         var relationships = Array.CreateInstance(relationshipType, 0);
         var manyToMany = Array.CreateInstance(manyToManyType, 0);
         var routines = Array.CreateInstance(skippedObjectType, 1);
         var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
         routines.SetValue(routine, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .Single(m => m.Name == "ScaffoldContextWithRelationships" && m.GetParameters().Length == 7);
+            .Single(m => m.Name == "ScaffoldContextWithRelationships" && m.GetParameters().Length == 8);
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys })!;
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues })!;
     }
 
     // ── ToPascalCase ────────────────────────────────────────────────────────
@@ -682,6 +684,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(\"dbo.GetRevenue\", ct, parameters, outputParameters)", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
         Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
+        Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32)", code);
         Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_" + Guid.NewGuid().ToString("N"));
