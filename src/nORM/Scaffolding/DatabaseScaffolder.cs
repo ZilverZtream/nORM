@@ -1808,7 +1808,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Skipped Database Objects");
                     sb.AppendLine();
-                    sb.AppendLine("Views, routines, and sequences are discovered for review, but v1 scaffolding emits entity classes only for base tables.");
+                    sb.AppendLine("Views/materialized views can be emitted as opt-in query artifacts, routines can be emitted as opt-in provider-bound stubs, and sequences/synonyms/events remain provider-owned review items.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Name | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
@@ -2039,11 +2039,11 @@ namespace nORM.Scaffolding
         private static string SuggestedActionForSkippedObject(string kind)
             => kind switch
             {
-                "View" => "Map a supported table-backed model or hand-write a read-only query surface for the view; v1 scaffolding emits base-table entities only.",
+                "View" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities to generate a read-oriented query artifact, or keep the view behind explicit provider-bound query code.",
                 "Routine" => "Keep routine calls behind explicit raw SQL/stored-procedure code and document the provider-bound contract.",
                 "Sequence" => "Configure generated-key behavior explicitly or keep sequence DDL in provider migrations.",
                 "Synonym" => "Resolve the synonym to a supported base table or keep it behind provider-bound integration code.",
-                "MaterializedView" => "Map a supported base table or hand-write a provider-bound refresh/query path for the materialized view.",
+                "MaterializedView" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities for a read-oriented query artifact and keep refresh behavior provider-bound.",
                 "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
                 "VirtualTable" => "Keep the virtual table behind provider-bound query/index code; v1 scaffolding emits normal base-table models only.",
                 "VirtualTableShadow" => "Do not map SQLite virtual-table shadow storage as domain entities; keep it provider-owned with the virtual table.",
