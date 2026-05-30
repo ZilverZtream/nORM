@@ -462,7 +462,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
-| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` are scaffolded as supported scalar storage; provider-specific declarations such as `GEOMETRY` remain diagnostics. |
+| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays, and MySQL `json`/`year` are scaffolded as supported storage; provider-specific declarations such as `GEOMETRY` remain diagnostics. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |

@@ -236,7 +236,7 @@ public class ScaffoldingContractDocTests
         foreach (var code in expectedCodes)
             Assert.Contains($"`{code}`", doc, StringComparison.Ordinal);
 
-        Assert.Contains("SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` are scaffolded as supported scalar storage", doc, StringComparison.Ordinal);
+        Assert.Contains("SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays, and MySQL `json`/`year` are scaffolded as supported storage", doc, StringComparison.Ordinal);
         Assert.Contains("provider-specific declarations such as `GEOMETRY` remain diagnostics", doc, StringComparison.Ordinal);
     }
 
