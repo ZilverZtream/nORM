@@ -137,6 +137,29 @@ public sealed class LinqCompositeNavigationTests : IAsyncLifetime
         Assert.Equal(new[] { 999 }, loaded[1].Cast<LcnLine>().Select(l => l.Amount).ToArray());
     }
 
+    [Fact]
+    public async Task Split_dependent_query_stitches_composite_navigation_by_all_key_columns()
+    {
+        var rows = (await _ctx.Query<LcnOrder>()
+            .Select(o => new LcnOrder
+            {
+                TenantId = o.TenantId,
+                OrderId = o.OrderId,
+                Customer = o.Customer,
+                Lines = o.Lines
+            })
+            .ToListAsync())
+            .OrderBy(r => r.TenantId)
+            .ThenBy(r => r.OrderId)
+            .ToArray();
+
+        var alice = rows.Single(r => r.TenantId == 1 && r.OrderId == 100);
+        var bob = rows.Single(r => r.TenantId == 2 && r.OrderId == 100);
+
+        Assert.Equal(new[] { 10, 20 }, alice.Lines.Select(l => l.Amount).OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { 999 }, bob.Lines.Select(l => l.Amount).ToArray());
+    }
+
     [Table("LcnOrder")]
     public sealed class LcnOrder
     {

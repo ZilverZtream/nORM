@@ -133,16 +133,21 @@ namespace nORM.Query
     /// Used to mitigate Cartesian explosion when projecting nested collections.
     /// </summary>
     /// <param name="TargetMapping">The table to fetch children from.</param>
-    /// <param name="ForeignKeyColumn">The foreign key column on the child table linking to the parent.</param>
-    /// <param name="ParentKeyProperty">The primary key property on the parent object to extract IDs from.</param>
+    /// <param name="ForeignKeyColumns">The ordered foreign key columns on the child table linking to the parent.</param>
+    /// <param name="ParentKeyProperties">The ordered key properties on the parent object to extract IDs from.</param>
     /// <param name="TargetCollectionProperty">The collection property on the parent object to populate with children.</param>
     /// <param name="CollectionElementType">The type of elements in the collection.</param>
     internal sealed record DependentQueryDefinition(
         TableMapping TargetMapping,
-        Column ForeignKeyColumn,
-        PropertyInfo ParentKeyProperty,
+        IReadOnlyList<Column> ForeignKeyColumns,
+        IReadOnlyList<PropertyInfo> ParentKeyProperties,
         PropertyInfo TargetCollectionProperty,
         Type CollectionElementType
-    );
+    )
+    {
+        internal Column ForeignKeyColumn => ForeignKeyColumns[0];
+        internal PropertyInfo ParentKeyProperty => ParentKeyProperties[0];
+        internal bool IsComposite => ForeignKeyColumns.Count > 1;
+    }
 
 }

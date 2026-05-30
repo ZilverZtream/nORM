@@ -879,8 +879,8 @@ namespace nORM.Query
                 // Create the dependent query definition
                 var dependentQuery = new DependentQueryDefinition(
                     TargetMapping: targetMapping,
-                    ForeignKeyColumn: relation.ForeignKey,
-                    ParentKeyProperty: relation.PrincipalKey.Prop,
+                    ForeignKeyColumns: relation.ForeignKeys,
+                    ParentKeyProperties: relation.PrincipalKeys.Select(c => c.Prop).ToArray(),
                     TargetCollectionProperty: collectionProperty,
                     CollectionElementType: elementType
                 );

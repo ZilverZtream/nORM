@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using nORM.Configuration;
 using nORM.Execution;
 using nORM.Core;
 using nORM.Internal;
@@ -950,11 +951,12 @@ namespace nORM.Query
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Phase 1: Extract parent IDs
+                // Phase 1: Extract parent IDs. Composite relationships must keep the
+                // full ordered key tuple or split-query stitching can cross tenants.
                 var parentIds = new HashSet<object>();
                 foreach (var parent in parents.Cast<object>())
                 {
-                    var keyValue = depQuery.ParentKeyProperty.GetValue(parent);
+                    var keyValue = GetParentKeyValue(depQuery, parent);
                     if (keyValue != null)
                     {
                         parentIds.Add(keyValue);
@@ -973,7 +975,8 @@ namespace nORM.Query
 
                 // Phase 2: Fetch children in batches (to handle SQL parameter limits).
                 // Uses provider's MaxParameters minus DependentQueryParameterReserve for overhead.
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
+                var availableParameters = Math.Max(1, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(1, availableParameters / Math.Max(1, depQuery.ForeignKeyColumns.Count));
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -1009,7 +1012,7 @@ namespace nORM.Query
                 var parentIds = new HashSet<object>();
                 foreach (var parent in parents.Cast<object>())
                 {
-                    var keyValue = depQuery.ParentKeyProperty.GetValue(parent);
+                    var keyValue = GetParentKeyValue(depQuery, parent);
                     if (keyValue != null)
                         parentIds.Add(keyValue);
                 }
@@ -1021,7 +1024,8 @@ namespace nORM.Query
                     continue;
                 }
 
-                var maxBatchSize = Math.Max(DependentQueryParameterReserve, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
+                var availableParameters = Math.Max(1, _ctx.RawProvider.MaxParameters - DependentQueryParameterReserve);
+                var maxBatchSize = Math.Max(1, availableParameters / Math.Max(1, depQuery.ForeignKeyColumns.Count));
                 var allChildren = new List<object>();
 
                 var parentIdList = parentIds.ToList();
@@ -1052,18 +1056,8 @@ namespace nORM.Query
 
             var sql = new System.Text.StringBuilder();
             sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
-            sql.Append(" WHERE ").Append(depQuery.ForeignKeyColumn.EscCol);
-            sql.Append(" IN (");
-
-            for (int i = 0; i < parentIds.Count; i++)
-            {
-                if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
-                sql.Append(paramName);
-                cmd.AddParam(paramName, parentIds[i]);
-            }
-
-            sql.Append(')');
+            sql.Append(" WHERE ");
+            AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
 
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
@@ -1122,18 +1116,8 @@ namespace nORM.Query
             // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...)
             var sql = new System.Text.StringBuilder();
             sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
-            sql.Append(" WHERE ").Append(depQuery.ForeignKeyColumn.EscCol);
-            sql.Append(" IN (");
-
-            for (int i = 0; i < parentIds.Count; i++)
-            {
-                if (i > 0) sql.Append(", ");
-                var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
-                sql.Append(paramName);
-                cmd.AddParam(paramName, parentIds[i]);
-            }
-
-            sql.Append(')');
+            sql.Append(" WHERE ");
+            AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
 
             // X2: Apply tenant predicate to split-query child loading, matching the filter applied
             // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
@@ -1177,6 +1161,47 @@ namespace nORM.Query
             return children;
         }
 
+        private void AppendDependentQueryWhere(
+            DbCommand cmd,
+            System.Text.StringBuilder sql,
+            DependentQueryDefinition depQuery,
+            List<object> parentIds)
+        {
+            if (!depQuery.IsComposite)
+            {
+                sql.Append(depQuery.ForeignKeyColumn.EscCol).Append(" IN (");
+                for (int i = 0; i < parentIds.Count; i++)
+                {
+                    if (i > 0) sql.Append(", ");
+                    var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
+                    sql.Append(paramName);
+                    cmd.AddParam(paramName, parentIds[i]);
+                }
+                sql.Append(')');
+                return;
+            }
+
+            sql.Append('(');
+            for (int keyIndex = 0; keyIndex < parentIds.Count; keyIndex++)
+            {
+                if (keyIndex > 0) sql.Append(" OR ");
+                if (parentIds[keyIndex] is not RelationKey key || key.Values.Length != depQuery.ForeignKeyColumns.Count)
+                    throw new NormConfigurationException(
+                        $"Composite split-query load expected {depQuery.ForeignKeyColumns.Count} key values for '{depQuery.TargetCollectionProperty.Name}'.");
+
+                sql.Append('(');
+                for (int columnIndex = 0; columnIndex < depQuery.ForeignKeyColumns.Count; columnIndex++)
+                {
+                    if (columnIndex > 0) sql.Append(" AND ");
+                    var paramName = $"{_ctx.RawProvider.ParamPrefix}p{keyIndex}_{columnIndex}";
+                    sql.Append(depQuery.ForeignKeyColumns[columnIndex].EscCol).Append(" = ").Append(paramName);
+                    cmd.AddParam(paramName, key.Values[columnIndex]!);
+                }
+                sql.Append(')');
+            }
+            sql.Append(')');
+        }
+
         /// <summary>
         /// Stitches fetched children back to their parent entities using a lookup.
         /// </summary>
@@ -1190,7 +1215,7 @@ namespace nORM.Query
 
             foreach (var child in children)
             {
-                var foreignKeyValue = depQuery.ForeignKeyColumn.Getter(child);
+                var foreignKeyValue = GetForeignKeyValue(depQuery, child);
                 if (foreignKeyValue != null)
                 {
                     if (!childrenByParentKey.TryGetValue(foreignKeyValue, out var list))
@@ -1205,7 +1230,7 @@ namespace nORM.Query
             // Assign children to parents
             foreach (var parent in parents.Cast<object>())
             {
-                var parentKeyValue = depQuery.ParentKeyProperty.GetValue(parent);
+                var parentKeyValue = GetParentKeyValue(depQuery, parent);
 
                 IList childCollection;
                 if (parentKeyValue != null && childrenByParentKey.TryGetValue(parentKeyValue, out var childList))
@@ -1224,6 +1249,57 @@ namespace nORM.Query
                 }
 
                 depQuery.TargetCollectionProperty.SetValue(parent, childCollection);
+            }
+        }
+
+        private static object? GetParentKeyValue(DependentQueryDefinition depQuery, object parent)
+            => GetKeyValue(depQuery.ParentKeyProperties, p => p.GetValue(parent));
+
+        private static object? GetForeignKeyValue(DependentQueryDefinition depQuery, object child)
+            => GetKeyValue(depQuery.ForeignKeyColumns, c => c.Getter(child));
+
+        private static object? GetKeyValue<T>(IReadOnlyList<T> keyParts, Func<T, object?> getter)
+        {
+            if (keyParts.Count == 1)
+                return getter(keyParts[0]);
+
+            var values = new object?[keyParts.Count];
+            for (var i = 0; i < keyParts.Count; i++)
+            {
+                values[i] = getter(keyParts[i]);
+                if (values[i] == null)
+                    return null;
+            }
+
+            return new RelationKey(values);
+        }
+
+        private sealed class RelationKey : IEquatable<RelationKey>
+        {
+            public RelationKey(object?[] values) => Values = values;
+
+            public object?[] Values { get; }
+
+            public bool Equals(RelationKey? other)
+            {
+                if (other == null || other.Values.Length != Values.Length)
+                    return false;
+                for (var i = 0; i < Values.Length; i++)
+                {
+                    if (!object.Equals(Values[i], other.Values[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            public override bool Equals(object? obj) => Equals(obj as RelationKey);
+
+            public override int GetHashCode()
+            {
+                var hash = 17;
+                foreach (var value in Values)
+                    hash = (hash * 23) + (value?.GetHashCode() ?? 0);
+                return hash;
             }
         }
 
