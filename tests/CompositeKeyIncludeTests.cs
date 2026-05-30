@@ -57,6 +57,17 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
         public string Description { get; set; } = string.Empty;
         [NotMapped]
         public TenantOrder? Order { get; set; }
+        public ICollection<TenantShipment> Shipments { get; set; } = new List<TenantShipment>();
+    }
+
+    [Table("CkiTenantShipment")]
+    private class TenantShipment
+    {
+        public int TenantId { get; set; }
+        public int OrderId { get; set; }
+        public int LineNo { get; set; }
+        public int ShipmentId { get; set; }
+        public string Tracking { get; set; } = string.Empty;
     }
 
     private static DbContextOptions BuildOptions() => new()
@@ -70,10 +81,15 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
                 .HasForeignKey(o => o.BlogId, b => b.Id);
             mb.Entity<TenantOrder>().HasKey(x => new { x.TenantId, x.OrderId });
             mb.Entity<TenantOrderLine>().HasKey(x => new { x.TenantId, x.OrderId, x.LineNo });
+            mb.Entity<TenantShipment>().HasKey(x => new { x.TenantId, x.OrderId, x.LineNo, x.ShipmentId });
             mb.Entity<TenantOrder>()
                 .HasMany(o => o.Lines)
                 .WithOne(l => l.Order)
                 .HasForeignKey(l => new { l.TenantId, l.OrderId }, o => new { o.TenantId, o.OrderId });
+            mb.Entity<TenantOrderLine>()
+                .HasMany(l => l.Shipments)
+                .WithOne()
+                .HasForeignKey(s => new { s.TenantId, s.OrderId, s.LineNo }, l => new { l.TenantId, l.OrderId, l.LineNo });
         }
     };
 
@@ -89,8 +105,10 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
             INSERT INTO OrderLine VALUES (1,1,'a-line1'),(1,2,'a-line2'),(2,1,'b-line1');
             CREATE TABLE CkiTenantOrder(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, Customer TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId));
             CREATE TABLE CkiTenantOrderLine(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, Description TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId, LineNo));
+            CREATE TABLE CkiTenantShipment(TenantId INTEGER NOT NULL, OrderId INTEGER NOT NULL, LineNo INTEGER NOT NULL, ShipmentId INTEGER NOT NULL, Tracking TEXT NOT NULL, PRIMARY KEY(TenantId, OrderId, LineNo, ShipmentId));
             INSERT INTO CkiTenantOrder VALUES (1,100,'Alice'),(2,100,'Bob'),(1,101,'Cara');
             INSERT INTO CkiTenantOrderLine VALUES (1,100,1,'a-100-1'),(1,100,2,'a-100-2'),(2,100,1,'b-100-1'),(1,101,1,'a-101-1');
+            INSERT INTO CkiTenantShipment VALUES (1,100,1,1,'a-ship-1'),(1,100,1,2,'a-ship-2'),(2,100,1,1,'b-ship-1'),(1,101,1,1,'c-ship-1');
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider(), BuildOptions());
@@ -203,5 +221,26 @@ public class CompositeKeyIncludeTests : IAsyncLifetime
 
         var tenantTwoSameOrderId = orders.Single(o => o.TenantId == 2 && o.OrderId == 100);
         Assert.Single(tenantTwoSameOrderId.Lines);
+    }
+
+    [Fact]
+    public async Task ThenInclude_CompositeForeignKey_loads_only_matching_composite_grandchildren()
+    {
+        var orders = await ((INormQueryable<TenantOrder>)_ctx.Query<TenantOrder>())
+            .AsSplitQuery()
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Shipments)
+            .OrderBy(o => o.TenantId)
+            .ThenBy(o => o.OrderId)
+            .ToListAsync();
+
+        var alice = orders.Single(o => o.TenantId == 1 && o.OrderId == 100);
+        var aliceLine = alice.Lines.Single(l => l.LineNo == 1);
+        Assert.Equal(new[] { "a-ship-1", "a-ship-2" }, aliceLine.Shipments.Select(s => s.Tracking).OrderBy(x => x).ToArray());
+
+        var bob = orders.Single(o => o.TenantId == 2 && o.OrderId == 100);
+        var bobLine = Assert.Single(bob.Lines);
+        var bobShipment = Assert.Single(bobLine.Shipments);
+        Assert.Equal("b-ship-1", bobShipment.Tracking);
     }
 }

@@ -356,10 +356,11 @@ namespace nORM.Query
                                 "configure a navigation property and use `parent.Children.Count()` / " +
                                 "`parent.Children.Sum(c => c.X)` instead, which nORM emits as a " +
                                 "correlated scalar subquery `(SELECT COUNT(*) FROM Children WHERE FK=parent.PK)`; " +
-                                "(b) a MULTI-HOP navigation chain like `p.Children.SelectMany(c => c.GrandChildren).Count()` — " +
-                                "nORM only emits single-hop nav subqueries; project the inner relation client-side " +
-                                "(`Include(p => p.Children).ThenInclude(c => c.GrandChildren)`) then aggregate in " +
-                                "memory, or compute the aggregate via a join in the SQL shape directly; " +
+                                "(b) a navigation chain using an unsupported multi-hop operator shape; nORM emits " +
+                                "single-hop navigation aggregates and two-hop Count/LongCount/Any over " +
+                                "`p.Children.SelectMany(c => c.GrandChildren)`, but deeper or different operators " +
+                                "may need `Include(...).ThenInclude(...)` plus an in-memory aggregate, or an explicit " +
+                                "join-shaped SQL query; " +
                                 "(c) a custom helper method or LINQ-to-Objects construct unreachable in SQL — " +
                                 "rewrite using SQL-translatable primitives. If you really need client-side " +
                                 "evaluation of the projection, set " +

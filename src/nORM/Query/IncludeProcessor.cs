@@ -398,9 +398,6 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
 
             var firstRelation = include.Path[0];
-            if (include.Path.Count > 1 && include.Path.Any(r => r.IsComposite))
-                throw new NormUnsupportedFeatureException(
-                    "Multi-level Include over composite-key relationships is not supported yet. Split the query into explicit loads or configure single-column relationship keys.");
 
             // Build lookup of parent entities by key to allow batching
             var parentLookup = new Dictionary<object, List<object>>();
@@ -490,9 +487,6 @@ namespace nORM.Query
             var pathMappings = include.Path.Select(r => _ctx.GetMapping(r.DependentType)).ToArray();
 
             var firstRelation = include.Path[0];
-            if (include.Path.Count > 1 && include.Path.Any(r => r.IsComposite))
-                throw new NormUnsupportedFeatureException(
-                    "Multi-level Include over composite-key relationships is not supported yet. Split the query into explicit loads or configure single-column relationship keys.");
 
             var parentLookup = new Dictionary<object, List<object>>();
             foreach (var p in parents.Cast<object>())
@@ -643,7 +637,7 @@ namespace nORM.Query
         private static object?[] GetKeyValues(object key)
             => key is RelationKey composite ? composite.Values : new object?[] { key };
 
-        private static void AppendCompositeKeyPredicate(System.Text.StringBuilder sb, TableMapping.Relation relation, List<string[]> paramGroups)
+        private static void AppendCompositeKeyPredicate(System.Text.StringBuilder sb, TableMapping.Relation relation, string tableAlias, List<string[]> paramGroups)
         {
             if (paramGroups.Count == 0)
             {
@@ -667,7 +661,7 @@ namespace nORM.Query
                 {
                     if (columnIndex > 0)
                         sb.Append(" AND ");
-                    sb.Append(relation.ForeignKeys[columnIndex].EscCol)
+                    sb.Append(tableAlias).Append('.').Append(relation.ForeignKeys[columnIndex].EscCol)
                       .Append(" = ")
                       .Append(group[columnIndex]);
                 }
@@ -679,53 +673,38 @@ namespace nORM.Query
         private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd)
         {
             var tenantActive = _ctx.Options.TenantProvider != null;
-            var current = $"({PooledStringBuilder.Join(paramNames, ",")})";
+            if (tenantActive)
+            {
+                for (var i = 0; i < path.Count; i++)
+                {
+                    var tp = $"{_ctx.RawProvider.ParamPrefix}tkn{i}";
+                    cmd.AddParam(tp, _ctx.GetRequiredTenantId(mappings[i], "include path load"));
+                }
+            }
+
             var sb = PooledStringBuilder.Rent();
             try
             {
                 for (int i = 0; i < path.Count; i++)
                 {
-                    var relation = path[i];
                     var map = mappings[i];
-                    var tenantCol = tenantActive ? _ctx.RequireTenantColumn(map, "include path load") : null;
+                    var alias = _ctx.RawProvider.Escape("__inc" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-                    sb.Append("SELECT * FROM ").Append(map.EscTable)
+                    sb.Append("SELECT ").Append(alias).Append(".* FROM ").Append(map.EscTable).Append(' ').Append(alias)
                       .Append(" WHERE ");
-                    if (i == 0 && relation.IsComposite)
-                    {
-                        AppendCompositeKeyPredicate(sb, relation, paramGroups);
-                    }
-                    else
-                    {
-                        sb.Append(relation.ForeignKey.EscCol)
-                          .Append(" IN ").Append(current);
-                    }
+                    AppendIncludeLevelPredicate(sb, path, mappings, i, alias, paramNames, paramGroups, tenantActive);
 
                     if (tenantActive)
                     {
+                        var tenantCol = _ctx.RequireTenantColumn(map, "include path load");
                         var tp = $"{_ctx.RawProvider.ParamPrefix}tkn{i}";
-                        sb.Append(" AND ").Append(tenantCol!.EscCol).Append(" = ").Append(tp);
-                        cmd.AddParam(tp, _ctx.GetRequiredTenantId(map, "include path load"));
+                        sb.Append(" AND ").Append(alias).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tp);
                     }
 
                     // Separate multiple result-set statements with semicolons;
                     // skip the trailing one so the final SQL is clean.
                     if (i < path.Count - 1)
                         sb.Append(';');
-
-                    // Build the subquery that feeds the NEXT level's IN clause.
-                    // Select only the single column that the next relation's FK references (the
-                    // next relation's PrincipalKey), not all PK columns of the current mapping.
-                    // Selecting composite PK columns would produce a multi-column subquery that
-                    // the next level's single-column IN cannot consume.
-                    if (i + 1 < path.Count)
-                    {
-                        var nextPrincipalKey = path[i + 1].PrincipalKey.EscCol;
-                        var tenantPart = tenantActive
-                            ? $" AND {tenantCol!.EscCol} = {_ctx.RawProvider.ParamPrefix}tkn{i}"
-                            : string.Empty;
-                        current = $"(SELECT {nextPrincipalKey} FROM {map.EscTable} WHERE {relation.ForeignKey.EscCol} IN {current}{tenantPart})";
-                    }
                 }
 
                 return sb.ToString();
@@ -733,6 +712,57 @@ namespace nORM.Query
             finally
             {
                 PooledStringBuilder.Return(sb);
+            }
+        }
+
+        private void AppendIncludeLevelPredicate(
+            System.Text.StringBuilder sb,
+            IReadOnlyList<TableMapping.Relation> path,
+            TableMapping[] mappings,
+            int level,
+            string currentAlias,
+            List<string> rootParamNames,
+            List<string[]> rootParamGroups,
+            bool tenantActive)
+        {
+            var relation = path[level];
+            if (level == 0)
+            {
+                if (relation.IsComposite)
+                {
+                    AppendCompositeKeyPredicate(sb, relation, currentAlias, rootParamGroups);
+                }
+                else
+                {
+                    sb.Append(currentAlias).Append('.').Append(relation.ForeignKey.EscCol)
+                      .Append(" IN (").Append(PooledStringBuilder.Join(rootParamNames, ",")).Append(')');
+                }
+                return;
+            }
+
+            var previousAlias = _ctx.RawProvider.Escape("__inc" + (level - 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "_p" + level.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            sb.Append("EXISTS(SELECT 1 FROM ").Append(mappings[level - 1].EscTable).Append(' ').Append(previousAlias)
+              .Append(" WHERE ");
+            AppendIncludeLevelPredicate(sb, path, mappings, level - 1, previousAlias, rootParamNames, rootParamGroups, tenantActive);
+            sb.Append(" AND ");
+            AppendRelationJoinPredicate(sb, path[level], currentAlias, previousAlias);
+            if (tenantActive)
+            {
+                var tenantCol = _ctx.RequireTenantColumn(mappings[level - 1], "include path load");
+                var tp = $"{_ctx.RawProvider.ParamPrefix}tkn{level - 1}";
+                sb.Append(" AND ").Append(previousAlias).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tp);
+            }
+            sb.Append(')');
+        }
+
+        private static void AppendRelationJoinPredicate(System.Text.StringBuilder sb, TableMapping.Relation relation, string dependentAlias, string principalAlias)
+        {
+            for (var i = 0; i < relation.ForeignKeys.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(" AND ");
+                sb.Append(dependentAlias).Append('.').Append(relation.ForeignKeys[i].EscCol)
+                  .Append(" = ").Append(principalAlias).Append('.').Append(relation.PrincipalKeys[i].EscCol);
             }
         }
 
