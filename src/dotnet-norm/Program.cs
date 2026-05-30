@@ -75,31 +75,61 @@ scaffold.SetAction(async (ParseResult result, CancellationToken _) =>
             EmitViewEntities = result.GetValue(emitViewEntitiesOpt),
             EmitQueryArtifacts = result.GetValue(emitQueryArtifactsOpt)
         };
-        try
-        {
-            await DatabaseScaffolder.ScaffoldAsync(connection, provider, output, ns, ctx, options);
-        }
-        catch (NormConfigurationException ex) when (IsScaffoldWarningsFailure(ex, output))
-        {
-            PrintScaffoldWarningSummary(output);
-            return Fail(ex);
-        }
-
+        string? dryRunTempOutput = null;
+        var scaffoldOutput = output;
+        var scaffoldOptions = options;
         if (options.DryRun)
         {
-            Console.WriteLine($"Scaffolding dry run completed. No files were written to {output}.");
-        }
-        else
-        {
-            Console.WriteLine($"Scaffolding completed. Files written to {output}.");
+            dryRunTempOutput = Path.Combine(Path.GetTempPath(), "norm_scaffold_dryrun_" + Guid.NewGuid().ToString("N"));
+            scaffoldOutput = dryRunTempOutput;
+            scaffoldOptions = new ScaffoldOptions
+            {
+                Tables = options.Tables,
+                OverwriteFiles = true,
+                DryRun = false,
+                FailOnWarnings = options.FailOnWarnings,
+                EmitRoutineStubs = options.EmitRoutineStubs,
+                EmitSequenceStubs = options.EmitSequenceStubs,
+                EmitViewEntities = options.EmitViewEntities,
+                EmitQueryArtifacts = options.EmitQueryArtifacts
+            };
         }
 
-        if (!options.DryRun && (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
-            || File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")))
-        )
+        try
         {
-            Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
-            PrintScaffoldWarningSummary(output);
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(connection, provider, scaffoldOutput, ns, ctx, scaffoldOptions);
+            }
+            catch (NormConfigurationException ex) when (IsScaffoldWarningsFailure(ex, scaffoldOutput))
+            {
+                PrintScaffoldWarningSummary(scaffoldOutput);
+                return Fail(ex);
+            }
+
+            if (options.DryRun)
+            {
+                if (ScaffoldWarningsExist(scaffoldOutput))
+                    PrintScaffoldWarningSummary(scaffoldOutput);
+                Console.WriteLine($"Scaffolding dry run completed. No files were written to {output}.");
+            }
+            else
+            {
+                Console.WriteLine($"Scaffolding completed. Files written to {output}.");
+            }
+
+            if (!options.DryRun && (File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md"))
+                || File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")))
+            )
+            {
+                Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
+                PrintScaffoldWarningSummary(output);
+            }
+        }
+        finally
+        {
+            if (dryRunTempOutput is not null)
+                TryDeleteDirectory(dryRunTempOutput);
         }
 
         return 0;
@@ -749,6 +779,17 @@ static int Fail(Exception ex, int exitCode = 1)
 static bool ScaffoldWarningsExist(string outputDirectory)
     => File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"))
        || File.Exists(Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"));
+
+static void TryDeleteDirectory(string path)
+{
+    try
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
+    }
+    catch (IOException) { }
+    catch (UnauthorizedAccessException) { }
+}
 
 static bool IsScaffoldWarningsFailure(NormConfigurationException exception, string outputDirectory)
     => exception.Message.Contains("Scaffolding produced warnings", StringComparison.Ordinal)

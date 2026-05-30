@@ -128,7 +128,6 @@ public class CliIntegrationTests
                 using var cmd = cn.CreateCommand();
                 cmd.CommandText = """
                     CREATE TABLE WarningRow (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Status TEXT NOT NULL DEFAULT 'new'
                     );
                     """;
@@ -171,7 +170,6 @@ public class CliIntegrationTests
                 using var cmd = cn.CreateCommand();
                 cmd.CommandText = """
                     CREATE TABLE WarningRow (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Status TEXT NOT NULL DEFAULT 'new'
                     );
                     """;
@@ -223,6 +221,41 @@ public class CliIntegrationTests
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("Scaffolding dry run completed", result.Stdout, StringComparison.Ordinal);
             Assert.Contains("No files were written", result.Stdout, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(output));
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
+    public void Scaffold_dry_run_prints_warning_summary_without_writing_output_files()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_dry_warn_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_dry_warn_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE TABLE WarningRow (Status TEXT NOT NULL DEFAULT 'new');";
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --dry-run",
+                root);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Scaffolding warning summary", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("SCF116=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("table-shape=1", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("Scaffolding dry run completed", result.Stdout, StringComparison.Ordinal);
             Assert.False(Directory.Exists(output));
         }
         finally

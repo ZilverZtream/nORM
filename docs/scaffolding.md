@@ -144,7 +144,9 @@ must be reviewed and edited like handwritten model code.
 - Optional dry-run validation through `ScaffoldOptions.DryRun` and CLI
   `--dry-run`. Dry runs perform schema discovery and in-memory generation
   without creating the output directory, deleting stale warning reports, or
-  writing generated files.
+  writing generated files. The CLI dry run uses an isolated temporary output
+  directory so it can print the same warning summary as a real run while
+  leaving the requested output path untouched.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
   `--fail-on-warnings`, which fails the scaffold run after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.

@@ -332,7 +332,8 @@ diagnostics.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
 Use `--dry-run` or `ScaffoldOptions.DryRun` to validate scaffold output without
-creating, deleting, or overwriting files.
+creating, deleting, or overwriting files. The CLI dry run also prints warning
+summaries while leaving the requested output path untouched.
 Clean later scaffold runs remove stale warning reports when overwrite is
 allowed, or fail clearly when overwrite protection would leave stale reports in
 place.
