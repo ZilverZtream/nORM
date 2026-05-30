@@ -2152,10 +2152,12 @@ namespace nORM.Scaffolding
                     dependentKey + "\u001f" + principalKey,
                     out var relationshipPairCount)
                     && relationshipPairCount > 1;
+                var isSelfRelationship = string.Equals(dependentKey, principalKey, StringComparison.OrdinalIgnoreCase);
 
                 var dependentMemberNames = GetOrCreateMemberNames(memberNamesByTable, dependentKey);
                 var referenceBase = principalEntity;
-                if (hasMultipleRelationshipsToSamePrincipal
+                if (isSelfRelationship
+                    || hasMultipleRelationshipsToSamePrincipal
                     || dependentMemberNames.Contains(referenceBase))
                 {
                     referenceBase = TrimIdSuffix(foreignKeyProperty);
@@ -2167,7 +2169,8 @@ namespace nORM.Scaffolding
 
                 var principalMemberNames = GetOrCreateMemberNames(memberNamesByTable, principalKey);
                 var collectionBase = Pluralize(dependentEntity);
-                if (hasMultipleRelationshipsToSamePrincipal
+                if (isSelfRelationship
+                    || hasMultipleRelationshipsToSamePrincipal
                     || principalMemberNames.Contains(collectionBase))
                 {
                     collectionBase = Pluralize(dependentEntity) + "By" + foreignKeyProperty;

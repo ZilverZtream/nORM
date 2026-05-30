@@ -1012,6 +1012,46 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSelfReferencingForeignKey_UsesRoleBasedNavigationNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Person (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ParentId INTEGER NULL,
+                Name TEXT NOT NULL,
+                CONSTRAINT FK_Person_Parent FOREIGN KEY (ParentId) REFERENCES Person(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "PersonContext");
+
+            var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "PersonContext.cs"));
+
+            Assert.Contains("[ForeignKey(nameof(ParentId))]", personCode);
+            Assert.Contains("public Person? Parent { get; set; }", personCode);
+            Assert.Contains("public List<Person> PersonsByParentId { get; set; } = new();", personCode);
+            Assert.DoesNotContain("public Person? Person { get; set; }", personCode);
+            Assert.Contains(".HasMany(p => p.PersonsByParentId)", contextCode);
+            Assert.Contains(".WithOne(d => d.Parent)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WhenNavigationNameCollidesWithScalarProperty_MakesNavigationUnique()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

@@ -64,7 +64,8 @@ must be reviewed and edited like handwritten model code.
   `cascadeDelete: false`. Relationships are emitted only when the FK targets
   the generated principal primary key; FK shapes targeting keyless tables or
   alternate/unique keys are reported for manual configuration instead of
-  emitting unsafe fluent code.
+  emitting unsafe fluent code. Self-referencing FKs use role-based navigation
+  names derived from the FK column instead of vague same-type names.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
   indexes without converting them into per-column uniqueness. Provider-specific
@@ -124,6 +125,7 @@ must be reviewed and edited like handwritten model code.
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
+  self-referencing FK role-based navigation naming,
   self-referencing pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column/descending index diagnostics,
   composite-FK, many-to-many candidate, and provider-owned schema diagnostics.
