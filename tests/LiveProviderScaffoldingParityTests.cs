@@ -62,6 +62,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string WarningView = "ScaffoldLiveWarningView";
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
+    private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
@@ -663,6 +664,49 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownPostgresTypedRoutineAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresTypedColumnTableAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_typed_columns_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresTypedColumnContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { "public." + PostgresTypedColumnTable },
+                        OverwriteFiles = false
+                    });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, PostgresTypedColumnTable + ".cs"));
+
+                Assert.Contains("public Guid TraceId { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public int[]? Scores { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public string[]? Tags { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresTypedColumnTableAsync(connection, provider);
             }
         }
     }
@@ -1537,6 +1581,15 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) $$");
     }
 
+    private static async Task SetupPostgresTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresTypedColumnTableAsync(connection, provider);
+
+        var table = Qualified(provider, "public", PostgresTypedColumnTable);
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL)");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -1902,6 +1955,18 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection,
                 $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(integer[], uuid)");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresTypedColumnTable, Qualified(provider, "public", PostgresTypedColumnTable)));
         }
         catch
         {
