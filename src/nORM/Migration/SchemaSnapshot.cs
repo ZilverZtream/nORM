@@ -39,6 +39,8 @@ namespace nORM.Migration
         public List<ForeignKeySchema> ForeignKeys { get; init; } = new();
         /// <summary>CHECK constraints defined on this table.</summary>
         public List<CheckConstraintSchema> CheckConstraints { get; init; } = new();
+        /// <summary>Provider-specific expression indexes defined on this table.</summary>
+        public List<ExpressionIndexSchema> ExpressionIndexes { get; init; } = new();
     }
 
     /// <summary>
@@ -50,6 +52,21 @@ namespace nORM.Migration
         public string ConstraintName { get; set; } = string.Empty;
         /// <summary>Provider SQL predicate inside the CHECK clause.</summary>
         public string Sql { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Describes an index whose key is a SQL expression rather than mapped columns.
+    /// </summary>
+    public class ExpressionIndexSchema
+    {
+        /// <summary>Database index name.</summary>
+        public string Name { get; set; } = string.Empty;
+        /// <summary>Provider SQL expression used as the index key.</summary>
+        public string ExpressionSql { get; set; } = string.Empty;
+        /// <summary>True when the expression index enforces uniqueness.</summary>
+        public bool IsUnique { get; set; }
+        /// <summary>Optional provider SQL predicate for a filtered/partial expression index.</summary>
+        public string? FilterSql { get; set; }
     }
 
     /// <summary>
@@ -440,6 +457,16 @@ namespace nORM.Migration
                             Sql = check.Sql
                         });
                     }
+                    foreach (var expressionIndex in map.FluentConfiguration.ExpressionIndexes)
+                    {
+                        table.ExpressionIndexes.Add(new ExpressionIndexSchema
+                        {
+                            Name = expressionIndex.Name,
+                            ExpressionSql = expressionIndex.ExpressionSql,
+                            IsUnique = expressionIndex.IsUnique,
+                            FilterSql = expressionIndex.FilterSql
+                        });
+                    }
                 }
                 snapshot.Tables.Add(table);
                 tableByType[map.Type] = table;
@@ -623,6 +650,10 @@ namespace nORM.Migration
         public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> AddedCheckConstraints { get; } = new();
         /// <summary>CHECK constraints present in the old snapshot but not the new for an existing table.</summary>
         public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> DroppedCheckConstraints { get; } = new();
+        /// <summary>Expression indexes present in the new snapshot but not the old for an existing table.</summary>
+        public List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)> AddedExpressionIndexes { get; } = new();
+        /// <summary>Expression indexes present in the old snapshot but not the new for an existing table.</summary>
+        public List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)> DroppedExpressionIndexes { get; } = new();
         /// <summary>
         /// Column renames detected via <c>[RenameColumn("oldName")]</c>. Each entry carries the table,
         /// the old column name, and the new <see cref="ColumnSchema"/> (with its new name). The differ
@@ -636,6 +667,7 @@ namespace nORM.Migration
             || DroppedTables.Count > 0 || DroppedColumns.Count > 0
             || AddedForeignKeys.Count > 0 || DroppedForeignKeys.Count > 0
             || AddedCheckConstraints.Count > 0 || DroppedCheckConstraints.Count > 0
+            || AddedExpressionIndexes.Count > 0 || DroppedExpressionIndexes.Count > 0
             || RenamedColumns.Count > 0;
 
         /// <summary>
@@ -707,6 +739,8 @@ namespace nORM.Migration
                     ValidateFkSchema(fk, t.Name);
                 foreach (var check in t.CheckConstraints)
                     ValidateCheckConstraintSchema(check, t.Name);
+                foreach (var expressionIndex in t.ExpressionIndexes)
+                    ValidateExpressionIndexSchema(expressionIndex, t.Name);
             }
             foreach (var t in newSnapshot.Tables)
             {
@@ -714,6 +748,8 @@ namespace nORM.Migration
                     ValidateFkSchema(fk, t.Name);
                 foreach (var check in t.CheckConstraints)
                     ValidateCheckConstraintSchema(check, t.Name);
+                foreach (var expressionIndex in t.ExpressionIndexes)
+                    ValidateExpressionIndexSchema(expressionIndex, t.Name);
             }
 
             // Build O(1) lookup dictionaries to avoid O(n²) scans inside the loops.
@@ -859,6 +895,26 @@ namespace nORM.Migration
                     if (!newChecks.ContainsKey(name))
                         diff.DroppedCheckConstraints.Add((newTable, oldCheck));
                 }
+
+                var oldExpressionIndexes = BuildExpressionIndexMap(oldTable);
+                var newExpressionIndexes = BuildExpressionIndexMap(newTable);
+                foreach (var (name, newExpressionIndex) in newExpressionIndexes)
+                {
+                    if (!oldExpressionIndexes.TryGetValue(name, out var oldExpressionIndex))
+                    {
+                        diff.AddedExpressionIndexes.Add((newTable, newExpressionIndex));
+                    }
+                    else if (!ExpressionIndexEqual(oldExpressionIndex, newExpressionIndex))
+                    {
+                        diff.DroppedExpressionIndexes.Add((newTable, oldExpressionIndex));
+                        diff.AddedExpressionIndexes.Add((newTable, newExpressionIndex));
+                    }
+                }
+                foreach (var (name, oldExpressionIndex) in oldExpressionIndexes)
+                {
+                    if (!newExpressionIndexes.ContainsKey(name))
+                        diff.DroppedExpressionIndexes.Add((oldTable, oldExpressionIndex));
+                }
             }
 
             // Detect dropped tables — tables present in old but not in new.
@@ -895,6 +951,14 @@ namespace nORM.Migration
                 throw new ArgumentException($"CHECK constraint on table '{owningTableName}' has no ConstraintName.");
             if (string.IsNullOrWhiteSpace(check.Sql))
                 throw new ArgumentException($"CHECK constraint '{check.ConstraintName}' on table '{owningTableName}' has no SQL predicate.");
+        }
+
+        private static void ValidateExpressionIndexSchema(ExpressionIndexSchema expressionIndex, string owningTableName)
+        {
+            if (string.IsNullOrWhiteSpace(expressionIndex.Name))
+                throw new ArgumentException($"Expression index on table '{owningTableName}' has no Name.");
+            if (string.IsNullOrWhiteSpace(expressionIndex.ExpressionSql))
+                throw new ArgumentException($"Expression index '{expressionIndex.Name}' on table '{owningTableName}' has no SQL expression.");
         }
 
         /// <summary>
@@ -942,6 +1006,11 @@ namespace nORM.Migration
 
         private static string NormalizeCheckSql(string sql)
             => string.Join(" ", sql.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+        private static bool ExpressionIndexEqual(ExpressionIndexSchema a, ExpressionIndexSchema b) =>
+            a.IsUnique == b.IsUnique
+            && string.Equals(NormalizeCheckSql(a.ExpressionSql), NormalizeCheckSql(b.ExpressionSql), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(NormalizeCheckSql(a.FilterSql ?? string.Empty), NormalizeCheckSql(b.FilterSql ?? string.Empty), StringComparison.OrdinalIgnoreCase);
 
         internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
@@ -1025,6 +1094,18 @@ namespace nORM.Migration
                 if (!map.TryAdd(check.ConstraintName, check))
                     throw new InvalidOperationException(
                         $"Duplicate CHECK constraint name '{check.ConstraintName}' on table '{table.Name}'.");
+            }
+            return map;
+        }
+
+        private static Dictionary<string, ExpressionIndexSchema> BuildExpressionIndexMap(TableSchema table)
+        {
+            var map = new Dictionary<string, ExpressionIndexSchema>(table.ExpressionIndexes.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var expressionIndex in table.ExpressionIndexes)
+            {
+                if (!map.TryAdd(expressionIndex.Name, expressionIndex))
+                    throw new InvalidOperationException(
+                        $"Duplicate expression index name '{expressionIndex.Name}' on table '{table.Name}'.");
             }
             return map;
         }

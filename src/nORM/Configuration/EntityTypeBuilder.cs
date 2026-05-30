@@ -25,6 +25,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
             public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
             public Dictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumns { get; } = new();
+            public List<ExpressionIndexConfiguration> ExpressionIndexList { get; } = new();
             public Type? TableSplitWith { get; private set; }
             public Dictionary<PropertyInfo, OwnedNavigation> OwnedNavigations { get; } = new();
             public Dictionary<string, ShadowPropertyConfiguration> ShadowProperties { get; } = new();
@@ -37,6 +38,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
             IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> IEntityTypeConfiguration.ComputedColumnSql => ComputedColumns;
+            IReadOnlyList<ExpressionIndexConfiguration> IEntityTypeConfiguration.ExpressionIndexes => ExpressionIndexList;
             IReadOnlyDictionary<PropertyInfo, OwnedNavigation> IEntityTypeConfiguration.OwnedNavigations => OwnedNavigations;
             IReadOnlyDictionary<string, ShadowPropertyConfiguration> IEntityTypeConfiguration.ShadowProperties => ShadowProperties;
             IReadOnlyList<RelationshipConfiguration> IEntityTypeConfiguration.Relationships => Relationships;
@@ -129,6 +131,19 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Computed column SQL cannot be null or whitespace.", nameof(sql));
                 ComputedColumns[prop] = new ComputedColumnConfiguration(sql.Trim(), stored);
+            }
+
+            /// <summary>
+            /// Adds a provider-specific index over a SQL expression.
+            /// </summary>
+            public void AddExpressionIndex(string name, string expressionSql, bool isUnique, string? filterSql)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                    throw new ArgumentException("Expression index name cannot be null or whitespace.", nameof(name));
+                if (string.IsNullOrWhiteSpace(expressionSql))
+                    throw new ArgumentException("Expression index SQL cannot be null or whitespace.", nameof(expressionSql));
+                ExpressionIndexList.RemoveAll(i => string.Equals(i.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+                ExpressionIndexList.Add(new ExpressionIndexConfiguration(name.Trim(), expressionSql.Trim(), isUnique, string.IsNullOrWhiteSpace(filterSql) ? null : filterSql.Trim()));
             }
 
             /// <summary>
@@ -310,6 +325,19 @@ namespace nORM.Configuration
         public EntityTypeBuilder<TEntity> HasCheckConstraint(string name, string sql)
         {
             _config.AddCheckConstraint(name, sql);
+            return this;
+        }
+
+        /// <summary>
+        /// Configures a provider-specific index over a SQL expression rather than a mapped property.
+        /// </summary>
+        /// <param name="name">Database index name.</param>
+        /// <param name="expressionSql">Provider SQL expression used as the index key.</param>
+        /// <param name="isUnique">Whether the index enforces uniqueness.</param>
+        /// <param name="filterSql">Optional provider SQL predicate for a filtered/partial expression index.</param>
+        public EntityTypeBuilder<TEntity> HasExpressionIndex(string name, string expressionSql, bool isUnique = false, string? filterSql = null)
+        {
+            _config.AddExpressionIndex(name, expressionSql, isUnique, filterSql);
             return this;
         }
 

@@ -47,6 +47,11 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumnSql { get; }
 
         /// <summary>
+        /// Gets provider-specific expression indexes configured for migration snapshots.
+        /// </summary>
+        IReadOnlyList<ExpressionIndexConfiguration> ExpressionIndexes { get; }
+
+        /// <summary>
         /// Gets the CLR type that this entity shares its table with, if any.
         /// </summary>
         Type? TableSplitWith { get; }
@@ -108,6 +113,11 @@ namespace nORM.Configuration
     /// <param name="Sql">Provider SQL expression used to compute the column.</param>
     /// <param name="Stored">Whether the generated value should be physically stored when the provider supports that choice.</param>
     public record ComputedColumnConfiguration(string Sql, bool Stored = false);
+
+    /// <summary>
+    /// Describes a provider-specific index over a SQL expression rather than a mapped property.
+    /// </summary>
+    public record ExpressionIndexConfiguration(string Name, string ExpressionSql, bool IsUnique = false, string? FilterSql = null);
 
     /// <summary>
     /// Configuration details for a relationship between entities including navigation and key information.

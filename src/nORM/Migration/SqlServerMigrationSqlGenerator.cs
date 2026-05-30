@@ -143,6 +143,7 @@ namespace nORM.Migration
             // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
             {
+                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -200,6 +201,8 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+                throw new NotSupportedException($"SQL Server does not support direct expression index '{expressionIndex.Name}' on table '{table.Name}'. Use a computed column plus a normal index.");
 
             // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
 
@@ -274,6 +277,7 @@ namespace nORM.Migration
             // DOWN-6: Restore tables that were dropped in UP-2.
             foreach (var table in diff.DroppedTables)
             {
+                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -307,6 +311,8 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+                throw new NotSupportedException($"SQL Server does not support direct expression index '{expressionIndex.Name}' on table '{table.Name}'. Use a computed column plus a normal index.");
 
             // Rename columns — SQL Server uses sp_rename.
             // Format: EXEC sp_rename 'table.old', 'new', 'COLUMN'
@@ -400,6 +406,12 @@ namespace nORM.Migration
 
         private static string FormatFilter(string? filterSql)
             => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
+
+        private static void EnsureNoExpressionIndexes(IReadOnlyList<ExpressionIndexSchema> expressionIndexes, string tableName)
+        {
+            if (expressionIndexes.Count > 0)
+                throw new NotSupportedException($"SQL Server does not support direct expression indexes on table '{tableName}'. Use computed columns plus normal indexes.");
+        }
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.

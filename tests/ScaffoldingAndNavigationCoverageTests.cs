@@ -1299,7 +1299,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithSqlitePartialAndExpressionIndexes_EmitsPartialIndexAndExpressionDiagnostic()
+    public async Task ScaffoldAsync_WithSqlitePartialAndExpressionIndexes_EmitsIndexMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -1321,23 +1321,13 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ProviderIndexCtx");
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedProviderSpecific.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ProviderIndexCtx.cs"));
 
             Assert.Contains("[Index(\"IX_IndexedProviderSpecific_Name_Active\", FilterSql = \"Active = 1\")]", entityCode);
             Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_LowerName\")]", entityCode);
-            Assert.DoesNotContain("PartialIndex", warnings);
-            Assert.Contains("ExpressionIndex", warnings);
-            Assert.DoesNotContain("IX_IndexedProviderSpecific_Name_Active", warnings);
-            Assert.Contains("IX_IndexedProviderSpecific_LowerName", warnings);
-
-            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            Assert.DoesNotContain(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "PartialIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedProviderSpecific_Name_Active");
-            Assert.Contains(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "ExpressionIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedProviderSpecific_LowerName");
+            Assert.Contains("mb.Entity<IndexedProviderSpecific>().HasExpressionIndex(\"IX_IndexedProviderSpecific_LowerName\", \"lower(Name)\");", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
         }
         finally
         {

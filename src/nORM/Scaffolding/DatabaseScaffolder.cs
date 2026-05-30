@@ -125,6 +125,12 @@ namespace nORM.Scaffolding
                     && checkConstraints.Any(check =>
                         string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                var expressionIndexConfigurations = BuildExpressionIndexConfigurations(entityByTable, unsupportedFeatures);
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
+                    && expressionIndexConfigurations.Any(index =>
+                        string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
                 unsupportedFeatures.RemoveAll(feature =>
@@ -178,7 +184,7 @@ namespace nORM.Scaffolding
                 var routineStubs = options.EmitRoutineStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations);
+                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
                 var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
@@ -1054,6 +1060,18 @@ namespace nORM.Scaffolding
             return where < 0 ? null : sql[(where + 7)..].Trim();
         }
 
+        private static async Task<string?> GetSqliteIndexSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
+        {
+            await using var cmd = connection.CreateCommand();
+            var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
+            cmd.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'index' AND name = @name";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@name";
+            p.Value = indexName;
+            cmd.Parameters.Add(p);
+            return Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
+        }
+
         private static async Task<IReadOnlyList<ScaffoldIndex>> QueryIndexesAsync(DbConnection connection, string sql)
         {
             var indexes = new List<ScaffoldIndex>();
@@ -1433,7 +1451,8 @@ namespace nORM.Scaffolding
                             if (ReaderHasColumn(infoReader, "cid")
                                 && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
                             {
-                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, "SQLite expression index"));
+                                var indexSql = await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
+                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, ExtractCreateIndexExpressionSql(indexSql) ?? "SQLite expression index"));
                                 break;
                             }
 
@@ -1613,7 +1632,7 @@ namespace nORM.Scaffolding
                       AND ix.indpred IS NOT NULL
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', 'PostgreSQL expression index'
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', pg_get_indexdef(ix.indexrelid)
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -3073,6 +3092,63 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldExpressionIndexConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || string.IsNullOrWhiteSpace(feature.Detail)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName))
+                {
+                    continue;
+                }
+
+                var expressionSql = ExtractCreateIndexExpressionSql(feature.Detail) ?? feature.Detail.Trim();
+                if (expressionSql.EndsWith("expression index", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                result.Add(new ScaffoldExpressionIndexConfiguration(
+                    feature.TableKey,
+                    entityName,
+                    feature.Name,
+                    expressionSql,
+                    IsUnique: feature.Detail.Contains("CREATE UNIQUE", StringComparison.OrdinalIgnoreCase),
+                    FilterSql: ExtractWhereClause(feature.Detail)));
+            }
+
+            return result;
+        }
+
+        private static string? ExtractWhereClause(string sql)
+        {
+            var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
+            return where < 0 ? null : sql[(where + 7)..].Trim();
+        }
+
+        private static string? ExtractCreateIndexExpressionSql(string? createIndexSql)
+        {
+            if (string.IsNullOrWhiteSpace(createIndexSql))
+                return null;
+
+            var onIndex = createIndexSql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
+            if (onIndex < 0)
+                return null;
+
+            var openIndex = createIndexSql.IndexOf('(', onIndex);
+            if (openIndex < 0)
+                return null;
+
+            var closeIndex = FindMatchingParenthesis(createIndexSql, openIndex);
+            if (closeIndex <= openIndex)
+                return null;
+
+            return createIndexSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+        }
+
         private static IReadOnlyList<ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
@@ -3574,12 +3650,14 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null,
             IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
             IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
-            IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null)
+            IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
+            IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
             checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
             computedColumnConfigurations ??= Array.Empty<ScaffoldComputedColumnConfiguration>();
+            expressionIndexConfigurations ??= Array.Empty<ScaffoldExpressionIndexConfiguration>();
             var sb = _stringBuilderPool.Get();
             try
             {
@@ -3603,7 +3681,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine();
                 sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
                 sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0)
+                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0)
                 {
                     sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
                 }
@@ -3625,7 +3703,7 @@ namespace nORM.Scaffolding
                     AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
                 }
 
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0)
                 {
                     sb.AppendLine();
                     sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
@@ -3668,6 +3746,17 @@ namespace nORM.Scaffolding
                         var sql = EscapeStringLiteral(computed.Sql);
                         var storedSuffix = computed.Stored ? ", stored: true" : string.Empty;
                         sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasComputedColumnSql(\"{sql}\"{storedSuffix});");
+                    }
+                    foreach (var expressionIndex in expressionIndexConfigurations
+                        .OrderBy(i => i.EntityName, StringComparer.Ordinal)
+                        .ThenBy(i => i.Name, StringComparer.Ordinal))
+                    {
+                        var entity = EscapeCSharpIdentifier(expressionIndex.EntityName);
+                        var name = EscapeStringLiteral(expressionIndex.Name);
+                        var expressionSql = EscapeStringLiteral(expressionIndex.ExpressionSql);
+                        var uniqueSuffix = expressionIndex.IsUnique ? ", isUnique: true" : string.Empty;
+                        var filterSuffix = string.IsNullOrWhiteSpace(expressionIndex.FilterSql) ? string.Empty : $", filterSql: \"{EscapeStringLiteral(expressionIndex.FilterSql)}\"";
+                        sb.AppendLine($"            mb.Entity<{entity}>().HasExpressionIndex(\"{name}\", \"{expressionSql}\"{uniqueSuffix}{filterSuffix});");
                     }
                     foreach (var relationship in relationships
                         .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
@@ -4489,6 +4578,14 @@ namespace nORM.Scaffolding
             string PropertyName,
             string Sql,
             bool Stored);
+
+        private readonly record struct ScaffoldExpressionIndexConfiguration(
+            string TableKey,
+            string EntityName,
+            string Name,
+            string ExpressionSql,
+            bool IsUnique,
+            string? FilterSql);
 
         private readonly record struct ScaffoldForeignKey(
             string? DependentSchema,

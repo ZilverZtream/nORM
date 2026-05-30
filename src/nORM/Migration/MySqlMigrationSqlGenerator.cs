@@ -106,6 +106,7 @@ namespace nORM.Migration
             // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
             {
+                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -165,6 +166,8 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+                throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
 
             // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
 
@@ -220,6 +223,7 @@ namespace nORM.Migration
             // DOWN-6: Restore tables that were dropped in UP-2.
             foreach (var table in diff.DroppedTables)
             {
+                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -255,6 +259,8 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+                throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
 
             // Rename columns — MySQL 8.0+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
@@ -343,6 +349,12 @@ namespace nORM.Migration
         {
             if (!string.IsNullOrWhiteSpace(filterSql))
                 throw new NotSupportedException($"MySQL does not support filtered indexes for index '{indexName}'. Keep the predicate in provider-specific migration code or remodel it as a generated column plus ordinary index.");
+        }
+
+        private static void EnsureNoExpressionIndexes(IReadOnlyList<ExpressionIndexSchema> expressionIndexes, string tableName)
+        {
+            if (expressionIndexes.Count > 0)
+                throw new NotSupportedException($"MySQL expression indexes on table '{tableName}' are not scaffolded as provider-neutral DDL. Use generated columns plus normal indexes.");
         }
 
         /// <summary>

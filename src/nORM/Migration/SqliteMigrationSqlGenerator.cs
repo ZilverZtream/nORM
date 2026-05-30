@@ -111,6 +111,8 @@ namespace nORM.Migration
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    up.Add(BuildExpressionIndexSql(table, expressionIndex));
 
                 down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
             }
@@ -198,6 +200,8 @@ namespace nORM.Migration
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    down.Add(BuildExpressionIndexSql(table, expressionIndex));
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
@@ -308,6 +312,16 @@ namespace nORM.Migration
                 needsDownFkPragma = true;
             }
 
+            foreach (var (_, expressionIndex) in diff.DroppedExpressionIndexes)
+                up.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+                up.Add(BuildExpressionIndexSql(table, expressionIndex));
+
+            foreach (var (_, expressionIndex) in diff.AddedExpressionIndexes)
+                down.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+                down.Add(BuildExpressionIndexSql(table, expressionIndex));
+
             // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
             {
@@ -405,6 +419,8 @@ namespace nORM.Migration
                 EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                 stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
             }
+            foreach (var expressionIndex in table.ExpressionIndexes)
+                stmts.Add(BuildExpressionIndexSql(table, expressionIndex));
         }
 
         // M1/X1: Allowlist for FK referential action tokens. Free-form strings are not safe
@@ -436,6 +452,12 @@ namespace nORM.Migration
 
         private static string FormatFilter(string? filterSql)
             => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
+
+        private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
+        {
+            var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
+            return $"CREATE {unique}INDEX {Esc(expressionIndex.Name)} ON {Esc(table.Name)} ({expressionIndex.ExpressionSql.Trim()}){FormatFilter(expressionIndex.FilterSql)}";
+        }
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE statement.

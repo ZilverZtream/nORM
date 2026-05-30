@@ -266,9 +266,11 @@ must be reviewed and edited like handwritten model code.
   mode/type summaries, INOUT direction, output string/binary sizes where
   providers expose them, and result/data type hints so stored
   procedures/functions are not lost during provider-mobility review.
-- Provider-specific expression indexes. These are discovered and reported for
-  review; v1 scaffolding emits provider-neutral key-column indexes, including
-  descending key order for ordinary column indexes, provider-bound
+- Provider-specific expression indexes on SQLite and PostgreSQL are emitted as
+  provider-bound `HasExpressionIndex` migration metadata. SQL Server and MySQL
+  expression-index shapes require generated/computed columns plus ordinary
+  indexes or provider-specific migration code. v1 scaffolding emits
+  provider-neutral key-column indexes, including descending key order for ordinary column indexes, provider-bound
   filtered/partial index metadata for SQL Server, PostgreSQL, and SQLite, and
   provider-bound included-column index metadata for SQL Server and PostgreSQL.
 
@@ -356,7 +358,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF109` | `schema-feature` | Non-default identity strategy discovered. |
 | `SCF110` | `database-object` | Trigger discovered. |
 | `SCF111` | `index` | Filtered/partial index discovered. |
-| `SCF112` | `index` | Expression index discovered. |
+| `SCF112` | `index` | Expression index discovered but not emitted. SQLite/PostgreSQL expression indexes are emitted as `HasExpressionIndex`. |
 | `SCF113` | `index` | Included-column index discovered. |
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |

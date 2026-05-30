@@ -572,6 +572,7 @@ public sealed class LiveProviderScaffoldingParityTests
                     new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
 
                 var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldProviderIndexContext.cs"));
                 var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
                 var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
                 var warnings = File.Exists(warningPath) ? await File.ReadAllTextAsync(warningPath) : string.Empty;
@@ -586,8 +587,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
                 {
                     Assert.DoesNotContain(ProviderExpressionIndex, entityCode, StringComparison.Ordinal);
-                    Assert.Contains("ExpressionIndex", warnings, StringComparison.Ordinal);
-                    Assert.Contains(ProviderExpressionIndex, warnings, StringComparison.Ordinal);
+                    Assert.Contains($"HasExpressionIndex(\"{ProviderExpressionIndex}\"", contextCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain("ExpressionIndex", warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderExpressionIndex, warnings, StringComparison.Ordinal);
                 }
 
                 if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)

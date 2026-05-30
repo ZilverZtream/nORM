@@ -278,6 +278,9 @@ participate in multiple indexes. Table CHECK constraints are emitted into
 fluent model configuration with `HasCheckConstraint` and migration snapshots.
 Computed/generated column expressions are emitted with
 `HasComputedColumnSql` and marked as database-generated for runtime writes.
+SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
+SQL Server/MySQL expression-index shapes are kept on the safer generated-column
+path.
 SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name

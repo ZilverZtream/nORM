@@ -73,6 +73,8 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT {Esc(fk.ConstraintName)}");
             foreach (var (table, check) in diff.DroppedCheckConstraints)
                 up.Add($"ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT {Esc(check.ConstraintName)}");
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+                up.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
 
             // UP-2: Drop tables.
             foreach (var table in diff.DroppedTables)
@@ -145,6 +147,8 @@ namespace nORM.Migration
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    up.Add(BuildExpressionIndexSql(table, expressionIndex));
             }
 
             // UP-6: Add columns to existing tables.
@@ -171,6 +175,8 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+                up.Add(BuildExpressionIndexSql(table, expressionIndex));
 
             // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
 
@@ -179,6 +185,8 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT {Esc(fk.ConstraintName)}");
             foreach (var (table, check) in diff.AddedCheckConstraints)
                 down.Add($"ALTER TABLE {Esc(table.Name)} DROP CONSTRAINT {Esc(check.ConstraintName)}");
+            foreach (var (_, expressionIndex) in diff.AddedExpressionIndexes)
+                down.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
 
             // DOWN-2: Drop columns that were added in UP-6.
             foreach (var (table, column) in diff.AddedColumns)
@@ -261,6 +269,8 @@ namespace nORM.Migration
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    down.Add(BuildExpressionIndexSql(table, expressionIndex));
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
@@ -268,6 +278,8 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+                down.Add(BuildExpressionIndexSql(table, expressionIndex));
 
             // Rename columns — PostgreSQL supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
@@ -404,6 +416,12 @@ namespace nORM.Migration
 
         private static string FormatFilter(string? filterSql)
             => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();
+
+        private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
+        {
+            var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
+            return $"CREATE {unique}INDEX {Esc(expressionIndex.Name)} ON {Esc(table.Name)} ({expressionIndex.ExpressionSql.Trim()}){FormatFilter(expressionIndex.FilterSql)}";
+        }
 
         /// <summary>
         /// Builds the inline FOREIGN KEY constraint SQL fragment for a CREATE TABLE or ALTER TABLE statement.
