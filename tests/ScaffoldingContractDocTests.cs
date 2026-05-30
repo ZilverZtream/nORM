@@ -116,6 +116,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("RelationshipPrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("outputParameters", source, StringComparison.Ordinal);
+        Assert.Contains("parameterModes", source, StringComparison.Ordinal);
         Assert.Contains("information_schema.parameters", source, StringComparison.Ordinal);
         Assert.Contains("specific_name", source, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", source, StringComparison.Ordinal);

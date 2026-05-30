@@ -447,7 +447,13 @@ namespace nORM.Scaffolding
                            CONCAT('SQL Server stored procedure; parameters=',
                                   (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id),
                                   '; outputParameters=',
-                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1))
+                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
+                                  '; parameterModes=',
+                                  COALESCE((
+                                      SELECT STRING_AGG(CONCAT(pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END), ',')
+                                      FROM sys.parameters pa
+                                      WHERE pa.object_id = p.object_id
+                                  ), ''))
                     FROM sys.procedures p
                     WHERE p.is_ms_shipped = 0
                     UNION ALL
@@ -493,6 +499,21 @@ namespace nORM.Scaffolding
                                WHERE p.specific_schema = r.specific_schema
                                  AND p.specific_name = r.specific_name
                            ), 0)::text ||
+                           '; outputParameters=' ||
+                           COALESCE((
+                               SELECT COUNT(*)
+                               FROM information_schema.parameters p
+                               WHERE p.specific_schema = r.specific_schema
+                                 AND p.specific_name = r.specific_name
+                                 AND p.parameter_mode IN ('OUT', 'INOUT')
+                           ), 0)::text ||
+                           '; parameterModes=' ||
+                           COALESCE((
+                               SELECT string_agg(COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN'), ',' ORDER BY p.ordinal_position)
+                               FROM information_schema.parameters p
+                               WHERE p.specific_schema = r.specific_schema
+                                 AND p.specific_name = r.specific_name
+                           ), '') ||
                            '; dataType=' || COALESCE(r.data_type, '')
                     FROM information_schema.routines r
                     WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
@@ -513,6 +534,17 @@ namespace nORM.Scaffolding
                                    FROM information_schema.parameters p
                                    WHERE p.specific_schema = r.routine_schema
                                      AND p.specific_name = r.specific_name),
+                                  '; outputParameters=',
+                                  (SELECT COUNT(*)
+                                   FROM information_schema.parameters p
+                                   WHERE p.specific_schema = r.routine_schema
+                                     AND p.specific_name = r.specific_name
+                                     AND p.parameter_mode IN ('OUT', 'INOUT')),
+                                  '; parameterModes=',
+                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN')) ORDER BY p.ordinal_position SEPARATOR ',')
+                                            FROM information_schema.parameters p
+                                            WHERE p.specific_schema = r.routine_schema
+                                              AND p.specific_name = r.specific_name), ''),
                                   '; dataType=', COALESCE(r.data_type, ''))
                     FROM information_schema.routines r
                     WHERE r.routine_schema = DATABASE()
