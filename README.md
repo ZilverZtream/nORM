@@ -285,6 +285,8 @@ SQL Server/MySQL expression-index shapes are kept on the safer generated-column
 path.
 Opt-in routine stubs include SQL Server scalar and table-valued functions as
 provider-bound `SELECT` wrappers instead of stored-procedure calls.
+Opt-in sequence stubs generate provider-bound next-value wrappers for SQL Server
+and PostgreSQL standalone sequences.
 SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name
@@ -315,7 +317,8 @@ Clean later scaffold runs remove stale warning reports when overwrite is
 allowed, or fail clearly when overwrite protection would leave stale reports in
 place.
 Opt-in scaffold switches can emit provider-bound routine wrappers
-(`--emit-routine-stubs`) and read-oriented view entities
+(`--emit-routine-stubs`), provider-bound sequence wrappers
+(`--emit-sequence-stubs`), and read-oriented view entities
 (`--emit-query-artifacts` / `--emit-view-entities`, also used for SQLite virtual-table query artifacts);
 both remain explicitly bounded and are not provider mobility proof by
 themselves. Routine wrappers preserve discovered input CLR types, output

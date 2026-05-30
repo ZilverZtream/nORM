@@ -141,6 +141,13 @@ must be reviewed and edited like handwritten model code.
   for INOUT parameters. XML comments list the discovered parameter metadata,
   including sized types such as `nvarchar(32)` and `decimal(18,2)`. Routine
   bodies remain provider-owned and are not translated across database engines.
+- Optional provider-bound standalone sequence wrappers through
+  `ScaffoldOptions.EmitSequenceStubs` and CLI `--emit-sequence-stubs`.
+  SQL Server and PostgreSQL standalone sequences are discovered with scalar
+  value type metadata where the provider exposes it, and generated context
+  methods retrieve the next value with provider SQL (`NEXT VALUE FOR` or
+  PostgreSQL `nextval(...::regclass)`). Sequence DDL, allocation/caching, and
+  cross-provider migration remain provider-owned.
 - Optional query-artifact entities through
   `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
   `EmitViewEntities`) and CLI `--emit-query-artifacts` or
@@ -176,7 +183,7 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL materialized views, SQLite virtual tables, routines, sequences,
   SQL Server synonyms, SQLite virtual-table shadow tables, and MySQL events are
   discovered and reported as skipped database objects unless an explicit
-  opt-in emits the supported query-artifact or routine-stub shape; likely
+  opt-in emits the supported query-artifact, routine-stub, or sequence-stub shape; likely
   many-to-many join tables are flagged when they are scaffolded as normal
   entities.
 
@@ -208,6 +215,9 @@ must be reviewed and edited like handwritten model code.
 - `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
   output compiles as a consumer project and keeps the provider-bound routine
   warning/metadata contract explicit.
+- `ScaffoldingAndNavigationCoverageTests` proves opt-in SQL Server/PostgreSQL
+  sequence wrappers generate typed next-value methods and compile in a consumer
+  project.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
   scaffolding converts SQLite views and SQLite virtual tables into compiling
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.

@@ -83,6 +83,9 @@ Column collations are emitted as provider-bound fluent migration metadata with
 `HasCollation`.
 SQLite/PostgreSQL expression indexes are emitted as provider-bound fluent
 migration metadata with `HasExpressionIndex`.
+Use `--emit-sequence-stubs` to generate provider-bound next-value wrappers for
+SQL Server and PostgreSQL standalone sequences; sequence DDL and allocation
+semantics remain provider-owned.
 With `--emit-routine-stubs`, SQL Server scalar and table-valued functions are
 emitted as provider-bound `SELECT` wrappers instead of stored-procedure calls.
 When warnings are present, the CLI prints a compact summary with stable

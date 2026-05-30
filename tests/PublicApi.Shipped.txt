@@ -1392,6 +1392,7 @@ P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String
 P:nORM.Scaffolding.ScaffoldOptions.EmitQueryArtifacts:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitRoutineStubs:System.Boolean
+P:nORM.Scaffolding.ScaffoldOptions.EmitSequenceStubs:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitViewEntities:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.FailOnWarnings:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.OverwriteFiles:System.Boolean

@@ -39,6 +39,14 @@ namespace nORM.Scaffolding
         public bool EmitRoutineStubs { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether provider-bound standalone sequence
+        /// wrapper methods should be generated on the scaffolded context.
+        /// Generated wrappers retrieve the next sequence value through provider
+        /// SQL and do not translate sequence DDL across database providers.
+        /// </summary>
+        public bool EmitSequenceStubs { get; init; }
+
+        /// <summary>
         /// Gets a value indicating whether views/materialized views and SQLite
         /// virtual tables should be emitted as query-only entity classes.
         /// Generated query-artifact entities are scaffolding
