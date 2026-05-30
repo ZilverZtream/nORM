@@ -2537,7 +2537,7 @@ namespace nORM.Scaffolding
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
         private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe pure join table over principal primary keys, verify all FK columns are NOT NULL with a primary key over them and use the generated UsingTable mapping. Keep alternate-key, payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
+            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
 
         private static string ScaffoldDiagnosticSeverity()
             => "Warning";
