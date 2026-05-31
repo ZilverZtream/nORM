@@ -94,6 +94,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
     private const string SqlServerScalarFunctionName = "ScaffoldLiveCalculateRisk";
     private const string SqlServerTableValuedFunctionName = "ScaffoldLiveRevenueRows";
+    private const string SequenceName = "ScaffoldLiveOrderNo";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
     private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
     private const string PostgresOverloadedRoutineName = "ScaffoldLiveOverloadedRoutine";
@@ -1140,6 +1141,55 @@ public sealed class LiveProviderScaffoldingParityTests
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    public async Task ScaffoldAsync_emits_sequence_wrappers_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSequenceAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sequence_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSequenceContext",
+                    new ScaffoldOptions { EmitSequenceStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSequenceContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var sequence = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Sequence" &&
+                            item.GetProperty("name").GetString()!.EndsWith(SequenceName, StringComparison.Ordinal));
+
+                Assert.Contains("public async Task<", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Next{SequenceName}ValueAsync", contextCode, StringComparison.Ordinal);
+                Assert.Contains("QueryUnchangedAsync<", contextCode, StringComparison.Ordinal);
+                if (kind == ProviderKind.SqlServer)
+                    Assert.Contains("NEXT VALUE FOR", contextCode, StringComparison.Ordinal);
+                else
+                    Assert.Contains("nextval('", contextCode, StringComparison.Ordinal);
+                Assert.Contains("dataType", sequence.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSequenceAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_reports_provider_owned_and_keyless_diagnostics_on_live_provider(ProviderKind kind)
@@ -2064,6 +2114,22 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerTableValuedFunctionName)} (@tenantId INT) RETURNS TABLE AS RETURN SELECT @tenantId AS Id, CAST('ok' AS nvarchar(20)) AS Name");
     }
 
+    private static async Task SetupSequenceAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownSequenceAsync(connection, provider, kind);
+
+        var qualifiedName = kind == ProviderKind.SqlServer
+            ? provider.Escape("dbo") + "." + provider.Escape(SequenceName)
+            : provider.Escape("public") + "." + provider.Escape(SequenceName);
+        var sql = kind switch
+        {
+            ProviderKind.SqlServer => $"CREATE SEQUENCE {qualifiedName} AS BIGINT START WITH 42 INCREMENT BY 1",
+            ProviderKind.Postgres => $"CREATE SEQUENCE {qualifiedName} AS integer START WITH 42 INCREMENT BY 1",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Sequence scaffolding live test only targets SQL Server and PostgreSQL.")
+        };
+        await ExecuteAsync(connection, sql);
+    }
+
     private static async Task SetupPostgresSetReturningRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownPostgresSetReturningRoutineAsync(connection, provider);
@@ -2537,6 +2603,27 @@ public sealed class LiveProviderScaffoldingParityTests
                 $"IF OBJECT_ID(N'dbo.{SqlServerTableValuedFunctionName}', N'IF') IS NOT NULL DROP FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerTableValuedFunctionName)}");
             await ExecuteAsync(connection,
                 $"IF OBJECT_ID(N'dbo.{SqlServerScalarFunctionName}', N'FN') IS NOT NULL DROP FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerScalarFunctionName)}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSequenceAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            var qualifiedName = kind == ProviderKind.SqlServer
+                ? provider.Escape("dbo") + "." + provider.Escape(SequenceName)
+                : provider.Escape("public") + "." + provider.Escape(SequenceName);
+            var sql = kind switch
+            {
+                ProviderKind.SqlServer => $"IF OBJECT_ID(N'dbo.{SequenceName}', N'SO') IS NOT NULL DROP SEQUENCE {qualifiedName}",
+                ProviderKind.Postgres => $"DROP SEQUENCE IF EXISTS {qualifiedName}",
+                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Sequence scaffolding live test only targets SQL Server and PostgreSQL.")
+            };
+            await ExecuteAsync(connection, sql);
         }
         catch
         {
