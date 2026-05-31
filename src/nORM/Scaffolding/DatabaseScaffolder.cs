@@ -124,13 +124,16 @@ namespace nORM.Scaffolding
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
                 AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
+                var enumCheckConstraintConfigurations = BuildMySqlEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
                 RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
                 unsupportedFeatures.RemoveAll(feature =>
                     string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
                     && defaultValuesByTable.TryGetValue(feature.TableKey, out var defaults)
                     && defaults.ContainsKey(feature.Name));
-                var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, unsupportedFeatures);
+                var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, unsupportedFeatures)
+                    .Concat(enumCheckConstraintConfigurations)
+                    .ToArray();
                 unsupportedFeatures.RemoveAll(feature =>
                     string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
                     && checkConstraints.Any(check =>
@@ -2678,6 +2681,7 @@ namespace nORM.Scaffolding
                    || normalized == "uuid"
                    || normalized == "user-defined (uuid)"
                    || (normalized.StartsWith("array", StringComparison.Ordinal) && TryMapPostgresArrayType(detail, out _))
+                   || TryParseMySqlEnumValues(detail, out _)
                    || normalized == "year";
         }
 
@@ -4030,6 +4034,110 @@ namespace nORM.Scaffolding
             }
 
             return result;
+        }
+
+        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildMySqlEnumCheckConstraintConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var result = new List<ScaffoldCheckConstraintConfiguration>();
+            foreach (var feature in features)
+            {
+                if (!string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
+                    || !TryParseMySqlEnumValues(feature.Detail, out var values)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || !IsSimpleSqlIdentifier(feature.Name)
+                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.TryGetValue(feature.Name, out var propertyName))
+                {
+                    continue;
+                }
+
+                var checkName = "CK_" + entityName + "_" + propertyName + "_Enum";
+                var quotedValues = values
+                    .Select(value => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'")
+                    .ToArray();
+                var sql = feature.Name + " IN (" + string.Join(", ", quotedValues) + ")";
+                result.Add(new ScaffoldCheckConstraintConfiguration(feature.TableKey, entityName, checkName, sql));
+            }
+
+            return result;
+        }
+
+        private static bool TryParseMySqlEnumValues(string? detail, out string[] values)
+        {
+            values = Array.Empty<string>();
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var trimmed = detail.Trim();
+            if (!trimmed.StartsWith("enum(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
+                return false;
+
+            var body = trimmed.Substring(trimmed.IndexOf('(') + 1, trimmed.Length - trimmed.IndexOf('(') - 2);
+            var parsed = new List<string>();
+            var current = new StringBuilder();
+            var inString = false;
+            for (var i = 0; i < body.Length; i++)
+            {
+                var ch = body[i];
+                if (!inString)
+                {
+                    if (char.IsWhiteSpace(ch) || ch == ',')
+                        continue;
+                    if (ch != '\'')
+                        return false;
+
+                    inString = true;
+                    current.Clear();
+                    continue;
+                }
+
+                if (ch == '\\' && i + 1 < body.Length)
+                {
+                    current.Append(body[++i]);
+                    continue;
+                }
+
+                if (ch == '\'')
+                {
+                    if (i + 1 < body.Length && body[i + 1] == '\'')
+                    {
+                        current.Append('\'');
+                        i++;
+                        continue;
+                    }
+
+                    parsed.Add(current.ToString());
+                    inString = false;
+                    continue;
+                }
+
+                current.Append(ch);
+            }
+
+            if (inString || parsed.Count == 0)
+                return false;
+
+            values = parsed.ToArray();
+            return true;
+        }
+
+        private static bool IsSimpleSqlIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || !(char.IsLetter(value[0]) || value[0] == '_'))
+                return false;
+
+            for (var i = 1; i < value.Length; i++)
+            {
+                var ch = value[i];
+                if (!char.IsLetterOrDigit(ch) && ch != '_')
+                    return false;
+            }
+
+            return true;
         }
 
         private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexConfigurations(

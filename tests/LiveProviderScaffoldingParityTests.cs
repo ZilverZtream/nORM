@@ -1532,10 +1532,13 @@ public sealed class LiveProviderScaffoldingParityTests
                     });
 
                 var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlTypedColumnTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlTypedColumnContext.cs"));
 
                 Assert.Contains("public string Payload { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public string Status { get; set; } = default!;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("FiscalYear { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.DoesNotContain("object FiscalYear", entityCode, StringComparison.Ordinal);
+                Assert.Contains($".HasCheckConstraint(\"CK_{MySqlTypedColumnTable}_Status_Enum\", \"Status IN ('draft', 'paid', 'cancelled')\")", contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -3660,7 +3663,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
         var table = provider.Escape(MySqlTypedColumnTable);
         await ExecuteAsync(connection,
-            $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("Payload")} JSON NOT NULL, {provider.Escape("FiscalYear")} YEAR NOT NULL)");
+            $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("Payload")} JSON NOT NULL, {provider.Escape("FiscalYear")} YEAR NOT NULL, {provider.Escape("Status")} ENUM('draft','paid','cancelled') NOT NULL)");
     }
 
     private static async Task SetupMySqlUnsignedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
