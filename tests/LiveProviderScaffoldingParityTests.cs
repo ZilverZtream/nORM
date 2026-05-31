@@ -1094,12 +1094,24 @@ public sealed class LiveProviderScaffoldingParityTests
                     new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlUnsignedRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routine = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Routine" &&
+                            item.GetProperty("name").GetString()!.EndsWith(MySqlUnsignedRoutineName, StringComparison.Ordinal));
+                var metadata = routine.GetProperty("metadata");
 
                 Assert.Contains($"public sealed class {MySqlUnsignedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public uint? customer_id { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public ulong? max_id { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public ushort? rank { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public byte? flag { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Equal("scalar-function", metadata.GetProperty("callShape").GetString());
+                Assert.Equal("int", metadata.GetProperty("dataType").GetString());
+                Assert.Contains($"Task<List<TResult>> {MySqlUnsignedRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"private sealed class {MySqlUnsignedRoutineName}ValueResult<TValue>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<TValue?> {MySqlUnsignedRoutineName}ValueAsync<TValue>", contextCode, StringComparison.Ordinal);
+                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

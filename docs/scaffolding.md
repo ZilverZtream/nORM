@@ -345,7 +345,7 @@ must be reviewed and edited like handwritten model code.
   provider-native temporal history read-only scaffolds, SQL Server
   scalar/table-valued function wrappers and table-valued-parameter routine
   stubs, PostgreSQL array/UUID and MySQL
-  unsigned routine parameter stubs, PostgreSQL overloaded function wrappers
+  scalar-function wrappers with unsigned routine parameter stubs, PostgreSQL overloaded function wrappers
   with deterministic generated names, PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts, and live
   generated-surrogate, composite generated-surrogate, shared-tenant,
