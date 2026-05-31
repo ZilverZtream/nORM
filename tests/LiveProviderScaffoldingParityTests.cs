@@ -100,6 +100,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DynamicIdentityTable = "ScaffoldLiveDynamicIdentity";
+    private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
@@ -1940,6 +1941,43 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Dynamic_scaffolding_preserves_composite_primary_key_order_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await ExecuteAsync(connection, DropTable(kind, DynamicCompositeKeyTable, provider.Escape(DynamicCompositeKeyTable)));
+            try
+            {
+                await ExecuteAsync(connection, DynamicCompositeKeyTableSql(kind, provider));
+
+                var type = new DynamicEntityTypeGenerator().GenerateEntityType(connection, DynamicCompositeKeyTable);
+                var properties = type.GetProperties().Select(prop => prop.Name).ToArray();
+
+                Assert.Equal("LocalId", properties[0]);
+                Assert.Equal("TenantId", properties[1]);
+                Assert.Contains(
+                    type.GetProperty("LocalId")!.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.KeyAttribute), inherit: false),
+                    attr => attr is System.ComponentModel.DataAnnotations.KeyAttribute);
+                Assert.Contains(
+                    type.GetProperty("TenantId")!.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.KeyAttribute), inherit: false),
+                    attr => attr is System.ComponentModel.DataAnnotations.KeyAttribute);
+            }
+            finally
+            {
+                await ExecuteAsync(connection, DropTable(kind, DynamicCompositeKeyTable, provider.Escape(DynamicCompositeKeyTable)));
+            }
+        }
+    }
+
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, BookLabelTable, provider.Escape(BookLabelTable)));
@@ -3156,5 +3194,15 @@ public sealed class LiveProviderScaffoldingParityTests
             ProviderKind.MySql => $"CREATE TABLE {table} ({id} INT NOT NULL AUTO_INCREMENT PRIMARY KEY, {name} {TextType(kind, 40)} NOT NULL)",
             _ => $"CREATE TABLE {table} ({id} INTEGER PRIMARY KEY, {name} {TextType(kind, 40)} NOT NULL)"
         };
+    }
+
+    private static string DynamicCompositeKeyTableSql(ProviderKind kind, DatabaseProvider provider)
+    {
+        var table = provider.Escape(DynamicCompositeKeyTable);
+        var tenantId = provider.Escape("TenantId");
+        var localId = provider.Escape("LocalId");
+        var payload = provider.Escape("Payload");
+
+        return $"CREATE TABLE {table} ({tenantId} {IntType(kind)} NOT NULL, {localId} {IntType(kind)} NOT NULL, {payload} {TextType(kind, 40)} NOT NULL, PRIMARY KEY ({localId}, {tenantId}))";
     }
 }
