@@ -200,7 +200,10 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(".WithMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains($".UsingTable(\"", contextCode);
                 Assert.Contains(BookLabelTable, contextCode);
-                Assert.Contains("\"BookId\", \"LabelId\");", contextCode);
+                if (kind == ProviderKind.SqlServer)
+                    Assert.Contains("\"BookId\", \"LabelId\", schema: \"dbo\");", contextCode);
+                else
+                    Assert.Contains("\"BookId\", \"LabelId\");", contextCode);
 
                 AssertScaffoldOutputBuilds(dir);
             }

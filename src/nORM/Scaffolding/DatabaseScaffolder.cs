@@ -960,6 +960,7 @@ namespace nORM.Scaffolding
 
             var selected = tables
                 .Where(table => requested.Any(request => MatchesTableFilter(table, request)))
+                .Select(table => ApplyRequestedTableCasing(table, requested))
                 .ToArray();
 
             var missing = requested
@@ -988,6 +989,25 @@ namespace nORM.Scaffolding
             }
 
             return selected;
+        }
+
+        private static ScaffoldTable ApplyRequestedTableCasing(ScaffoldTable table, IReadOnlyList<string> requested)
+        {
+            var request = requested.FirstOrDefault(filter => MatchesTableFilter(table, filter));
+            if (string.IsNullOrWhiteSpace(request))
+                return table;
+
+            var requestedSchema = GetSchemaNameOrNull(request);
+            if (!string.IsNullOrWhiteSpace(requestedSchema)
+                && string.Equals(requestedSchema, table.Schema, StringComparison.OrdinalIgnoreCase))
+            {
+                return new ScaffoldTable(GetUnqualifiedName(request), requestedSchema);
+            }
+
+            if (requestedSchema is null && string.Equals(request, table.Name, StringComparison.OrdinalIgnoreCase))
+                return new ScaffoldTable(request, table.Schema);
+
+            return table;
         }
 
         private static bool MatchesTableFilter(ScaffoldTable table, string requested)
@@ -3205,17 +3225,19 @@ namespace nORM.Scaffolding
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var tablesByKey = tables.ToDictionary(t => TableKey(t.Schema, t.Name), StringComparer.OrdinalIgnoreCase);
             var joins = new List<ScaffoldManyToManyJoin>();
 
             foreach (var group in foreignKeys
                 .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase))
             {
                 var joinTableKey = group.Key;
-                if (!tableKeys.Contains(joinTableKey))
+                if (!tableKeys.Contains(joinTableKey) || !tablesByKey.TryGetValue(joinTableKey, out var joinTable))
                     continue;
+                var canonicalJoinTableKey = TableKey(joinTable.Schema, joinTable.Name);
 
                 var fkGroups = OrderManyToManyForeignKeyGroups(
-                    GetUnqualifiedName(joinTableKey),
+                    joinTable.Name,
                     group
                     .GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
                     .Select(g => g.ToArray())
@@ -3304,11 +3326,11 @@ namespace nORM.Scaffolding
                 var existingInverseNames = GetOrCreateMemberNames(memberNamesByTable, rightTableKey);
                 var rightCollectionName = MakeUnique(rightCollectionBase, existingInverseNames);
                 joins.Add(new ScaffoldManyToManyJoin(
-                    joinTableKey,
+                    canonicalJoinTableKey,
                     leftTableKey,
                     rightTableKey,
-                    left.DependentTable,
-                    left.DependentSchema,
+                    joinTable.Name,
+                    joinTable.Schema,
                     leftEntity,
                     rightEntity,
                     leftGroup.Select(fk => fk.DependentColumn).ToArray(),
