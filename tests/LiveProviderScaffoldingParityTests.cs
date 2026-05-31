@@ -37,6 +37,11 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string SharedTenantStudentCourseTable = "ScaffoldLiveSharedTenantStudentCourse";
     private const string SharedTenantStudentCourseStudentFkName = "FK_ScaffoldLiveSharedTenantStudentCourse_Student";
     private const string SharedTenantStudentCourseCourseFkName = "FK_ScaffoldLiveSharedTenantStudentCourse_Course";
+    private const string SharedAlternateAuthorTable = "ScaffoldLiveSharedAlternateAuthor";
+    private const string SharedAlternateBookTable = "ScaffoldLiveSharedAlternateBook";
+    private const string SharedAlternateAuthorBookTable = "ScaffoldLiveSharedAlternateAuthorBook";
+    private const string SharedAlternateAuthorBookAuthorFkName = "FK_ScaffoldLiveSharedAlternateAuthorBook_Author";
+    private const string SharedAlternateAuthorBookBookFkName = "FK_ScaffoldLiveSharedAlternateAuthorBook_Book";
     private const string AlternateAuthorTable = "ScaffoldLiveAlternateAuthor";
     private const string AlternateBookTable = "ScaffoldLiveAlternateBook";
     private const string AlternateAuthorBookTable = "ScaffoldLiveAlternateAuthorBook";
@@ -293,6 +298,56 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownSharedTenantManyToManyAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_shared_tenant_alternate_key_many_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSharedAlternateKeyManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_shared_alternate_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSharedAlternateManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { SharedAlternateAuthorTable, SharedAlternateBookTable, SharedAlternateAuthorBookTable },
+                        OverwriteFiles = false
+                    });
+
+                var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, SharedAlternateAuthorTable + ".cs"));
+                var bookCode = await File.ReadAllTextAsync(Path.Combine(dir, SharedAlternateBookTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSharedAlternateManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, SharedAlternateAuthorBookTable + ".cs")));
+                Assert.Contains($"public List<{SharedAlternateBookTable}> {SharedAlternateBookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{SharedAlternateAuthorTable}> {SharedAlternateAuthorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SharedAlternateAuthorBookTable}\", new[] {{ \"TenantId\", \"AuthorCode\" }}, new[] {{ \"TenantId\", \"BookIsbn\" }}, p => new {{ p.TenantId, p.Code }}, p => new {{ p.TenantId, p.Isbn }});", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSharedAlternateKeyManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -1689,6 +1744,38 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveSharedTenantStudentCourse_Course")} ON {join} ({tenantId}, {courseId})");
     }
 
+    private static async Task SetupSharedAlternateKeyManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, SharedAlternateAuthorBookTable, provider.Escape(SharedAlternateAuthorBookTable)));
+        await ExecuteAsync(connection, DropTable(kind, SharedAlternateBookTable, provider.Escape(SharedAlternateBookTable)));
+        await ExecuteAsync(connection, DropTable(kind, SharedAlternateAuthorTable, provider.Escape(SharedAlternateAuthorTable)));
+
+        var author = provider.Escape(SharedAlternateAuthorTable);
+        var book = provider.Escape(SharedAlternateBookTable);
+        var join = provider.Escape(SharedAlternateAuthorBookTable);
+        var id = provider.Escape("Id");
+        var tenantId = provider.Escape("TenantId");
+        var code = provider.Escape("Code");
+        var isbn = provider.Escape("Isbn");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+        var authorCode = provider.Escape("AuthorCode");
+        var bookIsbn = provider.Escape("BookIsbn");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {author} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {tenantId} {IntType(kind)} NOT NULL, {code} {TextType(kind, 40)} NOT NULL, {name} {TextType(kind, 80)} NOT NULL, UNIQUE ({tenantId}, {code}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {tenantId} {IntType(kind)} NOT NULL, {isbn} {TextType(kind, 40)} NOT NULL, {title} {TextType(kind, 80)} NOT NULL, UNIQUE ({tenantId}, {isbn}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({tenantId} {IntType(kind)} NOT NULL, {authorCode} {TextType(kind, 40)} NOT NULL, {bookIsbn} {TextType(kind, 40)} NOT NULL, " +
+            $"PRIMARY KEY ({tenantId}, {authorCode}, {bookIsbn}), " +
+            $"CONSTRAINT {provider.Escape(SharedAlternateAuthorBookAuthorFkName)} FOREIGN KEY ({tenantId}, {authorCode}) REFERENCES {author} ({tenantId}, {code}), " +
+            $"CONSTRAINT {provider.Escape(SharedAlternateAuthorBookBookFkName)} FOREIGN KEY ({tenantId}, {bookIsbn}) REFERENCES {book} ({tenantId}, {isbn}))");
+
+        if (kind == ProviderKind.MySql)
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape("IX_ScaffoldLiveSharedAlternateAuthorBook_Book")} ON {join} ({tenantId}, {bookIsbn})");
+    }
+
     private static async Task SetupAlternateKeyManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, AlternateAuthorBookTable, provider.Escape(AlternateAuthorBookTable)));
@@ -2181,6 +2268,20 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentCourseTable, provider.Escape(SharedTenantStudentCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, SharedTenantCourseTable, provider.Escape(SharedTenantCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, SharedTenantStudentTable, provider.Escape(SharedTenantStudentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSharedAlternateKeyManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SharedAlternateAuthorBookTable, provider.Escape(SharedAlternateAuthorBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SharedAlternateBookTable, provider.Escape(SharedAlternateBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SharedAlternateAuthorTable, provider.Escape(SharedAlternateAuthorTable)));
         }
         catch
         {
