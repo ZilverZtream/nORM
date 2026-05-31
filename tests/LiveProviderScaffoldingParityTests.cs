@@ -92,6 +92,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
     private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
     private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
+    private const string SqlServerScalarFunctionName = "ScaffoldLiveCalculateRisk";
+    private const string SqlServerTableValuedFunctionName = "ScaffoldLiveRevenueRows";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
     private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
     private const string PostgresOverloadedRoutineName = "ScaffoldLiveOverloadedRoutine";
@@ -1047,6 +1049,61 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_emits_sqlserver_scalar_and_table_valued_function_wrappers_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerFunctionRoutinesAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_function_routines_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerFunctionRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqlServerFunctionRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routines = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
+
+                Assert.Contains(routines, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString()!.EndsWith(SqlServerScalarFunctionName, StringComparison.Ordinal) &&
+                    item.GetProperty("metadata").GetProperty("callShape").GetString() == "scalar-function");
+                Assert.Contains(routines, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString()!.EndsWith(SqlServerTableValuedFunctionName, StringComparison.Ordinal) &&
+                    item.GetProperty("metadata").GetProperty("callShape").GetString() == "table-valued-function");
+
+                Assert.Contains($"public sealed class {SqlServerScalarFunctionName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<TValue?> {SqlServerScalarFunctionName}ValueAsync<TValue>", contextCode, StringComparison.Ordinal);
+                Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {SqlServerTableValuedFunctionName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<TResult> Stream{SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{SqlServerScalarFunctionName}\")", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{SqlServerTableValuedFunctionName}\")", contextCode, StringComparison.Ordinal);
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerFunctionRoutinesAsync(connection, provider);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
@@ -1964,6 +2021,16 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineTableValuedParameterName)} @tenantId INT, @items {provider.Escape("dbo")}.{provider.Escape(RoutineTableTypeName)} READONLY AS SELECT @tenantId AS Id, COUNT(*) AS LineCount FROM @items");
     }
 
+    private static async Task SetupSqlServerFunctionRoutinesAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerFunctionRoutinesAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerScalarFunctionName)} (@customerId INT) RETURNS INT AS BEGIN RETURN @customerId + 7; END");
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerTableValuedFunctionName)} (@tenantId INT) RETURNS TABLE AS RETURN SELECT @tenantId AS Id, CAST('ok' AS nvarchar(20)) AS Name");
+    }
+
     private static async Task SetupPostgresSetReturningRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownPostgresSetReturningRoutineAsync(connection, provider);
@@ -2422,6 +2489,21 @@ public sealed class LiveProviderScaffoldingParityTests
                 $"IF OBJECT_ID(N'dbo.{RoutineTableValuedParameterName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineTableValuedParameterName)}");
             await ExecuteAsync(connection,
                 $"IF TYPE_ID(N'dbo.{RoutineTableTypeName}') IS NOT NULL DROP TYPE {provider.Escape("dbo")}.{provider.Escape(RoutineTableTypeName)}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerFunctionRoutinesAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{SqlServerTableValuedFunctionName}', N'IF') IS NOT NULL DROP FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerTableValuedFunctionName)}");
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{SqlServerScalarFunctionName}', N'FN') IS NOT NULL DROP FUNCTION {provider.Escape("dbo")}.{provider.Escape(SqlServerScalarFunctionName)}");
         }
         catch
         {
