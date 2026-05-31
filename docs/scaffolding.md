@@ -411,8 +411,9 @@ must be reviewed and edited like handwritten model code.
 - Relationship generation beyond primary keys and exact ordered unfiltered unique indexes.
   Single-column and composite FK constraints that target the exact generated
   primary key or an exact ordered unfiltered unique index are emitted as navigations and fluent
-  model configuration. FKs that target keyless or non-unique alternate columns
-  are discovered and reported in scaffold diagnostics.
+  model configuration. FKs that target keyless principals, start from keyless
+  dependents, or target non-unique alternate columns are discovered and reported
+  in scaffold diagnostics.
 - FK referential-action modeling outside the common provider action set.
   `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` are emitted
   into generated fluent configuration for delete/update actions. Unknown
