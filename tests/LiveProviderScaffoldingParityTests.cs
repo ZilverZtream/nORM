@@ -98,6 +98,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
+    private const string SqliteVirtualTable = "ScaffoldLiveVirtualSearch";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
     private const string MySqlTypedColumnTable = "ScaffoldLiveMySqlTypedColumns";
     private const string MySqlUnsignedColumnTable = "ScaffoldLiveMySqlUnsignedColumns";
@@ -2097,6 +2098,68 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownSqlServerNativeTemporalTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Sqlite);
+        if (Skip.If(live is null, "Live provider SQLite not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.Sqlite, SqliteVirtualTable, provider.Escape(SqliteVirtualTable)));
+            try
+            {
+                await ExecuteAsync(connection,
+                    $"CREATE VIRTUAL TABLE {provider.Escape(SqliteVirtualTable)} USING fts5({provider.Escape("Content")})");
+            }
+            catch (Exception ex)
+            {
+                if (Skip.If(true, $"SQLite FTS5 virtual tables are not available in this build: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlite_virtual_table_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqliteVirtualTableContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { SqliteVirtualTable },
+                        EmitQueryArtifacts = true,
+                        OverwriteFiles = false
+                    });
+
+                var virtualCode = await File.ReadAllTextAsync(Path.Combine(dir, SqliteVirtualTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqliteVirtualTableContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+                var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
+
+                Assert.Contains("[ReadOnlyEntity]", virtualCode, StringComparison.Ordinal);
+                Assert.Contains($"IQueryable<{SqliteVirtualTable}>", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                    item.GetProperty("table").GetString() == SqliteVirtualTable);
+                Assert.Contains(skippedObjects, item =>
+                    item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
+                    item.GetProperty("code").GetString() == "SCF207" &&
+                    item.GetProperty("name").GetString()!.StartsWith(SqliteVirtualTable + "_", StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await ExecuteAsync(connection, DropTable(ProviderKind.Sqlite, SqliteVirtualTable, provider.Escape(SqliteVirtualTable)));
             }
         }
     }

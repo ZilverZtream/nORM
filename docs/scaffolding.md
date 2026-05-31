@@ -354,7 +354,8 @@ must be reviewed and edited like handwritten model code.
   with deterministic generated names, PostgreSQL domain diagnostics,
   SQL Server alias-type diagnostics, MySQL unsigned-column diagnostics,
   PostgreSQL UUID/array column scaffolds,
-  MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts, and live
+  MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts,
+  SQLite virtual-table query artifacts, and live
   generated-surrogate, composite generated-surrogate, shared-tenant,
   shared-tenant alternate-key, composite payload bridge preservation,
   alternate-key, self-referencing, and
