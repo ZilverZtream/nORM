@@ -514,6 +514,10 @@ namespace nORM.Scaffolding
                 "uuid" => "uuid",
                 "date" => "date",
                 "text" => "text",
+                "citext" => "citext",
+                "json" => "json",
+                "jsonb" => "jsonb",
+                "xml" => "xml",
                 "character varying" or "varchar" => "character varying",
                 "character" or "char" => "character",
                 "numeric" or "decimal" => "numeric",
@@ -4985,6 +4989,7 @@ namespace nORM.Scaffolding
                     ? outputCount
                     : 0;
                 var inputParameters = GetRoutineInputParameters(metadata);
+                var inputParameterDataTypes = GetRoutineInputParameterDataTypes(metadata);
                 var outputParameters = GetRoutineOutputParameters(metadata);
                 var discoveredInputParameterCount = GetRoutineInputParameterCount(metadata);
                 var methodBase = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
@@ -5069,7 +5074,8 @@ namespace nORM.Scaffolding
                         resultType,
                         scalar: isScalarFunction,
                         usePositionalArguments: requiresPositionalFunctionArguments,
-                        expectedArgumentCount: discoveredInputParameterCount);
+                        expectedArgumentCount: discoveredInputParameterCount,
+                        inputParameterDataTypes: inputParameterDataTypes);
                 }
                 else
                 {
@@ -5278,13 +5284,14 @@ namespace nORM.Scaffolding
             string? resultType,
             bool scalar,
             bool usePositionalArguments,
-            int expectedArgumentCount)
+            int expectedArgumentCount,
+            IReadOnlyList<string> inputParameterDataTypes)
         {
             sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
             sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
             AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+            AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             if (scalar)
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
@@ -5301,7 +5308,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("    {");
                 sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
                 AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
                 sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
                 sb.AppendLine("    }");
@@ -5321,7 +5328,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("    {");
                 sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
                 AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
                 sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
                 sb.AppendLine("        return rows.Count == 0 ? default : rows[0].Value;");
@@ -5338,7 +5345,7 @@ namespace nORM.Scaffolding
             sb.AppendLine("    {");
             sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
             AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+            AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
             sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
             sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
@@ -5354,7 +5361,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("    {");
                 sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
                 AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
                 sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
                 sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
@@ -5395,6 +5402,127 @@ namespace nORM.Scaffolding
                 .Select(parameter => $"(object?)parameters.{parameter.Name} ?? System.DBNull.Value")
                 .ToArray();
             return "        var args = parameters is null ? System.Array.Empty<object>() : new object[] { " + string.Join(", ", values) + " };";
+        }
+
+        private static void AppendFunctionPlaceholderLine(
+            StringBuilder sb,
+            ScaffoldSkippedObject routine,
+            IReadOnlyList<string> inputParameterDataTypes,
+            int expectedArgumentCount)
+        {
+            var postgresCastTypes = GetPostgresFunctionArgumentCastTypes(routine, inputParameterDataTypes, expectedArgumentCount);
+            if (postgresCastTypes.Count == 0)
+            {
+                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                return;
+            }
+
+            sb.AppendLine("        var casts = new[] { " + string.Join(", ", postgresCastTypes.Select(type => $"\"{EscapeStringLiteral(type)}\"")) + " };");
+            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i + \"::\" + casts[i]));");
+        }
+
+        private static IReadOnlyList<string> GetPostgresFunctionArgumentCastTypes(
+            ScaffoldSkippedObject routine,
+            IReadOnlyList<string> inputParameterDataTypes,
+            int expectedArgumentCount)
+        {
+            if (!routine.Detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                || expectedArgumentCount <= 0
+                || inputParameterDataTypes.Count != expectedArgumentCount)
+            {
+                return Array.Empty<string>();
+            }
+
+            var castTypes = new List<string>(inputParameterDataTypes.Count);
+            foreach (var dataType in inputParameterDataTypes)
+            {
+                if (!TryMapPostgresFunctionArgumentCastType(dataType, out var castType))
+                    return Array.Empty<string>();
+
+                castTypes.Add(castType);
+            }
+
+            return castTypes;
+        }
+
+        private static bool TryMapPostgresFunctionArgumentCastType(string? dataType, out string castType)
+        {
+            var normalized = NormalizeRoutineDataType(dataType ?? string.Empty);
+            if (TryMapPostgresFunctionArrayArgumentCastType(normalized, out castType))
+                return true;
+
+            castType = normalized switch
+            {
+                "integer" or "int" or "int4" => "integer",
+                "bigint" or "int8" => "bigint",
+                "smallint" or "int2" => "smallint",
+                "boolean" or "bool" => "boolean",
+                "uuid" => "uuid",
+                "date" => "date",
+                "text" => "text",
+                "citext" => "citext",
+                "json" => "json",
+                "jsonb" => "jsonb",
+                "xml" => "xml",
+                "character varying" or "varchar" => "character varying",
+                "character" or "char" => "character",
+                "numeric" or "decimal" => "numeric",
+                "real" or "float4" => "real",
+                "double precision" or "float8" => "double precision",
+                "bytea" => "bytea",
+                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
+                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
+                "time without time zone" or "time" => "time without time zone",
+                "time with time zone" or "timetz" => "time with time zone",
+                "interval" => "interval",
+                _ => string.Empty
+            };
+
+            return castType.Length > 0;
+        }
+
+        private static bool TryMapPostgresFunctionArrayArgumentCastType(string normalized, out string castType)
+        {
+            castType = string.Empty;
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+                return false;
+
+            var open = normalized.IndexOf('(');
+            if (open < 0)
+                return false;
+
+            var close = normalized.IndexOf(')', open + 1);
+            var element = (close > open
+                    ? normalized.Substring(open + 1, close - open - 1)
+                    : normalized[(open + 1)..])
+                .Trim()
+                .TrimStart('_');
+
+            castType = element switch
+            {
+                "int2" or "smallint" => "smallint[]",
+                "int4" or "integer" => "integer[]",
+                "int8" or "bigint" => "bigint[]",
+                "float4" or "real" => "real[]",
+                "float8" or "double precision" => "double precision[]",
+                "numeric" or "decimal" => "numeric[]",
+                "bool" or "boolean" => "boolean[]",
+                "uuid" => "uuid[]",
+                "text" => "text[]",
+                "varchar" or "character varying" => "character varying[]",
+                "bpchar" or "char" or "character" => "character[]",
+                "citext" => "citext[]",
+                "bytea" => "bytea[]",
+                "date" => "date[]",
+                "time" or "time without time zone" => "time without time zone[]",
+                "timetz" or "time with time zone" => "time with time zone[]",
+                "interval" => "interval[]",
+                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
+                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
+                _ => string.Empty
+            };
+
+            return castType.Length > 0;
         }
 
         private static string FormatProviderEscapedRoutineName(ScaffoldSkippedObject routine)
@@ -5474,10 +5602,35 @@ namespace nORM.Scaffolding
                     return Array.Empty<RoutineStubParameter>();
 
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                names.Add(new RoutineStubParameter(escaped, GetRoutineParameterTypeName(dataType)));
+                names.Add(new RoutineStubParameter(escaped, GetRoutineParameterTypeName(dataType), dataType ?? string.Empty));
             }
 
             return names.ToArray();
+        }
+
+        private static IReadOnlyList<string> GetRoutineInputParameterDataTypes(IReadOnlyDictionary<string, object?> metadata)
+        {
+            if (!metadata.TryGetValue("parameters", out var parametersValue)
+                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
+                || parameters.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var dataTypes = new List<string>();
+            foreach (var parameter in parameters)
+            {
+                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
+                if (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                dataTypes.Add(Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null) ?? string.Empty);
+            }
+
+            return dataTypes.ToArray();
         }
 
         private static int GetRoutineInputParameterCount(IReadOnlyDictionary<string, object?> metadata)
@@ -6358,7 +6511,8 @@ namespace nORM.Scaffolding
 
         private readonly record struct RoutineStubParameter(
             string Name,
-            string TypeName);
+            string TypeName,
+            string DataType);
 
         private readonly record struct RoutineOutputParameter(
             string Name,

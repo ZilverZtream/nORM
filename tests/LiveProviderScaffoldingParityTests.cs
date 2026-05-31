@@ -1342,6 +1342,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}Async2<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public int? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public string? @value { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("var casts = new[] { \"integer\" };", contextCode, StringComparison.Ordinal);
+                Assert.Contains("var casts = new[] { \"text\" };", contextCode, StringComparison.Ordinal);
+                Assert.Contains("Provider.ParamPrefix + \"p\" + i + \"::\" + casts[i]", contextCode, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

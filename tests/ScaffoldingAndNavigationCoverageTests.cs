@@ -1134,6 +1134,8 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public string? note { get; init; }", code);
         Assert.Contains("public Guid? trace_id { get; init; }", code);
         Assert.Contains("if (args.Length != 6)", code);
+        Assert.Contains("var casts = new[] { \"integer\", \"interval\", \"integer[]\", \"text[]\", \"citext\", \"uuid\" };", code);
+        Assert.Contains("Provider.ParamPrefix + \"p\" + i + \"::\" + casts[i]", code);
         Assert.DoesNotContain("public object? duration { get; init; }", code);
         Assert.DoesNotContain("public object? customer_ids { get; init; }", code);
         Assert.DoesNotContain("public object? trace_id { get; init; }", code);

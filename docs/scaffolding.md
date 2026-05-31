@@ -220,7 +220,9 @@ must be reviewed and edited like handwritten model code.
   types are tracked separately through routine result/data type metadata. When
   provider parameter names cannot safely become C# DTO properties, wrappers use
   positional `object?[]` arguments instead of silently dropping or misbinding
-  required function arguments.
+  required function arguments. PostgreSQL function wrappers cast safe argument
+  placeholders to the scaffold-discovered provider types so overloaded
+  functions and provider inference do not drift between calls.
   Stored-procedure wrappers with such parameter names use
   `IReadOnlyDictionary<string, object?>` arguments so callers can pass exact
   provider parameter names without unsafe DTO generation.
