@@ -324,21 +324,26 @@ namespace nORM.Scaffolding
             builder.Append(';');
         }
 
-        private static IEnumerable<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
+        private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
             var qualified = EscapeQualified(connection, schemaName, tableName);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"SELECT * FROM {qualified} WHERE 1=0";
-            using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
-            var schema = reader.GetSchemaTable();
+            DataTable? schema;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $"SELECT * FROM {qualified} WHERE 1=0";
+                using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
+                schema = reader.GetSchemaTable();
+            }
+
             if (schema is null)
-                yield break;
+                return Array.Empty<ColumnInfo>();
             var existingPropertyNames = CreateReservedMemberNameSet();
             var computedColumns = GetComputedColumns(connection, schemaName, tableName);
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
             var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
+            var columns = new List<ColumnInfo>(schema.Rows.Count);
             var sourceOrdinal = 0;
             foreach (DataRow row in schema.Rows)
             {
@@ -365,8 +370,10 @@ namespace nORM.Scaffolding
 
                 var maxLength = GetScaffoldMaxLength(clrType, row);
 
-                yield return new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, isRowVersion, maxLength);
+                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, isRowVersion, maxLength));
             }
+
+            return columns;
         }
 
         private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
@@ -386,7 +393,7 @@ namespace nORM.Scaffolding
         {
             var connectionName = connection.GetType().Name;
 
-            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            if (IsSqliteConnection(connectionName))
             {
                 var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 using var cmd = connection.CreateCommand();
@@ -412,7 +419,7 @@ namespace nORM.Scaffolding
                 return result;
             }
 
-            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            if (IsSqlServerConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT c.name AS ColumnName
@@ -425,7 +432,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            if (IsPostgresConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -436,7 +443,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (IsMySqlConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -453,7 +460,7 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            if (!IsSqliteConnection(connection.GetType().Name))
                 return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -481,7 +488,7 @@ namespace nORM.Scaffolding
         {
             var connectionName = connection.GetType().Name;
 
-            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            if (IsSqliteConnection(connectionName))
             {
                 var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
                 using var cmd = connection.CreateCommand();
@@ -510,7 +517,7 @@ namespace nORM.Scaffolding
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }
 
-            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            if (IsSqlServerConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT c.name AS ColumnName
@@ -523,7 +530,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            if (IsPostgresConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -537,7 +544,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (IsMySqlConnection(connectionName))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -555,7 +562,7 @@ namespace nORM.Scaffolding
         {
             var connectionName = connection.GetType().Name;
 
-            if (connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            if (IsSqliteConnection(connectionName))
             {
                 var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 using var cmd = connection.CreateCommand();
@@ -578,7 +585,7 @@ namespace nORM.Scaffolding
                 return result;
             }
 
-            if (connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            if (IsSqlServerConnection(connectionName))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT c.name AS ColumnName, ic.key_ordinal AS Ordinal
@@ -592,7 +599,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            if (IsPostgresConnection(connectionName))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT att.attname AS ColumnName, keys.ordinality AS Ordinal
@@ -607,7 +614,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (IsMySqlConnection(connectionName))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT column_name AS ColumnName, ordinal_position AS Ordinal
@@ -624,7 +631,7 @@ namespace nORM.Scaffolding
         private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
         {
             var connectionName = connection.GetType().Name;
-            if (!connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase))
+            if (!IsSqlServerConnection(connectionName))
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             return QueryColumnNameSet(connection, """
@@ -646,10 +653,12 @@ namespace nORM.Scaffolding
             cmd.CommandText = sql;
             var tableParameter = cmd.CreateParameter();
             tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
             tableParameter.Value = tableName;
             cmd.Parameters.Add(tableParameter);
             var schemaParameter = cmd.CreateParameter();
             schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
             schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
             cmd.Parameters.Add(schemaParameter);
             using var reader = cmd.ExecuteReader();
@@ -670,10 +679,12 @@ namespace nORM.Scaffolding
             cmd.CommandText = sql;
             var tableParameter = cmd.CreateParameter();
             tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
             tableParameter.Value = tableName;
             cmd.Parameters.Add(tableParameter);
             var schemaParameter = cmd.CreateParameter();
             schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
             schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
             cmd.Parameters.Add(schemaParameter);
             using var reader = cmd.ExecuteReader();
@@ -768,10 +779,10 @@ namespace nORM.Scaffolding
             var name = connection.GetType().Name.ToLowerInvariant();
             return name switch
             {
-                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "]]")}]",
                 var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "\"\"")}\"",
                 var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "\"\"")}\"",
                 var n when n.Contains("mysql") => $"`{identifier.Replace("`", "``")}`",
+                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "]]")}]",
                 _ => $"\"{identifier.Replace("\"", "\"\"")}\""
             };
         }
@@ -794,13 +805,13 @@ namespace nORM.Scaffolding
 
         private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
         {
-            if (connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase)
+            if (IsSqliteConnection(connection.GetType().Name)
                 && IsSqliteUuidDeclaredType(declaredType))
             {
                 return typeof(Guid);
             }
 
-            if (connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase)
+            if (IsSqliteConnection(connection.GetType().Name)
                 && isKey
                 && isAuto
                 && !allowNull
@@ -813,6 +824,21 @@ namespace nORM.Scaffolding
 
             return clrType;
         }
+
+        private static bool IsSqliteConnection(string connectionName)
+            => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsPostgresConnection(string connectionName)
+            => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsMySqlConnection(string connectionName)
+            => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsSqlServerConnection(string connectionName)
+            => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
+               && !IsPostgresConnection(connectionName)
+               && !IsMySqlConnection(connectionName)
+               && !IsSqliteConnection(connectionName);
 
         private static bool IsSqliteUuidDeclaredType(string? declaredType)
             => !string.IsNullOrWhiteSpace(declaredType)
