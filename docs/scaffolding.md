@@ -300,7 +300,7 @@ must be reviewed and edited like handwritten model code.
   schema snapshots, and migration SQL generators,
   SQL Server identity seed/increment emission through generated
   `HasIdentityOptions(...)` configuration,
-  composite alternate-key FK generation when the target is an exact ordered unfiltered unique index,
+  single-column and composite alternate-key FK generation when the target is an exact ordered unfiltered unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
@@ -380,7 +380,7 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship
-  shapes, dynamic scaffolding of computed/generated columns, identity columns,
+  shapes, single-column alternate-key FK generation, dynamic scaffolding of computed/generated columns, identity columns,
   and composite primary-key ordinal order across live providers,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against

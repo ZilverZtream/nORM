@@ -91,6 +91,10 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string UniqueChildTable = "ScaffoldLiveUniqueChild";
     private const string UniqueFkName = "FK_ScaffoldLiveUniqueChild_Parent";
     private const string UniqueIndexName = "UX_ScaffoldLiveUniqueParent_Tenant_External";
+    private const string SingleAlternateParentTable = "ScaffoldLiveSingleAlternateParent";
+    private const string SingleAlternateChildTable = "ScaffoldLiveSingleAlternateChild";
+    private const string SingleAlternateFkName = "FK_ScaffoldLiveSingleAlternateChild_Parent";
+    private const string SingleAlternateIndexName = "UX_ScaffoldLiveSingleAlternateParent_Code";
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
     private const string WarningView = "ScaffoldLiveWarningView";
@@ -911,6 +915,52 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownCompositeUniqueAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_single_column_fk_to_unique_index_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSingleColumnAlternateKeyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_single_alt_key_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSingleAlternateKeyContext",
+                    new ScaffoldOptions { Tables = new[] { SingleAlternateParentTable, SingleAlternateChildTable }, OverwriteFiles = false });
+
+                var parentCode = await File.ReadAllTextAsync(Path.Combine(dir, SingleAlternateParentTable + ".cs"));
+                var childCode = await File.ReadAllTextAsync(Path.Combine(dir, SingleAlternateChildTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSingleAlternateKeyContext.cs"));
+
+                Assert.Contains("[Index(\"" + SingleAlternateIndexName + "\", IsUnique = true)]", parentCode, StringComparison.Ordinal);
+                Assert.Contains("public List<ScaffoldLiveSingleAlternateChild> ScaffoldLiveSingleAlternateChilds { get; set; } = new();", parentCode, StringComparison.Ordinal);
+                Assert.Contains("[ForeignKey(nameof(ParentCode))]", childCode, StringComparison.Ordinal);
+                Assert.Contains("public ScaffoldLiveSingleAlternateParent? ScaffoldLiveSingleAlternateParent { get; set; }", childCode, StringComparison.Ordinal);
+                Assert.Contains(".HasForeignKey(d => d.ParentCode, p => p.Code, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSingleColumnAlternateKeyAsync(connection, provider, kind);
             }
         }
     }
@@ -3067,6 +3117,27 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(UniqueFkName)} FOREIGN KEY ({tenantId}, {externalNo}) REFERENCES {parent} ({tenantId}, {externalNo}))");
     }
 
+    private static async Task SetupSingleColumnAlternateKeyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownSingleColumnAlternateKeyAsync(connection, provider, kind);
+
+        var parent = provider.Escape(SingleAlternateParentTable);
+        var child = provider.Escape(SingleAlternateChildTable);
+        var id = provider.Escape("Id");
+        var code = provider.Escape("Code");
+        var parentCode = provider.Escape("ParentCode");
+        var name = provider.Escape("Name");
+        var notes = provider.Escape("Notes");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {parent} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {code} {TextType(kind, 40)} NOT NULL, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE UNIQUE INDEX {provider.Escape(SingleAlternateIndexName)} ON {parent} ({code})");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {child} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {parentCode} {TextType(kind, 40)} NOT NULL, {notes} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(SingleAlternateFkName)} FOREIGN KEY ({parentCode}) REFERENCES {parent} ({code}))");
+    }
+
     private static async Task SetupDecimalPrecisionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, DecimalPrecisionTable, provider.Escape(DecimalPrecisionTable)));
@@ -3787,6 +3858,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(kind, UniqueChildTable, provider.Escape(UniqueChildTable)));
             await ExecuteAsync(connection, DropTable(kind, UniqueParentTable, provider.Escape(UniqueParentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSingleColumnAlternateKeyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SingleAlternateChildTable, provider.Escape(SingleAlternateChildTable)));
+            await ExecuteAsync(connection, DropTable(kind, SingleAlternateParentTable, provider.Escape(SingleAlternateParentTable)));
         }
         catch
         {
