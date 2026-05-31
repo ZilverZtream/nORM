@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Providers;
@@ -117,6 +118,39 @@ public class DynamicTypeQueryTests
 
         var row = Assert.Single(rows);
         Assert.Equal("Ada", row.GetType().GetProperty("Name")!.GetValue(row));
+    }
+
+    [Fact]
+    public void QueryString_KeylessDynamicType_RejectsGeneratedWrites()
+    {
+        var dbName = $"dynamic_query_keyless_write_{Guid.NewGuid():N}";
+        var cn = new SqliteConnection($"Data Source={dbName};Mode=Memory;Cache=Shared");
+        cn.Open();
+        var ctx = new DbContext(cn, new SqliteProvider());
+
+        using var _cn = cn;
+        using var _ctx = ctx;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE ImportRows (
+                    ExternalId TEXT NOT NULL,
+                    Payload TEXT NOT NULL
+                );
+                INSERT INTO ImportRows (ExternalId, Payload) VALUES ('ext-1', 'payload');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var row = ctx.Query("ImportRows").Cast<object>().Single();
+        var add = typeof(DbContext)
+            .GetMethods()
+            .Single(method => method.Name == nameof(DbContext.Add) && method.IsGenericMethodDefinition)
+            .MakeGenericMethod(row.GetType());
+
+        var ex = Assert.Throws<TargetInvocationException>(() => add.Invoke(ctx, new[] { row }));
+        var unsupported = Assert.IsType<NormUnsupportedFeatureException>(ex.InnerException);
+        Assert.Contains("read-only", unsupported.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
