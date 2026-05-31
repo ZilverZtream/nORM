@@ -329,6 +329,8 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` proves live FK referential actions are
   preserved in generated model configuration across SQLite, SQL Server,
   PostgreSQL, and MySQL, including `ON DELETE SET NULL` plus `ON UPDATE CASCADE`.
+  It also pins `ON DELETE RESTRICT` plus `ON UPDATE CASCADE` on the providers
+  whose DDL accepts that shape (SQLite, PostgreSQL, and MySQL).
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
   scaffolding converts SQLite views and SQLite virtual tables into compiling
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.

@@ -35,6 +35,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ReferentialParentTable = "ScaffoldLiveReferentialParent";
     private const string ReferentialChildTable = "ScaffoldLiveReferentialChild";
     private const string ReferentialFkName = "FK_ScaffoldLiveReferentialChild_Parent";
+    private const string ReferentialRestrictParentTable = "ScaffoldLiveRestrictParent";
+    private const string ReferentialRestrictChildTable = "ScaffoldLiveRestrictChild";
+    private const string ReferentialRestrictFkName = "FK_ScaffoldLiveRestrictChild_Parent";
     private const string CompositeStudentTable = "ScaffoldLiveCompositeStudent";
     private const string CompositeCourseTable = "ScaffoldLiveCompositeCourse";
     private const string CompositeStudentCourseTable = "ScaffoldLiveCompositeStudentCourse";
@@ -318,6 +321,46 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownReferentialActionAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_preserves_restrict_fk_referential_actions_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupRestrictReferentialActionAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_restrict_referential_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldRestrictReferentialContext",
+                    new ScaffoldOptions { Tables = new[] { ReferentialRestrictParentTable, ReferentialRestrictChildTable }, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRestrictReferentialContext.cs"));
+
+                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade);", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownRestrictReferentialActionAsync(connection, provider, kind);
             }
         }
     }
@@ -2398,6 +2441,25 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(ReferentialFkName)} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}) ON DELETE SET NULL ON UPDATE CASCADE)");
     }
 
+    private static async Task SetupRestrictReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictChildTable, provider.Escape(ReferentialRestrictChildTable)));
+        await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictParentTable, provider.Escape(ReferentialRestrictParentTable)));
+
+        var parent = provider.Escape(ReferentialRestrictParentTable);
+        var child = provider.Escape(ReferentialRestrictChildTable);
+        var id = provider.Escape("Id");
+        var parentId = provider.Escape("ParentId");
+        var name = provider.Escape("Name");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {parent} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {child} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {parentId} {IntType(kind)} NOT NULL, {name} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(ReferentialRestrictFkName)} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}) ON DELETE RESTRICT ON UPDATE CASCADE)");
+    }
+
     private static async Task SetupCompositeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, CompositeStudentCourseTable, provider.Escape(CompositeStudentCourseTable)));
@@ -3082,6 +3144,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(kind, ReferentialChildTable, provider.Escape(ReferentialChildTable)));
             await ExecuteAsync(connection, DropTable(kind, ReferentialParentTable, provider.Escape(ReferentialParentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownRestrictReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictChildTable, provider.Escape(ReferentialRestrictChildTable)));
+            await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictParentTable, provider.Escape(ReferentialRestrictParentTable)));
         }
         catch
         {
