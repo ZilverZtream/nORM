@@ -17,6 +17,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Trait("Category", TestCategory.LiveProvider)]
+[Collection("LiveProviderScaffolding")]
 public sealed class LiveProviderScaffoldingParityTests
 {
     private const string AuthorTable = "ScaffoldLiveAuthor";

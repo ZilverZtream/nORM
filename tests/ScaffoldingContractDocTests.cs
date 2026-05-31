@@ -377,6 +377,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("Scaffold_sqlite_output_builds_as_consumer_project", releaseGates, StringComparison.Ordinal);
         Assert.Contains("Scaffold_clean_run_removes_stale_warning_reports_without_printing_summary", releaseGates, StringComparison.Ordinal);
         Assert.Contains("LiveProviderScaffoldingParityTests", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("LiveProviderScaffoldCliParityTests", releaseGates, StringComparison.Ordinal);
         Assert.Contains("already-built `nORM.dll`", releaseGates, StringComparison.Ordinal);
 
         Assert.Contains("NormalizeScaffoldClrType", source, StringComparison.Ordinal);

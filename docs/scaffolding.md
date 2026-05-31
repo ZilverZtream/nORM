@@ -380,6 +380,10 @@ must be reviewed and edited like handwritten model code.
   filtered-unique surrogate join tables that must remain
   explicit entities instead of unsafe skip navigations, plus keyless dependent
   FK shapes that must suppress generated navigations.
+- `LiveProviderScaffoldCliParityTests` runs the real `dotnet-norm scaffold`
+  command against live SQLite, SQL Server, PostgreSQL, and MySQL schemas with a
+  shared-tenant composite-key many-to-many bridge, then builds the generated
+  output as a consumer project.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
