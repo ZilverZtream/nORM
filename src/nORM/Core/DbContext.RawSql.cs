@@ -476,6 +476,8 @@ namespace nORM.Core
                 p.DbType = op.DbType;
                 p.Direction = op.Direction;
                 if (op.Size.HasValue) p.Size = op.Size.Value;
+                if (op.Precision.HasValue) p.Precision = op.Precision.Value;
+                if (op.Scale.HasValue) p.Scale = op.Scale.Value;
                 if (op.Direction == ParameterDirection.InputOutput)
                 {
                     if (op.Value is not null)

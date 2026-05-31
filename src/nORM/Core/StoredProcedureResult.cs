@@ -11,12 +11,16 @@ namespace nORM.Core
     /// <param name="Name">Name of the parameter without provider-specific prefix.</param>
     /// <param name="DbType">Database type of the parameter.</param>
     /// <param name="Size">Optional size for variable-length parameters.</param>
+    /// <param name="Precision">Optional decimal precision for providers that require explicit output precision.</param>
+    /// <param name="Scale">Optional decimal scale for providers that require explicit output scale.</param>
     /// <param name="Direction">Parameter direction. Only Output, InputOutput, and ReturnValue are valid.</param>
     /// <param name="Value">Optional initial value for input/output parameters.</param>
     public sealed record OutputParameter(
         string Name,
         DbType DbType,
         int? Size,
+        byte? Precision,
+        byte? Scale,
         ParameterDirection Direction,
         object? Value)
     {
@@ -26,7 +30,7 @@ namespace nORM.Core
         /// <param name="name">Name of the parameter without provider-specific prefix.</param>
         /// <param name="dbType">Database type of the parameter.</param>
         public OutputParameter(string name, DbType dbType)
-            : this(name, dbType, null, ParameterDirection.Output, null)
+            : this(name, dbType, null, null, null, ParameterDirection.Output, null)
         {
         }
 
@@ -37,7 +41,32 @@ namespace nORM.Core
         /// <param name="dbType">Database type of the parameter.</param>
         /// <param name="size">Optional size for variable-length parameters.</param>
         public OutputParameter(string name, DbType dbType, int? size = null)
-            : this(name, dbType, size, ParameterDirection.Output, null)
+            : this(name, dbType, size, null, null, ParameterDirection.Output, null)
+        {
+        }
+
+        /// <summary>
+        /// Creates a decimal output parameter with explicit precision and scale.
+        /// </summary>
+        /// <param name="name">Name of the parameter without provider-specific prefix.</param>
+        /// <param name="dbType">Database type of the parameter.</param>
+        /// <param name="precision">Decimal precision.</param>
+        /// <param name="scale">Decimal scale.</param>
+        public OutputParameter(string name, DbType dbType, byte precision, byte scale)
+            : this(name, dbType, null, precision, scale, ParameterDirection.Output, null)
+        {
+        }
+
+        /// <summary>
+        /// Creates a decimal output, input/output, or return-value parameter definition.
+        /// </summary>
+        /// <param name="name">Name of the parameter without provider-specific prefix.</param>
+        /// <param name="dbType">Database type of the parameter.</param>
+        /// <param name="precision">Decimal precision.</param>
+        /// <param name="scale">Decimal scale.</param>
+        /// <param name="direction">Parameter direction.</param>
+        public OutputParameter(string name, DbType dbType, byte precision, byte scale, ParameterDirection direction)
+            : this(name, dbType, null, precision, scale, direction, null)
         {
         }
 
@@ -49,7 +78,20 @@ namespace nORM.Core
         /// <param name="size">Optional size for variable-length parameters.</param>
         /// <param name="direction">Parameter direction.</param>
         public OutputParameter(string name, DbType dbType, int? size, ParameterDirection direction)
-            : this(name, dbType, size, direction, null)
+            : this(name, dbType, size, null, null, direction, null)
+        {
+        }
+
+        /// <summary>
+        /// Creates an output, input/output, or return-value parameter definition.
+        /// </summary>
+        /// <param name="name">Name of the parameter without provider-specific prefix.</param>
+        /// <param name="dbType">Database type of the parameter.</param>
+        /// <param name="size">Optional size for variable-length parameters.</param>
+        /// <param name="direction">Parameter direction.</param>
+        /// <param name="value">Optional initial value for input/output parameters.</param>
+        public OutputParameter(string name, DbType dbType, int? size, ParameterDirection direction, object? value)
+            : this(name, dbType, size, null, null, direction, value)
         {
         }
 
@@ -61,6 +103,23 @@ namespace nORM.Core
             name = Name;
             dbType = DbType;
             size = Size;
+        }
+
+        /// <summary>
+        /// Deconstructs the v1 output-parameter fields.
+        /// </summary>
+        public void Deconstruct(
+            out string name,
+            out DbType dbType,
+            out int? size,
+            out ParameterDirection direction,
+            out object? value)
+        {
+            name = Name;
+            dbType = DbType;
+            size = Size;
+            direction = Direction;
+            value = Value;
         }
     }
 

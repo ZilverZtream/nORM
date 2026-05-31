@@ -583,7 +583,7 @@ namespace nORM.Scaffolding
                                   '; parameterModes=',
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
-                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'INOUT' ELSE 'IN' END, ':',
+                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
                                           CASE
                                               WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
                                               ELSE COALESCE(base_ty.name, ty.name)
@@ -641,7 +641,7 @@ namespace nORM.Scaffolding
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
                                           pa.name, ':',
-                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'INOUT' ELSE 'IN' END,
+                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
                                           ':',
                                           CASE
                                               WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
@@ -5376,10 +5376,13 @@ namespace nORM.Scaffolding
                     return Array.Empty<RoutineOutputParameter>();
 
                 var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
+                var (precision, scale) = GetRoutineParameterPrecisionScale(dataType);
                 names.Add(new RoutineOutputParameter(
                     normalized,
                     GetRoutineParameterDbTypeName(dataType),
                     GetRoutineParameterSize(dataType),
+                    precision,
+                    scale,
                     GetRoutineParameterDirection(mode)));
             }
 
@@ -5455,6 +5458,15 @@ namespace nORM.Scaffolding
         private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)
         {
             var baseCall = $"new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}";
+            if (parameter.Precision.HasValue && parameter.Scale.HasValue)
+            {
+                baseCall += $", (byte){parameter.Precision.Value.ToString(CultureInfo.InvariantCulture)}, (byte){parameter.Scale.Value.ToString(CultureInfo.InvariantCulture)}";
+                var hasNonDefaultDecimalDirection = !string.Equals(parameter.Direction, nameof(ParameterDirection.Output), StringComparison.Ordinal);
+                return hasNonDefaultDecimalDirection
+                    ? baseCall + ", System.Data.ParameterDirection." + parameter.Direction + ")"
+                    : baseCall + ")";
+            }
+
             var hasNonDefaultDirection = !string.Equals(parameter.Direction, nameof(ParameterDirection.Output), StringComparison.Ordinal);
             if (!parameter.Size.HasValue && !hasNonDefaultDirection)
                 return baseCall + ")";
@@ -5466,6 +5478,35 @@ namespace nORM.Scaffolding
                 return baseCall + ", " + sizeArgument + ")";
 
             return baseCall + ", " + sizeArgument + ", System.Data.ParameterDirection." + parameter.Direction + ")";
+        }
+
+        private static (byte? Precision, byte? Scale) GetRoutineParameterPrecisionScale(string? dataType)
+        {
+            if (string.IsNullOrWhiteSpace(dataType))
+                return (null, null);
+
+            var trimmed = dataType.Trim();
+            var open = trimmed.IndexOf('(');
+            if (open < 0)
+                return (null, null);
+
+            var close = trimmed.IndexOf(')', open + 1);
+            if (close < 0)
+                return (null, null);
+
+            var normalized = trimmed[..open].Trim().ToLowerInvariant();
+            if (normalized is not ("decimal" or "numeric"))
+                return (null, null);
+
+            var parts = trimmed.Substring(open + 1, close - open - 1)
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+                return (null, null);
+
+            return byte.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var precision)
+                   && byte.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var scale)
+                ? (precision, scale)
+                : (null, null);
         }
 
         private static string GetRoutineParameterDirection(string? mode)
@@ -6162,6 +6203,8 @@ namespace nORM.Scaffolding
             string Name,
             string DbType,
             int? Size,
+            byte? Precision,
+            byte? Scale,
             string Direction);
 
         private readonly record struct RoutineResultColumn(

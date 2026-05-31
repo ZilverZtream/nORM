@@ -226,8 +226,9 @@ must be reviewed and edited like handwritten model code.
   When safe
   output parameter metadata is available, scaffolding also emits an
   `OutputParameter[]` factory with mapped `DbType` values, discovered
-  string/binary sizes where providers expose them, and `InputOutput` direction
-  for INOUT parameters and SQL Server `OUTPUT` parameters. SQL Server stored
+  string/binary sizes, decimal precision/scale where providers expose them,
+  and `InputOutput` direction
+  for INOUT parameters. SQL Server stored
   procedures include the provider return status as a `ReturnValue` output
   definition. The generated output wrapper includes a convenience overload that
   uses the scaffold-discovered output definitions, plus an explicit

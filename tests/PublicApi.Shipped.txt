@@ -429,12 +429,16 @@ M:nORM.Core.NormValidator.ValidateEntity``1(`0,System.String):System.Void
 M:nORM.Core.NormValidator.ValidateLikeEscapeChar(System.Char):System.Char
 M:nORM.Core.NormValidator.ValidateRawSql(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}):System.Void
 M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType)
+M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte)
+M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte,System.Data.ParameterDirection)
 M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
 M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection)
 M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection,System.Object)
+M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Nullable{System.Byte},System.Nullable{System.Byte},System.Data.ParameterDirection,System.Object)
 M:nORM.Core.OutputParameter.<Clone>$():nORM.Core.OutputParameter
 M:nORM.Core.OutputParameter.Deconstruct(System.String&,System.Data.DbType&,System.Nullable{System.Int32}&):System.Void
 M:nORM.Core.OutputParameter.Deconstruct(System.String&,System.Data.DbType&,System.Nullable{System.Int32}&,System.Data.ParameterDirection&,System.Object&):System.Void
+M:nORM.Core.OutputParameter.Deconstruct(System.String&,System.Data.DbType&,System.Nullable{System.Int32}&,System.Nullable{System.Byte}&,System.Nullable{System.Byte}&,System.Data.ParameterDirection&,System.Object&):System.Void
 M:nORM.Core.OutputParameter.Equals(System.Object):System.Boolean
 M:nORM.Core.OutputParameter.Equals(nORM.Core.OutputParameter):System.Boolean
 M:nORM.Core.OutputParameter.GetHashCode():System.Int32
@@ -1156,6 +1160,8 @@ P:nORM.Core.NormException.SqlStatement:System.String
 P:nORM.Core.OutputParameter.DbType:System.Data.DbType
 P:nORM.Core.OutputParameter.Direction:System.Data.ParameterDirection
 P:nORM.Core.OutputParameter.Name:System.String
+P:nORM.Core.OutputParameter.Precision:System.Nullable{System.Byte}
+P:nORM.Core.OutputParameter.Scale:System.Nullable{System.Byte}
 P:nORM.Core.OutputParameter.Size:System.Nullable{System.Int32}
 P:nORM.Core.OutputParameter.Value:System.Object
 P:nORM.Core.StoredProcedureNonQueryResult.AffectedRows:System.Int32

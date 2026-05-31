@@ -132,8 +132,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("'Routine'", source, StringComparison.Ordinal);
         Assert.Contains("outputParameters", source, StringComparison.Ordinal);
         Assert.Contains("parameterModes", source, StringComparison.Ordinal);
-        Assert.Contains("pa.is_output = 1 THEN 'INOUT'", source, StringComparison.Ordinal);
-        Assert.Contains("SQL Server `OUTPUT` parameters", doc, StringComparison.Ordinal);
+        Assert.Contains("pa.is_output = 1 THEN 'OUT'", source, StringComparison.Ordinal);
+        Assert.Contains("decimal precision/scale", doc, StringComparison.Ordinal);
         Assert.Contains("exclude provider metadata return rows from callable input counts", doc, StringComparison.Ordinal);
         Assert.Contains("p.parameter_mode IS NOT NULL", source, StringComparison.Ordinal);
         Assert.Contains("WITHIN GROUP (ORDER BY pa.parameter_id)", source, StringComparison.Ordinal);

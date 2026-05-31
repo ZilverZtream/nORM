@@ -68,7 +68,8 @@ make the routine provider-mobile.
 On SQL Server, PostgreSQL, and MySQL the diagnostic detail includes routine
 metadata such as parameter count, ordered parameter mode/type summaries,
 INOUT direction, output-parameter count when available, output string/binary
-sizes where providers expose them, and declared result/data type hints.
+sizes, decimal precision/scale where providers expose them, and declared
+result/data type hints.
 The JSON warning report also exposes structured `metadata` for routine rows so
 CI and migration tools can classify provider-bound routines without parsing the
 human `detail` string. Use that report as migration inventory: each routine

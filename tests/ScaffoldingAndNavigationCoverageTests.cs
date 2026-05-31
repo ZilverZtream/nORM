@@ -893,7 +893,7 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("output parameters discovered at scaffold time", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")), CreateGetRevenueOutputParameters())", code);
         Assert.Contains("public static OutputParameter[] CreateGetRevenueOutputParameters()", code);
-        Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", code);
+        Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal, (byte)18, (byte)2)", code);
         Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32, System.Data.ParameterDirection.InputOutput)", code);
         Assert.Contains("private static object? RequireScaffoldedRoutineParameters", code);
         Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", code);

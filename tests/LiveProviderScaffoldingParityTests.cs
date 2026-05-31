@@ -1649,7 +1649,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRoutineOutputContext.cs"));
                 Assert.Contains($"Task<StoredProcedureResult<TResult>> {RoutineOutputName}WithOutputAsync<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public static OutputParameter[] Create{RoutineOutputName}OutputParameters()", contextCode, StringComparison.Ordinal);
-                Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal)", contextCode, StringComparison.Ordinal);
+                Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal, (byte)18, (byte)2)", contextCode, StringComparison.Ordinal);
                 if (kind == ProviderKind.MySql)
                 {
                     Assert.Contains("public string? message { get; init; }", contextCode, StringComparison.Ordinal);
@@ -1695,12 +1695,12 @@ public sealed class LiveProviderScaffoldingParityTests
                 var outputParameters = kind == ProviderKind.MySql
                     ? new[]
                     {
-                        new OutputParameter("total", DbType.Decimal),
+                        new OutputParameter("total", DbType.Decimal, 18, 2),
                         new OutputParameter("message", DbType.String, 32, ParameterDirection.InputOutput)
                     }
                     : new[]
                     {
-                        new OutputParameter("total", DbType.Decimal),
+                        new OutputParameter("total", DbType.Decimal, 18, 2),
                         new OutputParameter("message", DbType.String, 32),
                         new OutputParameter("return", DbType.Int32, null, ParameterDirection.ReturnValue)
                     };
