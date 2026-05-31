@@ -105,6 +105,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
     private const string MySqlTypedColumnTable = "ScaffoldLiveMySqlTypedColumns";
     private const string MySqlUnsignedColumnTable = "ScaffoldLiveMySqlUnsignedColumns";
+    private const string ProviderSpecificColumnDiagnosticsTable = "ScaffoldLiveProviderSpecificColumns";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
@@ -1404,6 +1405,57 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownMySqlUnsignedColumnTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer, "Location", "geometry")]
+    [InlineData(ProviderKind.Postgres, "Address", "inet")]
+    [InlineData(ProviderKind.MySql, "Location", "point")]
+    [InlineData(ProviderKind.Sqlite, "Location", "GEOMETRY")]
+    public async Task ScaffoldAsync_reports_nonportable_provider_specific_columns_on_live_provider(
+        ProviderKind kind,
+        string columnName,
+        string expectedDetail)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupProviderSpecificColumnDiagnosticsAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_provider_specific_columns_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldProviderSpecificColumnContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderSpecificColumnDiagnosticsTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderSpecificColumnDiagnosticsTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains(columnName + " { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("name").GetString() == columnName &&
+                    item.GetProperty("detail").GetString()!.Contains(expectedDetail, StringComparison.OrdinalIgnoreCase) &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("provider-specific type", StringComparison.OrdinalIgnoreCase));
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificColumnDiagnosticsAsync(connection, provider, kind);
             }
         }
     }
@@ -3177,6 +3229,29 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("UnsignedCount")} INT UNSIGNED NOT NULL, {provider.Escape("UnsignedTotal")} BIGINT UNSIGNED NOT NULL)");
     }
 
+    private static async Task SetupProviderSpecificColumnDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownProviderSpecificColumnDiagnosticsAsync(connection, provider, kind);
+
+        var table = kind == ProviderKind.SqlServer
+            ? SqlServerQualified(provider, ProviderSpecificColumnDiagnosticsTable)
+            : kind == ProviderKind.Postgres
+                ? Qualified(provider, "public", ProviderSpecificColumnDiagnosticsTable)
+                : provider.Escape(ProviderSpecificColumnDiagnosticsTable);
+        var id = provider.Escape("Id");
+        var providerColumnSql = kind switch
+        {
+            ProviderKind.SqlServer => $"{provider.Escape("Location")} geometry NULL",
+            ProviderKind.Postgres => $"{provider.Escape("Address")} inet NULL",
+            ProviderKind.MySql => $"{provider.Escape("Location")} POINT NULL",
+            ProviderKind.Sqlite => $"{provider.Escape("Location")} GEOMETRY NULL",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
+        };
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {providerColumnSql})");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -3943,6 +4018,23 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlUnsignedColumnTable, provider.Escape(MySqlUnsignedColumnTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownProviderSpecificColumnDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            var table = kind == ProviderKind.SqlServer
+                ? SqlServerQualified(provider, ProviderSpecificColumnDiagnosticsTable)
+                : kind == ProviderKind.Postgres
+                    ? Qualified(provider, "public", ProviderSpecificColumnDiagnosticsTable)
+                    : provider.Escape(ProviderSpecificColumnDiagnosticsTable);
+            await ExecuteAsync(connection, DropTable(kind, ProviderSpecificColumnDiagnosticsTable, table));
         }
         catch
         {

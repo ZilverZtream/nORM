@@ -355,6 +355,8 @@ must be reviewed and edited like handwritten model code.
   overloaded and quoted-parameter function wrappers
   with deterministic generated names, PostgreSQL domain diagnostics,
   SQL Server alias-type diagnostics, MySQL unsigned-column diagnostics,
+  SQL Server geometry, PostgreSQL inet, MySQL point, and SQLite declared
+  `GEOMETRY` provider-specific column diagnostics,
   PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts
   plus procedure-synonym rejection,
