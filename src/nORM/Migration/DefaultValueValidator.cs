@@ -42,7 +42,7 @@ namespace nORM.Migration
             @"|current_user" +                                          // H: ANSI current user keyword
             @"|now\(\)|getdate\(\)|getutcdate\(\)" +                    // common date functions
             @"|newid\(\)|newsequentialid\(\)" +                         // SQL Server UUID generators
-            @"|uuid\(\)|gen_random_uuid\(\)" +                          // PostgreSQL / MySQL UUID generators
+            @"|uuid\(\)|gen_random_uuid\(\)|uuid_generate_v4\(\)" +       // PostgreSQL / MySQL UUID generators
             @"|sysdate\(\)|sysdatetime\(\)|sysutcdatetime\(\)|sysdatetimeoffset\(\)" + // Oracle / SQL Server variants
             @"|utc_timestamp\(\)" +                                      // MySQL UTC timestamp
             @"|random\(\)" +                                            // H: SQLite / PostgreSQL random value

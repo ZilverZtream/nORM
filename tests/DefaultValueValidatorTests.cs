@@ -133,6 +133,7 @@ public class DefaultValueValidatorTests
         new object[] { "NEWSEQUENTIALID()" },
         new object[] { "UUID()" },
         new object[] { "GEN_RANDOM_UUID()" },
+        new object[] { "UUID_GENERATE_V4()" },
         new object[] { "SYSDATE()" },
         new object[] { "SYSDATETIME()" },
         new object[] { "SYSUTCDATETIME()" },
