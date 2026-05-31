@@ -307,6 +307,7 @@ M:nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbComm
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.ExecuteStoredProcedureNonQueryAsync(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Int32}
+M:nORM.Core.DbContext.ExecuteStoredProcedureNonQueryWithOutputAsync(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[]):System.Threading.Tasks.Task{nORM.Core.StoredProcedureNonQueryResult}
 M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[]):System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{`0}}
 M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
@@ -443,6 +444,13 @@ M:nORM.Core.PreparedOperation{`0}.ExecuteAsync(`0,System.Threading.CancellationT
 M:nORM.Core.SetPropertyCalls{`0}.#ctor()
 M:nORM.Core.SetPropertyCalls{`0}.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,`0}},System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Core.SetPropertyCalls{`0}
 M:nORM.Core.SetPropertyCalls{`0}.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,`0}},`0):nORM.Core.SetPropertyCalls{`0}
+M:nORM.Core.StoredProcedureNonQueryResult.#ctor(System.Int32,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})
+M:nORM.Core.StoredProcedureNonQueryResult.<Clone>$():nORM.Core.StoredProcedureNonQueryResult
+M:nORM.Core.StoredProcedureNonQueryResult.Deconstruct(System.Int32&,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}&):System.Void
+M:nORM.Core.StoredProcedureNonQueryResult.Equals(System.Object):System.Boolean
+M:nORM.Core.StoredProcedureNonQueryResult.Equals(nORM.Core.StoredProcedureNonQueryResult):System.Boolean
+M:nORM.Core.StoredProcedureNonQueryResult.GetHashCode():System.Int32
+M:nORM.Core.StoredProcedureNonQueryResult.ToString():System.String
 M:nORM.Core.StoredProcedureResult{`0}.#ctor(System.Collections.Generic.List{`0},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})
 M:nORM.Core.StoredProcedureResult{`0}.<Clone>$():nORM.Core.StoredProcedureResult{`0}
 M:nORM.Core.StoredProcedureResult{`0}.Deconstruct(System.Collections.Generic.List{`0}&,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}&):System.Void
@@ -1150,6 +1158,8 @@ P:nORM.Core.OutputParameter.Direction:System.Data.ParameterDirection
 P:nORM.Core.OutputParameter.Name:System.String
 P:nORM.Core.OutputParameter.Size:System.Nullable{System.Int32}
 P:nORM.Core.OutputParameter.Value:System.Object
+P:nORM.Core.StoredProcedureNonQueryResult.AffectedRows:System.Int32
+P:nORM.Core.StoredProcedureNonQueryResult.OutputParameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
 P:nORM.Core.StoredProcedureResult{`0}.OutputParameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
 P:nORM.Core.StoredProcedureResult{`0}.Results:System.Collections.Generic.List{`0}
 P:nORM.Core.TemporalDiffEntry{`0}.Changes:System.Collections.Generic.IReadOnlyList{nORM.Core.TemporalPropertyChange}
@@ -1493,6 +1503,7 @@ T:nORM.Core.OutputParameter
 T:nORM.Core.PreparedOperation{`0}
 T:nORM.Core.QueryTrackingBehavior
 T:nORM.Core.SetPropertyCalls{`0}
+T:nORM.Core.StoredProcedureNonQueryResult
 T:nORM.Core.StoredProcedureResult{`0}
 T:nORM.Core.TemporalDiffEntry{`0}
 T:nORM.Core.TemporalExtensions

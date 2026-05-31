@@ -228,6 +228,10 @@ must be reviewed and edited like handwritten model code.
   definition. The generated output wrapper includes a convenience overload that
   uses the scaffold-discovered output definitions, plus an explicit
   `params OutputParameter[]` overload for reviewed routine signature changes.
+  Procedures with explicit no-result-set metadata emit `Task<int>` non-query
+  wrappers, and no-result procedures with output metadata emit
+  `StoredProcedureNonQueryResult` wrappers so callers do not need to invent a
+  fake row DTO just to read affected rows and output values.
   Scalar-function stubs also include a direct `Task<TValue?> ...ValueAsync`
   convenience wrapper so callers do not need to hand-author a one-column
   result DTO for the generated `Value` projection.

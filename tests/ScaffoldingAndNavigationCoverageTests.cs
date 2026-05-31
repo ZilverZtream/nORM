@@ -929,6 +929,24 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithKnownNoResultOutputProcedure_EmitsNonQueryOutputWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "FinalizeLedger",
+            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@status:OUT:nvarchar(32); resultColumns=");
+
+        Assert.Contains("Task<int> FinalizeLedgerAsync(FinalizeLedgerParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("Task<StoredProcedureNonQueryResult> FinalizeLedgerWithOutputAsync(FinalizeLedgerParameters? parameters = null, CancellationToken ct = default, params OutputParameter[] outputParameters)", code);
+        Assert.Contains("ExecuteStoredProcedureNonQueryWithOutputAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"FinalizeLedger\"), ct, RequireScaffoldedRoutineParameters(parameters, 1, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"FinalizeLedger\")), outputParameters)", code);
+        Assert.Contains("Task<StoredProcedureNonQueryResult> FinalizeLedgerWithOutputAsync(FinalizeLedgerParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("ExecuteStoredProcedureNonQueryWithOutputAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"FinalizeLedger\"), ct, RequireScaffoldedRoutineParameters(parameters, 1, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"FinalizeLedger\")), CreateFinalizeLedgerOutputParameters())", code);
+        Assert.DoesNotContain("StoredProcedureResult<TResult> FinalizeLedgerWithOutputAsync", code);
+        Assert.DoesNotContain("FinalizeLedgerAsync<TResult>", code);
+        Assert.DoesNotContain("StreamFinalizeLedgerAsync", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithRoutineReturnValue_EmitsReturnOutputParameter()
     {
         var code = InvokeScaffoldContextWithRoutineReturnStub();

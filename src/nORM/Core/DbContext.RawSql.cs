@@ -327,6 +327,48 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Executes a stored procedure or provider-bound routine that does not
+        /// return a result set but does expose output parameters.
+        /// </summary>
+        /// <param name="procedureName">Provider routine name or invocation text.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Optional routine parameters.</param>
+        /// <param name="outputParameters">Output, input/output, or return-value parameter definitions.</param>
+        /// <returns>The affected row count and output parameter values.</returns>
+        public Task<StoredProcedureNonQueryResult> ExecuteStoredProcedureNonQueryWithOutputAsync(
+            string procedureName,
+            CancellationToken ct = default,
+            object? parameters = null,
+            params OutputParameter[] outputParameters)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteStoredProcedureNonQueryWithOutputAsync));
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.RawConnection, procedureName);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
+                var paramDict = new Dictionary<string, object>();
+                SetStoredProcedureParameters(cmd, ctx._p, parameters, paramDict);
+                var outputParamMap = AddStoredProcedureOutputParameters(cmd, ctx._p, outputParameters);
+
+                ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict, allowTextNonQuery: true);
+
+                var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, token).ConfigureAwait(false);
+                var outputs = ExtractStoredProcedureOutputs(outputParamMap);
+
+                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, affected);
+                cmd.Parameters.Clear();
+                return new StoredProcedureNonQueryResult(affected, outputs);
+            }, ct);
+        }
+
+        /// <summary>
         /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
         /// </summary>
         public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
@@ -383,41 +425,7 @@ namespace nORM.Core
                 var paramDict = new Dictionary<string, object>();
                 SetStoredProcedureParameters(cmd, ctx._p, parameters, paramDict);
 
-                var outputParamMap = new Dictionary<string, DbParameter>();
-                foreach (var op in outputParameters)
-                {
-                    if (!IsSafeOutputParamName(op.Name))
-                        throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
-                            "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
-                    if (op.Direction is not (ParameterDirection.Output or ParameterDirection.InputOutput or ParameterDirection.ReturnValue))
-                    {
-                        throw new NormUsageException(
-                            $"Invalid output parameter direction for '{op.Name}': {op.Direction}. " +
-                            "Use Output, InputOutput, or ReturnValue.");
-                    }
-
-                    var pName = ctx._p.ParamPrefix + op.Name;
-                    var p = FindParameter(cmd.Parameters, pName);
-                    if (p is null)
-                    {
-                        p = cmd.CreateParameter();
-                        p.ParameterName = pName;
-                        cmd.Parameters.Add(p);
-                    }
-
-                    p.DbType = op.DbType;
-                    p.Direction = op.Direction;
-                    if (op.Size.HasValue) p.Size = op.Size.Value;
-                    if (op.Direction == ParameterDirection.InputOutput)
-                    {
-                        if (op.Value is not null)
-                            p.Value = op.Value;
-                        else if (p.Value is null)
-                            p.Value = DBNull.Value;
-                    }
-
-                    outputParamMap[op.Name] = p;
-                }
+                var outputParamMap = AddStoredProcedureOutputParameters(cmd, ctx._p, outputParameters);
 
                 ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict);
 
@@ -430,14 +438,65 @@ namespace nORM.Core
                     list.Add(MaterializeRawEntity<T>(reader, colOrdinals));
                 await reader.DisposeAsync().ConfigureAwait(false);
 
-                var outputs = new Dictionary<string, object?>();
-                foreach (var kv in outputParamMap)
-                    outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
+                var outputs = ExtractStoredProcedureOutputs(outputParamMap);
 
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, list.Count);
                 cmd.Parameters.Clear();
                 return new StoredProcedureResult<T>(list, outputs);
             }, ct);
+        }
+
+        private static Dictionary<string, DbParameter> AddStoredProcedureOutputParameters(
+            DbCommand cmd,
+            Providers.DatabaseProvider provider,
+            IEnumerable<OutputParameter> outputParameters)
+        {
+            var outputParamMap = new Dictionary<string, DbParameter>();
+            foreach (var op in outputParameters)
+            {
+                if (!IsSafeOutputParamName(op.Name))
+                    throw new NormUsageException($"Invalid output parameter name: '{op.Name}'. " +
+                        "Parameter names must start with a letter or underscore and contain only letters, digits, and underscores.");
+                if (op.Direction is not (ParameterDirection.Output or ParameterDirection.InputOutput or ParameterDirection.ReturnValue))
+                {
+                    throw new NormUsageException(
+                        $"Invalid output parameter direction for '{op.Name}': {op.Direction}. " +
+                        "Use Output, InputOutput, or ReturnValue.");
+                }
+
+                var pName = provider.ParamPrefix + op.Name;
+                var p = FindParameter(cmd.Parameters, pName);
+                if (p is null)
+                {
+                    p = cmd.CreateParameter();
+                    p.ParameterName = pName;
+                    cmd.Parameters.Add(p);
+                }
+
+                p.DbType = op.DbType;
+                p.Direction = op.Direction;
+                if (op.Size.HasValue) p.Size = op.Size.Value;
+                if (op.Direction == ParameterDirection.InputOutput)
+                {
+                    if (op.Value is not null)
+                        p.Value = op.Value;
+                    else if (p.Value is null)
+                        p.Value = DBNull.Value;
+                }
+
+                outputParamMap[op.Name] = p;
+            }
+
+            return outputParamMap;
+        }
+
+        private static IReadOnlyDictionary<string, object?> ExtractStoredProcedureOutputs(Dictionary<string, DbParameter> outputParamMap)
+        {
+            var outputs = new Dictionary<string, object?>();
+            foreach (var kv in outputParamMap)
+                outputs[kv.Key] = kv.Value.Value == DBNull.Value ? null : kv.Value.Value;
+
+            return outputs;
         }
 
         private static DbParameter? FindParameter(DbParameterCollection parameters, string parameterName)

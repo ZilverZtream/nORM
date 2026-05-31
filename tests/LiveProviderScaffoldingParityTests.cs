@@ -1122,8 +1122,11 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Empty(metadata.GetProperty("resultColumns").EnumerateArray());
                 Assert.Contains($"Task<int> {RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<StoredProcedureNonQueryResult> {RoutineNonQueryName}WithOutputAsync", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"ExecuteStoredProcedureNonQueryAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{RoutineNonQueryName}\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"ExecuteStoredProcedureNonQueryWithOutputAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{RoutineNonQueryName}\")", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"Task<List<TResult>> {RoutineNonQueryName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"StoredProcedureResult<TResult> {RoutineNonQueryName}WithOutputAsync", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"Stream{RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }

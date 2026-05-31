@@ -72,4 +72,12 @@ namespace nORM.Core
     /// <param name="Results">List of materialized entities returned by the procedure.</param>
     /// <param name="OutputParameters">Dictionary of output parameter values keyed by name.</param>
     public sealed record StoredProcedureResult<T>(List<T> Results, IReadOnlyDictionary<string, object?> OutputParameters);
+
+    /// <summary>
+    /// Encapsulates the result of a stored procedure that does not return a
+    /// result set but does report affected rows and output parameters.
+    /// </summary>
+    /// <param name="AffectedRows">Provider-reported affected row count.</param>
+    /// <param name="OutputParameters">Dictionary of output parameter values keyed by name.</param>
+    public sealed record StoredProcedureNonQueryResult(int AffectedRows, IReadOnlyDictionary<string, object?> OutputParameters);
 }

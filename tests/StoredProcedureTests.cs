@@ -124,6 +124,46 @@ public class StoredProcedureTests
     }
 
     [Fact]
+    public async Task ExecuteStoredProcedureNonQueryWithOutputAsync_UsesProviderCommandType_WorksWithSqlite()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(12,'Mu');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?> { ["id"] = 12, ["name"] = "Xi" };
+
+        var result = await ctx.ExecuteStoredProcedureNonQueryWithOutputAsync(
+            "UPDATE Item SET Name = @name WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Equal(1, result.AffectedRows);
+        Assert.Empty(result.OutputParameters);
+        using var verify = cn.CreateCommand();
+        verify.CommandText = "SELECT Name FROM Item WHERE Id = 12";
+        Assert.Equal("Xi", verify.ExecuteScalar());
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureNonQueryWithOutputAsync_RejectsInvalidOutputParameterName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        var ex = await Record.ExceptionAsync(() =>
+            ctx.ExecuteStoredProcedureNonQueryWithOutputAsync(
+                "UPDATE Item SET Name = 'x'",
+                outputParameters: new OutputParameter("bad name", DbType.Int32)));
+
+        Assert.True(ContainsUsageException(ex), $"Expected NormUsageException in chain; got {ex?.GetType().Name}: {ex?.Message}");
+    }
+
+    [Fact]
     public async Task ExecuteStoredProcedureAsync_BindsPrefixedDictionaryParameters()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
