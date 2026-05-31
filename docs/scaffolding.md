@@ -350,8 +350,8 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL materialized-view query artifacts, SQL Server
   provider-native temporal history read-only scaffolds, SQL Server
   rowversion concurrency-token scaffolds, SQL Server scalar/table-valued
-  function wrappers and table-valued-parameter routine result wrappers,
-  stubs, PostgreSQL array/UUID and MySQL
+  function wrappers, SQL Server no-result procedure non-query wrappers,
+  table-valued-parameter routine result wrappers, PostgreSQL array/UUID and MySQL
   scalar-function wrappers with unsigned routine parameter stubs, PostgreSQL
   overloaded and quoted-parameter function wrappers
   with deterministic generated names, PostgreSQL domain diagnostics,

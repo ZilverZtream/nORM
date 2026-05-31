@@ -132,6 +132,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresDomainTable = "ScaffoldLiveDomainCustomer";
     private const string PostgresDomainName = "scaffold_live_email_address";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
+    private const string RoutineNonQueryName = "ScaffoldLiveRecalculateLedger";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
     private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
     private const string RoutineTableValuedParameterName = "ScaffoldLiveImportLines";
@@ -1086,6 +1087,51 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownRoutineAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_sqlserver_no_result_procedure_as_non_query_wrapper()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerNonQueryRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_nonquery_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerNonQueryRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqlServerNonQueryRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routine = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Routine" &&
+                            item.GetProperty("name").GetString()!.EndsWith(RoutineNonQueryName, StringComparison.Ordinal));
+                var metadata = routine.GetProperty("metadata");
+
+                Assert.Empty(metadata.GetProperty("resultColumns").EnumerateArray());
+                Assert.Contains($"Task<int> {RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"ExecuteStoredProcedureNonQueryAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{RoutineNonQueryName}\")", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"Task<List<TResult>> {RoutineNonQueryName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"Stream{RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerNonQueryRoutineAsync(connection, provider);
             }
         }
     }
@@ -3191,6 +3237,14 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task SetupSqlServerNonQueryRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerNonQueryRoutineAsync(connection, provider);
+
+        await ExecuteAsync(connection,
+            $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineNonQueryName)} @tenantId INT AS BEGIN SET NOCOUNT ON; DECLARE @ignored INT = @tenantId; END");
+    }
+
     private static async Task SetupSqlServerTableValuedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownSqlServerTableValuedParameterRoutineAsync(connection, provider);
@@ -3924,6 +3978,19 @@ public sealed class LiveProviderScaffoldingParityTests
 
             if (!string.IsNullOrWhiteSpace(sql))
                 await ExecuteAsync(connection, sql);
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerNonQueryRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{RoutineNonQueryName}', N'P') IS NOT NULL DROP PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineNonQueryName)}");
         }
         catch
         {
