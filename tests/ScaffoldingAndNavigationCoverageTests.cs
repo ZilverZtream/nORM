@@ -228,7 +228,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     private static string InvokeScaffoldContextWithRoutineStub()
-        => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32)");
+        => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32); resultColumns=Id:int:0|Name:nvarchar(40):0");
 
     private static string InvokeScaffoldContextWithRoutineReturnStub()
         => InvokeScaffoldContextWithRoutine("dbo", "ApplyDiscount", "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@orderId:IN:int,return:RETURN:int");
@@ -875,12 +875,20 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public sealed class GetRevenueParameters", code);
         Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("public string? message { get; init; }", code);
+        Assert.Contains("public sealed class GetRevenueResult", code);
+        Assert.Contains("public int Id { get; set; }", code);
+        Assert.Contains("public string Name { get; set; } = default!;", code);
         Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("Task<List<GetRevenueResult>> GetRevenueAsync(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
+        Assert.Contains("ExecuteStoredProcedureAsync<GetRevenueResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueAsync<TResult>(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("IAsyncEnumerable<GetRevenueResult> StreamGetRevenueAsync(GetRevenueParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
+        Assert.Contains("ExecuteStoredProcedureAsAsyncEnumerable<GetRevenueResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")))", code);
         Assert.Contains("without buffering the full result set", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> GetRevenueWithOutputAsync<TResult>", code);
+        Assert.Contains("Task<StoredProcedureResult<GetRevenueResult>> GetRevenueWithOutputAsync", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")), outputParameters)", code);
         Assert.Contains("output parameters discovered at scaffold time", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\"), ct, RequireScaffoldedRoutineParameters(parameters, 2, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenue\")), CreateGetRevenueOutputParameters())", code);

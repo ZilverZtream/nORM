@@ -676,6 +676,22 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(skippedObjects, item =>
                     item.GetProperty("kind").GetString() == "Routine" &&
                     item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                if (kind == ProviderKind.SqlServer)
+                {
+                    var routine = Assert.Single(skippedObjects, item =>
+                        item.GetProperty("kind").GetString() == "Routine" &&
+                        item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                    var resultColumns = routine.GetProperty("metadata").GetProperty("resultColumns").EnumerateArray().ToArray();
+                    Assert.Contains(resultColumns, item =>
+                        item.GetProperty("name").GetString() == "Id" &&
+                        item.GetProperty("dataType").GetString() == "int");
+                    Assert.Contains(resultColumns, item =>
+                        item.GetProperty("name").GetString() == "Name" &&
+                        item.GetProperty("dataType").GetString()!.StartsWith("nvarchar", StringComparison.OrdinalIgnoreCase));
+                    Assert.Contains($"public sealed class {RoutineName}Result", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"Task<List<{RoutineName}Result>> {RoutineName}Async", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"IAsyncEnumerable<{RoutineName}Result> Stream{RoutineName}Async", contextCode, StringComparison.Ordinal);
+                }
                 if (kind == ProviderKind.Postgres)
                 {
                     var routine = Assert.Single(skippedObjects, item =>
