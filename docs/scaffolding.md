@@ -389,7 +389,8 @@ must be reviewed and edited like handwritten model code.
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
   `[ReadOnlyEntity]` parity, composite primary-key ordinal parity,
   computed/identity/rowversion metadata in the dynamic cache key and generated
-  attributes, non-null reference-column `[Required]` parity, and connection
+  attributes, PostgreSQL domain-column schema probes, non-null
+  reference-column `[Required]` parity, and connection
   ownership for sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted

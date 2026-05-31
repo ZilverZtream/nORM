@@ -2797,6 +2797,40 @@ public sealed class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task Dynamic_scaffolding_handles_postgres_domain_columns_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await TeardownPostgresDomainColumnAsync(connection, provider);
+            var table = provider.Escape("public") + "." + provider.Escape(PostgresDomainTable);
+            var domain = provider.Escape("public") + "." + provider.Escape(PostgresDomainName);
+            try
+            {
+                await ExecuteAsync(connection, $"CREATE DOMAIN {domain} AS varchar(320) CHECK (VALUE LIKE '%@%')");
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL)");
+
+                var type = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, "public." + PostgresDomainTable);
+
+                var tableAttribute = Assert.Single(type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+                Assert.Equal("public", tableAttribute.Schema);
+                Assert.Equal(PostgresDomainTable, tableAttribute.Name);
+                Assert.Equal(typeof(int), type.GetProperty("Id")!.PropertyType);
+                Assert.Equal(typeof(string), type.GetProperty("Email")!.PropertyType);
+            }
+            finally
+            {
+                await TeardownPostgresDomainColumnAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_reports_sqlserver_alias_type_columns_with_base_type_on_live_provider()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);

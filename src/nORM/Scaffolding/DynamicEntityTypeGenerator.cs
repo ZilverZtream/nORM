@@ -327,10 +327,11 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
             var qualified = EscapeQualified(connection, schemaName, tableName);
+            var postgresDomainColumns = GetPostgresDomainColumns(connection, schemaName, tableName);
             DataTable? schema;
             using (var cmd = connection.CreateCommand())
             {
-                cmd.CommandText = $"SELECT * FROM {qualified} WHERE 1=0";
+                cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumns);
                 using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
                 schema = reader.GetSchemaTable();
             }
@@ -364,7 +365,7 @@ namespace nORM.Scaffolding
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
                     || computedColumns.Contains(colName);
                 var isRowVersion = rowVersionColumns.Contains(colName);
-                var effectiveAllowNull = allowNull && !isKey;
+                var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                 sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
                 var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType), effectiveAllowNull);
 
@@ -374,6 +375,31 @@ namespace nORM.Scaffolding
             }
 
             return columns;
+        }
+
+        private static string BuildSchemaProbeSql(
+            DbConnection connection,
+            string? schemaName,
+            string tableName,
+            string qualified,
+            IReadOnlySet<string> postgresDomainColumns)
+        {
+            if (!IsPostgresConnection(connection.GetType().Name) || postgresDomainColumns.Count == 0)
+                return $"SELECT * FROM {qualified} WHERE 1=0";
+
+            var columnNames = GetPostgresColumnNames(connection, schemaName, tableName);
+            if (columnNames.Count == 0)
+                return $"SELECT * FROM {qualified} WHERE 1=0";
+
+            var projection = columnNames.Select(column =>
+            {
+                var escaped = EscapeIdentifier(connection, column);
+                return postgresDomainColumns.Contains(column)
+                    ? $"{escaped}::text AS {escaped}"
+                    : escaped;
+            });
+
+            return $"SELECT {string.Join(", ", projection)} FROM {qualified} WHERE 1=0";
         }
 
         private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
@@ -644,6 +670,52 @@ namespace nORM.Scaffolding
                   AND (@schemaName IS NULL OR s.name = @schemaName)
                   AND ty.name IN ('timestamp', 'rowversion')
                 """, schemaName, tableName);
+        }
+
+        private static IReadOnlySet<string> GetPostgresDomainColumns(DbConnection connection, string? schemaName, string tableName)
+        {
+            if (!IsPostgresConnection(connection.GetType().Name))
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            return QueryColumnNameSet(connection, """
+                SELECT column_name AS ColumnName
+                FROM information_schema.columns
+                WHERE table_name = @tableName
+                  AND (@schemaName IS NULL OR table_schema = @schemaName)
+                  AND domain_name IS NOT NULL
+                """, schemaName, tableName);
+        }
+
+        private static IReadOnlyList<string> GetPostgresColumnNames(DbConnection connection, string? schemaName, string tableName)
+        {
+            var result = new List<string>();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT column_name AS ColumnName
+                FROM information_schema.columns
+                WHERE table_name = @tableName
+                  AND (@schemaName IS NULL OR table_schema = @schemaName)
+                ORDER BY ordinal_position
+                """;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (!string.IsNullOrWhiteSpace(columnName))
+                    result.Add(columnName);
+            }
+
+            return result;
         }
 
         private static IReadOnlySet<string> QueryColumnNameSet(DbConnection connection, string sql, string? schemaName, string tableName)
