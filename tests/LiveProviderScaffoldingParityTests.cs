@@ -1296,6 +1296,12 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("public DbParameter? items { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"table type (dbo.{RoutineTableTypeName})", contextCode, StringComparison.Ordinal);
                 Assert.Equal(2, metadata.GetProperty("parameterCount").GetInt32());
+                var resultColumns = metadata.GetProperty("resultColumns").EnumerateArray().ToArray();
+                Assert.Contains(resultColumns, item => item.GetProperty("name").GetString() == "Id");
+                Assert.Contains(resultColumns, item => item.GetProperty("name").GetString() == "LineCount");
+                Assert.Contains($"public sealed class {RoutineTableValuedParameterName}Result", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<{RoutineTableValuedParameterName}Result>> {RoutineTableValuedParameterName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<{RoutineTableValuedParameterName}Result> Stream{RoutineTableValuedParameterName}Async", contextCode, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
