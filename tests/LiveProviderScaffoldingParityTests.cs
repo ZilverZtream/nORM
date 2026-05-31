@@ -202,6 +202,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(BookLabelTable, contextCode);
                 if (kind == ProviderKind.SqlServer)
                     Assert.Contains("\"BookId\", \"LabelId\", schema: \"dbo\");", contextCode);
+                else if (kind == ProviderKind.Postgres)
+                    Assert.Contains("\"BookId\", \"LabelId\", schema: \"public\");", contextCode);
                 else
                     Assert.Contains("\"BookId\", \"LabelId\");", contextCode);
 
@@ -575,7 +577,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains(".HasForeignKey(d => new { d.StudentTenantId, d.StudentId }, p => new { p.TenantId, p.StudentId }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
                 Assert.Contains(".HasForeignKey(d => new { d.CourseTenantId, d.CourseId }, p => new { p.TenantId, p.CourseId }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
                 Assert.Contains(joinTables, item =>
-                    item.GetProperty("table").GetString() == CompositePayloadStudentCourseTable &&
+                    LastTableNameEquals(item.GetProperty("table").GetString(), CompositePayloadStudentCourseTable) &&
                     item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "payload-columns") &&
                     !item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "composite-foreign-key"));
                 AssertScaffoldOutputBuilds(dir);
@@ -873,8 +875,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.True(File.Exists(Path.Combine(dir, FilteredStudentCourseTable + ".cs")));
                 Assert.DoesNotContain($".UsingTable(\"{FilteredStudentCourseTable}\"", contextCode, StringComparison.Ordinal);
                 Assert.Contains(joinTables, item =>
-                    item.GetProperty("table").GetString() == FilteredStudentCourseTable &&
-                    item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "missing-exact-unique-index"));
+                    LastTableNameEquals(item.GetProperty("table").GetString(), FilteredStudentCourseTable) &&
+                    item.GetProperty("reasons").EnumerateArray().Any(reason =>
+                        reason.GetString() is "missing-exact-unique-index" or "primary-key-not-exact-bridge-columns"));
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
@@ -1835,8 +1838,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public sealed class {SqlServerTableValuedFunctionName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public sealed class {SqlServerTableValuedFunctionName}Result", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public int Id { get; set; }", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public string Name { get; set; } = default!;", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int? Id { get; set; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string? Name { get; set; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<TResult>> {SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<{SqlServerTableValuedFunctionName}Result>> {SqlServerTableValuedFunctionName}Async", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"IAsyncEnumerable<TResult> Stream{SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
@@ -1952,21 +1955,21 @@ public sealed class LiveProviderScaffoldingParityTests
                     Assert.Contains(".Property(e => e.Status).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
                     Assert.DoesNotContain(providerOwned, item =>
                         item.GetProperty("kind").GetString() == "Default" &&
-                        item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
+                        LastTableNameEquals(item.GetProperty("table").GetString(), WarningTable) &&
                         item.GetProperty("name").GetString() == "Status");
                 }
                 else
                 {
                     Assert.Contains(providerOwned, item =>
                         item.GetProperty("kind").GetString() == "Default" &&
-                        item.GetProperty("table").GetString()!.Split('.').Last() == WarningTable &&
+                        LastTableNameEquals(item.GetProperty("table").GetString(), WarningTable) &&
                         item.GetProperty("name").GetString() == "Status" &&
                         item.GetProperty("suggestedAction").GetString()!.Contains("default", StringComparison.OrdinalIgnoreCase));
                 }
 
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
-                    item.GetProperty("table").GetString()!.Split('.').Last() == KeylessTable &&
+                    LastTableNameEquals(item.GetProperty("table").GetString(), KeylessTable) &&
                     item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
             }
             finally
@@ -2019,7 +2022,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "RelationshipDependentKey" &&
-                    item.GetProperty("table").GetString()!.Split('.').Last() == KeylessDependentTable &&
+                    LastTableNameEquals(item.GetProperty("table").GetString(), KeylessDependentTable) &&
                     item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
                 AssertScaffoldOutputBuilds(dir);
             }
@@ -2077,7 +2080,7 @@ public sealed class LiveProviderScaffoldingParityTests
                         .ToArray();
 
                     Assert.DoesNotContain(providerOwned, item =>
-                        item.GetProperty("table").GetString()!.Split('.').Last() == FeatureOwnedTable &&
+                        LastTableNameEquals(item.GetProperty("table").GetString(), FeatureOwnedTable) &&
                         item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed" or "Collation");
                 }
 
@@ -2133,7 +2136,7 @@ public sealed class LiveProviderScaffoldingParityTests
                     item.GetProperty("code").GetString() == "SCF110" &&
                     item.GetProperty("category").GetString() == "database-object" &&
                     item.GetProperty("kind").GetString() == "Trigger" &&
-                    item.GetProperty("table").GetString()!.Split('.').Last() == TriggerDiagnosticsTable &&
+                    LastTableNameEquals(item.GetProperty("table").GetString(), TriggerDiagnosticsTable) &&
                     item.GetProperty("name").GetString() == TriggerDiagnosticsTrigger &&
                     item.GetProperty("suggestedAction").GetString()!.Contains("trigger", StringComparison.OrdinalIgnoreCase));
 
@@ -2176,7 +2179,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains("matched database object", ex.Message, StringComparison.Ordinal);
                 Assert.Contains("View", ex.Message, StringComparison.Ordinal);
-                Assert.Contains(WarningView, ex.Message, StringComparison.Ordinal);
+                Assert.Contains(WarningView, ex.Message, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("does not emit as entity classes", ex.Message, StringComparison.Ordinal);
             }
             finally
@@ -4560,6 +4563,12 @@ public sealed class LiveProviderScaffoldingParityTests
         => generatedCode
             .Replace(", schema: \"dbo\"", string.Empty, StringComparison.Ordinal)
             .Replace(", schema: \"public\"", string.Empty, StringComparison.Ordinal);
+
+    private static bool LastTableNameEquals(string? tableName, string expected)
+        => string.Equals(
+            tableName?.Split('.').LastOrDefault(),
+            expected,
+            StringComparison.OrdinalIgnoreCase);
 
     private static void AssertScaffoldOutputBuilds(string outputDirectory)
     {

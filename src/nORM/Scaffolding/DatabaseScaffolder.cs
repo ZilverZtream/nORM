@@ -359,7 +359,7 @@ namespace nORM.Scaffolding
                         || identityColumns?.Contains(colName) == true;
                     var isComputed = computedColumns?.Contains(colName) == true;
                     var isRowVersion = rowVersionColumns?.Contains(colName) == true;
-                    var effectiveAllowNull = allowNull && !isKey;
+                    var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                     string? declaredType = null;
                     sqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
                     string? providerSpecificType = null;
@@ -412,7 +412,9 @@ namespace nORM.Scaffolding
                     {
                         sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
                     }
-                    var initializer = !clrType.IsValueType && !effectiveAllowNull ? " = default!;" : string.Empty;
+                    var initializer = clrType == typeof(byte[]) && !effectiveAllowNull
+                        ? " = Array.Empty<byte>();"
+                        : !clrType.IsValueType && !effectiveAllowNull ? " = default!;" : string.Empty;
                     sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
                     sb.AppendLine();
                 }
@@ -612,7 +614,7 @@ namespace nORM.Scaffolding
                                   '; outputParameters=',
                                   (SELECT COUNT(*) + 1 FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
                                   '; parameterModes=',
-                                  COALESCE((
+                                  COALESCE(NULLIF((
                                       SELECT STRING_AGG(CONCAT(
                                           pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
                                           CASE
@@ -634,12 +636,9 @@ namespace nORM.Scaffolding
                                        AND base_ty.user_type_id = ty.system_type_id
                                        AND base_ty.is_user_defined = 0
                                       WHERE pa.object_id = p.object_id
-                                  ), '') + CASE
-                                      WHEN EXISTS (SELECT 1 FROM sys.parameters pa WHERE pa.object_id = p.object_id) THEN ','
-                                      ELSE ''
-                                  END + 'return:RETURN:int',
+                                  ), '') + ',', '') + 'return:RETURN:int',
                                   '; resultColumns=',
-                                  COALESCE((
+                                  COALESCE(NULLIF((
                                       SELECT STRING_AGG(CONCAT(
                                           COALESCE(rs.name, ''),
                                           ':',
@@ -649,7 +648,7 @@ namespace nORM.Scaffolding
                                       FROM sys.dm_exec_describe_first_result_set_for_object(p.object_id, NULL) rs
                                       WHERE rs.error_number IS NULL
                                         AND rs.is_hidden = 0
-                                  ), ''))
+                                  ), ''), ''))
                     FROM sys.procedures p
                     WHERE p.is_ms_shipped = 0
                     UNION ALL
@@ -703,7 +702,7 @@ namespace nORM.Scaffolding
                                         AND pa.parameter_id = 0
                                   ), CASE WHEN o.type IN ('IF', 'TF') THEN 'TABLE' ELSE '' END),
                                   '; resultColumns=',
-                                  COALESCE((
+                                  COALESCE(NULLIF((
                                       SELECT STRING_AGG(CONCAT(
                                           COALESCE(rs.name, ''),
                                           ':',
@@ -713,7 +712,25 @@ namespace nORM.Scaffolding
                                       FROM sys.dm_exec_describe_first_result_set_for_object(o.object_id, NULL) rs
                                       WHERE rs.error_number IS NULL
                                         AND rs.is_hidden = 0
-                                  ), ''))
+                                  ), ''), NULLIF((
+                                      SELECT STRING_AGG(CONCAT(
+                                          c.name,
+                                          ':',
+                                          ty.name,
+                                          CASE
+                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN c.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), c.max_length) END, ')')
+                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN c.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), c.max_length / 2) END, ')')
+                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', c.precision, ',', c.scale, ')')
+                                              ELSE ''
+                                          END,
+                                          ':',
+                                          CONVERT(varchar(1), c.is_nullable)), '|') WITHIN GROUP (ORDER BY c.column_id)
+                                      FROM sys.columns c
+                                      INNER JOIN sys.types ty ON c.user_type_id = ty.user_type_id
+                                      WHERE c.object_id = o.object_id
+                                        AND c.is_hidden = 0
+                                        AND o.type IN ('IF', 'TF')
+                                  ), ''), ''))
                     FROM sys.objects o
                     WHERE o.is_ms_shipped = 0
                       AND o.type IN ('FN', 'IF', 'TF')
@@ -2559,6 +2576,7 @@ namespace nORM.Scaffolding
                    || normalized == "jsonb"
                    || normalized == "uuid"
                    || normalized == "user-defined (uuid)"
+                   || (normalized.StartsWith("array", StringComparison.Ordinal) && TryMapPostgresArrayType(detail, out _))
                    || normalized == "year";
         }
 
