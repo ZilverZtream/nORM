@@ -869,7 +869,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.DoesNotContain($".UsingTable(\"{FilteredStudentCourseTable}\"", contextCode, StringComparison.Ordinal);
                 Assert.Contains(joinTables, item =>
                     item.GetProperty("table").GetString() == FilteredStudentCourseTable &&
-                    item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "primary-key-not-exact-bridge-columns"));
+                    item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "missing-exact-unique-index"));
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

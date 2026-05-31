@@ -179,6 +179,8 @@ public class ScaffoldingContractDocTests
         Assert.Contains("nullable-foreign-key", doc, StringComparison.Ordinal);
         Assert.Contains("foreign-key-metadata-incomplete", doc, StringComparison.Ordinal);
         Assert.Contains("primary-key-not-exact-bridge-columns", doc, StringComparison.Ordinal);
+        Assert.Contains("missing-exact-unique-index", doc, StringComparison.Ordinal);
+        Assert.Contains("principal-key-not-scaffoldable", doc, StringComparison.Ordinal);
         Assert.Contains("parameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("outputParameterCount", doc, StringComparison.Ordinal);
         Assert.Contains("routineType", doc, StringComparison.Ordinal);

@@ -3243,7 +3243,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("StudentCourse", warnings);
             var join = Assert.Single(joinTables);
             Assert.Equal("StudentCourse", join.GetProperty("table").GetString());
-            Assert.Contains("primary-key-not-exact-bridge-columns", join.GetProperty("reasons").EnumerateArray().Select(reason => reason.GetString()));
+            Assert.Contains("missing-exact-unique-index", join.GetProperty("reasons").EnumerateArray().Select(reason => reason.GetString()));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

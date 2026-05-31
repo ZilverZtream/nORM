@@ -237,11 +237,11 @@ namespace nORM.Scaffolding
                     : Array.Empty<ScaffoldSkippedObject>();
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, manyToManyJoinTableKeys);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
-                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, manyToManyJoinTableKeys)));
+                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, manyToManyJoinTableKeys)));
                 }
                 else
                 {
@@ -2520,6 +2520,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -2536,6 +2537,8 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
+                identityColumnsByTable,
+                indexes,
                 emittedManyToManyJoinTableKeys);
 
             if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0 && skippedObjects.Count == 0)
@@ -2654,6 +2657,8 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
         {
             return foreignKeys
@@ -2664,7 +2669,7 @@ namespace nORM.Scaffolding
                     var tableKey = g.Key;
                     var principalTables = rows.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
                     var constraintNames = rows.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-                    var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable);
+                    var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable, identityColumnsByTable, indexes);
                     return new ScaffoldPossibleJoinTableDiagnostic(tableKey, principalTables, constraintNames, reasons);
                 })
                 .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
@@ -2679,7 +2684,9 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable)
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes)
         {
             var reasons = new HashSet<string>(StringComparer.Ordinal);
             var fkColumns = foreignKeys.Select(fk => fk.DependentColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -2693,8 +2700,13 @@ namespace nORM.Scaffolding
             var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(tableKey, out var generatedColumns)
                 ? generatedColumns
                 : EmptyStringSet;
+            var identityColumns = identityColumnsByTable.TryGetValue(tableKey, out var identity)
+                ? identity
+                : EmptyStringSet;
             if (columnPropertiesByTable.TryGetValue(tableKey, out var columns)
-                && columns.Keys.Any(column => !fkColumns.Contains(column) && !databaseGeneratedColumns.Contains(column)))
+                && columns.Keys.Any(column => !fkColumns.Contains(column)
+                                             && !databaseGeneratedColumns.Contains(column)
+                                             && !identityColumns.Contains(column)))
             {
                 reasons.Add("payload-columns");
             }
@@ -2704,9 +2716,24 @@ namespace nORM.Scaffolding
             {
                 reasons.Add("missing-primary-key");
             }
-            else if (primaryKeyColumns.Count != fkColumns.Count || primaryKeyColumns.Any(column => !fkColumns.Contains(column)))
+            else
             {
-                reasons.Add("primary-key-not-exact-bridge-columns");
+                var hasExactBridgePrimaryKey = primaryKeyColumns.Count == fkColumns.Count
+                    && primaryKeyColumns.All(column => fkColumns.Contains(column));
+                if (!hasExactBridgePrimaryKey)
+                {
+                    var primaryKeyExtraColumns = primaryKeyColumns
+                        .Where(column => !fkColumns.Contains(column))
+                        .ToArray();
+                    var hasGeneratedSurrogatePrimaryKeyShape = primaryKeyColumns.Count == 1
+                        && primaryKeyExtraColumns.Length == 1
+                        && (databaseGeneratedColumns.Contains(primaryKeyExtraColumns[0])
+                            || identityColumns.Contains(primaryKeyExtraColumns[0]));
+
+                    reasons.Add(hasGeneratedSurrogatePrimaryKeyShape && !HasExactUniqueIndex(indexes, tableKey, fkColumns)
+                        ? "missing-exact-unique-index"
+                        : "primary-key-not-exact-bridge-columns");
+                }
             }
 
             if (nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
@@ -2715,15 +2742,19 @@ namespace nORM.Scaffolding
                 reasons.Add("nullable-foreign-key");
             }
 
-            foreach (var fk in constraints.Select(g => g.First()))
+            foreach (var fkGroup in constraints)
             {
+                var fk = fkGroup.First();
                 var principalTableKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
                 var principalColumns = foreignKeys
                     .Where(row => string.Equals(row.ConstraintName, fk.ConstraintName, StringComparison.OrdinalIgnoreCase))
                     .Select(row => row.PrincipalColumn)
                     .ToArray();
-                if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTableKey, principalColumns))
-                    reasons.Add("principal-key-not-primary-key");
+                if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTableKey, principalColumns)
+                    && !ReferencesUniqueIndex(fkGroup, primaryKeyColumnsByTable, indexes))
+                {
+                    reasons.Add("principal-key-not-scaffoldable");
+                }
             }
 
             if (reasons.Count == 0)
@@ -3031,6 +3062,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -3065,6 +3097,8 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
+                identityColumnsByTable,
+                indexes,
                 emittedManyToManyJoinTableKeys)
                 .Select(g => new
                 {
