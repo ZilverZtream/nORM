@@ -123,6 +123,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
     private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
     private const string PostgresOverloadedRoutineName = "ScaffoldLiveOverloadedRoutine";
+    private const string PostgresQuotedParameterRoutineName = "ScaffoldLiveQuotedParameterRoutine";
     private const string MySqlUnsignedRoutineName = "ScaffoldLiveUnsignedRoutine";
 
     [Theory]
@@ -1074,6 +1075,53 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownPostgresOverloadedRoutineAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_emits_postgres_quoted_parameter_function_as_positional_arguments()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresQuotedParameterRoutineAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_quoted_parameter_routine_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresQuotedParameterRoutineContext",
+                    new ScaffoldOptions { EmitRoutineStubs = true, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresQuotedParameterRoutineContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var routine = Assert.Single(
+                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    item => item.GetProperty("kind").GetString() == "Routine" &&
+                            item.GetProperty("name").GetString()!.EndsWith(PostgresQuotedParameterRoutineName, StringComparison.Ordinal));
+                var metadata = routine.GetProperty("metadata");
+
+                Assert.Equal(2, metadata.GetProperty("parameterCount").GetInt32());
+                Assert.Contains("tenant-id", metadata.GetProperty("parameterModes").GetString(), StringComparison.Ordinal);
+                Assert.Contains("search text", metadata.GetProperty("parameterModes").GetString(), StringComparison.Ordinal);
+                Assert.DoesNotContain($"public sealed class {PostgresQuotedParameterRoutineName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {PostgresQuotedParameterRoutineName}Async<TResult>(object?[]? arguments = null", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<TValue?> {PostgresQuotedParameterRoutineName}ValueAsync<TValue>(object?[]? arguments = null", contextCode, StringComparison.Ordinal);
+                Assert.Contains("was scaffolded with 2 input parameters", contextCode, StringComparison.Ordinal);
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresQuotedParameterRoutineAsync(connection, provider);
             }
         }
     }
@@ -2738,6 +2786,17 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {routine}(value text) RETURNS integer LANGUAGE SQL AS $$ SELECT char_length(value) $$");
     }
 
+    private static async Task SetupPostgresQuotedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresQuotedParameterRoutineAsync(connection, provider);
+
+        var routine = provider.Escape("public") + "." + provider.Escape(PostgresQuotedParameterRoutineName);
+        var tenantId = provider.Escape("tenant-id");
+        var searchText = provider.Escape("search text");
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {routine}({tenantId} integer, {searchText} text) RETURNS integer LANGUAGE SQL AS $$ SELECT {tenantId} + length({searchText}) $$");
+    }
+
     private static async Task SetupMySqlUnsignedRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownMySqlUnsignedRoutineAsync(connection, provider);
@@ -3309,6 +3368,19 @@ public sealed class LiveProviderScaffoldingParityTests
             var routine = provider.Escape("public") + "." + provider.Escape(PostgresOverloadedRoutineName);
             await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {routine}(integer)");
             await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {routine}(text)");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresQuotedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresQuotedParameterRoutineName)}(integer, text)");
         }
         catch
         {
