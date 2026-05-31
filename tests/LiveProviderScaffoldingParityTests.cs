@@ -110,6 +110,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
     private const string ProviderDescendingIndex = "IX_ScaffoldLiveProviderIndex_Descending";
     private const string ProviderPrefixIndex = "IX_ScaffoldLiveProviderIndex_Prefix";
+    private const string TriggerDiagnosticsTable = "ScaffoldLiveTriggerAudit";
+    private const string TriggerDiagnosticsTrigger = "TR_ScaffoldLiveTriggerAudit_Touch";
+    private const string TriggerDiagnosticsPostgresFunction = "fn_scaffold_live_trigger_audit_touch";
     private const string SqlServerTemporalBaseTable = "ScaffoldLiveTemporalOrder";
     private const string SqlServerTemporalHistoryTable = "ScaffoldLiveTemporalOrderHistory";
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
@@ -1757,6 +1760,62 @@ public sealed class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_reports_trigger_diagnostics_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupTriggerDiagnosticsAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_trigger_diag_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldTriggerDiagnosticsContext",
+                    new ScaffoldOptions { Tables = new[] { TriggerDiagnosticsTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, TriggerDiagnosticsTable + ".cs"));
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+                Assert.Contains("Touched { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.True(File.Exists(warningJsonPath), "Trigger diagnostics must write the scaffold warning JSON report.");
+
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
+                var providerOwned = warningJson.RootElement
+                    .GetProperty("providerOwnedSchemaFeatures")
+                    .EnumerateArray()
+                    .ToArray();
+
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("code").GetString() == "SCF110" &&
+                    item.GetProperty("category").GetString() == "database-object" &&
+                    item.GetProperty("kind").GetString() == "Trigger" &&
+                    item.GetProperty("table").GetString()!.Split('.').Last() == TriggerDiagnosticsTable &&
+                    item.GetProperty("name").GetString() == TriggerDiagnosticsTrigger &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("trigger", StringComparison.OrdinalIgnoreCase));
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownTriggerDiagnosticsAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_view_filter_fails_with_skipped_object_diagnostic_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -3111,11 +3170,107 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, createSql);
     }
 
+    private static async Task SetupTriggerDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownTriggerDiagnosticsAsync(connection, provider, kind);
+
+        var table = kind == ProviderKind.SqlServer
+            ? SqlServerQualified(provider, TriggerDiagnosticsTable)
+            : kind == ProviderKind.Postgres
+                ? Qualified(provider, "public", TriggerDiagnosticsTable)
+                : provider.Escape(TriggerDiagnosticsTable);
+        var id = provider.Escape("Id");
+        var touched = provider.Escape("Touched");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {touched} {IntType(kind)} NOT NULL)");
+
+        switch (kind)
+        {
+            case ProviderKind.SqlServer:
+                await ExecuteAsync(connection, $$"""
+                    CREATE TRIGGER {{SqlServerQualified(provider, TriggerDiagnosticsTrigger)}} ON {{table}}
+                    AFTER INSERT AS
+                    BEGIN
+                        SET NOCOUNT ON;
+                        UPDATE target
+                        SET {{touched}} = 1
+                        FROM {{table}} AS target
+                        INNER JOIN inserted AS source ON source.{{id}} = target.{{id}};
+                    END
+                    """);
+                break;
+            case ProviderKind.Postgres:
+                var function = Qualified(provider, "public", TriggerDiagnosticsPostgresFunction);
+                await ExecuteAsync(connection, $$"""
+                    CREATE FUNCTION {{function}}() RETURNS trigger
+                    LANGUAGE plpgsql
+                    AS $$
+                    BEGIN
+                        NEW."Touched" := 1;
+                        RETURN NEW;
+                    END
+                    $$
+                    """);
+                await ExecuteAsync(connection,
+                    $"CREATE TRIGGER {provider.Escape(TriggerDiagnosticsTrigger)} BEFORE INSERT ON {table} FOR EACH ROW EXECUTE FUNCTION {function}()");
+                break;
+            case ProviderKind.MySql:
+                await ExecuteAsync(connection,
+                    $"CREATE TRIGGER {provider.Escape(TriggerDiagnosticsTrigger)} BEFORE INSERT ON {table} FOR EACH ROW SET NEW.{touched} = 1");
+                break;
+            case ProviderKind.Sqlite:
+                await ExecuteAsync(connection, $$"""
+                    CREATE TRIGGER {{provider.Escape(TriggerDiagnosticsTrigger)}} AFTER INSERT ON {{table}}
+                    BEGIN
+                        UPDATE {{table}} SET {{touched}} = 1 WHERE {{id}} = NEW.{{id}};
+                    END
+                    """);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.");
+        }
+    }
+
     private static async Task TeardownFeatureOwnedMetadataAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try
         {
             await ExecuteAsync(connection, DropTable(kind, FeatureOwnedTable, provider.Escape(FeatureOwnedTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownTriggerDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            switch (kind)
+            {
+                case ProviderKind.SqlServer:
+                    await ExecuteAsync(connection,
+                        $"IF OBJECT_ID(N'dbo.{TriggerDiagnosticsTrigger}', N'TR') IS NOT NULL DROP TRIGGER {SqlServerQualified(provider, TriggerDiagnosticsTrigger)}");
+                    await ExecuteAsync(connection, DropTable(kind, "dbo." + TriggerDiagnosticsTable, SqlServerQualified(provider, TriggerDiagnosticsTable)));
+                    break;
+                case ProviderKind.Postgres:
+                    var table = Qualified(provider, "public", TriggerDiagnosticsTable);
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(TriggerDiagnosticsTrigger)} ON {table}");
+                    await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {Qualified(provider, "public", TriggerDiagnosticsPostgresFunction)}()");
+                    await ExecuteAsync(connection, DropTable(kind, TriggerDiagnosticsTable, table));
+                    break;
+                case ProviderKind.MySql:
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(TriggerDiagnosticsTrigger)}");
+                    await ExecuteAsync(connection, DropTable(kind, TriggerDiagnosticsTable, provider.Escape(TriggerDiagnosticsTable)));
+                    break;
+                case ProviderKind.Sqlite:
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(TriggerDiagnosticsTrigger)}");
+                    await ExecuteAsync(connection, DropTable(kind, TriggerDiagnosticsTable, provider.Escape(TriggerDiagnosticsTable)));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.");
+            }
         }
         catch
         {

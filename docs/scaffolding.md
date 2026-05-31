@@ -340,7 +340,9 @@ must be reviewed and edited like handwritten model code.
   across configured SQLite, SQL Server, PostgreSQL, and MySQL providers. It
   also pins live promotion of provider CHECK constraints, computed/generated
   column expressions, and explicit column collations into generated model
-  configuration across those providers.
+  configuration across those providers, while provider-native triggers are
+  inventoried as `SCF110` diagnostics instead of being silently ignored or
+  translated into unsafe model code.
   The SQLite generated-column extractor is parser-based rather than regex-only,
   so quoted identifiers inside expressions do not cause computed metadata to be
   left behind as unresolved diagnostics. The same test class also pins
