@@ -348,8 +348,9 @@ must be reviewed and edited like handwritten model code.
   unsigned routine parameter stubs, PostgreSQL overloaded function wrappers
   with deterministic generated names, PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts, and live
-  shared-tenant, shared-tenant alternate-key, alternate-key, self-referencing,
-  and schema-qualified many-to-many junction-table mappings, including
+  shared-tenant, shared-tenant alternate-key, composite payload bridge
+  preservation, alternate-key, self-referencing, and schema-qualified
+  many-to-many junction-table mappings, including
   filtered-unique surrogate join tables that must remain
   explicit entities instead of unsafe skip navigations.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
