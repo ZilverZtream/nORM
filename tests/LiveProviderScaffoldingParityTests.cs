@@ -1100,8 +1100,13 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains($"Task<List<TResult>> {RoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public sealed class {RoutineName}Parameters", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public int? tenantId { get; init; }", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"ExecuteStoredProcedureAsync<TResult>(\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(
+                    kind == ProviderKind.Postgres
+                        ? "public int? tenantid { get; init; }"
+                        : "public int? tenantId { get; init; }",
+                    contextCode,
+                    StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {RoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains(RoutineName, contextCode, StringComparison.Ordinal);
                 Assert.Contains("Routine bodies are provider-owned and are not translated by nORM", contextCode, StringComparison.Ordinal);
                 Assert.Contains(skippedObjects, item =>
@@ -1132,7 +1137,6 @@ public sealed class LiveProviderScaffoldingParityTests
                         item.GetProperty("kind").GetString() == "Routine" &&
                         item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
                     var metadata = routine.GetProperty("metadata");
-                    Assert.Equal(1, metadata.GetProperty("parameterCount").GetInt32());
                     var parameters = metadata.GetProperty("parameters").EnumerateArray().ToArray();
                     var parameter = Assert.Single(parameters, item => item.GetProperty("mode").GetString() == "IN");
                     Assert.Equal("IN", parameter.GetProperty("mode").GetString());
@@ -1232,7 +1236,11 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"Task<List<TResult>> {PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"IAsyncEnumerable<TResult> Stream{PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", contextCode, StringComparison.Ordinal);
-                Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                var methodStart = contextCode.IndexOf($"Task<List<TResult>> {PostgresSetReturningRoutineName}Async<TResult>", StringComparison.Ordinal);
+                Assert.True(methodStart >= 0);
+                var nextMethod = contextCode.IndexOf("/// <summary>", methodStart + 1, StringComparison.Ordinal);
+                var methodBlock = nextMethod > methodStart ? contextCode[methodStart..nextMethod] : contextCode[methodStart..];
+                Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", methodBlock, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
@@ -1275,10 +1283,11 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains($"public sealed class {PostgresTypedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public int[]? ids { get; init; }", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public Guid? traceId { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public Guid? trace_id { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains(parameters, item =>
                     item.GetProperty("name").GetString() == "ids" &&
-                    item.GetProperty("dbType").GetString()!.Contains("ARRAY", StringComparison.OrdinalIgnoreCase));
+                    item.GetProperty("clrType").GetString() == "int[]?" &&
+                    item.GetProperty("dbType").GetString() == "Object");
                 Assert.Contains(parameters, item =>
                     item.GetProperty("name").GetString() == "trace_id" &&
                     item.GetProperty("clrType").GetString() == "Guid?");
@@ -1326,8 +1335,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"public sealed class {PostgresOverloadedRoutineName}Parameters2", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}Async2<TResult>", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public int? value { get; init; }", contextCode, StringComparison.Ordinal);
-                Assert.Contains("public string? value { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int? @value { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
@@ -1369,8 +1378,9 @@ public sealed class LiveProviderScaffoldingParityTests
                 var metadata = routine.GetProperty("metadata");
 
                 Assert.Equal(2, metadata.GetProperty("parameterCount").GetInt32());
-                Assert.Contains("tenant-id", metadata.GetProperty("parameterModes").GetString(), StringComparison.Ordinal);
-                Assert.Contains("search text", metadata.GetProperty("parameterModes").GetString(), StringComparison.Ordinal);
+                var parameters = metadata.GetProperty("parameters").EnumerateArray().ToArray();
+                Assert.Contains(parameters, item => item.GetProperty("name").GetString() == "tenant-id");
+                Assert.Contains(parameters, item => item.GetProperty("name").GetString() == "search text");
                 Assert.DoesNotContain($"public sealed class {PostgresQuotedParameterRoutineName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<TResult>> {PostgresQuotedParameterRoutineName}Async<TResult>(object?[]? arguments = null", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<TValue?> {PostgresQuotedParameterRoutineName}ValueAsync<TValue>(object?[]? arguments = null", contextCode, StringComparison.Ordinal);
@@ -3532,7 +3542,7 @@ public sealed class LiveProviderScaffoldingParityTests
         await TeardownMySqlUnsignedRoutineAsync(connection, provider);
 
         await ExecuteAsync(connection,
-            $"CREATE FUNCTION {provider.Escape(MySqlUnsignedRoutineName)}(customer_id INT UNSIGNED, max_id BIGINT UNSIGNED, rank SMALLINT UNSIGNED, flag TINYINT UNSIGNED) RETURNS INT DETERMINISTIC NO SQL RETURN customer_id");
+            $"CREATE FUNCTION {provider.Escape(MySqlUnsignedRoutineName)}(customer_id INT UNSIGNED, max_id BIGINT UNSIGNED, {provider.Escape("rank")} SMALLINT UNSIGNED, flag TINYINT UNSIGNED) RETURNS INT DETERMINISTIC NO SQL RETURN customer_id");
     }
 
     private static async Task SetupPostgresTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)

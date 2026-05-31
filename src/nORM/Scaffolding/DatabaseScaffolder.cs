@@ -3011,7 +3011,11 @@ namespace nORM.Scaffolding
                         ["mode"] = parts.Length > 1 ? parts[1] : string.Empty
                     };
                     if (parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]))
+                    {
                         parameter["dataType"] = parts[2];
+                        parameter["clrType"] = GetRoutineParameterTypeName(parts[2]);
+                        parameter["dbType"] = GetRoutineParameterDbTypeName(parts[2]);
+                    }
                     return (IReadOnlyDictionary<string, object?>)parameter;
                 })
                 .ToArray();
