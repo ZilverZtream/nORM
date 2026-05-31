@@ -5049,7 +5049,12 @@ namespace nORM.Scaffolding
                 var parameterType = inputParameters.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
                     : null;
-                var resultColumns = GetRoutineResultColumns(metadata);
+                var scalarSetResultColumn = TryGetScalarSetReturningRoutineResultColumn(metadata, out var scalarSetColumn)
+                    ? scalarSetColumn
+                    : (RoutineResultColumn?)null;
+                var resultColumns = scalarSetResultColumn.HasValue
+                    ? new[] { scalarSetResultColumn.Value }
+                    : GetRoutineResultColumns(metadata);
                 var resultType = resultColumns.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Result", memberNames)
                     : null;
@@ -5128,7 +5133,8 @@ namespace nORM.Scaffolding
                         scalar: isScalarFunction,
                         usePositionalArguments: requiresPositionalFunctionArguments,
                         expectedArgumentCount: discoveredInputParameterCount,
-                        inputParameterDataTypes: inputParameterDataTypes);
+                        inputParameterDataTypes: inputParameterDataTypes,
+                        scalarSetReturnsValue: scalarSetResultColumn.HasValue);
                 }
                 else
                 {
@@ -5338,7 +5344,8 @@ namespace nORM.Scaffolding
             bool scalar,
             bool usePositionalArguments,
             int expectedArgumentCount,
-            IReadOnlyList<string> inputParameterDataTypes)
+            IReadOnlyList<string> inputParameterDataTypes,
+            bool scalarSetReturnsValue = false)
         {
             sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
             sb.AppendLine("    {");
@@ -5346,7 +5353,7 @@ namespace nORM.Scaffolding
             AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
             AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-            if (scalar)
+            if (scalar || scalarSetReturnsValue)
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
             else
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
@@ -5363,7 +5370,10 @@ namespace nORM.Scaffolding
                 AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
                 AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-                sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
+                if (scalarSetReturnsValue)
+                    sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
+                else
+                    sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
                 sb.AppendLine("    }");
             }
 
@@ -5400,7 +5410,10 @@ namespace nORM.Scaffolding
             AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
             AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
             sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-            sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
+            if (scalarSetReturnsValue)
+                sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
+            else
+                sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
             sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
             sb.AppendLine("            yield return row;");
             sb.AppendLine("    }");
@@ -5416,7 +5429,10 @@ namespace nORM.Scaffolding
                 AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
                 AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
                 sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-                sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
+                if (scalarSetReturnsValue)
+                    sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
+                else
+                    sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
                 sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
                 sb.AppendLine("            yield return row;");
                 sb.AppendLine("    }");
@@ -5820,6 +5836,37 @@ namespace nORM.Scaffolding
                 })
                 .ToArray();
             return columns.Count > 0;
+        }
+
+        private static bool TryGetScalarSetReturningRoutineResultColumn(
+            IReadOnlyDictionary<string, object?> metadata,
+            out RoutineResultColumn column)
+        {
+            column = default;
+            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
+            if (!string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (TryGetRoutineResultColumnMetadata(metadata, out var discoveredColumns)
+                && discoveredColumns.Count > 0)
+            {
+                return false;
+            }
+
+            var dataType = Convert.ToString(metadata.TryGetValue("dataType", out var d) ? d : null);
+            if (string.IsNullOrWhiteSpace(dataType))
+                return false;
+
+            var normalized = NormalizeRoutineDataType(dataType);
+            if (normalized is "record" or "table" or "void")
+                return false;
+
+            var typeName = GetRoutineResultColumnTypeName(dataType, nullable: false);
+            if (string.Equals(typeName, "object?", StringComparison.Ordinal))
+                return false;
+
+            column = new RoutineResultColumn("Value", typeName);
+            return true;
         }
 
         private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)

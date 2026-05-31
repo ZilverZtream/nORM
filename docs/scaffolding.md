@@ -195,7 +195,11 @@ must be reviewed and edited like handwritten model code.
   functions, PostgreSQL functions, and MySQL functions are discovered as
   routines and emitted as provider-bound `SELECT` wrappers (`SELECT
   function(...) AS Value` for scalar functions and `SELECT * FROM
-  function(...)` for table-valued and PostgreSQL set-returning functions)
+  function(...)` for table-valued functions with row metadata). PostgreSQL set-returning functions
+  that return scalars use `SELECT function(...) AS Value` and get a generated
+  `Value` result DTO so `RETURNS SETOF
+  integer/text/...` has a typed buffered and streaming path instead of forcing a
+  hand-written result class
   instead of being miscalled as stored procedures. Table-valued functions also
   receive a streaming wrapper so callers can consume large provider-owned
   rowsets without buffering. When provider metadata exposes a stable

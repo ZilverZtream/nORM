@@ -1232,7 +1232,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public void ScaffoldContext_WithPostgresSetReturningFunction_EmitsSelectStarInvocationWrapper()
+    public void ScaffoldContext_WithPostgresSetReturningScalarFunction_EmitsValueProjectionWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(
             "public",
@@ -1240,9 +1240,15 @@ public class DatabaseScaffolderPrivateMethodTests
             "PostgreSQL function; parameters=1; outputParameters=0; callShape=table-valued-function; parameterModes=tenant_id:IN:integer; dataType=integer");
 
         Assert.Contains("Executes provider-bound function `public.customer_ids`", code);
-        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
+        Assert.Contains("public sealed class CustomerIdsResult", code);
+        Assert.Contains("public int Value { get; set; }", code);
+        Assert.Contains("Task<List<CustomerIdsResult>> CustomerIdsAsync", code);
+        Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.Contains("return QueryUnchangedAsync<CustomerIdsResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.Contains("QueryUnchangedStreamAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.Contains("QueryUnchangedStreamAsync<CustomerIdsResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamCustomerIdsAsync<TResult>", code);
-        Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", code);
+        Assert.DoesNotContain("QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
     }
 
     [Fact]

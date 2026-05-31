@@ -1240,13 +1240,20 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresSetReturningContext.cs"));
                 Assert.Contains($"Task<List<TResult>> {PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {PostgresSetReturningRoutineName}Result", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int Value { get; set; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<{PostgresSetReturningRoutineName}Result>> {PostgresSetReturningRoutineName}Async", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"IAsyncEnumerable<TResult> Stream{PostgresSetReturningRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
-                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<{PostgresSetReturningRoutineName}Result> Stream{PostgresSetReturningRoutineName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"return QueryUnchangedAsync<{PostgresSetReturningRoutineName}Result>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains("QueryUnchangedStreamAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"QueryUnchangedStreamAsync<{PostgresSetReturningRoutineName}Result>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
                 var methodStart = contextCode.IndexOf($"Task<List<TResult>> {PostgresSetReturningRoutineName}Async<TResult>", StringComparison.Ordinal);
                 Assert.True(methodStart >= 0);
                 var nextMethod = contextCode.IndexOf("/// <summary>", methodStart + 1, StringComparison.Ordinal);
                 var methodBlock = nextMethod > methodStart ? contextCode[methodStart..nextMethod] : contextCode[methodStart..];
-                Assert.DoesNotContain("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", methodBlock, StringComparison.Ordinal);
+                Assert.DoesNotContain("SELECT * FROM \" + invocation", methodBlock, StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
