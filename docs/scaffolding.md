@@ -321,7 +321,8 @@ must be reviewed and edited like handwritten model code.
   warning/metadata contract explicit, including SQL Server first-result-set
   metadata parsing, and emits SQL Server/PostgreSQL/MySQL functions as `SELECT`
   wrappers instead of stored-procedure calls, including buffered and streaming
-  table-valued function wrappers.
+  table-valued function wrappers. Procedures with explicit no-result-set
+  metadata emit non-query wrappers instead of fake row-materialization stubs.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in SQL Server/PostgreSQL
   sequence wrappers generate typed next-value methods and compile in a consumer
   project. `LiveProviderScaffoldingParityTests` proves those sequence wrappers

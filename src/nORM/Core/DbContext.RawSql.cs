@@ -293,6 +293,40 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Executes a stored procedure or provider-bound routine that does not
+        /// return a result set.
+        /// </summary>
+        /// <param name="procedureName">Provider routine name or invocation text.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="parameters">Optional routine parameters.</param>
+        /// <returns>The provider-reported affected row count.</returns>
+        public Task<int> ExecuteStoredProcedureNonQueryAsync(string procedureName, CancellationToken ct = default, object? parameters = null)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteStoredProcedureNonQueryAsync));
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.RawConnection, procedureName);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandType = ctx._p.StoredProcedureCommandType;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.StoredProcedure, cmd.CommandText));
+
+                var paramDict = new Dictionary<string, object>();
+                SetStoredProcedureParameters(cmd, ctx._p, parameters, paramDict);
+
+                ValidateStoredProcedureCommandText(procedureName, ctx._p, paramDict, allowTextNonQuery: true);
+
+                var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, token).ConfigureAwait(false);
+                ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, affected);
+                cmd.Parameters.Clear();
+                return affected;
+            }, ct);
+        }
+
+        /// <summary>
         /// Streams the results of a stored procedure as an <see cref="IAsyncEnumerable{T}"/>.
         /// </summary>
         public async IAsyncEnumerable<T> ExecuteStoredProcedureAsAsyncEnumerable<T>(string procedureName, [EnumeratorCancellation] CancellationToken ct = default, object? parameters = null) where T : class, new()
@@ -556,11 +590,15 @@ namespace nORM.Core
         internal static void ValidateStoredProcedureCommandText(
             string procedureName,
             Providers.DatabaseProvider provider,
-            IReadOnlyDictionary<string, object>? parameters)
+            IReadOnlyDictionary<string, object>? parameters,
+            bool allowTextNonQuery = false)
         {
             if (provider.StoredProcedureCommandType == CommandType.Text)
             {
-                NormValidator.ValidateRawQuerySql(procedureName, provider, parameters);
+                if (allowTextNonQuery)
+                    NormValidator.ValidateRawNonQuerySql(procedureName, provider, parameters);
+                else
+                    NormValidator.ValidateRawQuerySql(procedureName, provider, parameters);
                 return;
             }
 

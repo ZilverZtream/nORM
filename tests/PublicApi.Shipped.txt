@@ -306,6 +306,7 @@ M:nORM.Core.DbContext.Entry(System.Object):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
+M:nORM.Core.DbContext.ExecuteStoredProcedureNonQueryAsync(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[]):System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{`0}}
 M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}

@@ -4733,6 +4733,9 @@ namespace nORM.Scaffolding
                 var resultType = resultColumns.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Result", memberNames)
                     : null;
+                var hasKnownNoResultSet = !IsFunctionCallShape(callShape)
+                    && metadata.ContainsKey("resultColumns")
+                    && resultColumns.Count == 0;
                 var outputFactory = outputParameters.Count > 0
                     ? MakeUnique("Create" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "OutputParameters", memberNames)
                     : null;
@@ -4811,30 +4814,38 @@ namespace nORM.Scaffolding
                     var storedProcedureParameters = FormatStoredProcedureParameterArgument(
                         routine,
                         discoveredInputParameterCount);
-                    sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
-                    if (resultType != null)
+                    if (hasKnownNoResultSet)
                     {
-                        sb.AppendLine();
-                        sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
-                        sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                        sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
-                        sb.AppendLine($"        => ExecuteStoredProcedureAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        sb.AppendLine($"    public Task<int> {methodBase}({parameterSignature}, CancellationToken ct = default)");
+                        sb.AppendLine($"        => ExecuteStoredProcedureNonQueryAsync({routineNameExpression}, ct, {storedProcedureParameters});");
                     }
-
-                    var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
-                    sb.AppendLine();
-                    sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
-                    sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                    sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                    sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
-                    if (resultType != null)
+                    else
                     {
+                        sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+                        sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        if (resultType != null)
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
+                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                            sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
+                            sb.AppendLine($"        => ExecuteStoredProcedureAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        }
+
+                        var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                         sb.AppendLine();
-                        sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
-                        sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                        sb.AppendLine($"    public IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, CancellationToken ct = default)");
-                        sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
+                        sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
+                        sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
+                        sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        if (resultType != null)
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
+                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                            sb.AppendLine($"    public IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, CancellationToken ct = default)");
+                            sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                        }
                     }
                 }
 

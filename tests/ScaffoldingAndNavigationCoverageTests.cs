@@ -915,6 +915,20 @@ public class DatabaseScaffolderPrivateMethodTests
     // ── ScaffoldAsync (public integration) ─────────────────────────────────
 
     [Fact]
+    public void ScaffoldContext_WithKnownNoResultProcedure_EmitsNonQueryWrapper()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "RecalculateLedger",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenantId:IN:int; resultColumns=");
+
+        Assert.Contains("Task<int> RecalculateLedgerAsync(RecalculateLedgerParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("ExecuteStoredProcedureNonQueryAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"RecalculateLedger\"), ct, RequireScaffoldedRoutineParameters(parameters, 1, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"RecalculateLedger\")))", code);
+        Assert.DoesNotContain("RecalculateLedgerAsync<TResult>", code);
+        Assert.DoesNotContain("StreamRecalculateLedgerAsync", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithRoutineReturnValue_EmitsReturnOutputParameter()
     {
         var code = InvokeScaffoldContextWithRoutineReturnStub();

@@ -89,6 +89,41 @@ public class StoredProcedureTests
     }
 
     [Fact]
+    public async Task ExecuteStoredProcedureNonQueryAsync_UsesProviderCommandType_WorksWithSqlite()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE Item(Id INTEGER, Name TEXT); INSERT INTO Item VALUES(12,'Mu');";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var parameters = new Dictionary<string, object?> { ["id"] = 12, ["name"] = "Nu" };
+
+        var affected = await ctx.ExecuteStoredProcedureNonQueryAsync(
+            "UPDATE Item SET Name = @name WHERE Id = @id",
+            parameters: parameters);
+
+        Assert.Equal(1, affected);
+        using var verify = cn.CreateCommand();
+        verify.CommandText = "SELECT Name FROM Item WHERE Id = 12";
+        Assert.Equal("Nu", verify.ExecuteScalar());
+    }
+
+    [Fact]
+    public async Task ExecuteStoredProcedureNonQueryAsync_RejectsStackedTextCommand()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        await Assert.ThrowsAsync<NormException>(() =>
+            ctx.ExecuteStoredProcedureNonQueryAsync("UPDATE Item SET Name = 'x'; DROP TABLE Item"));
+    }
+
+    [Fact]
     public async Task ExecuteStoredProcedureAsync_BindsPrefixedDictionaryParameters()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

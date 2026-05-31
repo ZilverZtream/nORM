@@ -297,6 +297,27 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Validates SQL used by text-mode non-query routine wrappers. This allows
+        /// one parameterized INSERT, UPDATE, or DELETE statement while still
+        /// rejecting DDL, administrative commands, procedure execution, and
+        /// stacked statements.
+        /// </summary>
+        internal static void ValidateRawNonQuerySql(string sql, DatabaseProvider provider, IReadOnlyDictionary<string, object>? parameters = null)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+
+            var normalized = NormalizeSql(sql);
+            if (!IsSafeRawNonQuerySql(normalized))
+            {
+                throw new NormUsageException(
+                    $"Raw SQL non-query for provider '{provider.GetType().Name}' must be a single INSERT, UPDATE, or DELETE statement. " +
+                    "DDL, administrative commands, stored procedure execution and stacked statements are not allowed through text-mode routine non-query wrappers.");
+            }
+
+            ValidateRawSql(sql, parameters);
+        }
+
+        /// <summary>
         /// Detects common SQL injection patterns in raw SQL, including UNION attacks,
         /// comment-based injection, and embedded quotes without proper parameterization.
         /// </summary>
@@ -831,6 +852,46 @@ namespace nORM.Core
                 return idx >= 0;
             }
             return false;
+        }
+
+        private static bool IsSafeRawNonQuerySql(string normalizedSql)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedSql))
+                return false;
+
+            var trimmed = normalizedSql.Trim();
+            if (trimmed.EndsWith(';'))
+                trimmed = trimmed[..^1].TrimEnd();
+
+            if (trimmed.Contains(';'))
+                return false;
+
+            if (!(trimmed.StartsWith("insert ", StringComparison.Ordinal)
+                  || trimmed.StartsWith("update ", StringComparison.Ordinal)
+                  || trimmed.StartsWith("delete ", StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            return !(ContainsDeniedKeyword(trimmed, "drop")
+                     || ContainsDeniedKeyword(trimmed, "alter")
+                     || ContainsDeniedKeyword(trimmed, "truncate")
+                     || ContainsDeniedKeyword(trimmed, "exec")
+                     || ContainsDeniedKeyword(trimmed, "execute")
+                     || ContainsDeniedKeyword(trimmed, "merge")
+                     || ContainsDeniedKeyword(trimmed, "create")
+                     || ContainsDeniedKeyword(trimmed, "grant")
+                     || ContainsDeniedKeyword(trimmed, "revoke")
+                     || ContainsDeniedKeyword(trimmed, "pragma")
+                     || ContainsDeniedKeyword(trimmed, "vacuum")
+                     || ContainsDeniedKeyword(trimmed, "reindex")
+                     || ContainsDeniedKeyword(trimmed, "analyze")
+                     || ContainsDeniedKeyword(trimmed, "call")
+                     || ContainsDeniedKeyword(trimmed, "attach")
+                     || ContainsDeniedKeyword(trimmed, "detach")
+                     || ContainsDeniedKeyword(trimmed, "load")
+                     || ContainsDeniedKeyword(trimmed, "import")
+                     || ContainsDeniedKeyword(trimmed, "use"));
         }
 
         /// <summary>
