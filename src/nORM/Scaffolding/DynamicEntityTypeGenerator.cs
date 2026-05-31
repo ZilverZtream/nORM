@@ -327,11 +327,11 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
             var qualified = EscapeQualified(connection, schemaName, tableName);
-            var postgresDomainColumns = GetPostgresDomainColumns(connection, schemaName, tableName);
+            var postgresDomainColumnCastTypes = GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
             DataTable? schema;
             using (var cmd = connection.CreateCommand())
             {
-                cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumns);
+                cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumnCastTypes);
                 using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
                 schema = reader.GetSchemaTable();
             }
@@ -382,9 +382,9 @@ namespace nORM.Scaffolding
             string? schemaName,
             string tableName,
             string qualified,
-            IReadOnlySet<string> postgresDomainColumns)
+            IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
         {
-            if (!IsPostgresConnection(connection.GetType().Name) || postgresDomainColumns.Count == 0)
+            if (!IsPostgresConnection(connection.GetType().Name) || postgresDomainColumnCastTypes.Count == 0)
                 return $"SELECT * FROM {qualified} WHERE 1=0";
 
             var columnNames = GetPostgresColumnNames(connection, schemaName, tableName);
@@ -394,8 +394,8 @@ namespace nORM.Scaffolding
             var projection = columnNames.Select(column =>
             {
                 var escaped = EscapeIdentifier(connection, column);
-                return postgresDomainColumns.Contains(column)
-                    ? $"{escaped}::text AS {escaped}"
+                return postgresDomainColumnCastTypes.TryGetValue(column, out var castType)
+                    ? $"{escaped}::{castType} AS {escaped}"
                     : escaped;
             });
 
@@ -672,18 +672,68 @@ namespace nORM.Scaffolding
                 """, schemaName, tableName);
         }
 
-        private static IReadOnlySet<string> GetPostgresDomainColumns(DbConnection connection, string? schemaName, string tableName)
+        private static IReadOnlyDictionary<string, string> GetPostgresDomainColumnCastTypes(DbConnection connection, string? schemaName, string tableName)
         {
             if (!IsPostgresConnection(connection.GetType().Name))
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
-            return QueryColumnNameSet(connection, """
-                SELECT column_name AS ColumnName
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT column_name AS ColumnName, data_type AS DataType
                 FROM information_schema.columns
                 WHERE table_name = @tableName
                   AND (@schemaName IS NULL OR table_schema = @schemaName)
                   AND domain_name IS NOT NULL
-                """, schemaName, tableName);
+                """;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName))
+                    continue;
+
+                var dataType = Convert.ToString(reader["DataType"]) ?? string.Empty;
+                result[columnName] = NormalizePostgresDomainProbeCastType(dataType);
+            }
+
+            return result;
+        }
+
+        private static string NormalizePostgresDomainProbeCastType(string typeText)
+        {
+            return typeText.Trim().ToLowerInvariant() switch
+            {
+                "integer" or "int" or "int4" => "integer",
+                "bigint" or "int8" => "bigint",
+                "smallint" or "int2" => "smallint",
+                "boolean" or "bool" => "boolean",
+                "uuid" => "uuid",
+                "date" => "date",
+                "text" => "text",
+                "character varying" or "varchar" => "character varying",
+                "character" or "char" => "character",
+                "numeric" or "decimal" => "numeric",
+                "real" or "float4" => "real",
+                "double precision" or "float8" => "double precision",
+                "bytea" => "bytea",
+                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
+                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
+                "time without time zone" or "time" => "time without time zone",
+                "time with time zone" or "timetz" => "time with time zone",
+                "interval" => "interval",
+                _ => "text"
+            };
         }
 
         private static IReadOnlyList<string> GetPostgresColumnNames(DbConnection connection, string? schemaName, string tableName)

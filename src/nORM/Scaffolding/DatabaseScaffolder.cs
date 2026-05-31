@@ -478,11 +478,55 @@ namespace nORM.Scaffolding
                 var escaped = provider.Escape(column);
                 return providerSpecificColumnTypes.TryGetValue(column, out var detail)
                        && detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase)
-                    ? $"{escaped}::text AS {escaped}"
+                    ? $"{escaped}::{GetPostgresDomainProbeCastType(detail)} AS {escaped}"
                     : escaped;
             });
 
             return $"SELECT {string.Join(", ", columns)} FROM {qualified} WHERE 1=0";
+        }
+
+        private static string GetPostgresDomainProbeCastType(string detail)
+        {
+            const string fallback = "text";
+            var arrowIndex = detail.IndexOf("->", StringComparison.Ordinal);
+            if (arrowIndex < 0)
+                return fallback;
+
+            var typeText = detail[(arrowIndex + 2)..].Trim();
+            if (typeText.EndsWith(")", StringComparison.Ordinal))
+                typeText = typeText[..^1].Trim();
+
+            var udtSuffixIndex = typeText.LastIndexOf(" (", StringComparison.Ordinal);
+            if (udtSuffixIndex >= 0 && typeText.EndsWith(")", StringComparison.Ordinal))
+                typeText = typeText[..udtSuffixIndex].Trim();
+
+            return NormalizePostgresDomainProbeCastType(typeText);
+        }
+
+        private static string NormalizePostgresDomainProbeCastType(string typeText)
+        {
+            return typeText.Trim().ToLowerInvariant() switch
+            {
+                "integer" or "int" or "int4" => "integer",
+                "bigint" or "int8" => "bigint",
+                "smallint" or "int2" => "smallint",
+                "boolean" or "bool" => "boolean",
+                "uuid" => "uuid",
+                "date" => "date",
+                "text" => "text",
+                "character varying" or "varchar" => "character varying",
+                "character" or "char" => "character",
+                "numeric" or "decimal" => "numeric",
+                "real" or "float4" => "real",
+                "double precision" or "float8" => "double precision",
+                "bytea" => "bytea",
+                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
+                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
+                "time without time zone" or "time" => "time without time zone",
+                "time with time zone" or "timetz" => "time with time zone",
+                "interval" => "interval",
+                _ => "text"
+            };
         }
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)

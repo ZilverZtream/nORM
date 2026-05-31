@@ -391,7 +391,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("RequiredAttribute", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("BuildSchemaDescriptor", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("GetSqliteDeclaredColumnTypes", dynamicSource, StringComparison.Ordinal);
-        Assert.Contains("GetPostgresDomainColumns", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("GetPostgresDomainColumnCastTypes", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("SQLite `UUID` declared-type parity", doc, StringComparison.Ordinal);
         Assert.Contains("keyless dynamic", doc, StringComparison.Ordinal);
         Assert.Contains("composite primary-key ordinal parity", doc, StringComparison.Ordinal);

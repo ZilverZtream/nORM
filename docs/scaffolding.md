@@ -42,7 +42,10 @@ must be reviewed and edited like handwritten model code.
   share native array DDL.
   PostgreSQL domain columns are reported with the domain schema/name and
   underlying provider type so reviewers can preserve or remodel domain-owned
-  constraints before claiming provider mobility.
+  constraints before claiming provider mobility. Static and dynamic schema
+  probes cast safe domains back to their base provider type, so string,
+  numeric, temporal, UUID, boolean, and binary domains keep useful CLR types
+  instead of being flattened to `string`.
   SQL Server alias/user-defined column types are reported with schema/name and
   base system type when available so reviewers can preserve or remodel
   provider-owned type semantics.
@@ -389,7 +392,8 @@ must be reviewed and edited like handwritten model code.
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
   `[ReadOnlyEntity]` parity, composite primary-key ordinal parity,
   computed/identity/rowversion metadata in the dynamic cache key and generated
-  attributes, PostgreSQL domain-column schema probes, non-null
+  attributes, PostgreSQL domain-column schema probes with base-type
+  preservation, non-null
   reference-column `[Required]` parity, and connection
   ownership for sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
