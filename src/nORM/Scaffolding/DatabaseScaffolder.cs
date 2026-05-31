@@ -343,7 +343,7 @@ namespace nORM.Scaffolding
 
                 // Read schema using a zero-row query (fast) with key info
                 await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, schemaName, tableName)} WHERE 1=0";
+                cmd.CommandText = BuildSchemaProbeSql(provider, schemaName, tableName, columnPropertyNames, providerSpecificColumnTypes);
                 await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
                 var schema = reader.GetSchemaTable()!;
                 foreach (DataRow row in schema.Rows)
@@ -364,7 +364,8 @@ namespace nORM.Scaffolding
                     sqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
                     string? providerSpecificType = null;
                     providerSpecificColumnTypes?.TryGetValue(colName, out providerSpecificType);
-                    var clrType = NormalizeScaffoldClrType(provider, (Type)row["DataType"]!, effectiveAllowNull, isKey, isAuto, declaredType, providerSpecificType);
+                    var rawClrType = row["DataType"] is Type type ? type : typeof(object);
+                    var clrType = NormalizeScaffoldClrType(provider, rawClrType, effectiveAllowNull, isKey, isAuto, declaredType, providerSpecificType);
 
                     // Decide C# type name with correct nullability for value OR reference types
                     var typeName = GetTypeName(clrType, effectiveAllowNull);
@@ -450,6 +451,36 @@ namespace nORM.Scaffolding
                 sb.Clear();
                 _stringBuilderPool.Return(sb);
             }
+        }
+
+        private static string BuildSchemaProbeSql(
+            DatabaseProvider provider,
+            string? schemaName,
+            string tableName,
+            IReadOnlyDictionary<string, string>? columnPropertyNames,
+            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes)
+        {
+            var qualified = EscapeQualified(provider, schemaName, tableName);
+            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
+                || providerSpecificColumnTypes is null
+                || providerSpecificColumnTypes.Count == 0
+                || !providerSpecificColumnTypes.Values.Any(detail => detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase))
+                || columnPropertyNames is null
+                || columnPropertyNames.Count == 0)
+            {
+                return $"SELECT * FROM {qualified} WHERE 1=0";
+            }
+
+            var columns = columnPropertyNames.Keys.Select(column =>
+            {
+                var escaped = provider.Escape(column);
+                return providerSpecificColumnTypes.TryGetValue(column, out var detail)
+                       && detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase)
+                    ? $"{escaped}::text AS {escaped}"
+                    : escaped;
+            });
+
+            return $"SELECT {string.Join(", ", columns)} FROM {qualified} WHERE 1=0";
         }
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)
@@ -3653,6 +3684,17 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
         {
+            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                return await QueryColumnNameMapAsync(connection, tableKeys, """
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                      AND is_nullable = 'NO'
+                    """).ConfigureAwait(false);
+            }
+
             var result = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var table in tables)
             {
@@ -3680,6 +3722,17 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
         {
+            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            {
+                var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var orderedColumns = await QueryOrderedColumnNameMapAsync(connection, tableKeys, """
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName, ordinal_position AS Ordinal
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                    """).ConfigureAwait(false);
+                return BuildColumnPropertyNameMap(orderedColumns);
+            }
+
             var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var table in tables)
             {
@@ -3697,6 +3750,26 @@ namespace nORM.Scaffolding
                 }
 
                 result[TableKey(table.Schema, table.Name)] = properties;
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildColumnPropertyNameMap(
+            IReadOnlyDictionary<string, IReadOnlyList<string>> orderedColumns)
+        {
+            var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (tableKey, columns) in orderedColumns)
+            {
+                var existingNames = CreateReservedMemberNameSet();
+                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var columnName in columns)
+                {
+                    var baseName = EscapeCSharpIdentifier(ToPascalCase(columnName));
+                    properties[columnName] = MakeUnique(baseName, existingNames);
+                }
+
+                result[tableKey] = properties;
             }
 
             return result;
