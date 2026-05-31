@@ -29,6 +29,7 @@ namespace nORM.Scaffolding
     {
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
+        private static readonly IReadOnlySet<string> EmptyStringSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Generates entity classes and a DbContext based on the current database schema.
@@ -159,7 +160,7 @@ namespace nORM.Scaffolding
                     && TryParseDecimalPrecision(feature.Detail, out _, out _));
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
                 var providerNativeTemporalHistoryTableKeys = BuildProviderNativeTemporalHistoryTableKeys(unsupportedFeatures);
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, computedColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
@@ -176,6 +177,24 @@ namespace nORM.Scaffolding
                     && identityOptionConfigurations.Any(identity =>
                         string.Equals(identity.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(identity.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                defaultValueConfigurations = defaultValueConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                checkConstraints = checkConstraints
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                computedColumnConfigurations = computedColumnConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                expressionIndexConfigurations = expressionIndexConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                collationConfigurations = collationConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                identityOptionConfigurations = identityOptionConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
                 var generatedFiles = new List<(string Path, string Content)>();
 
                 foreach (var table in tables)
@@ -217,11 +236,11 @@ namespace nORM.Scaffolding
                     : Array.Empty<ScaffoldSkippedObject>();
                 var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations);
                 generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys);
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, manyToManyJoinTableKeys);
                 if (!string.IsNullOrWhiteSpace(diagnostics))
                 {
                     generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
-                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, manyToManyJoinTableKeys)));
+                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, manyToManyJoinTableKeys)));
                 }
                 else
                 {
@@ -2475,6 +2494,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -2490,6 +2510,7 @@ namespace nORM.Scaffolding
                 primaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
+                databaseGeneratedColumnsByTable,
                 emittedManyToManyJoinTableKeys);
 
             if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0 && skippedObjects.Count == 0)
@@ -2607,6 +2628,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
         {
             return foreignKeys
@@ -2617,7 +2639,7 @@ namespace nORM.Scaffolding
                     var tableKey = g.Key;
                     var principalTables = rows.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
                     var constraintNames = rows.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-                    var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable);
+                    var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable);
                     return new ScaffoldPossibleJoinTableDiagnostic(tableKey, principalTables, constraintNames, reasons);
                 })
                 .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
@@ -2631,7 +2653,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable)
         {
             var reasons = new HashSet<string>(StringComparer.Ordinal);
             var fkColumns = foreignKeys.Select(fk => fk.DependentColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -2642,8 +2665,11 @@ namespace nORM.Scaffolding
             if (constraints.Any(g => g.Count() == 0 || g.Any(fk => fk.ColumnCount != g.Count())))
                 reasons.Add("foreign-key-metadata-incomplete");
 
+            var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(tableKey, out var generatedColumns)
+                ? generatedColumns
+                : EmptyStringSet;
             if (columnPropertiesByTable.TryGetValue(tableKey, out var columns)
-                && (columns.Count != fkColumns.Count || columns.Keys.Any(column => !fkColumns.Contains(column))))
+                && columns.Keys.Any(column => !fkColumns.Contains(column) && !databaseGeneratedColumns.Contains(column)))
             {
                 reasons.Add("payload-columns");
             }
@@ -2977,6 +3003,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
             var compositeForeignKeys = foreignKeys
@@ -3010,6 +3037,7 @@ namespace nORM.Scaffolding
                 primaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
+                databaseGeneratedColumnsByTable,
                 emittedManyToManyJoinTableKeys)
                 .Select(g => new
                 {
@@ -3110,6 +3138,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
@@ -3145,16 +3174,21 @@ namespace nORM.Scaffolding
 
                 var hasExactBridgePrimaryKey = joinPrimaryKeyColumns.Count == fkColumnNames.Count
                     && joinPrimaryKeyColumns.All(column => fkColumnNames.Contains(column));
+                var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(joinTableKey, out var generatedColumns)
+                    ? generatedColumns
+                    : EmptyStringSet;
                 var extraColumns = joinColumns.Keys.Where(column => !fkColumnNames.Contains(column)).ToArray();
-                var hasGeneratedSurrogatePrimaryKey = extraColumns.Length == 1
+                var payloadColumns = extraColumns
+                    .Where(column => !databaseGeneratedColumns.Contains(column))
+                    .ToArray();
+                var hasGeneratedSurrogatePrimaryKey = payloadColumns.Length == 1
                     && joinPrimaryKeyColumns.Count == 1
-                    && string.Equals(joinPrimaryKeyColumns[0], extraColumns[0], StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
                     && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
-                    && identityColumns.Contains(extraColumns[0])
+                    && identityColumns.Contains(payloadColumns[0])
                     && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
 
-                if (!(joinColumns.Count == fkColumnNames.Count && joinColumns.Keys.All(column => fkColumnNames.Contains(column)))
-                    && !hasGeneratedSurrogatePrimaryKey)
+                if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
                     continue;
 
                 if (!hasExactBridgePrimaryKey && !hasGeneratedSurrogatePrimaryKey)

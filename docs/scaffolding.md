@@ -147,6 +147,9 @@ must be reviewed and edited like handwritten model code.
   configuration instead of a join entity. Alternate-key bridges use the
   key-selector `UsingTable` overload so runtime include/loading and join-table
   sync use the referenced unique columns instead of assuming primary keys.
+  Database-generated bridge columns such as computed values and
+  rowversion/timestamp metadata do not force an otherwise pure bridge to become
+  a payload entity.
   Schema-qualified join tables use the schema-aware `UsingTable` overload so
   generated SQL targets the qualified bridge table rather than a literal dotted
   table name. Self-referencing pure join tables receive distinct role-based

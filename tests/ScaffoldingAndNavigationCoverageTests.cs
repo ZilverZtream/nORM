@@ -2981,6 +2981,58 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithDatabaseGeneratedBridgeColumn_StillEmitsManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Student (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE Course (
+                Id INTEGER PRIMARY KEY,
+                Title TEXT NOT NULL
+            );
+            CREATE TABLE StudentCourse (
+                StudentId INTEGER NOT NULL,
+                CourseId INTEGER NOT NULL,
+                PairKey TEXT GENERATED ALWAYS AS (StudentId || ':' || CourseId) VIRTUAL,
+                PRIMARY KEY (StudentId, CourseId),
+                CONSTRAINT FK_StudentCourse_Student FOREIGN KEY (StudentId) REFERENCES Student(Id),
+                CONSTRAINT FK_StudentCourse_Course FOREIGN KEY (CourseId) REFERENCES Course(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "GeneratedBridgeJoinCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "GeneratedBridgeJoinCtx.cs"));
+            var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+            Assert.False(File.Exists(Path.Combine(dir, "StudentCourse.cs")));
+            Assert.Contains(".UsingTable(\"StudentCourse\", \"StudentId\", \"CourseId\");", contextCode);
+            if (File.Exists(warningJsonPath))
+            {
+                using var warningJson = JsonDocument.Parse(File.ReadAllText(warningJsonPath));
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables");
+                Assert.Empty(joinTables.EnumerateArray());
+            }
+
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCompositeKeyPayloadJoinTable_ReportsPayloadNotCompositeUnsupported()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
