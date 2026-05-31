@@ -44,8 +44,8 @@ must be reviewed and edited like handwritten model code.
   underlying provider type so reviewers can preserve or remodel domain-owned
   constraints before claiming provider mobility. Static and dynamic schema
   probes cast safe domains back to their base provider type, so string,
-  numeric, temporal, UUID, boolean, and binary domains keep useful CLR types
-  instead of being flattened to `string`.
+  numeric, temporal, UUID, boolean, binary, and safe scalar-array domains keep
+  useful CLR types instead of being flattened to `string`.
   SQL Server alias/user-defined column types are reported with schema/name and
   base system type when available so reviewers can preserve or remodel
   provider-owned type semantics.

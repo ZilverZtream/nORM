@@ -497,14 +497,23 @@ namespace nORM.Scaffolding
                 typeText = typeText[..^1].Trim();
 
             var udtSuffixIndex = typeText.LastIndexOf(" (", StringComparison.Ordinal);
-            if (udtSuffixIndex >= 0 && typeText.EndsWith(")", StringComparison.Ordinal))
+            if (udtSuffixIndex >= 0
+                && typeText.EndsWith(")", StringComparison.Ordinal)
+                && !typeText.StartsWith("ARRAY", StringComparison.OrdinalIgnoreCase)
+                && !typeText.StartsWith("USER-DEFINED", StringComparison.OrdinalIgnoreCase))
+            {
                 typeText = typeText[..udtSuffixIndex].Trim();
+            }
 
             return NormalizePostgresDomainProbeCastType(typeText);
         }
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
         {
+            var normalized = typeText.Trim().ToLowerInvariant();
+            if (TryMapPostgresArrayProbeCastType(normalized, out var arrayCastType))
+                return arrayCastType;
+
             return typeText.Trim().ToLowerInvariant() switch
             {
                 "integer" or "int" or "int4" => "integer",
@@ -531,6 +540,50 @@ namespace nORM.Scaffolding
                 "interval" => "interval",
                 _ => "text"
             };
+        }
+
+        private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
+        {
+            castType = string.Empty;
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+                return false;
+
+            var open = normalized.IndexOf('(');
+            if (open < 0)
+                return false;
+
+            var close = normalized.IndexOf(')', open + 1);
+            var element = (close > open
+                    ? normalized.Substring(open + 1, close - open - 1)
+                    : normalized[(open + 1)..])
+                .Trim()
+                .TrimStart('_');
+
+            castType = element switch
+            {
+                "int2" or "smallint" => "smallint[]",
+                "int4" or "integer" => "integer[]",
+                "int8" or "bigint" => "bigint[]",
+                "float4" or "real" => "real[]",
+                "float8" or "double precision" => "double precision[]",
+                "numeric" or "decimal" => "numeric[]",
+                "bool" or "boolean" => "boolean[]",
+                "uuid" => "uuid[]",
+                "text" => "text[]",
+                "varchar" or "character varying" => "character varying[]",
+                "bpchar" or "char" or "character" => "character[]",
+                "citext" => "citext[]",
+                "bytea" => "bytea[]",
+                "date" => "date[]",
+                "time" or "time without time zone" => "time without time zone[]",
+                "timetz" or "time with time zone" => "time with time zone[]",
+                "interval" => "interval[]",
+                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
+                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
+                _ => string.Empty
+            };
+
+            return castType.Length > 0;
         }
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)
@@ -6159,6 +6212,12 @@ namespace nORM.Scaffolding
                 return false;
 
             var normalized = detail.Trim().ToLowerInvariant();
+            if (normalized.Contains("domain", StringComparison.OrdinalIgnoreCase))
+                normalized = GetPostgresDomainProbeCastType(detail).Trim().ToLowerInvariant();
+
+            if (TryMapPostgresArrayCastType(normalized, out arrayType))
+                return true;
+
             if (!normalized.StartsWith("array", StringComparison.Ordinal))
                 return false;
 
@@ -6186,6 +6245,40 @@ namespace nORM.Scaffolding
                 "interval" => typeof(TimeSpan),
                 "timestamp" or "timestamp without time zone" => typeof(DateTime),
                 "timestamptz" or "timestamp with time zone" => typeof(DateTimeOffset),
+                _ => null
+            };
+
+            if (elementType is null)
+                return false;
+
+            arrayType = elementType.MakeArrayType();
+            return true;
+        }
+
+        private static bool TryMapPostgresArrayCastType(string normalized, out Type arrayType)
+        {
+            arrayType = typeof(object[]);
+            if (!normalized.EndsWith("[]", StringComparison.Ordinal))
+                return false;
+
+            var element = normalized[..^2].Trim();
+            var elementType = element switch
+            {
+                "smallint" => typeof(short),
+                "integer" => typeof(int),
+                "bigint" => typeof(long),
+                "real" => typeof(float),
+                "double precision" => typeof(double),
+                "numeric" => typeof(decimal),
+                "boolean" => typeof(bool),
+                "uuid" => typeof(Guid),
+                "text" or "character varying" or "character" or "citext" => typeof(string),
+                "bytea" => typeof(byte[]),
+                "date" => typeof(DateOnly),
+                "time without time zone" or "time with time zone" => typeof(TimeOnly),
+                "interval" => typeof(TimeSpan),
+                "timestamp without time zone" => typeof(DateTime),
+                "timestamp with time zone" => typeof(DateTimeOffset),
                 _ => null
             };
 

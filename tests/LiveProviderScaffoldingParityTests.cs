@@ -143,6 +143,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresDomainTable = "ScaffoldLiveDomainCustomer";
     private const string PostgresDomainName = "scaffold_live_email_address";
     private const string PostgresDomainScoreName = "scaffold_live_score_value";
+    private const string PostgresDomainScoreArrayName = "scaffold_live_score_values";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineNonQueryName = "ScaffoldLiveRecalculateLedger";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
@@ -2765,13 +2766,15 @@ public sealed class LiveProviderScaffoldingParityTests
             var table = provider.Escape("public") + "." + provider.Escape(PostgresDomainTable);
             var domain = provider.Escape("public") + "." + provider.Escape(PostgresDomainName);
             var scoreDomain = provider.Escape("public") + "." + provider.Escape(PostgresDomainScoreName);
+            var scoreArrayDomain = provider.Escape("public") + "." + provider.Escape(PostgresDomainScoreArrayName);
             var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_domain_" + Guid.NewGuid().ToString("N"));
             try
             {
                 await ExecuteAsync(connection, $"CREATE DOMAIN {domain} AS varchar(320) CHECK (VALUE LIKE '%@%')");
                 await ExecuteAsync(connection, $"CREATE DOMAIN {scoreDomain} AS integer CHECK (VALUE >= 0)");
+                await ExecuteAsync(connection, $"CREATE DOMAIN {scoreArrayDomain} AS integer[]");
                 await ExecuteAsync(connection,
-                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL, {provider.Escape("Score")} {scoreDomain} NOT NULL)");
+                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL, {provider.Escape("Score")} {scoreDomain} NOT NULL, {provider.Escape("Scores")} {scoreArrayDomain} NOT NULL)");
 
                 await DatabaseScaffolder.ScaffoldAsync(
                     connection,
@@ -2787,6 +2790,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains("public string Email { get; set; } = default!;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public int Score { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public int[] Scores { get; set; } = default!;", entityCode, StringComparison.Ordinal);
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                     item.GetProperty("code").GetString() == "SCF104" &&
@@ -2797,6 +2801,11 @@ public sealed class LiveProviderScaffoldingParityTests
                     item.GetProperty("code").GetString() == "SCF104" &&
                     item.GetProperty("table").GetString() == "public." + PostgresDomainTable &&
                     item.GetProperty("detail").GetString()!.Contains("DOMAIN (public." + PostgresDomainScoreName, StringComparison.Ordinal));
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("table").GetString() == "public." + PostgresDomainTable &&
+                    item.GetProperty("detail").GetString()!.Contains("DOMAIN (public." + PostgresDomainScoreArrayName, StringComparison.Ordinal));
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
@@ -2821,12 +2830,14 @@ public sealed class LiveProviderScaffoldingParityTests
             var table = provider.Escape("public") + "." + provider.Escape(PostgresDomainTable);
             var domain = provider.Escape("public") + "." + provider.Escape(PostgresDomainName);
             var scoreDomain = provider.Escape("public") + "." + provider.Escape(PostgresDomainScoreName);
+            var scoreArrayDomain = provider.Escape("public") + "." + provider.Escape(PostgresDomainScoreArrayName);
             try
             {
                 await ExecuteAsync(connection, $"CREATE DOMAIN {domain} AS varchar(320) CHECK (VALUE LIKE '%@%')");
                 await ExecuteAsync(connection, $"CREATE DOMAIN {scoreDomain} AS integer CHECK (VALUE >= 0)");
+                await ExecuteAsync(connection, $"CREATE DOMAIN {scoreArrayDomain} AS integer[]");
                 await ExecuteAsync(connection,
-                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL, {provider.Escape("Score")} {scoreDomain} NOT NULL)");
+                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL, {provider.Escape("Score")} {scoreDomain} NOT NULL, {provider.Escape("Scores")} {scoreArrayDomain} NOT NULL)");
 
                 var type = await new DynamicEntityTypeGenerator()
                     .GenerateEntityTypeAsync(connection, "public." + PostgresDomainTable);
@@ -2837,6 +2848,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Equal(typeof(int), type.GetProperty("Id")!.PropertyType);
                 Assert.Equal(typeof(string), type.GetProperty("Email")!.PropertyType);
                 Assert.Equal(typeof(int), type.GetProperty("Score")!.PropertyType);
+                Assert.Equal(typeof(int[]), type.GetProperty("Scores")!.PropertyType);
             }
             finally
             {
@@ -4422,6 +4434,7 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresDomainTable, Qualified(provider, "public", PostgresDomainTable)));
+            await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {Qualified(provider, "public", PostgresDomainScoreArrayName)}");
             await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {Qualified(provider, "public", PostgresDomainScoreName)}");
             await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {Qualified(provider, "public", PostgresDomainName)}");
         }

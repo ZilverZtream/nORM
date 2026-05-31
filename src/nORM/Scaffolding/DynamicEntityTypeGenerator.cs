@@ -367,7 +367,16 @@ namespace nORM.Scaffolding
                 var isRowVersion = rowVersionColumns.Contains(colName);
                 var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                 sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
-                var propertyType = GetPropertyType(NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType), effectiveAllowNull);
+                var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType);
+                if (IsPostgresConnection(connection.GetType().Name)
+                    && normalizedClrType == typeof(Array)
+                    && postgresDomainColumnCastTypes.TryGetValue(colName, out var domainCastType)
+                    && TryMapPostgresArrayCastType(domainCastType, out var arrayClrType))
+                {
+                    normalizedClrType = arrayClrType;
+                }
+
+                var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
 
                 var maxLength = GetScaffoldMaxLength(clrType, row);
 
@@ -680,7 +689,14 @@ namespace nORM.Scaffolding
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """
-                SELECT column_name AS ColumnName, data_type AS DataType
+                SELECT column_name AS ColumnName,
+                       CASE
+                           WHEN data_type IN ('ARRAY', 'USER-DEFINED')
+                                AND udt_name IS NOT NULL
+                                AND udt_name <> ''
+                           THEN data_type || ' (' || udt_name || ')'
+                           ELSE data_type
+                       END AS DataType
                 FROM information_schema.columns
                 WHERE table_name = @tableName
                   AND (@schemaName IS NULL OR table_schema = @schemaName)
@@ -712,7 +728,11 @@ namespace nORM.Scaffolding
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
         {
-            return typeText.Trim().ToLowerInvariant() switch
+            var normalized = typeText.Trim().ToLowerInvariant();
+            if (TryMapPostgresArrayProbeCastType(normalized, out var arrayCastType))
+                return arrayCastType;
+
+            return normalized switch
             {
                 "integer" or "int" or "int4" => "integer",
                 "bigint" or "int8" => "bigint",
@@ -721,6 +741,10 @@ namespace nORM.Scaffolding
                 "uuid" => "uuid",
                 "date" => "date",
                 "text" => "text",
+                "citext" => "citext",
+                "json" => "json",
+                "jsonb" => "jsonb",
+                "xml" => "xml",
                 "character varying" or "varchar" => "character varying",
                 "character" or "char" => "character",
                 "numeric" or "decimal" => "numeric",
@@ -734,6 +758,85 @@ namespace nORM.Scaffolding
                 "interval" => "interval",
                 _ => "text"
             };
+        }
+
+        private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
+        {
+            castType = string.Empty;
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+                return false;
+
+            var open = normalized.IndexOf('(');
+            if (open < 0)
+                return false;
+
+            var close = normalized.IndexOf(')', open + 1);
+            var element = (close > open
+                    ? normalized.Substring(open + 1, close - open - 1)
+                    : normalized[(open + 1)..])
+                .Trim()
+                .TrimStart('_');
+
+            castType = element switch
+            {
+                "int2" or "smallint" => "smallint[]",
+                "int4" or "integer" => "integer[]",
+                "int8" or "bigint" => "bigint[]",
+                "float4" or "real" => "real[]",
+                "float8" or "double precision" => "double precision[]",
+                "numeric" or "decimal" => "numeric[]",
+                "bool" or "boolean" => "boolean[]",
+                "uuid" => "uuid[]",
+                "text" => "text[]",
+                "varchar" or "character varying" => "character varying[]",
+                "bpchar" or "char" or "character" => "character[]",
+                "citext" => "citext[]",
+                "bytea" => "bytea[]",
+                "date" => "date[]",
+                "time" or "time without time zone" => "time without time zone[]",
+                "timetz" or "time with time zone" => "time with time zone[]",
+                "interval" => "interval[]",
+                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
+                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
+                _ => string.Empty
+            };
+
+            return castType.Length > 0;
+        }
+
+        private static bool TryMapPostgresArrayCastType(string castType, out Type arrayType)
+        {
+            arrayType = typeof(object[]);
+            var normalized = castType.Trim().ToLowerInvariant();
+            if (!normalized.EndsWith("[]", StringComparison.Ordinal))
+                return false;
+
+            var element = normalized[..^2].Trim();
+            var elementType = element switch
+            {
+                "smallint" => typeof(short),
+                "integer" => typeof(int),
+                "bigint" => typeof(long),
+                "real" => typeof(float),
+                "double precision" => typeof(double),
+                "numeric" => typeof(decimal),
+                "boolean" => typeof(bool),
+                "uuid" => typeof(Guid),
+                "text" or "character varying" or "character" or "citext" => typeof(string),
+                "bytea" => typeof(byte[]),
+                "date" => typeof(DateOnly),
+                "time without time zone" or "time with time zone" => typeof(TimeOnly),
+                "interval" => typeof(TimeSpan),
+                "timestamp without time zone" => typeof(DateTime),
+                "timestamp with time zone" => typeof(DateTimeOffset),
+                _ => null
+            };
+
+            if (elementType is null)
+                return false;
+
+            arrayType = elementType.MakeArrayType();
+            return true;
         }
 
         private static IReadOnlyList<string> GetPostgresColumnNames(DbConnection connection, string? schemaName, string tableName)
