@@ -24,6 +24,11 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string FkName = "FK_ScaffoldLiveBook_Author";
     private const string BookLabelBookFkName = "FK_ScaffoldLiveBookLabel_Book";
     private const string BookLabelLabelFkName = "FK_ScaffoldLiveBookLabel_Label";
+    private const string SurrogateAuthorTable = "ScaffoldLiveSurrogateAuthor";
+    private const string SurrogateBookTable = "ScaffoldLiveSurrogateBook";
+    private const string SurrogateAuthorBookTable = "ScaffoldLiveSurrogateAuthorBook";
+    private const string SurrogateAuthorBookAuthorFkName = "FK_ScaffoldLiveSurrogateAuthorBook_Author";
+    private const string SurrogateAuthorBookBookFkName = "FK_ScaffoldLiveSurrogateAuthorBook_Book";
     private const string CompositeParentTable = "ScaffoldLiveCompositeParent";
     private const string CompositeChildTable = "ScaffoldLiveCompositeChild";
     private const string CompositeFkName = "FK_ScaffoldLiveCompositeChild_Parent";
@@ -162,6 +167,56 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_surrogate_key_many_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSurrogateManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_surrogate_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSurrogateManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { SurrogateAuthorTable, SurrogateBookTable, SurrogateAuthorBookTable },
+                        OverwriteFiles = false
+                    });
+
+                var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, SurrogateAuthorTable + ".cs"));
+                var bookCode = await File.ReadAllTextAsync(Path.Combine(dir, SurrogateBookTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSurrogateManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, SurrogateAuthorBookTable + ".cs")));
+                Assert.Contains($"public List<{SurrogateBookTable}> {SurrogateBookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{SurrogateAuthorTable}> {SurrogateAuthorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SurrogateAuthorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSurrogateManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -1935,6 +1990,29 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(CompositeFkName)} FOREIGN KEY ({tenantId}, {orderNo}) REFERENCES {parent} ({tenantId}, {orderNo}))");
     }
 
+    private static async Task SetupSurrogateManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorBookTable, provider.Escape(SurrogateAuthorBookTable)));
+        await ExecuteAsync(connection, DropTable(kind, SurrogateBookTable, provider.Escape(SurrogateBookTable)));
+        await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorTable, provider.Escape(SurrogateAuthorTable)));
+
+        var author = provider.Escape(SurrogateAuthorTable);
+        var book = provider.Escape(SurrogateBookTable);
+        var join = provider.Escape(SurrogateAuthorBookTable);
+        var id = provider.Escape("Id");
+        var authorId = provider.Escape("AuthorId");
+        var bookId = provider.Escape("BookId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+
+        await ExecuteAsync(connection, $"CREATE TABLE {author} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({IdentityPrimaryKeyColumn(kind, id)}, {authorId} {IntType(kind)} NOT NULL, {bookId} {IntType(kind)} NOT NULL, UNIQUE ({authorId}, {bookId}), " +
+            $"CONSTRAINT {provider.Escape(SurrogateAuthorBookAuthorFkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}), " +
+            $"CONSTRAINT {provider.Escape(SurrogateAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
+    }
+
     private static async Task SetupReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ReferentialChildTable, provider.Escape(ReferentialChildTable)));
@@ -2569,6 +2647,20 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task TeardownSurrogateManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorBookTable, provider.Escape(SurrogateAuthorBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SurrogateBookTable, provider.Escape(SurrogateBookTable)));
+            await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorTable, provider.Escape(SurrogateAuthorTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
     private static async Task TeardownReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try
@@ -3027,6 +3119,14 @@ public sealed class LiveProviderScaffoldingParityTests
         : kind == ProviderKind.Sqlite
             ? "TEXT"
             : $"VARCHAR({length})";
+
+    private static string IdentityPrimaryKeyColumn(ProviderKind kind, string escapedColumnName) => kind switch
+    {
+        ProviderKind.SqlServer => $"{escapedColumnName} INT IDENTITY(1,1) NOT NULL PRIMARY KEY",
+        ProviderKind.Postgres => $"{escapedColumnName} integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+        ProviderKind.MySql => $"{escapedColumnName} INT NOT NULL AUTO_INCREMENT PRIMARY KEY",
+        _ => $"{escapedColumnName} INTEGER PRIMARY KEY AUTOINCREMENT"
+    };
 
     private static string GeneratedColumnTableSql(ProviderKind kind, DatabaseProvider provider)
     {
