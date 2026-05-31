@@ -49,9 +49,10 @@ must be reviewed and edited like handwritten model code.
   SQL Server alias/user-defined column types are reported with schema/name and
   base system type when available so reviewers can preserve or remodel
   provider-owned type semantics.
-  MySQL unsigned integer columns are reported as provider-specific storage
-  because SQL Server, PostgreSQL, and SQLite do not share MySQL's unsigned
-  integer DDL semantics.
+  MySQL unsigned integer columns scaffold as exact unsigned CLR widths where
+  provider metadata exposes them (`uint`, `ulong`, etc.) and are still reported
+  as provider-specific storage because SQL Server, PostgreSQL, and SQLite do
+  not share MySQL's unsigned integer DDL semantics.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
   the reverse-engineered model carries the full key shape explicitly.

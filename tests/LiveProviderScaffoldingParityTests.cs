@@ -1573,6 +1573,8 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains("UnsignedCount", entityCode, StringComparison.Ordinal);
                 Assert.Contains("UnsignedTotal", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public uint UnsignedCount { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public ulong UnsignedTotal { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                     item.GetProperty("code").GetString() == "SCF104" &&
@@ -1589,6 +1591,32 @@ public sealed class LiveProviderScaffoldingParityTests
             {
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
+                await TeardownMySqlUnsignedColumnTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Dynamic_scaffolding_handles_mysql_unsigned_columns_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlUnsignedColumnTableAsync(connection, provider);
+            try
+            {
+                var type = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, MySqlUnsignedColumnTable);
+
+                Assert.Equal(typeof(int), type.GetProperty("Id")!.PropertyType);
+                Assert.Equal(typeof(uint), type.GetProperty("UnsignedCount")!.PropertyType);
+                Assert.Equal(typeof(ulong), type.GetProperty("UnsignedTotal")!.PropertyType);
+            }
+            finally
+            {
                 await TeardownMySqlUnsignedColumnTableAsync(connection, provider);
             }
         }

@@ -6191,6 +6191,12 @@ namespace nORM.Scaffolding
                 return arrayType;
             }
 
+            if (provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+                && TryMapMySqlUnsignedType(providerSpecificColumnType, out var unsignedType))
+            {
+                return unsignedType;
+            }
+
             if (provider is SqliteProvider
                 && isKey
                 && isAuto
@@ -6203,6 +6209,28 @@ namespace nORM.Scaffolding
             }
 
             return clrType;
+        }
+
+        private static bool TryMapMySqlUnsignedType(string? detail, out Type type)
+        {
+            type = typeof(object);
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var normalized = detail.Trim().ToLowerInvariant();
+            if (!normalized.Contains("unsigned", StringComparison.Ordinal))
+                return false;
+
+            type = normalized.Split('(', 2)[0].Trim() switch
+            {
+                "tinyint unsigned" => typeof(byte),
+                "smallint unsigned" => typeof(ushort),
+                "mediumint unsigned" or "int unsigned" or "integer unsigned" => typeof(uint),
+                "bigint unsigned" => typeof(ulong),
+                _ => typeof(object)
+            };
+
+            return type != typeof(object);
         }
 
         private static bool TryMapPostgresArrayType(string? detail, out Type arrayType)

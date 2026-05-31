@@ -343,6 +343,7 @@ namespace nORM.Scaffolding
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
+            var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
             var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
             var columns = new List<ColumnInfo>(schema.Rows.Count);
             var sourceOrdinal = 0;
@@ -374,6 +375,12 @@ namespace nORM.Scaffolding
                     && TryMapPostgresArrayCastType(domainCastType, out var arrayClrType))
                 {
                     normalizedClrType = arrayClrType;
+                }
+                else if (IsMySqlConnection(connection.GetType().Name)
+                         && mySqlUnsignedColumnTypes.TryGetValue(colName, out var unsignedColumnType)
+                         && TryMapMySqlUnsignedType(unsignedColumnType, out var unsignedClrType))
+                {
+                    normalizedClrType = unsignedClrType;
                 }
 
                 var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
@@ -724,6 +731,65 @@ namespace nORM.Scaffolding
             }
 
             return result;
+        }
+
+        private static IReadOnlyDictionary<string, string> GetMySqlUnsignedColumnTypes(DbConnection connection, string? schemaName, string tableName)
+        {
+            if (!IsMySqlConnection(connection.GetType().Name))
+                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
+
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT column_name AS ColumnName, column_type AS ColumnType
+                FROM information_schema.columns
+                WHERE table_schema = COALESCE(@schemaName, DATABASE())
+                  AND table_name = @tableName
+                  AND LOWER(COALESCE(column_type, '')) LIKE '%unsigned%'
+                """;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName))
+                    continue;
+
+                result[columnName] = Convert.ToString(reader["ColumnType"]) ?? string.Empty;
+            }
+
+            return result;
+        }
+
+        private static bool TryMapMySqlUnsignedType(string? detail, out Type type)
+        {
+            type = typeof(object);
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var normalized = detail.Trim().ToLowerInvariant();
+            if (!normalized.Contains("unsigned", StringComparison.Ordinal))
+                return false;
+
+            type = normalized.Split('(', 2)[0].Trim() switch
+            {
+                "tinyint unsigned" => typeof(byte),
+                "smallint unsigned" => typeof(ushort),
+                "mediumint unsigned" or "int unsigned" or "integer unsigned" => typeof(uint),
+                "bigint unsigned" => typeof(ulong),
+                _ => typeof(object)
+            };
+
+            return type != typeof(object);
         }
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
