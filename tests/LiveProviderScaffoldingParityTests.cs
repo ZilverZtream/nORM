@@ -684,8 +684,13 @@ public sealed class LiveProviderScaffoldingParityTests
                     var metadata = routine.GetProperty("metadata");
                     Assert.Equal(1, metadata.GetProperty("parameterCount").GetInt32());
                     var parameters = metadata.GetProperty("parameters").EnumerateArray().ToArray();
-                    var parameter = Assert.Single(parameters);
+                    var parameter = Assert.Single(parameters, item => item.GetProperty("mode").GetString() == "IN");
                     Assert.Equal("IN", parameter.GetProperty("mode").GetString());
+                    Assert.Contains($"public sealed class {RoutineName}Result", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("public int Id { get; set; }", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("public string Name { get; set; } = default!;", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"Task<List<{RoutineName}Result>> {RoutineName}Async", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"IAsyncEnumerable<{RoutineName}Result> Stream{RoutineName}Async", contextCode, StringComparison.Ordinal);
                 }
 
                 AssertScaffoldOutputBuilds(dir);

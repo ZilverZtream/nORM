@@ -1177,10 +1177,15 @@ public class DatabaseScaffolderPrivateMethodTests
         var code = InvokeScaffoldContextWithRoutine(
             "public",
             "customer_orders",
-            "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=customer_id:IN:integer; dataType=record");
+            "PostgreSQL function; parameters=3; outputParameters=2; parameterModes=customer_id:IN:integer,Id:OUT:integer,Name:OUT:text; dataType=record");
 
         Assert.Contains("Executes provider-bound function `public.customer_orders`", code);
+        Assert.Contains("public sealed class CustomerOrdersResult", code);
+        Assert.Contains("public int Id { get; set; }", code);
+        Assert.Contains("public string Name { get; set; } = default!;", code);
+        Assert.Contains("Task<List<CustomerOrdersResult>> CustomerOrdersAsync(CustomerOrdersParameters? parameters = null, CancellationToken ct = default)", code);
         Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
+        Assert.Contains("QueryUnchangedAsync<CustomerOrdersResult>", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
     }
 

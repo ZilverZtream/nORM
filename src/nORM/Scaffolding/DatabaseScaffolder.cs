@@ -5256,9 +5256,7 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyList<RoutineResultColumn> GetRoutineResultColumns(IReadOnlyDictionary<string, object?> metadata)
         {
-            if (!metadata.TryGetValue("resultColumns", out var columnsValue)
-                || columnsValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> columns
-                || columns.Count == 0)
+            if (!TryGetRoutineResultColumnMetadata(metadata, out var columns))
             {
                 return Array.Empty<RoutineResultColumn>();
             }
@@ -5284,6 +5282,42 @@ namespace nORM.Scaffolding
             }
 
             return result.ToArray();
+        }
+
+        private static bool TryGetRoutineResultColumnMetadata(
+            IReadOnlyDictionary<string, object?> metadata,
+            out IReadOnlyList<IReadOnlyDictionary<string, object?>> columns)
+        {
+            if (metadata.TryGetValue("resultColumns", out var columnsValue)
+                && columnsValue is IReadOnlyList<IReadOnlyDictionary<string, object?>> resultColumns
+                && resultColumns.Count > 0)
+            {
+                columns = resultColumns;
+                return true;
+            }
+
+            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
+            if (!string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase)
+                || !metadata.TryGetValue("parameters", out var parametersValue)
+                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
+                || parameters.Count == 0)
+            {
+                columns = Array.Empty<IReadOnlyDictionary<string, object?>>();
+                return false;
+            }
+
+            columns = parameters
+                .Where(parameter =>
+                {
+                    var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
+                    var name = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
+                    return !string.IsNullOrWhiteSpace(name)
+                           && !string.Equals(name, "return", StringComparison.OrdinalIgnoreCase)
+                           && (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(mode, "INOUT", StringComparison.OrdinalIgnoreCase));
+                })
+                .ToArray();
+            return columns.Count > 0;
         }
 
         private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)
