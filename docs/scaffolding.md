@@ -347,7 +347,8 @@ must be reviewed and edited like handwritten model code.
   function wrappers and table-valued-parameter routine
   stubs, PostgreSQL array/UUID and MySQL
   scalar-function wrappers with unsigned routine parameter stubs, PostgreSQL overloaded function wrappers
-  with deterministic generated names, PostgreSQL UUID/array column scaffolds,
+  with deterministic generated names, PostgreSQL domain diagnostics,
+  PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts, and live
   generated-surrogate, composite generated-surrogate, shared-tenant,
   shared-tenant alternate-key, composite payload bridge preservation,

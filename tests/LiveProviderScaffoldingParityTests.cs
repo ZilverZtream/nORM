@@ -108,6 +108,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string SqlServerRowVersionTable = "ScaffoldLiveRowVersion";
+    private const string PostgresDomainTable = "ScaffoldLiveDomainCustomer";
+    private const string PostgresDomainName = "scaffold_live_email_address";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
     private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
@@ -1993,6 +1995,54 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_domain_columns_with_underlying_type_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await TeardownPostgresDomainColumnAsync(connection, provider);
+            var table = provider.Escape("public") + "." + provider.Escape(PostgresDomainTable);
+            var domain = provider.Escape("public") + "." + provider.Escape(PostgresDomainName);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_domain_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await ExecuteAsync(connection, $"CREATE DOMAIN {domain} AS varchar(320) CHECK (VALUE LIKE '%@%')");
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("Email")} {domain} NOT NULL)");
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresDomainContext",
+                    new ScaffoldOptions { Tables = new[] { "public." + PostgresDomainTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, PostgresDomainTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("public string Email { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("table").GetString() == "public." + PostgresDomainTable &&
+                    item.GetProperty("detail").GetString()!.Contains("DOMAIN (public." + PostgresDomainName, StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownPostgresDomainColumnAsync(connection, provider);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
@@ -3152,6 +3202,19 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {provider.Escape(MySqlUnsignedRoutineName)}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownPostgresDomainColumnAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresDomainTable, Qualified(provider, "public", PostgresDomainTable)));
+            await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {Qualified(provider, "public", PostgresDomainName)}");
         }
         catch
         {
