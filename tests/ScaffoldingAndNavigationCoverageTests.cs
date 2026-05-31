@@ -695,6 +695,7 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData("inet", false)]
     [InlineData("enum", false)]
     [InlineData("enum('draft','paid','cancelled')", true)]
+    [InlineData("ENUM (public.customer_status: 'draft','active','archived')", true)]
     [InlineData("set('read','write','admin')", false)]
     [InlineData("DOMAIN (public.email_address -> character varying)", false)]
     [InlineData("user-defined type (dbo.EmailAddress -> nvarchar)", false)]

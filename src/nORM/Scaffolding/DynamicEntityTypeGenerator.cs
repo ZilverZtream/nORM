@@ -698,6 +698,16 @@ namespace nORM.Scaffolding
             cmd.CommandText = """
                 SELECT column_name AS ColumnName,
                        CASE
+                           WHEN data_type = 'USER-DEFINED'
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM pg_type enum_type
+                                    INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
+                                    WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
+                                      AND enum_type.typname = udt_name
+                                      AND enum_type.typtype = 'e'
+                                )
+                           THEN 'text'
                            WHEN data_type IN ('ARRAY', 'USER-DEFINED')
                                 AND udt_name IS NOT NULL
                                 AND udt_name <> ''
@@ -707,7 +717,10 @@ namespace nORM.Scaffolding
                 FROM information_schema.columns
                 WHERE table_name = @tableName
                   AND (@schemaName IS NULL OR table_schema = @schemaName)
-                  AND domain_name IS NOT NULL
+                  AND (
+                      domain_name IS NOT NULL
+                      OR data_type = 'USER-DEFINED'
+                  )
                 """;
             var tableParameter = cmd.CreateParameter();
             tableParameter.ParameterName = "@tableName";

@@ -116,6 +116,7 @@ namespace nORM.Scaffolding
                 var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
                 var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
+                unsupportedFeatures.AddRange(await GetPostgresEnumColumnFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
                 RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedPartialIndexDiagnostics(unsupportedFeatures, indexes);
@@ -124,7 +125,7 @@ namespace nORM.Scaffolding
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
                 AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
-                var enumCheckConstraintConfigurations = BuildMySqlEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
+                var enumCheckConstraintConfigurations = BuildEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
                 RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
                 unsupportedFeatures.RemoveAll(feature =>
@@ -139,6 +140,13 @@ namespace nORM.Scaffolding
                     && checkConstraints.Any(check =>
                         string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                unsupportedFeatures.RemoveAll(feature =>
+                    string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
+                    && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    && properties.TryGetValue(feature.Name, out var propertyName)
+                    && enumCheckConstraintConfigurations.Any(check =>
+                        string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && check.Name.EndsWith("_" + propertyName + "_Enum", StringComparison.Ordinal)));
                 var expressionIndexConfigurations = BuildExpressionIndexConfigurations(entityByTable, unsupportedFeatures);
                 unsupportedFeatures.RemoveAll(feature =>
                     string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
@@ -345,8 +353,9 @@ namespace nORM.Scaffolding
                 sb.AppendLine("{");
 
                 // Read schema using a zero-row query (fast) with key info
+                var postgresTextCastColumns = await GetPostgresUserDefinedColumnNamesAsync(connection, provider, schemaName, tableName).ConfigureAwait(false);
                 await using var cmd = connection.CreateCommand();
-                cmd.CommandText = BuildSchemaProbeSql(provider, schemaName, tableName, columnPropertyNames, providerSpecificColumnTypes);
+                cmd.CommandText = BuildSchemaProbeSql(provider, schemaName, tableName, columnPropertyNames, providerSpecificColumnTypes, postgresTextCastColumns);
                 await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
                 var schema = reader.GetSchemaTable()!;
                 foreach (DataRow row in schema.Rows)
@@ -463,13 +472,15 @@ namespace nORM.Scaffolding
             string? schemaName,
             string tableName,
             IReadOnlyDictionary<string, string>? columnPropertyNames,
-            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes)
+            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
+            IReadOnlySet<string>? postgresTextCastColumns = null)
         {
             var qualified = EscapeQualified(provider, schemaName, tableName);
             if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
-                || providerSpecificColumnTypes is null
-                || providerSpecificColumnTypes.Count == 0
-                || !providerSpecificColumnTypes.Values.Any(detail => detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase))
+                || ((providerSpecificColumnTypes is null
+                     || providerSpecificColumnTypes.Count == 0
+                     || !providerSpecificColumnTypes.Values.Any(RequiresPostgresSchemaProbeCast))
+                    && (postgresTextCastColumns is null || postgresTextCastColumns.Count == 0))
                 || columnPropertyNames is null
                 || columnPropertyNames.Count == 0)
             {
@@ -479,13 +490,83 @@ namespace nORM.Scaffolding
             var columns = columnPropertyNames.Keys.Select(column =>
             {
                 var escaped = provider.Escape(column);
-                return providerSpecificColumnTypes.TryGetValue(column, out var detail)
-                       && detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase)
-                    ? $"{escaped}::{GetPostgresDomainProbeCastType(detail)} AS {escaped}"
+                return providerSpecificColumnTypes is not null
+                       && providerSpecificColumnTypes.TryGetValue(column, out var detail)
+                       && TryGetPostgresSchemaProbeCastType(detail, out var castType)
+                    ? $"{escaped}::{castType} AS {escaped}"
+                    : postgresTextCastColumns is not null && postgresTextCastColumns.Contains(column)
+                        ? $"{escaped}::text AS {escaped}"
                     : escaped;
             });
 
             return $"SELECT {string.Join(", ", columns)} FROM {qualified} WHERE 1=0";
+        }
+
+        private static async Task<IReadOnlySet<string>> GetPostgresUserDefinedColumnNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            string? schemaName,
+            string tableName)
+        {
+            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+                return EmptyStringSet;
+
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = @tableName
+                  AND (@schemaName IS NULL OR table_schema = @schemaName)
+                  AND domain_name IS NULL
+                  AND data_type = 'USER-DEFINED'
+                """;
+            AddParameter(cmd, "@tableName", tableName);
+            AddParameter(cmd, "@schemaName", string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName);
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var columnName = Convert.ToString(reader["column_name"]);
+                if (!string.IsNullOrWhiteSpace(columnName))
+                    result.Add(columnName);
+            }
+
+            return result.Count == 0 ? EmptyStringSet : result;
+        }
+
+        private static void AddParameter(DbCommand command, string name, object? value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value ?? DBNull.Value;
+            command.Parameters.Add(parameter);
+        }
+
+        private static bool RequiresPostgresSchemaProbeCast(string detail)
+            => TryGetPostgresSchemaProbeCastType(detail, out _);
+
+        private static bool TryGetPostgresSchemaProbeCastType(string detail, out string castType)
+        {
+            if (detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase))
+            {
+                castType = GetPostgresDomainProbeCastType(detail);
+                return true;
+            }
+
+            if (TryParsePostgresEnumValues(detail, out _))
+            {
+                castType = "text";
+                return true;
+            }
+
+            if (detail.StartsWith("USER-DEFINED", StringComparison.OrdinalIgnoreCase))
+            {
+                castType = "text";
+                return true;
+            }
+
+            castType = string.Empty;
+            return false;
         }
 
         private static string GetPostgresDomainProbeCastType(string detail)
@@ -2033,6 +2114,28 @@ namespace nORM.Scaffolding
                                  domain_name || ' -> ' ||
                                  CASE WHEN udt_name IS NULL OR udt_name = '' THEN data_type ELSE data_type || ' (' || udt_name || ')' END ||
                                  ')'
+                            WHEN data_type = 'USER-DEFINED'
+                                 AND EXISTS (
+                                     SELECT 1
+                                     FROM pg_type enum_type
+                                     INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
+                                     WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
+                                       AND enum_type.typname = udt_name
+                                       AND enum_type.typtype = 'e'
+                                 )
+                            THEN 'ENUM (' ||
+                                 CASE WHEN udt_schema IS NOT NULL AND udt_schema <> '' THEN udt_schema || '.' ELSE '' END ||
+                                 udt_name || ': ' ||
+                                 COALESCE((
+                                     SELECT string_agg(quote_literal(enum_value.enumlabel), ',' ORDER BY enum_value.enumsortorder)
+                                     FROM pg_type enum_type
+                                     INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
+                                     INNER JOIN pg_enum enum_value ON enum_value.enumtypid = enum_type.oid
+                                     WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
+                                       AND enum_type.typname = udt_name
+                                       AND enum_type.typtype = 'e'
+                                 ), '') ||
+                                 ')'
                             WHEN udt_name IS NULL OR udt_name = '' THEN data_type
                             ELSE data_type || ' (' || udt_name || ')'
                         END
@@ -2204,6 +2307,53 @@ namespace nORM.Scaffolding
                     Convert.ToString(reader["ObjectName"]) ?? string.Empty,
                     Convert.ToString(reader["Detail"]) ?? string.Empty));
             }
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresEnumColumnFeaturesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+                return Array.Empty<ScaffoldUnsupportedFeature>();
+
+            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var features = new List<ScaffoldUnsupportedFeature>();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT c.table_schema AS TableSchema,
+                       c.table_name AS TableName,
+                       c.column_name AS ColumnName,
+                       'ENUM (' ||
+                       CASE WHEN c.udt_schema IS NOT NULL AND c.udt_schema <> '' THEN c.udt_schema || '.' ELSE '' END ||
+                       c.udt_name || ': ' ||
+                       string_agg(quote_literal(e.enumlabel), ',' ORDER BY e.enumsortorder) ||
+                       ')' AS Detail
+                FROM information_schema.columns c
+                INNER JOIN pg_namespace ns ON ns.nspname = COALESCE(c.udt_schema, c.table_schema)
+                INNER JOIN pg_type t ON t.typnamespace = ns.oid AND t.typname = c.udt_name AND t.typtype = 'e'
+                INNER JOIN pg_enum e ON e.enumtypid = t.oid
+                WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
+                  AND c.data_type = 'USER-DEFINED'
+                GROUP BY c.table_schema, c.table_name, c.column_name, c.udt_schema, c.udt_name
+                """;
+            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var tableKey = TableKey(
+                    NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])),
+                    Convert.ToString(reader["TableName"]) ?? string.Empty);
+                if (!tableKeys.Contains(tableKey))
+                    continue;
+
+                features.Add(new ScaffoldUnsupportedFeature(
+                    tableKey,
+                    "ProviderSpecificColumnType",
+                    Convert.ToString(reader["ColumnName"]) ?? string.Empty,
+                    Convert.ToString(reader["Detail"]) ?? string.Empty));
+            }
+
+            return features;
         }
 
         private static void AddMissingPrimaryKeyDiagnostics(
@@ -2682,6 +2832,7 @@ namespace nORM.Scaffolding
                    || normalized == "user-defined (uuid)"
                    || (normalized.StartsWith("array", StringComparison.Ordinal) && TryMapPostgresArrayType(detail, out _))
                    || TryParseMySqlEnumValues(detail, out _)
+                   || TryParsePostgresEnumValues(detail, out _)
                    || normalized == "year";
         }
 
@@ -4036,7 +4187,7 @@ namespace nORM.Scaffolding
             return result;
         }
 
-        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildMySqlEnumCheckConstraintConfigurations(
+        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildEnumCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
@@ -4045,7 +4196,7 @@ namespace nORM.Scaffolding
             foreach (var feature in features)
             {
                 if (!string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
-                    || !TryParseMySqlEnumValues(feature.Detail, out var values)
+                    || !TryParseEnumValues(feature.Detail, out var values)
                     || string.IsNullOrWhiteSpace(feature.Name)
                     || !IsSimpleSqlIdentifier(feature.Name)
                     || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
@@ -4066,6 +4217,10 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static bool TryParseEnumValues(string? detail, out string[] values)
+            => TryParseMySqlEnumValues(detail, out values)
+               || TryParsePostgresEnumValues(detail, out values);
+
         private static bool TryParseMySqlEnumValues(string? detail, out string[] values)
         {
             values = Array.Empty<string>();
@@ -4077,6 +4232,75 @@ namespace nORM.Scaffolding
                 return false;
 
             var body = trimmed.Substring(trimmed.IndexOf('(') + 1, trimmed.Length - trimmed.IndexOf('(') - 2);
+            var parsed = new List<string>();
+            var current = new StringBuilder();
+            var inString = false;
+            for (var i = 0; i < body.Length; i++)
+            {
+                var ch = body[i];
+                if (!inString)
+                {
+                    if (char.IsWhiteSpace(ch) || ch == ',')
+                        continue;
+                    if (ch != '\'')
+                        return false;
+
+                    inString = true;
+                    current.Clear();
+                    continue;
+                }
+
+                if (ch == '\\' && i + 1 < body.Length)
+                {
+                    current.Append(body[++i]);
+                    continue;
+                }
+
+                if (ch == '\'')
+                {
+                    if (i + 1 < body.Length && body[i + 1] == '\'')
+                    {
+                        current.Append('\'');
+                        i++;
+                        continue;
+                    }
+
+                    parsed.Add(current.ToString());
+                    inString = false;
+                    continue;
+                }
+
+                current.Append(ch);
+            }
+
+            if (inString || parsed.Count == 0)
+                return false;
+
+            values = parsed.ToArray();
+            return true;
+        }
+
+        private static bool TryParsePostgresEnumValues(string? detail, out string[] values)
+        {
+            values = Array.Empty<string>();
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            var trimmed = detail.Trim();
+            if (!trimmed.StartsWith("ENUM (", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
+                return false;
+
+            var colon = trimmed.IndexOf(':');
+            if (colon < 0)
+                return false;
+
+            var valueList = trimmed.Substring(colon + 1, trimmed.Length - colon - 2).Trim();
+            return TryParseSqlStringLiteralList(valueList, out values);
+        }
+
+        private static bool TryParseSqlStringLiteralList(string body, out string[] values)
+        {
+            values = Array.Empty<string>();
             var parsed = new List<string>();
             var current = new StringBuilder();
             var inString = false;
