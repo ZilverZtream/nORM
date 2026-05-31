@@ -94,6 +94,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
     private const string MySqlTypedColumnTable = "ScaffoldLiveMySqlTypedColumns";
+    private const string MySqlUnsignedColumnTable = "ScaffoldLiveMySqlUnsignedColumns";
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
@@ -1210,6 +1211,58 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownMySqlTypedColumnTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_mysql_unsigned_columns_as_provider_specific_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlUnsignedColumnTableAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_unsigned_columns_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlUnsignedColumnContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { MySqlUnsignedColumnTable },
+                        OverwriteFiles = false
+                    });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlUnsignedColumnTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("UnsignedCount", entityCode, StringComparison.Ordinal);
+                Assert.Contains("UnsignedTotal", entityCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("name").GetString() == "UnsignedCount" &&
+                    item.GetProperty("detail").GetString()!.Contains("unsigned", StringComparison.OrdinalIgnoreCase));
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("name").GetString() == "UnsignedTotal" &&
+                    item.GetProperty("detail").GetString()!.Contains("unsigned", StringComparison.OrdinalIgnoreCase));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownMySqlUnsignedColumnTableAsync(connection, provider);
             }
         }
     }
@@ -2711,6 +2764,15 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("Payload")} JSON NOT NULL, {provider.Escape("FiscalYear")} YEAR NOT NULL)");
     }
 
+    private static async Task SetupMySqlUnsignedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownMySqlUnsignedColumnTableAsync(connection, provider);
+
+        var table = provider.Escape(MySqlUnsignedColumnTable);
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("UnsignedCount")} INT UNSIGNED NOT NULL, {provider.Escape("UnsignedTotal")} BIGINT UNSIGNED NOT NULL)");
+    }
+
     private static async Task SetupWarningDiagnosticsAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
@@ -3309,6 +3371,18 @@ public sealed class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlTypedColumnTable, provider.Escape(MySqlTypedColumnTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownMySqlUnsignedColumnTableAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlUnsignedColumnTable, provider.Escape(MySqlUnsignedColumnTable)));
         }
         catch
         {
