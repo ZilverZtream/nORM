@@ -1120,11 +1120,15 @@ public sealed class LiveProviderScaffoldingParityTests
                             item.GetProperty("name").GetString()!.EndsWith(RoutineNonQueryName, StringComparison.Ordinal));
                 var metadata = routine.GetProperty("metadata");
 
+                Assert.Equal(2, metadata.GetProperty("outputParameterCount").GetInt32());
                 Assert.Empty(metadata.GetProperty("resultColumns").EnumerateArray());
                 Assert.Contains($"Task<int> {RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<StoredProcedureNonQueryResult> {RoutineNonQueryName}WithOutputAsync", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"ExecuteStoredProcedureNonQueryAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{RoutineNonQueryName}\")", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"ExecuteStoredProcedureNonQueryWithOutputAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{RoutineNonQueryName}\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public static OutputParameter[] Create{RoutineNonQueryName}OutputParameters()", contextCode, StringComparison.Ordinal);
+                Assert.Contains("new OutputParameter(\"status\", System.Data.DbType.String, 32)", contextCode, StringComparison.Ordinal);
+                Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"Task<List<TResult>> {RoutineNonQueryName}Async<TResult>", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"StoredProcedureResult<TResult> {RoutineNonQueryName}WithOutputAsync", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"Stream{RoutineNonQueryName}Async", contextCode, StringComparison.Ordinal);
@@ -3245,7 +3249,7 @@ public sealed class LiveProviderScaffoldingParityTests
         await TeardownSqlServerNonQueryRoutineAsync(connection, provider);
 
         await ExecuteAsync(connection,
-            $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineNonQueryName)} @tenantId INT AS BEGIN SET NOCOUNT ON; DECLARE @ignored INT = @tenantId; END");
+            $"CREATE PROCEDURE {provider.Escape("dbo")}.{provider.Escape(RoutineNonQueryName)} @tenantId INT, @status NVARCHAR(32) OUTPUT AS BEGIN SET NOCOUNT ON; SET @status = N'ok'; DECLARE @ignored INT = @tenantId; END");
     }
 
     private static async Task SetupSqlServerTableValuedParameterRoutineAsync(DbConnection connection, DatabaseProvider provider)
