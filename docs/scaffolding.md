@@ -315,9 +315,10 @@ must be reviewed and edited like handwritten model code.
   quoted/backslash/XML-sensitive table and column identifiers.
 - `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
   output compiles as a consumer project, keeps the provider-bound routine
-  warning/metadata contract explicit, and emits SQL Server/PostgreSQL/MySQL
-  functions as `SELECT` wrappers instead of stored-procedure calls, including
-  buffered and streaming table-valued function wrappers.
+  warning/metadata contract explicit, including SQL Server first-result-set
+  metadata parsing, and emits SQL Server/PostgreSQL/MySQL functions as `SELECT`
+  wrappers instead of stored-procedure calls, including buffered and streaming
+  table-valued function wrappers.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in SQL Server/PostgreSQL
   sequence wrappers generate typed next-value methods and compile in a consumer
   project.
@@ -416,8 +417,9 @@ must be reviewed and edited like handwritten model code.
   Routine diagnostics include provider metadata such as parameter counts,
   output-parameter counts where the provider exposes them, ordered parameter
   mode/type summaries, INOUT direction, output string/binary sizes where
-  providers expose them, and result/data type hints so stored
-  procedures/functions are not lost during provider-mobility review.
+  providers expose them, SQL Server first-result-set columns where metadata is
+  available, and result/data type hints so stored procedures/functions are not
+  lost during provider-mobility review.
 - Provider-specific expression indexes on SQLite and PostgreSQL are emitted as
   provider-bound `HasExpressionIndex` migration metadata. SQL Server and MySQL
   expression-index shapes require generated/computed columns plus ordinary

@@ -215,11 +215,12 @@ public class ScaffoldingContractDocTests
             "dbo",
             "GetRevenue",
             "Routine",
-            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal")!;
+            "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal; resultColumns=Id:int:0|Name:nvarchar(40):1")!;
         var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
 
         var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
+        var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
         Assert.Equal("SQL Server", metadata["provider"]);
         Assert.Equal("stored procedure", metadata["routineType"]);
@@ -231,6 +232,12 @@ public class ScaffoldingContractDocTests
         Assert.Equal("@total", parameters[1]["name"]);
         Assert.Equal("OUT", parameters[1]["mode"]);
         Assert.Equal("decimal", parameters[1]["dataType"]);
+        Assert.Equal("Id", resultColumns[0]["name"]);
+        Assert.Equal("int", resultColumns[0]["dataType"]);
+        Assert.Equal(false, resultColumns[0]["nullable"]);
+        Assert.Equal("Name", resultColumns[1]["name"]);
+        Assert.Equal("nvarchar(40)", resultColumns[1]["dataType"]);
+        Assert.Equal(true, resultColumns[1]["nullable"]);
     }
 
     [Fact]

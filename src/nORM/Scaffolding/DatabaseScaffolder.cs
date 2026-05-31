@@ -583,6 +583,18 @@ namespace nORM.Scaffolding
                                        AND base_ty.user_type_id = ty.system_type_id
                                        AND base_ty.is_user_defined = 0
                                       WHERE pa.object_id = p.object_id
+                                  ), ''),
+                                  '; resultColumns=',
+                                  COALESCE((
+                                      SELECT STRING_AGG(CONCAT(
+                                          COALESCE(rs.name, ''),
+                                          ':',
+                                          COALESCE(rs.system_type_name, ''),
+                                          ':',
+                                          CONVERT(varchar(1), COALESCE(rs.is_nullable, 0))), '|') WITHIN GROUP (ORDER BY rs.column_ordinal)
+                                      FROM sys.dm_exec_describe_first_result_set_for_object(p.object_id, NULL) rs
+                                      WHERE rs.error_number IS NULL
+                                        AND rs.is_hidden = 0
                                   ), ''))
                     FROM sys.procedures p
                     WHERE p.is_ms_shipped = 0
@@ -635,7 +647,19 @@ namespace nORM.Scaffolding
                                       INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                                       WHERE pa.object_id = o.object_id
                                         AND pa.parameter_id = 0
-                                  ), CASE WHEN o.type IN ('IF', 'TF') THEN 'TABLE' ELSE '' END))
+                                  ), CASE WHEN o.type IN ('IF', 'TF') THEN 'TABLE' ELSE '' END),
+                                  '; resultColumns=',
+                                  COALESCE((
+                                      SELECT STRING_AGG(CONCAT(
+                                          COALESCE(rs.name, ''),
+                                          ':',
+                                          COALESCE(rs.system_type_name, ''),
+                                          ':',
+                                          CONVERT(varchar(1), COALESCE(rs.is_nullable, 0))), '|') WITHIN GROUP (ORDER BY rs.column_ordinal)
+                                      FROM sys.dm_exec_describe_first_result_set_for_object(o.object_id, NULL) rs
+                                      WHERE rs.error_number IS NULL
+                                        AND rs.is_hidden = 0
+                                  ), ''))
                     FROM sys.objects o
                     WHERE o.is_ms_shipped = 0
                       AND o.type IN ('FN', 'IF', 'TF')
@@ -2820,6 +2844,9 @@ namespace nORM.Scaffolding
             if (values.TryGetValue("parameterModes", out var parameterModes))
                 metadata["parameters"] = ParseRoutineParameters(parameterModes);
 
+            if (values.TryGetValue("resultColumns", out var resultColumns))
+                metadata["resultColumns"] = ParseRoutineResultColumns(resultColumns);
+
             return metadata;
         }
 
@@ -2879,6 +2906,28 @@ namespace nORM.Scaffolding
                     if (parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]))
                         parameter["dataType"] = parts[2];
                     return (IReadOnlyDictionary<string, object?>)parameter;
+                })
+                .ToArray();
+        }
+
+        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParseRoutineResultColumns(string resultColumns)
+        {
+            if (string.IsNullOrWhiteSpace(resultColumns))
+                return Array.Empty<IReadOnlyDictionary<string, object?>>();
+
+            return resultColumns
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(raw =>
+                {
+                    var parts = raw.Split(':', 3);
+                    var column = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["name"] = parts.Length > 0 ? parts[0] : string.Empty,
+                        ["dataType"] = parts.Length > 1 ? parts[1] : string.Empty
+                    };
+                    if (parts.Length > 2 && int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var nullable))
+                        column["nullable"] = nullable != 0;
+                    return (IReadOnlyDictionary<string, object?>)column;
                 })
                 .ToArray();
         }

@@ -1078,10 +1078,17 @@ public sealed class LiveProviderScaffoldingParityTests
                     item.GetProperty("kind").GetString() == "Routine" &&
                     item.GetProperty("name").GetString()!.EndsWith(SqlServerScalarFunctionName, StringComparison.Ordinal) &&
                     item.GetProperty("metadata").GetProperty("callShape").GetString() == "scalar-function");
-                Assert.Contains(routines, item =>
+                var tableValuedFunction = Assert.Single(routines, item =>
                     item.GetProperty("kind").GetString() == "Routine" &&
                     item.GetProperty("name").GetString()!.EndsWith(SqlServerTableValuedFunctionName, StringComparison.Ordinal) &&
                     item.GetProperty("metadata").GetProperty("callShape").GetString() == "table-valued-function");
+                var resultColumns = tableValuedFunction.GetProperty("metadata").GetProperty("resultColumns").EnumerateArray().ToArray();
+                Assert.Contains(resultColumns, item =>
+                    item.GetProperty("name").GetString() == "Id" &&
+                    item.GetProperty("dataType").GetString() == "int");
+                Assert.Contains(resultColumns, item =>
+                    item.GetProperty("name").GetString() == "Name" &&
+                    item.GetProperty("dataType").GetString()!.StartsWith("nvarchar", StringComparison.OrdinalIgnoreCase));
 
                 Assert.Contains($"public sealed class {SqlServerScalarFunctionName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<TValue?> {SqlServerScalarFunctionName}ValueAsync<TValue>", contextCode, StringComparison.Ordinal);
