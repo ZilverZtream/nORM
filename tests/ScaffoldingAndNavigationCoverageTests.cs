@@ -2548,6 +2548,16 @@ public class DatabaseScaffolderPrivateMethodTests
 
         var insert = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() => ctx.InsertAsync(item));
         Assert.Contains("read-only", insert.Message, StringComparison.OrdinalIgnoreCase);
+
+        var executeUpdate = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            ctx.Query<SanReadOnlyReport>().ExecuteUpdateAsync(setters => setters.SetProperty(r => r.Payload, "changed")));
+        Assert.Contains("read-only", executeUpdate.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ExecuteUpdateAsync", executeUpdate.Message, StringComparison.Ordinal);
+
+        var executeDelete = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            ctx.Query<SanReadOnlyReport>().ExecuteDeleteAsync());
+        Assert.Contains("read-only", executeDelete.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ExecuteDeleteAsync", executeDelete.Message, StringComparison.Ordinal);
     }
 
     [Fact]

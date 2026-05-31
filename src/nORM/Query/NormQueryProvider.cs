@@ -1774,6 +1774,7 @@ namespace nORM.Query
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
+            EnsureWritableMapping(mapping, "ExecuteDeleteAsync");
             string finalSql;
             if (plan.Tables.Count != 1)
             {
@@ -1873,6 +1874,7 @@ namespace nORM.Query
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
+            EnsureWritableMapping(mapping, "ExecuteUpdateAsync");
             string finalSql;
             Dictionary<string, object> setParams;
             if (plan.Tables.Count != 1)
@@ -1908,6 +1910,17 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw?.Elapsed ?? default, affected);
             return affected;
         }
+
+        private static void EnsureWritableMapping(TableMapping mapping, string operation)
+        {
+            if (!mapping.IsReadOnly)
+                return;
+
+            throw new NormUnsupportedFeatureException(
+                $"{operation} for '{mapping.Type.Name}' is not supported because the entity is configured as read-only/query-only. " +
+                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.");
+        }
+
         public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Execute in true streaming mode so only one row is materialized at a time.
