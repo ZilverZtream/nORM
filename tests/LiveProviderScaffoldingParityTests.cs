@@ -97,6 +97,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string FeatureOwnedTable = "ScaffoldLiveFeatureOwned";
     private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
+    private const string SqlServerProcedureSynonym = "ScaffoldLiveProcedureSynonym";
+    private const string SqlServerSynonymProcedure = "ScaffoldLiveSynonymProcedure";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string SqliteVirtualTable = "ScaffoldLiveVirtualSearch";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
@@ -2103,6 +2105,46 @@ public sealed class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_rejects_sqlserver_procedure_synonym_as_entity_filter()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSqlServerProcedureSynonymAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_proc_synonym_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var ex = await Assert.ThrowsAsync<nORM.Core.NormConfigurationException>(() =>
+                    DatabaseScaffolder.ScaffoldAsync(
+                        connection,
+                        provider,
+                        dir,
+                        "LiveScaffold",
+                        "LiveScaffoldSqlServerProcedureSynonymContext",
+                        new ScaffoldOptions
+                        {
+                            Tables = new[] { "dbo." + SqlServerProcedureSynonym },
+                            EmitQueryArtifacts = true,
+                            OverwriteFiles = false
+                        }));
+
+                Assert.Contains("matched database object", ex.Message, StringComparison.Ordinal);
+                Assert.Contains("Synonym dbo." + SqlServerProcedureSynonym, ex.Message, StringComparison.Ordinal);
+                Assert.Contains("does not emit as entity classes", ex.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerProcedureSynonymAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Sqlite);
@@ -3124,6 +3166,16 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE SYNONYM {synonym} FOR {warning}");
     }
 
+    private static async Task SetupSqlServerProcedureSynonymAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownSqlServerProcedureSynonymAsync(connection, provider);
+
+        var procedure = SqlServerQualified(provider, SqlServerSynonymProcedure);
+        var synonym = SqlServerQualified(provider, SqlServerProcedureSynonym);
+        await ExecuteAsync(connection, $"CREATE PROCEDURE {procedure} AS SELECT 1 AS {provider.Escape("Value")}");
+        await ExecuteAsync(connection, $"CREATE SYNONYM {synonym} FOR {procedure}");
+    }
+
     private static async Task SetupProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
@@ -3724,6 +3776,21 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection,
                 $"IF OBJECT_ID(N'dbo.{SqlServerWarningSynonym}', N'SN') IS NOT NULL DROP SYNONYM {SqlServerQualified(provider, SqlServerWarningSynonym)}");
             await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, WarningTable, SqlServerQualified(provider, WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerProcedureSynonymAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{SqlServerProcedureSynonym}', N'SN') IS NOT NULL DROP SYNONYM {SqlServerQualified(provider, SqlServerProcedureSynonym)}");
+            await ExecuteAsync(connection,
+                $"IF OBJECT_ID(N'dbo.{SqlServerSynonymProcedure}', N'P') IS NOT NULL DROP PROCEDURE {SqlServerQualified(provider, SqlServerSynonymProcedure)}");
         }
         catch
         {
