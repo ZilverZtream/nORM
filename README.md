@@ -325,6 +325,9 @@ parsing prose.
 Tables without primary keys and all opt-in query artifacts are emitted as
 `[ReadOnlyEntity]` types: they can be queried, but nORM rejects generated
 insert/update/delete and tracked `SaveChanges` writes before SQL generation.
+Foreign keys from keyless dependent tables are reported as relationship
+diagnostics instead of generating navigations that cannot be safely included or
+tracked.
 Opt-in query artifacts can include views, materialized views, SQLite virtual
 tables, and SQL Server synonyms whose local base object resolves as a table or
 view; non-query, remote, or unresolved synonyms remain provider-owned
