@@ -108,6 +108,8 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string SqlServerRowVersionTable = "ScaffoldLiveRowVersion";
+    private const string SqlServerAliasTypeTable = "ScaffoldLiveAliasCustomer";
+    private const string SqlServerAliasTypeName = "ScaffoldLiveEmailAddress";
     private const string PostgresDomainTable = "ScaffoldLiveDomainCustomer";
     private const string PostgresDomainName = "scaffold_live_email_address";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
@@ -2043,6 +2045,55 @@ public sealed class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_reports_sqlserver_alias_type_columns_with_base_type_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await TeardownSqlServerAliasTypeColumnAsync(connection, provider);
+            var table = provider.Escape("dbo") + "." + provider.Escape(SqlServerAliasTypeTable);
+            var aliasType = provider.Escape("dbo") + "." + provider.Escape(SqlServerAliasTypeName);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_alias_type_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await ExecuteAsync(connection, $"CREATE TYPE {aliasType} FROM nvarchar(320) NOT NULL");
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {table} ({provider.Escape("Id")} INT NOT NULL PRIMARY KEY, {provider.Escape("Email")} {aliasType} NOT NULL)");
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerAliasTypeContext",
+                    new ScaffoldOptions { Tables = new[] { "dbo." + SqlServerAliasTypeTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, SqlServerAliasTypeTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("public string Email { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains("[MaxLength(320)]", entityCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                    item.GetProperty("code").GetString() == "SCF104" &&
+                    item.GetProperty("table").GetString() == "dbo." + SqlServerAliasTypeTable &&
+                    item.GetProperty("detail").GetString()!.Contains("user-defined type (dbo." + SqlServerAliasTypeName, StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSqlServerAliasTypeColumnAsync(connection, provider);
+            }
+        }
+    }
+
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
@@ -3215,6 +3266,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresDomainTable, Qualified(provider, "public", PostgresDomainTable)));
             await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {Qualified(provider, "public", PostgresDomainName)}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSqlServerAliasTypeColumnAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, "dbo." + SqlServerAliasTypeTable, Qualified(provider, "dbo", SqlServerAliasTypeTable)));
+            await ExecuteAsync(connection, $"IF TYPE_ID(N'dbo.{SqlServerAliasTypeName}') IS NOT NULL DROP TYPE {Qualified(provider, "dbo", SqlServerAliasTypeName)}");
         }
         catch
         {
