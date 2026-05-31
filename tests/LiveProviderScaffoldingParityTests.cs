@@ -38,6 +38,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ReferentialRestrictParentTable = "ScaffoldLiveRestrictParent";
     private const string ReferentialRestrictChildTable = "ScaffoldLiveRestrictChild";
     private const string ReferentialRestrictFkName = "FK_ScaffoldLiveRestrictChild_Parent";
+    private const string ReferentialDefaultParentTable = "ScaffoldLiveDefaultParent";
+    private const string ReferentialDefaultChildTable = "ScaffoldLiveDefaultChild";
+    private const string ReferentialDefaultFkName = "FK_ScaffoldLiveDefaultChild_Parent";
     private const string CompositeStudentTable = "ScaffoldLiveCompositeStudent";
     private const string CompositeCourseTable = "ScaffoldLiveCompositeCourse";
     private const string CompositeStudentCourseTable = "ScaffoldLiveCompositeStudentCourse";
@@ -361,6 +364,46 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownRestrictReferentialActionAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_preserves_set_default_fk_referential_actions_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSetDefaultReferentialActionAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_default_referential_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldDefaultReferentialContext",
+                    new ScaffoldOptions { Tables = new[] { ReferentialDefaultParentTable, ReferentialDefaultChildTable }, OverwriteFiles = false });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldDefaultReferentialContext.cs"));
+
+                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetDefault, ReferentialAction.SetDefault);", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSetDefaultReferentialActionAsync(connection, provider, kind);
             }
         }
     }
@@ -2460,6 +2503,28 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(ReferentialRestrictFkName)} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}) ON DELETE RESTRICT ON UPDATE CASCADE)");
     }
 
+    private static async Task SetupSetDefaultReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, ReferentialDefaultChildTable, provider.Escape(ReferentialDefaultChildTable)));
+        await ExecuteAsync(connection, DropTable(kind, ReferentialDefaultParentTable, provider.Escape(ReferentialDefaultParentTable)));
+
+        var parent = provider.Escape(ReferentialDefaultParentTable);
+        var child = provider.Escape(ReferentialDefaultChildTable);
+        var id = provider.Escape("Id");
+        var parentId = provider.Escape("ParentId");
+        var name = provider.Escape("Name");
+        var defaultClause = kind == ProviderKind.SqlServer
+            ? $"CONSTRAINT {provider.Escape("DF_ScaffoldLiveDefaultChild_ParentId")} DEFAULT (0)"
+            : "DEFAULT 0";
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {parent} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {child} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {parentId} {IntType(kind)} NOT NULL {defaultClause}, {name} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(ReferentialDefaultFkName)} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}) ON DELETE SET DEFAULT ON UPDATE SET DEFAULT)");
+    }
+
     private static async Task SetupCompositeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, CompositeStudentCourseTable, provider.Escape(CompositeStudentCourseTable)));
@@ -3157,6 +3222,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictChildTable, provider.Escape(ReferentialRestrictChildTable)));
             await ExecuteAsync(connection, DropTable(kind, ReferentialRestrictParentTable, provider.Escape(ReferentialRestrictParentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownSetDefaultReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, ReferentialDefaultChildTable, provider.Escape(ReferentialDefaultChildTable)));
+            await ExecuteAsync(connection, DropTable(kind, ReferentialDefaultParentTable, provider.Escape(ReferentialDefaultParentTable)));
         }
         catch
         {

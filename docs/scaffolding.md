@@ -330,7 +330,8 @@ must be reviewed and edited like handwritten model code.
   preserved in generated model configuration across SQLite, SQL Server,
   PostgreSQL, and MySQL, including `ON DELETE SET NULL` plus `ON UPDATE CASCADE`.
   It also pins `ON DELETE RESTRICT` plus `ON UPDATE CASCADE` on the providers
-  whose DDL accepts that shape (SQLite, PostgreSQL, and MySQL).
+  whose DDL accepts that shape (SQLite, PostgreSQL, and MySQL), and `SET
+  DEFAULT` delete/update actions on SQLite, SQL Server, and PostgreSQL.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
   scaffolding converts SQLite views and SQLite virtual tables into compiling
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.
