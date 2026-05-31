@@ -101,6 +101,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string SqlServerSynonymProcedure = "ScaffoldLiveSynonymProcedure";
     private const string PostgresMaterializedView = "ScaffoldLiveWarningMatView";
     private const string SqliteVirtualTable = "ScaffoldLiveVirtualSearch";
+    private const string MySqlEventDiagnosticsName = "ScaffoldLiveScheduledEvent";
     private const string PostgresTypedColumnTable = "ScaffoldLivePostgresTypedColumns";
     private const string MySqlTypedColumnTable = "ScaffoldLiveMySqlTypedColumns";
     private const string MySqlUnsignedColumnTable = "ScaffoldLiveMySqlUnsignedColumns";
@@ -2204,6 +2205,59 @@ public sealed class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_reports_mysql_event_diagnostics_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupMySqlEventDiagnosticsAsync(connection, provider);
+            }
+            catch (Exception ex)
+            {
+                await TeardownMySqlEventDiagnosticsAsync(connection, provider);
+                if (Skip.If(true, $"MySQL EVENT privilege is not available in this live database: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_event_diag_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlEventDiagnosticsContext",
+                    new ScaffoldOptions { Tables = new[] { MySqlEventDiagnosticsName }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlEventDiagnosticsName + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
+
+                Assert.Contains("public int Id { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains(skippedObjects, item =>
+                    item.GetProperty("kind").GetString() == "Event" &&
+                    item.GetProperty("code").GetString() == "SCF205" &&
+                    item.GetProperty("category").GetString() == "routine" &&
+                    item.GetProperty("name").GetString() == MySqlEventDiagnosticsName &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("scheduled event", StringComparison.OrdinalIgnoreCase));
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownMySqlEventDiagnosticsAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Sqlite);
@@ -3331,6 +3385,17 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE SYNONYM {synonym} FOR {procedure}");
     }
 
+    private static async Task SetupMySqlEventDiagnosticsAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownMySqlEventDiagnosticsAsync(connection, provider);
+
+        var table = provider.Escape(MySqlEventDiagnosticsName);
+        var id = provider.Escape("Id");
+        await ExecuteAsync(connection, $"CREATE TABLE {table} ({id} {IntType(ProviderKind.MySql)} NOT NULL PRIMARY KEY)");
+        await ExecuteAsync(connection,
+            $"CREATE EVENT {provider.Escape(MySqlEventDiagnosticsName)} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY DO UPDATE {table} SET {id} = {id}");
+    }
+
     private static async Task SetupProviderSpecificIndexesAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
@@ -3946,6 +4011,19 @@ public sealed class LiveProviderScaffoldingParityTests
                 $"IF OBJECT_ID(N'dbo.{SqlServerProcedureSynonym}', N'SN') IS NOT NULL DROP SYNONYM {SqlServerQualified(provider, SqlServerProcedureSynonym)}");
             await ExecuteAsync(connection,
                 $"IF OBJECT_ID(N'dbo.{SqlServerSynonymProcedure}', N'P') IS NOT NULL DROP PROCEDURE {SqlServerQualified(provider, SqlServerSynonymProcedure)}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownMySqlEventDiagnosticsAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            await ExecuteAsync(connection, $"DROP EVENT IF EXISTS {provider.Escape(MySqlEventDiagnosticsName)}");
+            await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlEventDiagnosticsName, provider.Escape(MySqlEventDiagnosticsName)));
         }
         catch
         {

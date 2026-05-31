@@ -358,7 +358,7 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL UUID/array column scaffolds,
   MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts
   plus procedure-synonym rejection,
-  SQLite virtual-table query artifacts, and live
+  MySQL scheduled-event diagnostics, SQLite virtual-table query artifacts, and live
   generated-surrogate, composite generated-surrogate, shared-tenant,
   shared-tenant alternate-key, composite payload bridge preservation,
   alternate-key, self-referencing, and
