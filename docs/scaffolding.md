@@ -32,12 +32,15 @@ must be reviewed and edited like handwritten model code.
   provider-specific type rows. JSON/XML query semantics remain ordinary string
   semantics unless the application adds explicit provider-bound queries.
   SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid`/simple enum columns,
-  and MySQL `json`/`year`/simple `enum(...)` columns likewise scaffold as safe
+  and MySQL `json`/`year`/simple `enum(...)`/bounded simple `set(...)` columns likewise scaffold as safe
   scalar CLR storage instead of warning-only provider-specific type rows;
   native JSON/XML operator semantics remain provider-bound. Simple PostgreSQL
   and MySQL enum columns are emitted as `string` storage plus a generated
   `HasCheckConstraint` over the discovered literal value set so the allowed
-  values can move with generated migrations.
+  values can move with generated migrations. MySQL `set(...)` columns with
+  eight or fewer comma-free members are emitted as `string` storage plus a
+  generated check over the canonical MySQL value combinations; larger or
+  ambiguous `set(...)` definitions remain diagnostics.
   PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
   UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR
   arrays so the model compiles and materializes with Npgsql; they remain
@@ -565,7 +568,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
-| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` are scaffolded as supported storage; MySQL unsigned integers preserve exact unsigned CLR widths but remain diagnostics because the DDL is provider-specific. provider-specific declarations such as `GEOMETRY` remain diagnostics. |
+| `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integers preserve exact unsigned CLR widths but remain diagnostics because the DDL is provider-specific. provider-specific declarations such as `GEOMETRY` remain diagnostics. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |

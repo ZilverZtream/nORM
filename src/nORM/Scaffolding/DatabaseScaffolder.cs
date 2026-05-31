@@ -30,6 +30,7 @@ namespace nORM.Scaffolding
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private static readonly IReadOnlySet<string> EmptyStringSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private const int MaxScaffoldedMySqlSetValueCount = 8;
 
         /// <summary>
         /// Generates entity classes and a DbContext based on the current database schema.
@@ -2832,6 +2833,7 @@ namespace nORM.Scaffolding
                    || normalized == "user-defined (uuid)"
                    || (normalized.StartsWith("array", StringComparison.Ordinal) && TryMapPostgresArrayType(detail, out _))
                    || TryParseMySqlEnumValues(detail, out _)
+                   || TryParseBoundedMySqlSetValues(detail, out _)
                    || TryParsePostgresEnumValues(detail, out _)
                    || normalized == "year";
         }
@@ -4196,7 +4198,7 @@ namespace nORM.Scaffolding
             foreach (var feature in features)
             {
                 if (!string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
-                    || !TryParseEnumValues(feature.Detail, out var values)
+                    || !TryBuildProviderValueCheckSql(feature.Name, feature.Detail, out var checkKind, out var sql)
                     || string.IsNullOrWhiteSpace(feature.Name)
                     || !IsSimpleSqlIdentifier(feature.Name)
                     || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
@@ -4206,15 +4208,37 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                var checkName = "CK_" + entityName + "_" + propertyName + "_Enum";
-                var quotedValues = values
-                    .Select(value => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'")
-                    .ToArray();
-                var sql = feature.Name + " IN (" + string.Join(", ", quotedValues) + ")";
+                var checkName = "CK_" + entityName + "_" + propertyName + "_" + checkKind;
                 result.Add(new ScaffoldCheckConstraintConfiguration(feature.TableKey, entityName, checkName, sql));
             }
 
             return result;
+        }
+
+        private static bool TryBuildProviderValueCheckSql(
+            string columnName,
+            string? detail,
+            out string checkKind,
+            out string sql)
+        {
+            checkKind = string.Empty;
+            sql = string.Empty;
+
+            if (TryParseEnumValues(detail, out var enumValues))
+            {
+                checkKind = "Enum";
+                sql = columnName + " IN (" + string.Join(", ", QuoteSqlStringLiterals(enumValues)) + ")";
+                return true;
+            }
+
+            if (TryParseBoundedMySqlSetValues(detail, out var setValues))
+            {
+                checkKind = "Set";
+                sql = columnName + " IN (" + string.Join(", ", QuoteSqlStringLiterals(BuildMySqlSetCombinations(setValues))) + ")";
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryParseEnumValues(string? detail, out string[] values)
@@ -4222,13 +4246,31 @@ namespace nORM.Scaffolding
                || TryParsePostgresEnumValues(detail, out values);
 
         private static bool TryParseMySqlEnumValues(string? detail, out string[] values)
+            => TryParseMySqlQuotedTypeValues(detail, "enum", out values);
+
+        private static bool TryParseBoundedMySqlSetValues(string? detail, out string[] values)
+        {
+            if (!TryParseMySqlQuotedTypeValues(detail, "set", out values)
+                || values.Length == 0
+                || values.Length > MaxScaffoldedMySqlSetValueCount
+                || values.Any(static value => value.Length == 0 || value.Contains(','))
+                || values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+            {
+                values = Array.Empty<string>();
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryParseMySqlQuotedTypeValues(string? detail, string typeName, out string[] values)
         {
             values = Array.Empty<string>();
             if (string.IsNullOrWhiteSpace(detail))
                 return false;
 
             var trimmed = detail.Trim();
-            if (!trimmed.StartsWith("enum(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
+            if (!trimmed.StartsWith(typeName + "(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
                 return false;
 
             var body = trimmed.Substring(trimmed.IndexOf('(') + 1, trimmed.Length - trimmed.IndexOf('(') - 2);
@@ -4279,6 +4321,28 @@ namespace nORM.Scaffolding
             values = parsed.ToArray();
             return true;
         }
+
+        private static string[] BuildMySqlSetCombinations(IReadOnlyList<string> values)
+        {
+            var result = new List<string> { string.Empty };
+            var combinationCount = 1 << values.Count;
+            for (var mask = 1; mask < combinationCount; mask++)
+            {
+                var selected = new List<string>(values.Count);
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if ((mask & (1 << i)) != 0)
+                        selected.Add(values[i]);
+                }
+
+                result.Add(string.Join(",", selected));
+            }
+
+            return result.ToArray();
+        }
+
+        private static IEnumerable<string> QuoteSqlStringLiterals(IEnumerable<string> values)
+            => values.Select(static value => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'");
 
         private static bool TryParsePostgresEnumValues(string? detail, out string[] values)
         {
