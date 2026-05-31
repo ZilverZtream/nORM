@@ -326,6 +326,9 @@ must be reviewed and edited like handwritten model code.
   sequence wrappers generate typed next-value methods and compile in a consumer
   project. `LiveProviderScaffoldingParityTests` proves those sequence wrappers
   are discovered and emitted from live SQL Server and PostgreSQL catalogs.
+- `LiveProviderScaffoldingParityTests` proves live FK referential actions are
+  preserved in generated model configuration across SQLite, SQL Server,
+  PostgreSQL, and MySQL, including `ON DELETE SET NULL` plus `ON UPDATE CASCADE`.
 - `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
   scaffolding converts SQLite views and SQLite virtual tables into compiling
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.
