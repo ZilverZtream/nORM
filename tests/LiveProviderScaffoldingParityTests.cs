@@ -252,7 +252,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, SurrogateAuthorBookTable + ".cs")));
                 Assert.Contains($"public List<{SurrogateBookTable}> {SurrogateBookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{SurrogateAuthorTable}> {SurrogateAuthorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{SurrogateAuthorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SurrogateAuthorBookTable}\", \"AuthorId\", \"BookId\");", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -302,7 +302,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, GeneratedBridgeStudentCourseTable + ".cs")));
                 Assert.Contains($"public List<{GeneratedBridgeCourseTable}> {GeneratedBridgeCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{GeneratedBridgeStudentTable}> {GeneratedBridgeStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{GeneratedBridgeStudentCourseTable}\", \"StudentId\", \"CourseId\");", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{GeneratedBridgeStudentCourseTable}\", \"StudentId\", \"CourseId\");", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -520,7 +520,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, CompositeStudentCourseTable + ".cs")));
                 Assert.Contains($"public List<{CompositeCourseTable}> {CompositeCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{CompositeStudentTable}> {CompositeStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{CompositeStudentCourseTable}\", new[] {{ \"StudentTenantId\", \"StudentId\" }}, new[] {{ \"CourseTenantId\", \"CourseId\" }});", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{CompositeStudentCourseTable}\", new[] {{ \"StudentTenantId\", \"StudentId\" }}, new[] {{ \"CourseTenantId\", \"CourseId\" }});", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -625,7 +625,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, CompositeSurrogateStudentCourseTable + ".cs")));
                 Assert.Contains($"public List<{CompositeSurrogateCourseTable}> {CompositeSurrogateCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{CompositeSurrogateStudentTable}> {CompositeSurrogateStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{CompositeSurrogateStudentCourseTable}\", new[] {{ \"StudentTenantId\", \"StudentId\" }}, new[] {{ \"CourseTenantId\", \"CourseId\" }});", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{CompositeSurrogateStudentCourseTable}\", new[] {{ \"StudentTenantId\", \"StudentId\" }}, new[] {{ \"CourseTenantId\", \"CourseId\" }});", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -675,7 +675,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, SharedTenantStudentCourseTable + ".cs")));
                 Assert.Contains($"public List<{SharedTenantCourseTable}> {SharedTenantCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{SharedTenantStudentTable}> {SharedTenantStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{SharedTenantStudentCourseTable}\", new[] {{ \"TenantId\", \"StudentId\" }}, new[] {{ \"TenantId\", \"CourseId\" }});", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SharedTenantStudentCourseTable}\", new[] {{ \"TenantId\", \"StudentId\" }}, new[] {{ \"TenantId\", \"CourseId\" }});", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -725,7 +725,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, SharedAlternateAuthorBookTable + ".cs")));
                 Assert.Contains($"public List<{SharedAlternateBookTable}> {SharedAlternateBookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{SharedAlternateAuthorTable}> {SharedAlternateAuthorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{SharedAlternateAuthorBookTable}\", new[] {{ \"TenantId\", \"AuthorCode\" }}, new[] {{ \"TenantId\", \"BookIsbn\" }}, p => new {{ p.TenantId, p.Code }}, p => new {{ p.TenantId, p.Isbn }});", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SharedAlternateAuthorBookTable}\", new[] {{ \"TenantId\", \"AuthorCode\" }}, new[] {{ \"TenantId\", \"BookIsbn\" }}, p => new {{ p.TenantId, p.Code }}, p => new {{ p.TenantId, p.Isbn }});", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -775,7 +775,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.False(File.Exists(Path.Combine(dir, AlternateAuthorBookTable + ".cs")));
                 Assert.Contains($"public List<{AlternateBookTable}> {AlternateBookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{AlternateAuthorTable}> {AlternateAuthorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{AlternateAuthorBookTable}\", \"AuthorCode\", \"BookIsbn\", p => p.Code, p => p.Isbn);", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{AlternateAuthorBookTable}\", \"AuthorCode\", \"BookIsbn\", p => p.Code, p => p.Isbn);", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -824,7 +824,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.Contains("ByMenteeId", personCode, StringComparison.Ordinal);
                 Assert.Contains("ByMentorId", personCode, StringComparison.Ordinal);
-                Assert.Contains($".UsingTable(\"{SelfPersonRelationshipTable}\", \"MenteeId\", \"MentorId\");", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SelfPersonRelationshipTable}\", \"MenteeId\", \"MentorId\");", StripDefaultSchemaArguments(contextCode), StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -4545,6 +4545,11 @@ public sealed class LiveProviderScaffoldingParityTests
         cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync();
     }
+
+    private static string StripDefaultSchemaArguments(string generatedCode)
+        => generatedCode
+            .Replace(", schema: \"dbo\"", string.Empty, StringComparison.Ordinal)
+            .Replace(", schema: \"public\"", string.Empty, StringComparison.Ordinal);
 
     private static void AssertScaffoldOutputBuilds(string outputDirectory)
     {
