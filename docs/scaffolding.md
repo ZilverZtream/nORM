@@ -116,8 +116,9 @@ must be reviewed and edited like handwritten model code.
   generated principal primary key or an exact ordered unfiltered unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
   reference the exact generated composite primary key or an exact ordered unfiltered unique index;
-  FK shapes targeting keyless tables or non-unique alternate columns are
-  reported for manual configuration instead of emitting unsafe fluent code.
+  FK shapes targeting keyless principals, keyless dependents, or non-unique
+  alternate columns are reported for manual configuration instead of emitting
+  unsafe fluent code.
   Self-referencing FKs use role-based navigation names derived from the FK
   column instead of vague same-type names.
 - Single-column, composite, and multi-membership non-primary-key index
@@ -551,6 +552,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
 | `SCF117` | `index` | MySQL prefix index discovered. Prefix indexes stay provider-owned and are not used as full-column unique alternate-key evidence. |
+| `SCF118` | `relationship` | FK dependent table has no primary key, so generated navigations are suppressed. |
 | `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
 | `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |

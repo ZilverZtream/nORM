@@ -122,6 +122,7 @@ namespace nORM.Scaffolding
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
                 AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
                 RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
@@ -2140,6 +2141,30 @@ namespace nORM.Scaffolding
             }
         }
 
+        private static void AddRelationshipDependentKeyDiagnostics(
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
+        {
+            foreach (var group in foreignKeys
+                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
+            {
+                var fk = group.First();
+                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
+                if (primaryKeyColumnsByTable.TryGetValue(dependentKey, out var primaryKeyColumns)
+                    && primaryKeyColumns.Count > 0)
+                {
+                    continue;
+                }
+
+                features.Add(new ScaffoldUnsupportedFeature(
+                    dependentKey,
+                    "RelationshipDependentKey",
+                    fk.ConstraintName,
+                    $"FK dependent table {dependentKey} has no primary key; generated navigations are suppressed because nORM cannot track or include the dependent side safely."));
+            }
+        }
+
         private static IReadOnlyList<(string Name, string Sql)> ExtractSqliteCheckConstraints(string tableName, string? createTableSql)
         {
             if (string.IsNullOrWhiteSpace(createTableSql))
@@ -2749,6 +2774,7 @@ namespace nORM.Scaffolding
                 "ProviderSpecificColumnType" => "SCF104",
                 "ReferentialAction" => "SCF106",
                 "RelationshipPrincipalKey" => "SCF107",
+                "RelationshipDependentKey" => "SCF118",
                 "RowVersion" => "SCF108",
                 "IdentityStrategy" => "SCF109",
                 "Trigger" => "SCF110",
@@ -2765,7 +2791,7 @@ namespace nORM.Scaffolding
         private static string ScaffoldDiagnosticCategoryForUnsupportedFeature(string kind)
             => kind switch
             {
-                "ReferentialAction" or "RelationshipPrincipalKey" => "relationship",
+                "ReferentialAction" or "RelationshipPrincipalKey" or "RelationshipDependentKey" => "relationship",
                 "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" or "PrefixIndex" => "index",
                 "Trigger" or "TemporalTable" => "database-object",
                 "MissingPrimaryKey" => "table-shape",
@@ -2806,6 +2832,7 @@ namespace nORM.Scaffolding
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
                 "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
+                "RelationshipDependentKey" => "Add a primary key to the dependent table before relying on generated navigations/includes, or keep the keyless type read-only and configure explicit query projections.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Parsed SQL Server IDENTITY(seed, increment) metadata is scaffolded into HasIdentityOptions; review any unparsed provider-specific identity strategy manually.",
                 "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
@@ -3475,6 +3502,12 @@ namespace nORM.Scaffolding
 
                 if (!ReferencesScaffoldablePrincipalKey(foreignKeyGroup, primaryKeyColumnsByTable, indexes))
                     continue;
+
+                if (!primaryKeyColumnsByTable.TryGetValue(dependentKey, out var dependentPrimaryKeyColumns)
+                    || dependentPrimaryKeyColumns.Count == 0)
+                {
+                    continue;
+                }
 
                 var foreignKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, dependentKey, row.DependentColumn)).ToArray();
                 var principalKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, principalKey, row.PrincipalColumn)).ToArray();

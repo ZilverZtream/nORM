@@ -2609,6 +2609,56 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithForeignKeyFromKeylessDependent_DoesNotEmitUnsafeNavigation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Customer (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE ImportLine (
+                CustomerId INTEGER NOT NULL,
+                Payload TEXT NOT NULL,
+                CONSTRAINT FK_ImportLine_Customer
+                    FOREIGN KEY (CustomerId) REFERENCES Customer(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "KeylessDependentRelCtx");
+
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "ImportLine.cs"));
+            var principalCode = File.ReadAllText(Path.Combine(dir, "Customer.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "KeylessDependentRelCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[ReadOnlyEntity]", dependentCode);
+            Assert.DoesNotContain("[ForeignKey(", dependentCode);
+            Assert.DoesNotContain("ImportLines", principalCode);
+            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            Assert.Contains("RelationshipDependentKey", warnings);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "RelationshipDependentKey" &&
+                item.GetProperty("table").GetString() == "ImportLine");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithForeignKeyToReorderedUniqueIndex_DoesNotEmitUnsafeNavigation()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
