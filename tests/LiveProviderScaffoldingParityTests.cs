@@ -107,6 +107,7 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string DynamicIdentityTable = "ScaffoldLiveDynamicIdentity";
     private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
+    private const string SqlServerRowVersionTable = "ScaffoldLiveRowVersion";
     private const string RoutineName = "ScaffoldLiveGetRevenue";
     private const string RoutineOutputName = "ScaffoldLiveGetRevenueOutput";
     private const string RoutineTableTypeName = "ScaffoldLiveLineItemList";
@@ -1936,6 +1937,58 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, PostgresSerialTable, provider.Escape(PostgresSerialTable)));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, SqlServerRowVersionTable, provider.Escape(SqlServerRowVersionTable)));
+            var table = provider.Escape(SqlServerRowVersionTable);
+            var id = provider.Escape("Id");
+            var name = provider.Escape("Name");
+            var rowVersion = provider.Escape("RowVersion");
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_rowversion_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {name} NVARCHAR(80) NOT NULL, {rowVersion} rowversion NOT NULL)");
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldRowVersionContext",
+                    new ScaffoldOptions { Tables = new[] { SqlServerRowVersionTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, SqlServerRowVersionTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRowVersionContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("[Timestamp]", entityCode, StringComparison.Ordinal);
+                Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public byte[] RowVersion { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(".Property(e => e.RowVersion).HasComputedColumnSql", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "RowVersion" &&
+                    item.GetProperty("code").GetString() == "SCF108" &&
+                    item.GetProperty("table").GetString()!.EndsWith(SqlServerRowVersionTable, StringComparison.Ordinal));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, SqlServerRowVersionTable, provider.Escape(SqlServerRowVersionTable)));
             }
         }
     }
