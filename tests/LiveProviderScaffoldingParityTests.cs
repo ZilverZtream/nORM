@@ -682,6 +682,7 @@ public sealed class LiveProviderScaffoldingParityTests
                     var routine = Assert.Single(skippedObjects, item =>
                         item.GetProperty("kind").GetString() == "Routine" &&
                         item.GetProperty("name").GetString()!.EndsWith(RoutineName, StringComparison.Ordinal));
+                    Assert.Equal(1, routine.GetProperty("metadata").GetProperty("outputParameterCount").GetInt32());
                     var resultColumns = routine.GetProperty("metadata").GetProperty("resultColumns").EnumerateArray().ToArray();
                     Assert.Contains(resultColumns, item =>
                         item.GetProperty("name").GetString() == "Id" &&
@@ -692,6 +693,8 @@ public sealed class LiveProviderScaffoldingParityTests
                     Assert.Contains($"public sealed class {RoutineName}Result", contextCode, StringComparison.Ordinal);
                     Assert.Contains($"Task<List<{RoutineName}Result>> {RoutineName}Async", contextCode, StringComparison.Ordinal);
                     Assert.Contains($"IAsyncEnumerable<{RoutineName}Result> Stream{RoutineName}Async", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"public static OutputParameter[] Create{RoutineName}OutputParameters()", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", contextCode, StringComparison.Ordinal);
                 }
                 if (kind == ProviderKind.Postgres)
                 {
@@ -1014,6 +1017,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 else
                 {
                     Assert.Contains("new OutputParameter(\"message\", System.Data.DbType.String, 32)", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", contextCode, StringComparison.Ordinal);
                 }
                 AssertScaffoldOutputBuilds(dir);
             }

@@ -559,7 +559,7 @@ namespace nORM.Scaffolding
                            CONCAT('SQL Server stored procedure; parameters=',
                                   (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id),
                                   '; outputParameters=',
-                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
+                                  (SELECT COUNT(*) + 1 FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
                                   '; parameterModes=',
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
@@ -583,7 +583,10 @@ namespace nORM.Scaffolding
                                        AND base_ty.user_type_id = ty.system_type_id
                                        AND base_ty.is_user_defined = 0
                                       WHERE pa.object_id = p.object_id
-                                  ), ''),
+                                  ), '') + CASE
+                                      WHEN EXISTS (SELECT 1 FROM sys.parameters pa WHERE pa.object_id = p.object_id) THEN ','
+                                      ELSE ''
+                                  END + 'return:RETURN:int',
                                   '; resultColumns=',
                                   COALESCE((
                                       SELECT STRING_AGG(CONCAT(
