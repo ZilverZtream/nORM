@@ -4726,6 +4726,10 @@ namespace nORM.Scaffolding
                 var parameterType = inputParameters.Count > 0
                     ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
                     : null;
+                var resultColumns = GetRoutineResultColumns(metadata);
+                var resultType = resultColumns.Count > 0
+                    ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Result", memberNames)
+                    : null;
                 var outputFactory = outputParameters.Count > 0
                     ? MakeUnique("Create" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "OutputParameters", memberNames)
                     : null;
@@ -4741,6 +4745,19 @@ namespace nORM.Scaffolding
                     sb.AppendLine("    {");
                     foreach (var parameter in inputParameters)
                         sb.AppendLine($"        public {parameter.TypeName} {parameter.Name} {{ get; init; }}");
+                    sb.AppendLine("    }");
+                }
+
+                if (resultType != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"    public sealed class {resultType}");
+                    sb.AppendLine("    {");
+                    foreach (var column in resultColumns)
+                    {
+                        var initializer = RequiresDefaultInitializer(column.TypeName) ? " = default!;" : string.Empty;
+                        sb.AppendLine($"        public {column.TypeName} {column.Name} {{ get; set; }}{initializer}");
+                    }
                     sb.AppendLine("    }");
                 }
 
@@ -4781,6 +4798,7 @@ namespace nORM.Scaffolding
                         parameterSignature,
                         parameterType,
                         inputParameters,
+                        resultType,
                         scalar: isScalarFunction,
                         usePositionalArguments: requiresPositionalFunctionArguments,
                         expectedArgumentCount: discoveredInputParameterCount);
@@ -4792,6 +4810,14 @@ namespace nORM.Scaffolding
                         discoveredInputParameterCount);
                     sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
+                    if (resultType != null)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
+                        sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                        sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
+                        sb.AppendLine($"        => ExecuteStoredProcedureAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                    }
 
                     var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
                     sb.AppendLine();
@@ -4799,6 +4825,14 @@ namespace nORM.Scaffolding
                     sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
+                    if (resultType != null)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
+                        sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                        sb.AppendLine($"    public IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, CancellationToken ct = default)");
+                        sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
+                    }
                 }
 
                 if (outputParameterCount > 0 && !isFunctionCallShape)
@@ -4812,6 +4846,14 @@ namespace nORM.Scaffolding
                     sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
                     sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
                     sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
+                    if (resultType != null)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters and the scaffold-discovered result shape.</summary>");
+                        sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                        sb.AppendLine($"    public Task<StoredProcedureResult<{resultType}>> {outputMethod}({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters)");
+                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
+                    }
 
                     if (outputFactory != null)
                     {
@@ -4820,6 +4862,14 @@ namespace nORM.Scaffolding
                         sb.AppendLine("    /// <remarks>Use this overload when the scaffolded output parameter metadata still matches the database routine. Pass explicit output parameters to the overload with <c>params OutputParameter[]</c> after routine signature changes.</remarks>");
                         sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
                         sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
+                        if (resultType != null)
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with scaffold-discovered output parameters and result shape.</summary>");
+                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                            sb.AppendLine($"    public Task<StoredProcedureResult<{resultType}>> {outputMethod}({parameterSignature}, CancellationToken ct = default)");
+                            sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
+                        }
 
                         sb.AppendLine();
                         sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
@@ -4932,6 +4982,7 @@ namespace nORM.Scaffolding
             string parameterSignature,
             string? parameterType,
             IReadOnlyList<RoutineStubParameter> inputParameters,
+            string? resultType,
             bool scalar,
             bool usePositionalArguments,
             int expectedArgumentCount)
@@ -4947,6 +4998,21 @@ namespace nORM.Scaffolding
             else
                 sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
             sb.AppendLine("    }");
+
+            if (!scalar && resultType != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"    /// <summary>Executes provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
+                sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
+                sb.AppendLine("    {");
+                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
+                AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
+                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+                sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
+                sb.AppendLine("    }");
+            }
 
             if (scalar && scalarValueType != null)
             {
@@ -4985,6 +5051,23 @@ namespace nORM.Scaffolding
             sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
             sb.AppendLine("            yield return row;");
             sb.AppendLine("    }");
+
+            if (resultType != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"    /// <summary>Streams provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
+                sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
+                sb.AppendLine($"    public async IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)");
+                sb.AppendLine("    {");
+                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
+                AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
+                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
+                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
+                sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
+                sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
+                sb.AppendLine("            yield return row;");
+                sb.AppendLine("    }");
+            }
         }
 
         private static void AppendFunctionArgumentCountGuard(
@@ -5171,6 +5254,38 @@ namespace nORM.Scaffolding
             return names.ToArray();
         }
 
+        private static IReadOnlyList<RoutineResultColumn> GetRoutineResultColumns(IReadOnlyDictionary<string, object?> metadata)
+        {
+            if (!metadata.TryGetValue("resultColumns", out var columnsValue)
+                || columnsValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> columns
+                || columns.Count == 0)
+            {
+                return Array.Empty<RoutineResultColumn>();
+            }
+
+            var result = new List<RoutineResultColumn>();
+            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < columns.Count; i++)
+            {
+                var column = columns[i];
+                var rawName = Convert.ToString(column.TryGetValue("name", out var n) ? n : null);
+                var baseName = string.IsNullOrWhiteSpace(rawName)
+                    ? "Column" + (i + 1).ToString(CultureInfo.InvariantCulture)
+                    : ToPascalCase(rawName);
+                var escaped = EscapeCSharpIdentifier(baseName);
+                var unique = escaped;
+                var suffix = 2;
+                while (!usedNames.Add(unique))
+                    unique = escaped + suffix++.ToString(CultureInfo.InvariantCulture);
+
+                var dataType = Convert.ToString(column.TryGetValue("dataType", out var d) ? d : null);
+                var nullable = column.TryGetValue("nullable", out var isNullable) && isNullable is true;
+                result.Add(new RoutineResultColumn(unique, GetRoutineResultColumnTypeName(dataType, nullable)));
+            }
+
+            return result.ToArray();
+        }
+
         private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)
         {
             var baseCall = $"new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}";
@@ -5323,6 +5438,19 @@ namespace nORM.Scaffolding
                 _ => nameof(DbType.Object)
             };
         }
+
+        private static string GetRoutineResultColumnTypeName(string? dataType, bool nullable)
+        {
+            var typeName = GetRoutineParameterTypeName(dataType);
+            if (typeName.EndsWith("?", StringComparison.Ordinal))
+                return nullable ? typeName : typeName[..^1];
+
+            return nullable && typeName is not "object?" ? typeName + "?" : typeName;
+        }
+
+        private static bool RequiresDefaultInitializer(string typeName)
+            => !typeName.EndsWith("?", StringComparison.Ordinal)
+               && (typeName == "string" || typeName.EndsWith("[]", StringComparison.Ordinal));
 
         private static string NormalizeRoutineDataType(string dataType)
         {
@@ -5869,6 +5997,10 @@ namespace nORM.Scaffolding
             string DbType,
             int? Size,
             string Direction);
+
+        private readonly record struct RoutineResultColumn(
+            string Name,
+            string TypeName);
 
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,

@@ -1094,8 +1094,13 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"Task<TValue?> {SqlServerScalarFunctionName}ValueAsync<TValue>", contextCode, StringComparison.Ordinal);
                 Assert.Contains("SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"public sealed class {SqlServerTableValuedFunctionName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {SqlServerTableValuedFunctionName}Result", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int Id { get; set; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string Name { get; set; } = default!;", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"Task<List<TResult>> {SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<{SqlServerTableValuedFunctionName}Result>> {SqlServerTableValuedFunctionName}Async", contextCode, StringComparison.Ordinal);
                 Assert.Contains($"IAsyncEnumerable<TResult> Stream{SqlServerTableValuedFunctionName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<{SqlServerTableValuedFunctionName}Result> Stream{SqlServerTableValuedFunctionName}Async", contextCode, StringComparison.Ordinal);
                 Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{SqlServerScalarFunctionName}\")", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($"ExecuteStoredProcedureAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"{SqlServerTableValuedFunctionName}\")", contextCode, StringComparison.Ordinal);

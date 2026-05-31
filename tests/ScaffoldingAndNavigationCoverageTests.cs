@@ -989,19 +989,26 @@ public class DatabaseScaffolderPrivateMethodTests
         var code = InvokeScaffoldContextWithRoutine(
             "dbo",
             "GetRevenueRows",
-            "SQL Server table-valued function; parameters=1; outputParameters=0; callShape=table-valued-function; parameterModes=@tenantId:IN:int; dataType=TABLE");
+            "SQL Server table-valued function; parameters=1; outputParameters=0; callShape=table-valued-function; parameterModes=@tenantId:IN:int; dataType=TABLE; resultColumns=Id:int:0|Name:nvarchar(40):0");
 
         Assert.Contains("Executes provider-bound table-valued function `dbo.GetRevenueRows`", code);
         Assert.Contains("public sealed class GetRevenueRowsParameters", code);
         Assert.Contains("public int? tenantId { get; init; }", code);
+        Assert.Contains("public sealed class GetRevenueRowsResult", code);
+        Assert.Contains("public int Id { get; set; }", code);
+        Assert.Contains("public string Name { get; set; } = default!;", code);
         Assert.Contains("var args = parameters is null ? System.Array.Empty<object>() : new object[] { (object?)parameters.tenantId ?? System.DBNull.Value };", code);
         Assert.Contains("if (args.Length != 1)", code);
         Assert.Contains("Function `dbo.GetRevenueRows` was scaffolded with 1 input parameters", code);
         Assert.Contains("Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"GetRevenueRows\")", code);
         Assert.Contains("SELECT * FROM ", code);
         Assert.Contains("QueryUnchangedAsync<TResult>", code);
+        Assert.Contains("Task<List<GetRevenueRowsResult>> GetRevenueRowsAsync(GetRevenueRowsParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("QueryUnchangedAsync<GetRevenueRowsResult>", code);
         Assert.Contains("IAsyncEnumerable<TResult> StreamGetRevenueRowsAsync<TResult>", code);
+        Assert.Contains("IAsyncEnumerable<GetRevenueRowsResult> StreamGetRevenueRowsAsync(GetRevenueRowsParameters? parameters = null", code);
         Assert.Contains("QueryUnchangedStreamAsync<TResult>", code);
+        Assert.Contains("QueryUnchangedStreamAsync<GetRevenueRowsResult>", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>(\"dbo.GetRevenueRows\"", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_tvf_" + Guid.NewGuid().ToString("N"));

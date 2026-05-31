@@ -190,8 +190,10 @@ must be reviewed and edited like handwritten model code.
   function(...)` for table-valued and PostgreSQL set-returning functions)
   instead of being miscalled as stored procedures. Table-valued functions also
   receive a streaming wrapper so callers can consume large provider-owned
-  rowsets without buffering. When
-  provider metadata exposes safe
+  rowsets without buffering. When provider metadata exposes a stable
+  first-result-set shape, scaffolding emits a nested result DTO plus typed
+  non-generic buffered and streaming overloads alongside the generic escape
+  hatch. When provider metadata exposes safe
   input parameter names, scaffolding emits a nested parameter DTO with known CLR
   scalar types (`int?`, `decimal?`, `DateTime?`, `DateTimeOffset?`,
   `DateOnly?`, `TimeOnly?`, `TimeSpan?`, `Guid?`, `string?`, `byte[]?`,
