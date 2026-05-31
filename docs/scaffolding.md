@@ -375,7 +375,8 @@ must be reviewed and edited like handwritten model code.
   alternate-key, self-referencing, and
   schema-qualified many-to-many junction-table mappings, including
   filtered-unique surrogate join tables that must remain
-  explicit entities instead of unsafe skip navigations.
+  explicit entities instead of unsafe skip navigations, plus keyless dependent
+  FK shapes that must suppress generated navigations.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic

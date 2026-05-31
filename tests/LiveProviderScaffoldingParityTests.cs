@@ -102,6 +102,9 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string SingleAlternateIndexName = "UX_ScaffoldLiveSingleAlternateParent_Code";
     private const string WarningTable = "ScaffoldLiveWarning";
     private const string KeylessTable = "ScaffoldLiveKeyless";
+    private const string KeylessDependentParentTable = "ScaffoldLiveKeylessDependentParent";
+    private const string KeylessDependentTable = "ScaffoldLiveKeylessDependent";
+    private const string KeylessDependentFkName = "FK_ScaffoldLiveKeylessDependent_Parent";
     private const string WarningView = "ScaffoldLiveWarningView";
     private const string FeatureOwnedTable = "ScaffoldLiveFeatureOwned";
     private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";
@@ -1911,6 +1914,60 @@ public sealed class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_suppresses_keyless_dependent_fk_navigation_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupKeylessDependentRelationshipAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_keyless_dependent_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldKeylessDependentContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { KeylessDependentParentTable, KeylessDependentTable },
+                        OverwriteFiles = false
+                    });
+
+                var dependentCode = await File.ReadAllTextAsync(Path.Combine(dir, KeylessDependentTable + ".cs"));
+                var parentCode = await File.ReadAllTextAsync(Path.Combine(dir, KeylessDependentParentTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldKeylessDependentContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("[ReadOnlyEntity]", dependentCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("[ForeignKey(", dependentCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(KeylessDependentTable + "s", parentCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "RelationshipDependentKey" &&
+                    item.GetProperty("table").GetString()!.Split('.').Last() == KeylessDependentTable &&
+                    item.GetProperty("suggestedAction").GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownKeylessDependentRelationshipAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_promotes_check_and_computed_metadata_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -3490,6 +3547,24 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {keyless} ({externalId} {TextType(kind, 40)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL)");
     }
 
+    private static async Task SetupKeylessDependentRelationshipAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownKeylessDependentRelationshipAsync(connection, provider, kind);
+
+        var parent = provider.Escape(KeylessDependentParentTable);
+        var dependent = provider.Escape(KeylessDependentTable);
+        var id = provider.Escape("Id");
+        var parentId = provider.Escape("ParentId");
+        var payload = provider.Escape("Payload");
+        var fkName = provider.Escape(KeylessDependentFkName);
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {parent} ({id} {IntType(kind)} NOT NULL PRIMARY KEY)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {dependent} ({parentId} {IntType(kind)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {fkName} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}))");
+    }
+
     private static async Task SetupFeatureOwnedMetadataAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await TeardownFeatureOwnedMetadataAsync(connection, provider, kind);
@@ -4305,6 +4380,19 @@ public sealed class LiveProviderScaffoldingParityTests
         {
             await ExecuteAsync(connection, DropTable(kind, KeylessTable, provider.Escape(KeylessTable)));
             await ExecuteAsync(connection, DropTable(kind, WarningTable, provider.Escape(WarningTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownKeylessDependentRelationshipAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, KeylessDependentTable, provider.Escape(KeylessDependentTable)));
+            await ExecuteAsync(connection, DropTable(kind, KeylessDependentParentTable, provider.Escape(KeylessDependentParentTable)));
         }
         catch
         {
