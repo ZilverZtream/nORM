@@ -360,7 +360,9 @@ must be reviewed and edited like handwritten model code.
   rowversion concurrency-token scaffolds, SQL Server scalar/table-valued
   function wrappers, SQL Server no-result procedure non-query wrappers,
   table-valued-parameter routine result wrappers, PostgreSQL array/UUID and MySQL
-  scalar-function wrappers with unsigned routine parameter stubs, PostgreSQL
+  scalar-function wrappers with unsigned routine parameter stubs, env-gated
+  execution of scaffold-style escaped routine output invocation names,
+  PostgreSQL
   overloaded and quoted-parameter function wrappers
   with deterministic generated names, PostgreSQL domain diagnostics,
   SQL Server alias-type diagnostics, MySQL unsigned-column diagnostics,

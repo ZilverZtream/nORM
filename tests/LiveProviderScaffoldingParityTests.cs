@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
@@ -8,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using nORM.Core;
 using nORM.Providers;
 using nORM.Scaffolding;
 using Xunit;
@@ -1664,6 +1666,60 @@ public sealed class LiveProviderScaffoldingParityTests
             {
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
+                await TeardownRoutineWithOutputAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task Scaffolded_routine_output_invocation_name_executes_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupRoutineWithOutputAsync(connection, provider, kind);
+            try
+            {
+                await using var ctx = new DbContext(connection, provider);
+                var routineName = kind == ProviderKind.SqlServer
+                    ? provider.Escape("dbo") + "." + provider.Escape(RoutineOutputName)
+                    : provider.Escape(RoutineOutputName);
+                object parameters = kind == ProviderKind.MySql
+                    ? new { tenantId = 7, message = "seed" }
+                    : new { tenantId = 7 };
+                var outputParameters = kind == ProviderKind.MySql
+                    ? new[]
+                    {
+                        new OutputParameter("total", DbType.Decimal),
+                        new OutputParameter("message", DbType.String, 32, ParameterDirection.InputOutput)
+                    }
+                    : new[]
+                    {
+                        new OutputParameter("total", DbType.Decimal),
+                        new OutputParameter("message", DbType.String, 32),
+                        new OutputParameter("return", DbType.Int32, null, ParameterDirection.ReturnValue)
+                    };
+
+                var result = await ctx.ExecuteStoredProcedureWithOutputAsync<LiveRoutineOutputRow>(
+                    routineName,
+                    parameters: parameters,
+                    outputParameters: outputParameters);
+
+                var row = Assert.Single(result.Results);
+                Assert.Equal(7, row.Id);
+                Assert.Equal("ok", row.Name);
+                Assert.Equal(12.34m, Convert.ToDecimal(result.OutputParameters["total"]));
+                Assert.Equal(kind == ProviderKind.MySql ? "seedok" : "ok", Convert.ToString(result.OutputParameters["message"]));
+                if (kind == ProviderKind.SqlServer)
+                    Assert.Equal(0, Convert.ToInt32(result.OutputParameters["return"]));
+            }
+            finally
+            {
                 await TeardownRoutineWithOutputAsync(connection, provider, kind);
             }
         }
@@ -4599,5 +4655,11 @@ public sealed class LiveProviderScaffoldingParityTests
         var payload = provider.Escape("Payload");
 
         return $"CREATE TABLE {table} ({tenantId} {IntType(kind)} NOT NULL, {localId} {IntType(kind)} NOT NULL, {payload} {TextType(kind, 40)} NOT NULL, PRIMARY KEY ({localId}, {tenantId}))";
+    }
+
+    private sealed class LiveRoutineOutputRow
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }
