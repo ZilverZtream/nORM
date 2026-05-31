@@ -249,7 +249,7 @@ public class ScaffoldingContractDocTests
             "SCF001", "SCF002",
             "SCF100", "SCF101", "SCF102", "SCF103", "SCF104", "SCF106", "SCF107",
             "SCF108", "SCF109", "SCF110", "SCF111", "SCF112", "SCF113", "SCF114", "SCF115",
-            "SCF116", "SCF117", "SCF199",
+            "SCF116", "SCF117", "SCF118", "SCF199",
             "SCF200", "SCF201", "SCF202", "SCF203", "SCF204", "SCF205", "SCF206", "SCF207",
             "SCF299"
         };

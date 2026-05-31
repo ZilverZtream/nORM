@@ -386,7 +386,8 @@ must be reviewed and edited like handwritten model code.
   ownership for sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted
-  identifiers.
+  identifiers and that keyless runtime-generated types reject generated write
+  paths through the same `[ReadOnlyEntity]` guard as static scaffolds.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship

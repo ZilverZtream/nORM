@@ -83,6 +83,8 @@ creating, deleting, or overwriting files in the requested output path.
 Tables and query artifacts without primary keys are generated with
 `[ReadOnlyEntity]`, so they remain queryable but generated writes are rejected
 before SQL generation until the model has a real key.
+Foreign keys from keyless dependent tables are reported as relationship
+diagnostics instead of generating unsafe navigations.
 Table CHECK constraints are emitted as provider-bound fluent migration metadata
 with `HasCheckConstraint` instead of being dropped into the warning report.
 Computed/generated column expressions are emitted as provider-bound fluent
