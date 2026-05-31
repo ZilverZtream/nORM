@@ -29,6 +29,11 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string SurrogateAuthorBookTable = "ScaffoldLiveSurrogateAuthorBook";
     private const string SurrogateAuthorBookAuthorFkName = "FK_ScaffoldLiveSurrogateAuthorBook_Author";
     private const string SurrogateAuthorBookBookFkName = "FK_ScaffoldLiveSurrogateAuthorBook_Book";
+    private const string GeneratedBridgeStudentTable = "ScaffoldLiveGeneratedBridgeStudent";
+    private const string GeneratedBridgeCourseTable = "ScaffoldLiveGeneratedBridgeCourse";
+    private const string GeneratedBridgeStudentCourseTable = "ScaffoldLiveGeneratedBridgeStudentCourse";
+    private const string GeneratedBridgeStudentCourseStudentFkName = "FK_ScaffoldLiveGeneratedBridgeStudentCourse_Student";
+    private const string GeneratedBridgeStudentCourseCourseFkName = "FK_ScaffoldLiveGeneratedBridgeStudentCourse_Course";
     private const string CompositeParentTable = "ScaffoldLiveCompositeParent";
     private const string CompositeChildTable = "ScaffoldLiveCompositeChild";
     private const string CompositeFkName = "FK_ScaffoldLiveCompositeChild_Parent";
@@ -249,6 +254,56 @@ public sealed class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownSurrogateManyToManyAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_many_to_many_with_database_generated_bridge_column_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupGeneratedBridgeManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_generated_bridge_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldGeneratedBridgeManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { GeneratedBridgeStudentTable, GeneratedBridgeCourseTable, GeneratedBridgeStudentCourseTable },
+                        OverwriteFiles = false
+                    });
+
+                var studentCode = await File.ReadAllTextAsync(Path.Combine(dir, GeneratedBridgeStudentTable + ".cs"));
+                var courseCode = await File.ReadAllTextAsync(Path.Combine(dir, GeneratedBridgeCourseTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldGeneratedBridgeManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, GeneratedBridgeStudentCourseTable + ".cs")));
+                Assert.Contains($"public List<{GeneratedBridgeCourseTable}> {GeneratedBridgeCourseTable}s {{ get; set; }} = new();", studentCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{GeneratedBridgeStudentTable}> {GeneratedBridgeStudentTable}s {{ get; set; }} = new();", courseCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{GeneratedBridgeStudentCourseTable}\", \"StudentId\", \"CourseId\");", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownGeneratedBridgeManyToManyAsync(connection, provider, kind);
             }
         }
     }
@@ -2838,6 +2893,36 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {provider.Escape(SurrogateAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
     }
 
+    private static async Task SetupGeneratedBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownGeneratedBridgeManyToManyAsync(connection, provider, kind);
+
+        var student = provider.Escape(GeneratedBridgeStudentTable);
+        var course = provider.Escape(GeneratedBridgeCourseTable);
+        var join = provider.Escape(GeneratedBridgeStudentCourseTable);
+        var id = provider.Escape("Id");
+        var studentId = provider.Escape("StudentId");
+        var courseId = provider.Escape("CourseId");
+        var pairSum = provider.Escape("PairSum");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+        var generatedColumn = kind switch
+        {
+            ProviderKind.SqlServer => $"{pairSum} AS ({studentId} + {courseId}) PERSISTED",
+            ProviderKind.Postgres => $"{pairSum} integer GENERATED ALWAYS AS ({studentId} + {courseId}) STORED",
+            ProviderKind.MySql => $"{pairSum} INT GENERATED ALWAYS AS ({studentId} + {courseId}) STORED",
+            ProviderKind.Sqlite => $"{pairSum} INTEGER GENERATED ALWAYS AS ({studentId} + {courseId}) VIRTUAL",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
+        };
+
+        await ExecuteAsync(connection, $"CREATE TABLE {student} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE TABLE {course} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({studentId} {IntType(kind)} NOT NULL, {courseId} {IntType(kind)} NOT NULL, {generatedColumn}, PRIMARY KEY ({studentId}, {courseId}), " +
+            $"CONSTRAINT {provider.Escape(GeneratedBridgeStudentCourseStudentFkName)} FOREIGN KEY ({studentId}) REFERENCES {student} ({id}), " +
+            $"CONSTRAINT {provider.Escape(GeneratedBridgeStudentCourseCourseFkName)} FOREIGN KEY ({courseId}) REFERENCES {course} ({id}))");
+    }
+
     private static async Task SetupReferentialActionAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await ExecuteAsync(connection, DropTable(kind, ReferentialChildTable, provider.Escape(ReferentialChildTable)));
@@ -3738,6 +3823,20 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorBookTable, provider.Escape(SurrogateAuthorBookTable)));
             await ExecuteAsync(connection, DropTable(kind, SurrogateBookTable, provider.Escape(SurrogateBookTable)));
             await ExecuteAsync(connection, DropTable(kind, SurrogateAuthorTable, provider.Escape(SurrogateAuthorTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownGeneratedBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, GeneratedBridgeStudentCourseTable, provider.Escape(GeneratedBridgeStudentCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, GeneratedBridgeCourseTable, provider.Escape(GeneratedBridgeCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, GeneratedBridgeStudentTable, provider.Escape(GeneratedBridgeStudentTable)));
         }
         catch
         {
