@@ -165,8 +165,9 @@ items:
             <code>modelBuilder.Entity&lt;T&gt;()</code>. Types present in the assembly but not
             registered are silently excluded, preventing StackOverflowExceptions from
             circular navigation properties in test assemblies.</li><li>Includes foreign key constraints derived from fluent <code>HasForeignKey()</code>
-            / <code>HasOne()</code> / <code>HasMany()</code> configuration.</li><li>Owned collection tables and many-to-many join tables are not included — see
-            <xref href="nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable%7bnORM.Mapping.TableMapping%7d)" data-throw-if-not-resolved="false"></xref> remarks for details.</li></ul>
+            / <code>HasOne()</code> / <code>HasMany()</code> configuration.</li><li>Includes inline owned scalar columns, shadow columns, and metadata from <code>OwnsOne()</code>,
+            owned collection child tables from <code>OwnsMany()</code>, and configured
+            many-to-many join tables.</li></ul>
   example: []
   syntax:
     content: public static SchemaSnapshot Build(DbContext ctx)

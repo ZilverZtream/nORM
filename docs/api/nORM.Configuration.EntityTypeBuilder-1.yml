@@ -8,12 +8,14 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   - nORM.Configuration.EntityTypeBuilder`1.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})
   - nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
+  - nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
   - nORM.Configuration.EntityTypeBuilder`1.OwnsOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
   - nORM.Configuration.EntityTypeBuilder`1.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   - nORM.Configuration.EntityTypeBuilder`1.Property``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
   - nORM.Configuration.EntityTypeBuilder`1.Property``1(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.SharesTableWith``1
   - nORM.Configuration.EntityTypeBuilder`1.ToTable(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.ToTable(System.String,System.String)
   langs:
   - csharp
   - vb
@@ -79,7 +81,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 193
+    startLine: 303
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -103,6 +105,51 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).ToTable(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ToTable(String)
   name.vb: ToTable(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.ToTable(System.String,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.ToTable(System.String,System.String)
+  id: ToTable(System.String,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: ToTable(string, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.ToTable(string, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ToTable(string, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 316
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies the schema-qualified database table that <code class="typeparamref">TEntity</code> maps to.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> ToTable(string name, string? schema)
+    parameters:
+    - id: name
+      type: System.String
+      description: The unqualified table name.
+    - id: schema
+      type: System.String
+      description: The unescaped database schema containing the table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The same <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> instance for chaining.
+    content.vb: Public Function ToTable(name As String, schema As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.ToTable*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">name</code> is null or whitespace, or <code class="paramref">schema</code> is whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ToTable(String, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ToTable(String, String)
+  name.vb: ToTable(String, String)
 - uid: nORM.Configuration.EntityTypeBuilder`1.SharesTableWith``1
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.SharesTableWith``1
   id: SharesTableWith``1
@@ -434,6 +481,77 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).OwnsMany(Of TOwned)(Expression(Of Func(Of TEntity, IEnumerable(Of TOwned))), String, String, Action(Of EntityTypeBuilder(Of TOwned)))
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).OwnsMany(Of TOwned)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, System.Collections.Generic.IEnumerable(Of TOwned))), String, String, System.Action(Of nORM.Configuration.EntityTypeBuilder(Of TOwned)))
   name.vb: OwnsMany(Of TOwned)(Expression(Of Func(Of TEntity, IEnumerable(Of TOwned))), String, String, Action(Of EntityTypeBuilder(Of TOwned)))
+- uid: nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
+  id: OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: OwnsMany<TOwned>(Expression<Func<TEntity, IEnumerable<TOwned>>>, string?, string?, string?, Action<EntityTypeBuilder<TOwned>>?)
+  nameWithType: EntityTypeBuilder<TEntity>.OwnsMany<TOwned>(Expression<Func<TEntity, IEnumerable<TOwned>>>, string?, string?, string?, Action<EntityTypeBuilder<TOwned>>?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.OwnsMany<TOwned>(System.Linq.Expressions.Expression<System.Func<TEntity, System.Collections.Generic.IEnumerable<TOwned>>>, string?, string?, string?, System.Action<nORM.Configuration.EntityTypeBuilder<TOwned>>?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OwnsMany
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 519
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures a collection navigation property as an owned collection stored in a separate schema-qualified child table.
+  example: []
+  syntax:
+    content: 'public EntityTypeBuilder<TEntity> OwnsMany<TOwned>(Expression<Func<TEntity, IEnumerable<TOwned>>> navigation, string? tableName, string? foreignKey, string? schema, Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class'
+    parameters:
+    - id: navigation
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Collections.Generic.IEnumerable{{TOwned}}}}
+      description: Expression selecting the collection navigation property.
+    - id: tableName
+      type: System.String
+      description: >-
+        Name of the child table without schema qualification. Defaults to the owned type name.
+
+        Must be supplied explicitly when <code class="typeparamref">TOwned</code> is a generic type.
+    - id: foreignKey
+      type: System.String
+      description: >-
+        FK column name referencing owner's PK. Defaults to owner type name + "Id".
+
+        Must be supplied explicitly when <code class="typeparamref">TEntity</code> is a generic type.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the child table.
+    - id: buildAction
+      type: System.Action{nORM.Configuration.EntityTypeBuilder{{TOwned}}}
+      description: Optional configuration for the owned element type.
+    typeParameters:
+    - id: TOwned
+      description: CLR element type of the owned collection.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The same builder instance for chaining.
+    content.vb: Public Function OwnsMany(Of TOwned As Class)(navigation As Expression(Of Func(Of TEntity, IEnumerable(Of TOwned))), tableName As String, foreignKey As String, schema As String, buildAction As Action(Of EntityTypeBuilder(Of TOwned)) = Nothing) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.OwnsMany*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">navigation</code> is null.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: >-
+      Thrown when <code class="paramref">tableName</code> is omitted and the owned type is generic,
+
+      when <code class="paramref">foreignKey</code> is omitted and the owning type is generic, or when
+
+      <code class="paramref">schema</code> is whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).OwnsMany(Of TOwned)(Expression(Of Func(Of TEntity, IEnumerable(Of TOwned))), String, String, String, Action(Of EntityTypeBuilder(Of TOwned)))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).OwnsMany(Of TOwned)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, System.Collections.Generic.IEnumerable(Of TOwned))), String, String, String, System.Action(Of nORM.Configuration.EntityTypeBuilder(Of TOwned)))
+  name.vb: OwnsMany(Of TOwned)(Expression(Of Func(Of TEntity, IEnumerable(Of TOwned))), String, String, String, Action(Of EntityTypeBuilder(Of TOwned)))
 - uid: nORM.Configuration.EntityTypeBuilder`1.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})
   id: HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})

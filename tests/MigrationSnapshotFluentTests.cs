@@ -71,6 +71,26 @@ public class MigrationSnapshotFluentTests
     }
 
     [Fact]
+    public void Build_WithContext_ReflectsFluentTableSchema()
+    {
+        using var ctx = CreateCtx(mb =>
+            mb.Entity<AppUser>()
+              .ToTable("app_users", "tenant")
+              .HasKey(u => u.Id));
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+        var table = snapshot.Tables.Single(t => t.Name == "tenant.app_users");
+
+        Assert.DoesNotContain(snapshot.Tables, t => t.Name == "app_users");
+        var sql = new PostgresMigrationSqlGenerator()
+            .GenerateSql(SchemaDiffer.Diff(new SchemaSnapshot(), snapshot))
+            .Up;
+        Assert.Contains("CREATE SCHEMA IF NOT EXISTS \"tenant\"", sql);
+        Assert.Contains(sql, statement => statement.StartsWith("CREATE TABLE \"tenant\".\"app_users\"", System.StringComparison.Ordinal));
+        Assert.Contains(table.Columns, c => c.Name == "Id" && c.IsPrimaryKey);
+    }
+
+    [Fact]
     public void Build_WithContext_ReflectsFluentColumnName()
     {
         using var ctx = CreateCtx(mb =>

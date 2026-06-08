@@ -33,10 +33,9 @@ namespace nORM.Query
     ///    - Doesn't parse binary operations: `new { Total = x.Price * x.Quantity }`
     ///    - These patterns fall through to "select all columns" fallback
     ///
-    /// 4. **String-Based Name Lookup:**
-    ///    - Uses `ColumnsByName.TryGetValue(memberExpr.Member.Name)` (line 104)
-    ///    - Case-sensitive, brittle to renamed properties or aliasing
-    ///    - No normalization or fallback strategies
+    /// 4. **Limited Member-Path Surface:**
+    ///    - Resolves direct and owned scalar member paths through table metadata
+    ///    - Still falls back for computed expressions and complex transparent identifiers
     ///
     /// **Recommended Refactoring:**
     /// Replace pattern matching with a proper expression tree analyzer:
@@ -282,11 +281,12 @@ namespace nORM.Query
                 colSql = string.Empty;
                 if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ue)
                     expr = ue.Operand;
-                if (expr is not MemberExpression mem || mem.Expression is not ParameterExpression param)
+                if (expr is not MemberExpression mem ||
+                    !TableMapping.TryGetMemberAccessRoot(mem, out var param))
                     return false;
                 var mapping = ResolveMapping(param.Type, out var alias);
                 if (mapping == null) return false;
-                if (!mapping.ColumnsByName.TryGetValue(mem.Member.Name, out var col)) return false;
+                if (!mapping.TryGetColumnForMemberAccess(mem, out var col)) return false;
                 colSql = $"{alias}.{col.EscCol}";
                 return true;
             }

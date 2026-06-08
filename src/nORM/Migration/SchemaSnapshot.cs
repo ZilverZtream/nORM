@@ -376,8 +376,9 @@ namespace nORM.Migration
         ///         circular navigation properties in test assemblies.</item>
         ///   <item>Includes foreign key constraints derived from fluent <c>HasForeignKey()</c>
         ///         / <c>HasOne()</c> / <c>HasMany()</c> configuration.</item>
-        ///   <item>Owned collection tables and many-to-many join tables are not included — see
-        ///         <see cref="BuildFromMappings"/> remarks for details.</item>
+        ///   <item>Includes inline owned scalar columns, shadow columns, and metadata from <c>OwnsOne()</c>,
+        ///         owned collection child tables from <c>OwnsMany()</c>, and configured
+        ///         many-to-many join tables.</item>
         /// </list>
         /// </remarks>
         public static SchemaSnapshot Build(DbContext ctx)
@@ -389,26 +390,13 @@ namespace nORM.Migration
         /// <summary>
         /// Builds a <see cref="SchemaSnapshot"/> from a set of resolved <see cref="TableMapping"/> instances.
         /// </summary>
-        /// <remarks>
-        /// <b>Architectural limitations — tables not included in the snapshot:</b>
-        /// <list type="bullet">
-        ///   <item>
-        ///     <b>Owned collection tables</b> (configured via <c>OwnedCollectionMapping</c>) are not
-        ///     represented in <see cref="TableMapping"/> and are therefore absent from the snapshot.
-        ///     Migrations for owned collection tables must be managed manually.
-        ///   </item>
-        ///   <item>
-        ///     <b>Many-to-many join tables</b> (implicit or explicit) are not included.
-        ///     Migrations for join tables must be managed manually.
-        ///   </item>
-        /// </list>
-        /// </remarks>
         private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
         {
             ArgumentNullException.ThrowIfNull(mappings);
 
             var snapshot = new SchemaSnapshot();
             var allMappings = mappings as IReadOnlyList<TableMapping> ?? mappings.ToList();
+            var tableByName = new Dictionary<string, TableSchema>(StringComparer.OrdinalIgnoreCase);
 
             // Pass 1: build all TableSchema objects, indexed by CLR type.
             var tableByType = new Dictionary<Type, TableSchema>();
@@ -418,22 +406,24 @@ namespace nORM.Migration
 
                 // Count PK columns so that composite PKs do not produce per-column UNIQUE constraints.
                 var pkCount = map.Columns.Count(c => c.IsKey);
+                var indexAttributesByProperty = BuildIndexAttributesByProperty(map.Columns);
+                var indexColumnCounts = BuildIndexColumnCounts(indexAttributesByProperty);
 
                 foreach (var col in map.Columns)
                 {
+                    var columnConfiguration = ResolveColumnConfiguration(map, col);
                     var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                    var isNullable = !col.Prop.PropertyType.IsValueType
-                                  || Nullable.GetUnderlyingType(col.Prop.PropertyType) != null;
-                    var columnAttr = col.Prop.GetCustomAttribute<ColumnAttribute>();
+                    var isNullable = col.IsNullable;
+                    var columnAttr = GetColumnAttribute(col);
                     var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
                     ComputedColumnConfiguration? computedColumn = null;
-                    map.FluentConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
+                    columnConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
                     IdentityOptionsConfiguration? identityOptions = null;
-                    map.FluentConfiguration?.IdentityOptions.TryGetValue(col.Prop, out identityOptions);
+                    columnConfiguration?.IdentityOptions.TryGetValue(col.Prop, out identityOptions);
                     string? collation = null;
-                    map.FluentConfiguration?.Collations.TryGetValue(col.Prop, out collation);
-                    var dbGenerated = col.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
-                    table.Columns.Add(new ColumnSchema
+                    columnConfiguration?.Collations.TryGetValue(col.Prop, out collation);
+                    var dbGenerated = GetDatabaseGeneratedOption(col);
+                    var column = new ColumnSchema
                     {
                         Name         = col.Name,
                         // Use ToString() as fallback: for constructed generic types it returns the
@@ -454,35 +444,22 @@ namespace nORM.Migration
                         ComputedColumnSql = computedColumn?.Sql
                             ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
                         IsStoredComputedColumn = computedColumn?.Stored == true,
-                        DefaultValue = map.FluentConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
+                        DefaultValue = columnConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
                             ? defaultValue
                             : null,
                         Collation = collation,
-                    });
+                    };
+                    ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
+                    table.Columns.Add(column);
                 }
                 if (map.FluentConfiguration is not null)
                 {
-                    foreach (var check in map.FluentConfiguration.CheckConstraints)
-                    {
-                        table.CheckConstraints.Add(new CheckConstraintSchema
-                        {
-                            ConstraintName = check.Name,
-                            Sql = check.Sql
-                        });
-                    }
-                    foreach (var expressionIndex in map.FluentConfiguration.ExpressionIndexes)
-                    {
-                        table.ExpressionIndexes.Add(new ExpressionIndexSchema
-                        {
-                            Name = expressionIndex.Name,
-                            ExpressionSql = expressionIndex.ExpressionSql,
-                            IsUnique = expressionIndex.IsUnique,
-                            FilterSql = expressionIndex.FilterSql
-                        });
-                    }
+                    AddConfiguredTableMetadata(table, map.FluentConfiguration);
+                    AddConfiguredOwnedNavigationTableMetadata(table, map.FluentConfiguration);
                 }
                 snapshot.Tables.Add(table);
                 tableByType[map.Type] = table;
+                tableByName[table.Name] = table;
             }
 
             // Pass 2: add FK constraints from principal Relations to the dependent TableSchema.
@@ -501,7 +478,9 @@ namespace nORM.Migration
                     }
                     depTable.ForeignKeys.Add(new ForeignKeySchema
                     {
-                        ConstraintName   = $"FK_{depTable.Name}_{map.TableName}_{string.Join("_", rel.ForeignKeys.Select(c => c.Name))}",
+                        ConstraintName   = !string.IsNullOrWhiteSpace(rel.ConstraintName)
+                            ? rel.ConstraintName!
+                            : $"FK_{depTable.Name}_{map.TableName}_{string.Join("_", rel.ForeignKeys.Select(c => c.Name))}",
                         DependentColumns = rel.ForeignKeys.Select(c => c.Name).ToArray(),
                         PrincipalTable   = map.TableName,
                         PrincipalColumns = rel.PrincipalKeys.Select(c => c.Name).ToArray(),
@@ -511,8 +490,334 @@ namespace nORM.Migration
                 }
             }
 
+            // Pass 3: add configured owned collection tables so migrations create
+            // the child tables used by runtime OwnsMany persistence.
+            foreach (var map in allMappings)
+            {
+                foreach (var owned in map.OwnedCollections)
+                {
+                    var ownedTableName = FormatTableName(owned.TableName, owned.SchemaName);
+                    if (tableByName.ContainsKey(ownedTableName))
+                        continue;
+
+                    if (map.KeyColumns.Length == 0)
+                    {
+                        WarnSkippedOwnedCollection(ownedTableName, map.Type.Name);
+                        continue;
+                    }
+
+                    var ownerKey = ResolveOwnerKeyColumnForOwnedFk(map.KeyColumns, owned.ForeignKeyColumn, map.Type.Name);
+                    var ownedTable = new TableSchema { Name = ownedTableName };
+                    ownedTable.Columns.Add(BuildOwnedForeignKeyColumn(owned, ownerKey));
+
+                    var ownedPkCount = owned.Columns.Count(static c => c.IsKey);
+                    var ownedIndexAttributesByProperty = BuildIndexAttributesByProperty(owned.Columns);
+                    var ownedIndexColumnCounts = BuildIndexColumnCounts(ownedIndexAttributesByProperty);
+                    foreach (var col in owned.Columns)
+                    {
+                        if (string.Equals(col.Name, owned.ForeignKeyColumn, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        ownedTable.Columns.Add(BuildOwnedColumnSchema(
+                            col,
+                            ownedPkCount,
+                            owned.TableName,
+                            owned.Configuration,
+                            ownedIndexAttributesByProperty,
+                            ownedIndexColumnCounts));
+                    }
+
+                    AddConfiguredTableMetadata(ownedTable, owned.Configuration);
+                    ownedTable.ForeignKeys.Add(new ForeignKeySchema
+                    {
+                        ConstraintName = $"FK_{owned.TableName}_{map.TableName}_{owned.ForeignKeyColumn}",
+                        DependentColumns = new[] { owned.ForeignKeyColumn },
+                        PrincipalTable = map.TableName,
+                        PrincipalColumns = new[] { ownerKey.Name },
+                        OnDelete = "CASCADE",
+                        OnUpdate = "NO ACTION"
+                    });
+
+                    snapshot.Tables.Add(ownedTable);
+                    tableByName[ownedTableName] = ownedTable;
+                }
+            }
+
+            // Pass 4: add configured many-to-many join tables so migrations create the
+            // bridge tables required by runtime skip-navigation mappings.
+            foreach (var map in allMappings)
+            {
+                foreach (var join in map.ManyToManyJoins)
+                {
+                    var joinTableName = FormatTableName(join.TableName, join.SchemaName);
+                    if (tableByName.ContainsKey(joinTableName))
+                        continue;
+
+                    if (!tableByType.TryGetValue(join.RightType, out var rightTable))
+                    {
+                        WarnSkippedManyToManyJoin(join.TableName, join.RightType.Name);
+                        continue;
+                    }
+
+                    var joinTable = new TableSchema { Name = joinTableName };
+                    var joinColumns = new Dictionary<string, ColumnSchema>(StringComparer.OrdinalIgnoreCase);
+                    AddJoinColumns(joinTable, joinColumns, join.LeftFkColumns, join.LeftKeyColumns, joinTableName);
+                    AddJoinColumns(joinTable, joinColumns, join.RightFkColumns, join.RightKeyColumns, joinTableName);
+
+                    joinTable.ForeignKeys.Add(new ForeignKeySchema
+                    {
+                        ConstraintName   = $"FK_{join.TableName}_{map.TableName}_{string.Join("_", join.LeftFkColumns)}",
+                        DependentColumns = join.LeftFkColumns.ToArray(),
+                        PrincipalTable   = map.TableName,
+                        PrincipalColumns = join.LeftKeyColumns.Select(c => c.Name).ToArray()
+                    });
+                    joinTable.ForeignKeys.Add(new ForeignKeySchema
+                    {
+                        ConstraintName   = $"FK_{join.TableName}_{rightTable.Name}_{string.Join("_", join.RightFkColumns)}",
+                        DependentColumns = join.RightFkColumns.ToArray(),
+                        PrincipalTable   = rightTable.Name,
+                        PrincipalColumns = join.RightKeyColumns.Select(c => c.Name).ToArray()
+                    });
+
+                    snapshot.Tables.Add(joinTable);
+                    tableByName[joinTableName] = joinTable;
+                }
+            }
+
             return snapshot;
         }
+
+        private static ColumnSchema BuildOwnedForeignKeyColumn(OwnedCollectionMapping owned, Column ownerKey)
+        {
+            var clrType = Nullable.GetUnderlyingType(ownerKey.Prop.PropertyType) ?? ownerKey.Prop.PropertyType;
+            return new ColumnSchema
+            {
+                Name = owned.ForeignKeyColumn,
+                ClrType = clrType.FullName ?? clrType.ToString(),
+                IsNullable = false,
+                IsPrimaryKey = false,
+                IsUnique = false,
+                IndexName = null
+            };
+        }
+
+        private static IEntityTypeConfiguration? ResolveColumnConfiguration(TableMapping map, Column column)
+        {
+            var configuration = map.FluentConfiguration;
+            if (configuration is null)
+                return null;
+
+            if (column.Prop.DeclaringType == map.Type)
+                return configuration;
+
+            foreach (var (navigationProperty, ownedNavigation) in configuration.OwnedNavigations)
+            {
+                if (ownedNavigation.Configuration is null)
+                    continue;
+                if (column.Prop.DeclaringType != ownedNavigation.OwnedType)
+                    continue;
+
+                var prefix = navigationProperty.Name + "_";
+                if (column.PropName.StartsWith(prefix, StringComparison.Ordinal))
+                    return ownedNavigation.Configuration;
+            }
+
+            return configuration;
+        }
+
+        private static ColumnSchema BuildOwnedColumnSchema(
+            Column col,
+            int pkCount,
+            string tableName,
+            IEntityTypeConfiguration? configuration,
+            IReadOnlyDictionary<PropertyInfo, IndexAttribute[]> indexAttributesByProperty,
+            IReadOnlyDictionary<string, int> indexColumnCounts)
+        {
+            var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+            var isNullable = col.IsNullable;
+            var columnAttr = GetColumnAttribute(col);
+            var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
+            ComputedColumnConfiguration? computedColumn = null;
+            configuration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
+            IdentityOptionsConfiguration? identityOptions = null;
+            configuration?.IdentityOptions.TryGetValue(col.Prop, out identityOptions);
+            string? collation = null;
+            configuration?.Collations.TryGetValue(col.Prop, out collation);
+            var dbGenerated = GetDatabaseGeneratedOption(col);
+            var column = new ColumnSchema
+            {
+                Name = col.Name,
+                ClrType = clrType.FullName ?? clrType.ToString(),
+                Precision = precision,
+                Scale = scale,
+                IsNullable = isNullable,
+                IsPrimaryKey = col.IsKey,
+                IsUnique = col.IsKey && pkCount == 1,
+                IndexName = col.IsKey ? $"PK_{tableName}" : null,
+                IsIdentity = dbGenerated == DatabaseGeneratedOption.Identity,
+                IdentitySeed = identityOptions?.Seed,
+                IdentityIncrement = identityOptions?.Increment,
+                ComputedColumnSql = computedColumn?.Sql
+                    ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
+                IsStoredComputedColumn = computedColumn?.Stored == true,
+                DefaultValue = configuration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
+                    ? defaultValue
+                    : null,
+                Collation = collation
+            };
+            ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
+            return column;
+        }
+
+        private static void AddConfiguredOwnedNavigationTableMetadata(TableSchema table, IEntityTypeConfiguration configuration)
+        {
+            foreach (var ownedNavigation in configuration.OwnedNavigations.Values)
+            {
+                AddConfiguredTableMetadata(table, ownedNavigation.Configuration);
+            }
+        }
+
+        private static void AddConfiguredTableMetadata(TableSchema table, IEntityTypeConfiguration? configuration)
+        {
+            if (configuration is null)
+                return;
+
+            foreach (var check in configuration.CheckConstraints)
+            {
+                table.CheckConstraints.Add(new CheckConstraintSchema
+                {
+                    ConstraintName = check.Name,
+                    Sql = check.Sql
+                });
+            }
+
+            foreach (var expressionIndex in configuration.ExpressionIndexes)
+            {
+                table.ExpressionIndexes.Add(new ExpressionIndexSchema
+                {
+                    Name = expressionIndex.Name,
+                    ExpressionSql = expressionIndex.ExpressionSql,
+                    IsUnique = expressionIndex.IsUnique,
+                    FilterSql = expressionIndex.FilterSql
+                });
+            }
+        }
+
+        private static ColumnAttribute? GetColumnAttribute(Column column)
+            => column.IsShadow ? null : column.Prop.GetCustomAttribute<ColumnAttribute>();
+
+        private static DatabaseGeneratedOption? GetDatabaseGeneratedOption(Column column)
+            => column.IsShadow
+                ? null
+                : column.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
+
+        private static Dictionary<PropertyInfo, IndexAttribute[]> BuildIndexAttributesByProperty(IEnumerable<Column> columns)
+            => columns
+                .Where(static column => !column.IsShadow)
+                .Select(static column => column.Prop)
+                .Distinct()
+                .ToDictionary(
+                    static prop => prop,
+                    static prop => prop.GetCustomAttributes<IndexAttribute>().ToArray());
+
+        private static Dictionary<string, int> BuildIndexColumnCounts(IReadOnlyDictionary<PropertyInfo, IndexAttribute[]> indexAttributesByProperty)
+            => indexAttributesByProperty.Values
+                .SelectMany(static attrs => attrs.Select(static attr => attr.Name))
+                .GroupBy(static name => name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+        private static void ApplyIndexAttributes(
+            ColumnSchema column,
+            IReadOnlyDictionary<PropertyInfo, IndexAttribute[]> indexAttributesByProperty,
+            IReadOnlyDictionary<string, int> indexColumnCounts,
+            PropertyInfo property)
+        {
+            if (!indexAttributesByProperty.TryGetValue(property, out var indexAttrs) || indexAttrs.Length == 0)
+                return;
+
+            var firstIndexAttr = indexAttrs[0];
+            if (!column.IsPrimaryKey)
+            {
+                column.IndexName = firstIndexAttr.Name;
+                column.IndexOrder = firstIndexAttr.Order;
+            }
+
+            if (indexAttrs.Any(attr =>
+                    attr.IsUnique &&
+                    indexColumnCounts.TryGetValue(attr.Name, out var count) &&
+                    count == 1))
+            {
+                column.IsUnique = true;
+            }
+
+            foreach (var indexAttr in indexAttrs)
+            {
+                column.Indexes.Add(new ColumnIndexSchema
+                {
+                    Name = indexAttr.Name,
+                    IsUnique = indexAttr.IsUnique,
+                    Order = indexAttr.Order,
+                    IsDescending = indexAttr.IsDescending,
+                    IsIncluded = indexAttr.IsIncluded,
+                    FilterSql = indexAttr.FilterSql
+                });
+            }
+        }
+
+        private static Column ResolveOwnerKeyColumnForOwnedFk(Column[] ownerKeyColumns, string ownedFkColumnName, string ownerTypeName)
+        {
+            if (ownerKeyColumns.Length == 1)
+                return ownerKeyColumns[0];
+
+            var match = Array.Find(ownerKeyColumns, c =>
+                string.Equals(c.Name, ownedFkColumnName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+                return match;
+
+            if (ownedFkColumnName.Length > ownerTypeName.Length
+                && ownedFkColumnName.StartsWith(ownerTypeName, StringComparison.OrdinalIgnoreCase))
+            {
+                var suffix = ownedFkColumnName.Substring(ownerTypeName.Length);
+                match = Array.Find(ownerKeyColumns, c =>
+                    string.Equals(c.Name, suffix, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                    return match;
+            }
+
+            return ownerKeyColumns[0];
+        }
+
+        private static void AddJoinColumns(
+            TableSchema joinTable,
+            Dictionary<string, ColumnSchema> columnsByName,
+            IReadOnlyList<string> fkColumns,
+            IReadOnlyList<Column> principalColumns,
+            string joinTableName)
+        {
+            for (var i = 0; i < fkColumns.Count; i++)
+            {
+                var fkColumn = fkColumns[i];
+                if (columnsByName.ContainsKey(fkColumn))
+                    continue;
+
+                var principalColumn = principalColumns[i];
+                var clrType = Nullable.GetUnderlyingType(principalColumn.Prop.PropertyType) ?? principalColumn.Prop.PropertyType;
+                var column = new ColumnSchema
+                {
+                    Name         = fkColumn,
+                    ClrType      = clrType.FullName ?? clrType.ToString(),
+                    IsNullable   = false,
+                    IsPrimaryKey = true,
+                    IsUnique     = false,
+                    IndexName    = $"PK_{joinTableName}"
+                };
+                columnsByName[fkColumn] = column;
+                joinTable.Columns.Add(column);
+            }
+        }
+
+        private static string FormatTableName(string tableName, string? schemaName)
+            => string.IsNullOrWhiteSpace(schemaName) ? tableName : schemaName + "." + tableName;
 
         private static string ToForeignKeyActionSql(ReferentialAction action)
             => action switch
@@ -627,6 +932,32 @@ namespace nORM.Migration
                 $"registered in this context's mappings (principal table: '{principalTableName}'). " +
                 "Register the dependent type via modelBuilder.Entity<T>() to include its FK.");
         }
+
+        /// <summary>
+        /// Emits a debug diagnostic when a configured many-to-many join cannot be snapshotted
+        /// because the related mapping is not present in the current mapping set.
+        /// Active only in DEBUG builds; no-op in Release.
+        /// </summary>
+        [Conditional("DEBUG")]
+        private static void WarnSkippedManyToManyJoin(string joinTableName, string relatedTypeName)
+        {
+            Debug.WriteLine(
+                $"[SchemaSnapshot] many-to-many join table '{joinTableName}' skipped: " +
+                $"related type '{relatedTypeName}' is not registered in this context's mappings.");
+        }
+
+        /// <summary>
+        /// Emits a debug diagnostic when a configured owned collection cannot be snapshotted
+        /// because the owner mapping has no primary key metadata.
+        /// Active only in DEBUG builds; no-op in Release.
+        /// </summary>
+        [Conditional("DEBUG")]
+        private static void WarnSkippedOwnedCollection(string ownedTableName, string ownerTypeName)
+        {
+            Debug.WriteLine(
+                $"[SchemaSnapshot] owned collection table '{ownedTableName}' skipped: " +
+                $"owner type '{ownerTypeName}' has no primary key metadata.");
+        }
     }
 
     /// <summary>
@@ -684,19 +1015,24 @@ namespace nORM.Migration
             || RenamedColumns.Count > 0;
 
         /// <summary>
-        /// Indicates whether the diff contains table or column drops that can destroy data.
+        /// Indicates whether the diff contains operations that can remove data or weaken
+        /// schema-enforced integrity.
         /// </summary>
-        public bool HasDestructiveChanges => DroppedTables.Count > 0 || DroppedColumns.Count > 0;
+        public bool HasDestructiveChanges => GetDestructiveChangeWarnings().Count > 0;
 
         /// <summary>
         /// Returns human-readable warnings for destructive operations in this diff.
         /// </summary>
         public IReadOnlyList<string> GetDestructiveChangeWarnings()
         {
-            if (!HasDestructiveChanges)
-                return Array.Empty<string>();
-
-            var warnings = new List<string>(DroppedTables.Count + DroppedColumns.Count);
+            var warnings = new List<string>(
+                DroppedTables.Count
+                + DroppedColumns.Count
+                + DroppedForeignKeys.Count
+                + DroppedCheckConstraints.Count
+                + DroppedIndexes.Count
+                + DroppedExpressionIndexes.Count
+                + AlteredColumns.Count);
             foreach (var table in DroppedTables)
             {
                 warnings.Add($"Drop table '{table.Name}' will remove all data in that table. If this is a rename, replace the generated drop/create with a provider-specific rename operation.");
@@ -720,8 +1056,121 @@ namespace nORM.Migration
                 warnings.Add(message);
             }
 
+            foreach (var (table, fk) in DroppedForeignKeys)
+            {
+                warnings.Add($"Drop foreign key '{fk.ConstraintName}' on '{table.Name}' will stop enforcing referential integrity to '{fk.PrincipalTable}'.");
+            }
+
+            foreach (var (table, check) in DroppedCheckConstraints)
+            {
+                warnings.Add($"Drop check constraint '{check.ConstraintName}' on '{table.Name}' will stop enforcing its predicate.");
+            }
+
+            foreach (var (table, indexName) in DroppedIndexes)
+            {
+                var index = SchemaDiffer.GetExplicitIndexes(table)
+                    .FirstOrDefault(index => string.Equals(index.IndexName, indexName, StringComparison.OrdinalIgnoreCase));
+                if (index.IsUnique)
+                {
+                    var columns = index.ColumnNames.Length == 0
+                        ? "<unknown>"
+                        : string.Join(", ", index.ColumnNames);
+                    warnings.Add($"Drop unique index '{indexName}' on '{table.Name}' will stop enforcing uniqueness for '{columns}'.");
+                }
+            }
+
+            foreach (var (table, expressionIndex) in DroppedExpressionIndexes)
+            {
+                if (expressionIndex.IsUnique)
+                    warnings.Add($"Drop unique expression index '{expressionIndex.Name}' on '{table.Name}' will stop enforcing uniqueness for expression '{expressionIndex.ExpressionSql}'.");
+            }
+
+            foreach (var (table, newColumn, oldColumn) in AlteredColumns)
+            {
+                AddDestructiveColumnAlterWarnings(warnings, table, oldColumn, newColumn);
+            }
+
+            if (warnings.Count == 0)
+                return Array.Empty<string>();
+
             return warnings;
         }
+
+        private static void AddDestructiveColumnAlterWarnings(
+            List<string> warnings,
+            TableSchema table,
+            ColumnSchema oldColumn,
+            ColumnSchema newColumn)
+        {
+            var column = $"{table.Name}.{newColumn.Name}";
+            if (!string.Equals(oldColumn.ClrType, newColumn.ClrType, StringComparison.OrdinalIgnoreCase))
+            {
+                warnings.Add($"Alter column '{column}' changes type from '{oldColumn.ClrType}' to '{newColumn.ClrType}' and may truncate or fail to convert existing data.");
+            }
+
+            if (oldColumn.IsNullable && !newColumn.IsNullable)
+            {
+                warnings.Add($"Alter column '{column}' changes nullability from nullable to required and may fail if existing rows contain NULL.");
+            }
+
+            if (NarrowsPrecisionOrScale(oldColumn, newColumn))
+            {
+                warnings.Add($"Alter column '{column}' narrows precision/scale from '{FormatPrecisionScale(oldColumn)}' to '{FormatPrecisionScale(newColumn)}' and may truncate existing values.");
+            }
+
+            if (oldColumn.IsPrimaryKey && !newColumn.IsPrimaryKey)
+            {
+                warnings.Add($"Alter column '{column}' drops primary key membership and will stop enforcing entity identity.");
+            }
+
+            if (oldColumn.IsUnique && !newColumn.IsUnique)
+            {
+                warnings.Add($"Alter column '{column}' drops uniqueness and will allow duplicate values.");
+            }
+
+            if (oldColumn.IsIdentity != newColumn.IsIdentity
+                || oldColumn.IdentitySeed != newColumn.IdentitySeed
+                || oldColumn.IdentityIncrement != newColumn.IdentityIncrement)
+            {
+                warnings.Add($"Alter column '{column}' changes identity metadata; review generated DDL before applying it.");
+            }
+
+            if ((oldColumn.ComputedColumnSql is not null || newColumn.ComputedColumnSql is not null)
+                && (!string.Equals(oldColumn.ComputedColumnSql, newColumn.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
+                    || oldColumn.IsStoredComputedColumn != newColumn.IsStoredComputedColumn))
+            {
+                warnings.Add($"Alter column '{column}' changes computed column SQL; stored computed values may be rebuilt.");
+            }
+        }
+
+        private static bool NarrowsPrecisionOrScale(ColumnSchema oldColumn, ColumnSchema newColumn)
+        {
+            if (oldColumn.Precision == newColumn.Precision && oldColumn.Scale == newColumn.Scale)
+                return false;
+
+            if (newColumn.Precision is null)
+                return false;
+
+            if (oldColumn.Precision is null)
+                return true;
+
+            var oldScale = oldColumn.Scale ?? 0;
+            var newScale = newColumn.Scale ?? 0;
+            var oldIntegralDigits = oldColumn.Precision.Value - oldScale;
+            var newIntegralDigits = newColumn.Precision.Value - newScale;
+            return newColumn.Precision.Value < oldColumn.Precision.Value
+                || newScale < oldScale
+                || newIntegralDigits < oldIntegralDigits;
+        }
+
+        private static string FormatPrecisionScale(ColumnSchema column)
+            => column.Precision is null
+                ? "unbounded"
+                : column.Scale is null
+                    ? column.Precision.Value.ToString(CultureInfo.InvariantCulture)
+                    : string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"{column.Precision.Value},{column.Scale.Value}");
     }
 
     /// <summary>
@@ -839,7 +1288,8 @@ namespace nORM.Migration
                 {
                     if (!oldIndexes.ContainsKey(name))
                     {
-                        diff.AddedIndexes.Add((newTable, name, isUnique, cols, descending));
+                        if (!IsSyntheticIndexKey(name))
+                            diff.AddedIndexes.Add((newTable, name, isUnique, cols, descending));
                     }
                     else
                     {
@@ -852,16 +1302,19 @@ namespace nORM.Migration
                         var filterChanged = !string.Equals(oldFilterSql, filterSql, StringComparison.OrdinalIgnoreCase);
                         if (oldIsUnique != isUnique || colsChanged || directionChanged || includedChanged || filterChanged)
                         {
-                            // Use oldTable for DroppedIndexes (the index existed on the OLD table).
-                            diff.DroppedIndexes.Add((oldTable, name));
-                            diff.AddedIndexes.Add((newTable, name, isUnique, cols, descending));
+                            if (!IsSyntheticIndexKey(name))
+                            {
+                                // Use oldTable for DroppedIndexes (the index existed on the OLD table).
+                                diff.DroppedIndexes.Add((oldTable, name));
+                                diff.AddedIndexes.Add((newTable, name, isUnique, cols, descending));
+                            }
                         }
                     }
                 }
 
                 foreach (var (name, _) in oldIndexes)
                 {
-                    if (!newIndexes.ContainsKey(name))
+                    if (!newIndexes.ContainsKey(name) && !IsSyntheticIndexKey(name))
                         // Use oldTable for DroppedIndexes (the index existed on the OLD table).
                         diff.DroppedIndexes.Add((oldTable, name));
                 }
@@ -1030,10 +1483,43 @@ namespace nORM.Migration
 
         internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
-                .Where(static index => !index.Key.StartsWith("__PK__", StringComparison.Ordinal) &&
-                                       !index.Key.StartsWith("__UQ__", StringComparison.Ordinal))
+                .Where(static index => !IsSyntheticIndexKey(index.Key))
                 .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.IncludedColumnNames, index.Value.FilterSql))
                 .ToArray();
+
+        internal static IReadOnlyList<(TableSchema Table, ColumnSchema[] OldPrimaryKeyColumns, ColumnSchema[] NewPrimaryKeyColumns)> GetPrimaryKeyChanges(SchemaDiff diff)
+        {
+            ArgumentNullException.ThrowIfNull(diff);
+
+            var changes = new List<(TableSchema Table, ColumnSchema[] OldPrimaryKeyColumns, ColumnSchema[] NewPrimaryKeyColumns)>();
+            foreach (var group in diff.AlteredColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                var oldByName = group.ToDictionary(static item => item.NewColumn.Name, static item => item.OldColumn, StringComparer.OrdinalIgnoreCase);
+                var oldColumns = table.Columns
+                    .Select(column => oldByName.TryGetValue(column.Name, out var oldColumn) ? oldColumn : column)
+                    .ToArray();
+                var oldPk = oldColumns.Where(static column => column.IsPrimaryKey).ToArray();
+                var newPk = table.Columns.Where(static column => column.IsPrimaryKey).ToArray();
+                if (PrimaryKeyDefinitionChanged(table.Name, oldPk, newPk))
+                    changes.Add((table, oldPk, newPk));
+            }
+
+            return changes;
+        }
+
+        private static bool PrimaryKeyDefinitionChanged(string tableName, ColumnSchema[] oldPk, ColumnSchema[] newPk)
+            => oldPk.Length != newPk.Length
+               || !oldPk.Select(static column => column.Name).SequenceEqual(newPk.Select(static column => column.Name), StringComparer.OrdinalIgnoreCase)
+               || !string.Equals(GetPrimaryKeyConstraintName(tableName, oldPk), GetPrimaryKeyConstraintName(tableName, newPk), StringComparison.OrdinalIgnoreCase);
+
+        private static string GetPrimaryKeyConstraintName(string tableName, IReadOnlyList<ColumnSchema> pkCols)
+            => pkCols.FirstOrDefault(static column => !string.IsNullOrWhiteSpace(column.IndexName))?.IndexName
+               ?? $"PK_{tableName}";
+
+        private static bool IsSyntheticIndexKey(string indexName)
+            => indexName.StartsWith("__PK__", StringComparison.Ordinal)
+               || indexName.StartsWith("__UQ__", StringComparison.Ordinal);
 
         /// <summary>
         /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
@@ -1065,8 +1551,8 @@ namespace nORM.Migration
                 }
 
                 // Include columns that have an explicit IndexName, or are unique/PK (implicit constraint).
-                // This ensures that changes to IsPrimaryKey or IsUnique flow through AddedIndexes/DroppedIndexes.
-                string? indexKey = col.Indexes.Count > 0 ? null : col.IndexName;
+                // A primary key's IndexName is the constraint name, not a secondary index name.
+                string? indexKey = col.Indexes.Count > 0 || col.IsPrimaryKey ? null : col.IndexName;
                 if (indexKey == null)
                 {
                     if (col.IsPrimaryKey)

@@ -124,9 +124,15 @@ public sealed class LiveProviderScaffoldingParityTests
     private const string ProviderIndexTable = "ScaffoldLiveProviderIndex";
     private const string ProviderPartialIndex = "IX_ScaffoldLiveProviderIndex_Partial";
     private const string ProviderExpressionIndex = "IX_ScaffoldLiveProviderIndex_Expression";
+    private const string ProviderPartialExpressionIndex = "IX_ScaffoldLiveProviderIndex_ExpressionPartial";
+    private const string ProviderExpressionDescendingIndex = "IX_ScaffoldLiveProviderIndex_ExprDesc";
+    private const string ProviderExpressionLiteralDescIndex = "IX_ScaffoldLiveProviderIndex_ExprLiteral";
+    private const string ProviderExpressionIncludedIndex = "IX_ScaffoldLiveProviderIndex_ExpressionIncluded";
     private const string ProviderIncludedIndex = "IX_ScaffoldLiveProviderIndex_Included";
     private const string ProviderDescendingIndex = "IX_ScaffoldLiveProviderIndex_Descending";
     private const string ProviderPrefixIndex = "IX_ScaffoldLiveProviderIndex_Prefix";
+    private const string ProviderFullPrefixIndex = "IX_ScaffoldLiveProviderIndex_FullPrefix";
+    private const string ProviderSpecificIndex = "IX_ScaffoldLiveProviderIndex_ProviderSpecific";
     private const string TriggerDiagnosticsTable = "ScaffoldLiveTriggerAudit";
     private const string TriggerDiagnosticsTrigger = "TR_ScaffoldLiveTriggerAudit_Touch";
     private const string TriggerDiagnosticsPostgresFunction = "fn_scaffold_live_trigger_audit_touch";
@@ -199,7 +205,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("public List<ScaffoldLiveBook> ScaffoldLiveBooks { get; set; } = new();", labelCode);
                 Assert.Contains(".HasMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains(".WithOne(d => d.ScaffoldLiveAuthor)", contextCode);
-                Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => d.AuthorId", "p => p.Id", FkName), contextCode);
                 Assert.Contains(".HasMany<ScaffoldLiveLabel>(p => p.ScaffoldLiveLabels)", contextCode);
                 Assert.Contains(".WithMany(p => p.ScaffoldLiveBooks)", contextCode);
                 Assert.Contains($".UsingTable(\"", contextCode);
@@ -355,7 +361,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"public {CompositeParentTable}? {CompositeParentTable} {{ get; set; }}", childCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{CompositeChildTable}> {CompositeChildTable}s {{ get; set; }} = new();", parentCode, StringComparison.Ordinal);
                 Assert.Contains($"mb.Entity<{CompositeParentTable}>().HasKey(e => new {{ e.TenantId, e.OrderNo }});", contextCode, StringComparison.Ordinal);
-                Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderNo }, p => new { p.TenantId, p.OrderNo }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => new { d.TenantId, d.OrderNo }", "p => new { p.TenantId, p.OrderNo }", CompositeFkName), contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -396,7 +402,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldReferentialContext.cs"));
 
-                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.Cascade);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedReferentialForeignKey(kind, "d => d.ParentId", "p => p.Id", "ReferentialAction.SetNull", "ReferentialAction.Cascade", ReferentialFkName), contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -436,7 +442,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldRestrictReferentialContext.cs"));
 
-                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedReferentialForeignKey(kind, "d => d.ParentId", "p => p.Id", "ReferentialAction.Restrict", "ReferentialAction.Cascade", ReferentialRestrictFkName), contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -476,7 +482,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldDefaultReferentialContext.cs"));
 
-                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetDefault, ReferentialAction.SetDefault);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedReferentialForeignKey(kind, "d => d.ParentId", "p => p.Id", "ReferentialAction.SetDefault", "ReferentialAction.SetDefault", ReferentialDefaultFkName), contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -578,8 +584,8 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains($"public {CompositePayloadStudentTable}?", joinCode, StringComparison.Ordinal);
                 Assert.Contains($"public {CompositePayloadCourseTable}?", joinCode, StringComparison.Ordinal);
                 Assert.DoesNotContain($".UsingTable(\"{CompositePayloadStudentCourseTable}\"", contextCode, StringComparison.Ordinal);
-                Assert.Contains(".HasForeignKey(d => new { d.StudentTenantId, d.StudentId }, p => new { p.TenantId, p.StudentId }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
-                Assert.Contains(".HasForeignKey(d => new { d.CourseTenantId, d.CourseId }, p => new { p.TenantId, p.CourseId }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => new { d.StudentTenantId, d.StudentId }", "p => new { p.TenantId, p.StudentId }", CompositePayloadStudentCourseStudentFkName), contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => new { d.CourseTenantId, d.CourseId }", "p => new { p.TenantId, p.CourseId }", CompositePayloadStudentCourseCourseFkName), contextCode, StringComparison.Ordinal);
                 Assert.Contains(joinTables, item =>
                     LastTableNameEquals(item.GetProperty("table").GetString(), CompositePayloadStudentCourseTable) &&
                     item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "payload-columns") &&
@@ -976,7 +982,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
                 Assert.Contains($"public {UniqueParentTable}? {UniqueParentTable} {{ get; set; }}", childCode, StringComparison.Ordinal);
                 Assert.Contains($"public List<{UniqueChildTable}> {UniqueChildTable}s {{ get; set; }} = new();", parentCode, StringComparison.Ordinal);
-                Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => new { d.TenantId, d.ExternalNo }", "p => new { p.TenantId, p.ExternalNo }", UniqueFkName), contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -1023,7 +1029,7 @@ public sealed class LiveProviderScaffoldingParityTests
                 Assert.Contains("public List<ScaffoldLiveSingleAlternateChild> ScaffoldLiveSingleAlternateChilds { get; set; } = new();", parentCode, StringComparison.Ordinal);
                 Assert.Contains("[ForeignKey(nameof(ParentCode))]", childCode, StringComparison.Ordinal);
                 Assert.Contains("public ScaffoldLiveSingleAlternateParent? ScaffoldLiveSingleAlternateParent { get; set; }", childCode, StringComparison.Ordinal);
-                Assert.Contains(".HasForeignKey(d => d.ParentCode, p => p.Code, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => d.ParentCode", "p => p.Code", SingleAlternateFkName), contextCode, StringComparison.Ordinal);
 
                 AssertScaffoldOutputBuilds(dir);
             }
@@ -1070,6 +1076,38 @@ public sealed class LiveProviderScaffoldingParityTests
             {
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
+                await TeardownDecimalPrecisionAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task Dynamic_scaffolding_preserves_decimal_precision_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupDecimalPrecisionAsync(connection, provider, kind);
+            try
+            {
+                var type = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, DecimalPrecisionTable);
+
+                var amount = type.GetProperty("Amount")!;
+                var column = Assert.Single(amount.GetCustomAttributes(typeof(ColumnAttribute), inherit: false).Cast<ColumnAttribute>());
+
+                Assert.Equal(typeof(decimal), amount.PropertyType);
+                Assert.Equal("Amount", column.Name);
+                Assert.Equal("decimal(28,6)", column.TypeName);
+            }
+            finally
+            {
                 await TeardownDecimalPrecisionAsync(connection, provider, kind);
             }
         }
@@ -1491,6 +1529,7 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, PostgresTypedColumnTable + ".cs"));
 
+                Assert.Contains("using System;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public Guid TraceId { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public int[]? Scores { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public string[]? Tags { get; set; }", entityCode, StringComparison.Ordinal);
@@ -2155,7 +2194,16 @@ public sealed class LiveProviderScaffoldingParityTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
-            await SetupTriggerDiagnosticsAsync(connection, provider, kind);
+            try
+            {
+                await SetupTriggerDiagnosticsAsync(connection, provider, kind);
+            }
+            catch (DbException ex)
+            {
+                await TeardownTriggerDiagnosticsAsync(connection, provider, kind);
+                if (Skip.If(true, $"{kind} trigger diagnostics setup is not available on this server: {ex.Message}")) return;
+            }
+
             var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_trigger_diag_" + Guid.NewGuid().ToString("N"));
             try
             {
@@ -2179,13 +2227,37 @@ public sealed class LiveProviderScaffoldingParityTests
                     .EnumerateArray()
                     .ToArray();
 
-                Assert.Contains(providerOwned, item =>
+                var triggerDiagnostic = Assert.Single(providerOwned, item =>
                     item.GetProperty("code").GetString() == "SCF110" &&
                     item.GetProperty("category").GetString() == "database-object" &&
                     item.GetProperty("kind").GetString() == "Trigger" &&
                     LastTableNameEquals(item.GetProperty("table").GetString(), TriggerDiagnosticsTable) &&
                     item.GetProperty("name").GetString() == TriggerDiagnosticsTrigger &&
                     item.GetProperty("suggestedAction").GetString()!.Contains("trigger", StringComparison.OrdinalIgnoreCase));
+                var triggerMetadata = triggerDiagnostic.GetProperty("metadata");
+                Assert.Equal("Trigger", triggerMetadata.GetProperty("providerObjectKind").GetString());
+                Assert.True(LastTableNameEquals(triggerMetadata.GetProperty("table").GetString(), TriggerDiagnosticsTable));
+                Assert.Equal(TriggerDiagnosticsTrigger, triggerMetadata.GetProperty("triggerName").GetString());
+                Assert.True(triggerMetadata.GetProperty("providerOwnedDdl").GetBoolean());
+                Assert.False(triggerMetadata.GetProperty("generatedModelConfigurationSupported").GetBoolean());
+                switch (kind)
+                {
+                    case ProviderKind.SqlServer:
+                        Assert.Equal("AFTER", triggerMetadata.GetProperty("timing").GetString());
+                        Assert.False(triggerMetadata.GetProperty("isDisabled").GetBoolean());
+                        Assert.False(triggerMetadata.GetProperty("isInsteadOf").GetBoolean());
+                        break;
+                    case ProviderKind.Postgres:
+                    case ProviderKind.MySql:
+                        Assert.Equal("BEFORE", triggerMetadata.GetProperty("timing").GetString());
+                        Assert.Equal("INSERT", triggerMetadata.GetProperty("event").GetString());
+                        Assert.Equal("ROW", triggerMetadata.GetProperty("orientation").GetString());
+                        break;
+                    case ProviderKind.Sqlite:
+                        Assert.True(triggerMetadata.GetProperty("definitionAvailable").GetBoolean());
+                        Assert.Contains("CREATE TRIGGER", triggerMetadata.GetProperty("triggerSql").GetString(), StringComparison.OrdinalIgnoreCase);
+                        break;
+                }
 
                 AssertScaffoldOutputBuilds(dir);
             }
@@ -2413,20 +2485,41 @@ public sealed class LiveProviderScaffoldingParityTests
                 using var warningJson = File.Exists(warningJsonPath)
                     ? JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath))
                     : JsonDocument.Parse("{\"providerOwnedSchemaFeatures\":[]}");
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
 
                 Assert.Contains($"[Index(\"{ProviderPartialIndex}\", FilterSql = ", entityCode, StringComparison.Ordinal);
                 Assert.Contains($"[Index(\"{ProviderDescendingIndex}\", IsDescending = true)]", entityCode, StringComparison.Ordinal);
                 Assert.DoesNotContain("PartialIndex", warnings, StringComparison.Ordinal);
                 Assert.DoesNotContain(ProviderPartialIndex, warnings, StringComparison.Ordinal);
-                Assert.DoesNotContain("DescendingIndex", warnings, StringComparison.Ordinal);
                 Assert.DoesNotContain(ProviderDescendingIndex, warnings, StringComparison.Ordinal);
 
                 if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
                 {
                     Assert.DoesNotContain(ProviderExpressionIndex, entityCode, StringComparison.Ordinal);
                     Assert.Contains($"HasExpressionIndex(\"{ProviderExpressionIndex}\"", contextCode, StringComparison.Ordinal);
-                    Assert.DoesNotContain("ExpressionIndex", warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderPartialExpressionIndex, entityCode, StringComparison.Ordinal);
+                    Assert.Contains($"HasExpressionIndex(\"{ProviderPartialExpressionIndex}\"", contextCode, StringComparison.Ordinal);
+                    Assert.Contains("filterSql:", contextCode, StringComparison.Ordinal);
                     Assert.DoesNotContain(ProviderExpressionIndex, warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderPartialExpressionIndex, warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderExpressionDescendingIndex, entityCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderExpressionDescendingIndex}\"", contextCode, StringComparison.Ordinal);
+                    Assert.Contains(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                        item.GetProperty("name").GetString() == ProviderExpressionDescendingIndex);
+                    Assert.Contains(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "DescendingIndex" &&
+                        item.GetProperty("name").GetString() == ProviderExpressionDescendingIndex);
+                }
+
+                if (kind is ProviderKind.Postgres)
+                {
+                    Assert.DoesNotContain(ProviderExpressionLiteralDescIndex, entityCode, StringComparison.Ordinal);
+                    Assert.Contains($"HasExpressionIndex(\"{ProviderExpressionLiteralDescIndex}\"", contextCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain(ProviderExpressionLiteralDescIndex, warnings, StringComparison.Ordinal);
+                    Assert.DoesNotContain(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "DescendingIndex" &&
+                        item.GetProperty("name").GetString() == ProviderExpressionLiteralDescIndex);
                 }
 
                 if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
@@ -2437,7 +2530,6 @@ public sealed class LiveProviderScaffoldingParityTests
                     Assert.DoesNotContain(ProviderIncludedIndex, warnings, StringComparison.Ordinal);
                 }
 
-                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
                 Assert.DoesNotContain(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "PartialIndex" &&
                     item.GetProperty("name").GetString() == ProviderPartialIndex);
@@ -2483,17 +2575,369 @@ public sealed class LiveProviderScaffoldingParityTests
                 var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
 
                 Assert.DoesNotContain(ProviderPrefixIndex, entityCode, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{ProviderFullPrefixIndex}\")]", entityCode, StringComparison.Ordinal);
                 var prefix = Assert.Single(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "PrefixIndex" &&
                     item.GetProperty("name").GetString() == ProviderPrefixIndex);
                 Assert.Equal("SCF117", prefix.GetProperty("code").GetString());
                 Assert.Equal("index", prefix.GetProperty("category").GetString());
+                var prefixMetadata = prefix.GetProperty("metadata");
+                var prefixColumn = Assert.Single(prefixMetadata.GetProperty("prefixColumns").EnumerateArray());
+                Assert.Equal("Name", prefixColumn.GetProperty("name").GetString());
+                Assert.Equal(8, prefixColumn.GetProperty("prefixLength").GetInt32());
+                Assert.DoesNotContain(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "PrefixIndex" &&
+                    item.GetProperty("name").GetString() == ProviderFullPrefixIndex);
             }
             finally
             {
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.MySql);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_mysql_expression_index_as_provider_owned()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupMySqlExpressionIndexAsync(connection, provider);
+            }
+            catch (DbException ex)
+            {
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.MySql);
+                if (Skip.If(true, $"MySQL expression indexes are not available on this server: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_expression_index_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlExpressionIndexContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlExpressionIndexContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderExpressionIndex, entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderExpressionIndex}\"", contextCode, StringComparison.Ordinal);
+                var expression = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                    item.GetProperty("name").GetString() == ProviderExpressionIndex);
+                Assert.Equal("SCF112", expression.GetProperty("code").GetString());
+                Assert.Equal("index", expression.GetProperty("category").GetString());
+                Assert.Equal("MySQL", expression.GetProperty("metadata").GetProperty("provider").GetString());
+                Assert.Contains("LOWER", expression.GetProperty("metadata").GetProperty("expressionSql").GetString(), StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.MySql);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task ScaffoldAsync_reports_provider_specific_index_access_methods_as_provider_owned(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupProviderSpecificAccessMethodIndexAsync(connection, provider, kind);
+            }
+            catch (DbException ex)
+            {
+                await TeardownProviderSpecificIndexesAsync(connection, provider, kind);
+                if (Skip.If(true, $"{kind} provider-specific index access method is not available on this server: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_provider_specific_index_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldProviderSpecificIndexContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldProviderSpecificIndexContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderSpecificIndex, entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderSpecificIndex}\"", contextCode, StringComparison.Ordinal);
+                var providerSpecific = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificIndex" &&
+                    item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                Assert.Equal("SCF119", providerSpecific.GetProperty("code").GetString());
+                Assert.Equal("index", providerSpecific.GetProperty("category").GetString());
+                var providerSpecificMetadata = providerSpecific.GetProperty("metadata");
+                if (kind is ProviderKind.SqlServer)
+                {
+                    Assert.Equal("SQL Server", providerSpecificMetadata.GetProperty("provider").GetString());
+                    Assert.Contains("COLUMNSTORE", providerSpecificMetadata.GetProperty("indexType").GetString(), StringComparison.OrdinalIgnoreCase);
+                }
+                else if (kind is ProviderKind.Postgres)
+                {
+                    Assert.Equal("PostgreSQL", providerSpecificMetadata.GetProperty("provider").GetString());
+                    Assert.Equal("hash", providerSpecificMetadata.GetProperty("accessMethod").GetString());
+                    Assert.Contains("USING hash", providerSpecificMetadata.GetProperty("indexSql").GetString(), StringComparison.OrdinalIgnoreCase);
+                }
+                else if (kind is ProviderKind.MySql)
+                {
+                    Assert.Equal("MySQL", providerSpecificMetadata.GetProperty("provider").GetString());
+                    Assert.Equal("FULLTEXT", providerSpecificMetadata.GetProperty("indexType").GetString());
+                }
+
+                if (kind is ProviderKind.Postgres)
+                {
+                    var expression = Assert.Single(providerOwned, item =>
+                        item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                        item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                    Assert.Equal("SCF112", expression.GetProperty("code").GetString());
+                    Assert.Equal("index", expression.GetProperty("category").GetString());
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_expression_index_with_include_as_provider_owned()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresExpressionIncludedIndexAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_postgres_expression_include_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresExpressionIncludeContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresExpressionIncludeContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderExpressionIncludedIndex, entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderExpressionIncludedIndex}\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                    item.GetProperty("name").GetString() == ProviderExpressionIncludedIndex);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "IncludedColumnIndex" &&
+                    item.GetProperty("name").GetString() == ProviderExpressionIncludedIndex);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_btree_key_options_as_provider_owned()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupPostgresProviderSpecificBtreeOptionIndexAsync(connection, provider);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_postgres_btree_options_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresBtreeOptionsContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderSpecificIndex, entityCode, StringComparison.Ordinal);
+                var providerSpecific = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificIndex" &&
+                    item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                Assert.Equal("SCF119", providerSpecific.GetProperty("code").GetString());
+                Assert.Equal("index", providerSpecific.GetProperty("category").GetString());
+                Assert.Contains("provider-specific key options", providerSpecific.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                var metadata = providerSpecific.GetProperty("metadata");
+                Assert.Equal("PostgreSQL", metadata.GetProperty("provider").GetString());
+                Assert.Equal("btree", metadata.GetProperty("accessMethod").GetString());
+                Assert.True(metadata.GetProperty("hasNonDefaultNullOrdering").GetBoolean());
+                Assert.False(metadata.GetProperty("hasNullsNotDistinct").GetBoolean());
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_expression_btree_key_options_as_provider_owned()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupPostgresExpressionBtreeOptionIndexAsync(connection, provider);
+            }
+            catch (DbException ex)
+            {
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
+                if (Skip.If(true, $"PostgreSQL expression B-tree key options are not available on this server: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_postgres_expression_btree_options_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresExpressionBtreeOptionsContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresExpressionBtreeOptionsContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderSpecificIndex, entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderSpecificIndex}\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                    item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                var providerSpecific = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificIndex" &&
+                    item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                Assert.Equal("SCF119", providerSpecific.GetProperty("code").GetString());
+                Assert.Equal("index", providerSpecific.GetProperty("category").GetString());
+                Assert.Contains("provider-specific key options", providerSpecific.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                var metadata = providerSpecific.GetProperty("metadata");
+                Assert.Equal("PostgreSQL", metadata.GetProperty("provider").GetString());
+                Assert.Equal("btree", metadata.GetProperty("accessMethod").GetString());
+                Assert.True(metadata.GetProperty("hasNonDefaultOperatorClass").GetBoolean());
+                Assert.False(metadata.GetProperty("hasNullsNotDistinct").GetBoolean());
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_nulls_not_distinct_unique_index_as_provider_owned()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupPostgresNullsNotDistinctUniqueIndexAsync(connection, provider);
+            }
+            catch (DbException ex)
+            {
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
+                if (Skip.If(true, $"PostgreSQL NULLS NOT DISTINCT indexes are not available on this server: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_postgres_nulls_not_distinct_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresNullsNotDistinctContext",
+                    new ScaffoldOptions { Tables = new[] { ProviderIndexTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain(ProviderSpecificIndex, entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("IsUnique = true", entityCode, StringComparison.Ordinal);
+                var providerSpecific = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ProviderSpecificIndex" &&
+                    item.GetProperty("name").GetString() == ProviderSpecificIndex);
+                Assert.Equal("SCF119", providerSpecific.GetProperty("code").GetString());
+                Assert.Equal("index", providerSpecific.GetProperty("category").GetString());
+                Assert.Contains("provider-specific key options", providerSpecific.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                var metadata = providerSpecific.GetProperty("metadata");
+                Assert.Equal("PostgreSQL", metadata.GetProperty("provider").GetString());
+                Assert.Equal("btree", metadata.GetProperty("accessMethod").GetString());
+                Assert.True(metadata.GetProperty("hasNullsNotDistinct").GetBoolean());
+                Assert.False(metadata.GetProperty("hasNonDefaultNullOrdering").GetBoolean());
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderSpecificIndexesAsync(connection, provider, ProviderKind.Postgres);
             }
         }
     }
@@ -2530,14 +2974,24 @@ public sealed class LiveProviderScaffoldingParityTests
 
                 Assert.DoesNotContain("[ReadOnlyEntity]", baseCode, StringComparison.Ordinal);
                 Assert.Contains("[ReadOnlyEntity]", historyCode, StringComparison.Ordinal);
-                Assert.Contains(providerOwned, item =>
+                var baseTemporal = Assert.Single(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "TemporalTable" &&
                     item.GetProperty("table").GetString() == "dbo." + SqlServerTemporalBaseTable &&
                     item.GetProperty("code").GetString() == "SCF115");
-                Assert.Contains(providerOwned, item =>
+                var baseTemporalMetadata = baseTemporal.GetProperty("metadata");
+                Assert.Equal("TemporalTable", baseTemporalMetadata.GetProperty("providerObjectKind").GetString());
+                Assert.True(baseTemporalMetadata.GetProperty("providerNativeTemporal").GetBoolean());
+                Assert.False(baseTemporalMetadata.GetProperty("generatedTemporalConfigurationSupported").GetBoolean());
+                Assert.Equal("system-versioned", baseTemporalMetadata.GetProperty("temporalType").GetString());
+                Assert.Contains(SqlServerTemporalHistoryTable, baseTemporalMetadata.GetProperty("historyTable").GetString(), StringComparison.OrdinalIgnoreCase);
+                var historyTemporal = Assert.Single(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "TemporalTable" &&
                     item.GetProperty("table").GetString() == "dbo." + SqlServerTemporalHistoryTable &&
                     item.GetProperty("detail").GetString()!.Contains("history table", StringComparison.OrdinalIgnoreCase));
+                var historyTemporalMetadata = historyTemporal.GetProperty("metadata");
+                Assert.Equal("history", historyTemporalMetadata.GetProperty("temporalType").GetString());
+                Assert.True(historyTemporalMetadata.GetProperty("providerNativeTemporal").GetBoolean());
+                Assert.False(historyTemporalMetadata.GetProperty("generatedTemporalConfigurationSupported").GetBoolean());
 
                 AssertScaffoldOutputBuilds(dir);
             }
@@ -3062,6 +3516,26 @@ public sealed class LiveProviderScaffoldingParityTests
             }
         }
     }
+
+    private static string ExpectedCascadeForeignKey(
+        ProviderKind kind,
+        string foreignKeySelector,
+        string principalKeySelector,
+        string constraintName)
+        => kind == ProviderKind.Sqlite
+            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, cascadeDelete: false);"
+            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, \"{constraintName}\", false);";
+
+    private static string ExpectedReferentialForeignKey(
+        ProviderKind kind,
+        string foreignKeySelector,
+        string principalKeySelector,
+        string onDelete,
+        string onUpdate,
+        string constraintName)
+        => kind == ProviderKind.Sqlite
+            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate});"
+            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate}, \"{constraintName}\");";
 
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
@@ -3971,7 +4445,14 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderDescendingIndex)} ON {table} ({name} DESC)");
 
         if (kind is ProviderKind.Postgres or ProviderKind.Sqlite)
+        {
             await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionIndex)} ON {table} (lower({name}))");
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPartialExpressionIndex)} ON {table} (lower({name})) WHERE {activePredicate}");
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionDescendingIndex)} ON {table} (lower({name}) DESC)");
+        }
+
+        if (kind is ProviderKind.Postgres)
+            await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionLiteralDescIndex)} ON {table} (strpos({name}, ' DESC'))");
 
         if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
             await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderIncludedIndex)} ON {table} ({name}) INCLUDE ({includedValue})");
@@ -3987,6 +4468,96 @@ public sealed class LiveProviderScaffoldingParityTests
         await ExecuteAsync(connection,
             $"CREATE TABLE {table} ({id} {IntType(ProviderKind.MySql)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.MySql, 80)} NOT NULL)");
         await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderPrefixIndex)} ON {table} ({name}(8))");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderFullPrefixIndex)} ON {table} ({name}(80))");
+    }
+
+    private static async Task SetupMySqlExpressionIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.MySql, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var score = provider.Escape("Score");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.MySql)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.MySql, 80)} NOT NULL, {score} {IntType(ProviderKind.MySql)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionIndex)} ON {table} ((LOWER({name})), {score})");
+    }
+
+    private static async Task SetupProviderSpecificAccessMethodIndexAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await ExecuteAsync(connection, DropTable(kind, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var score = provider.Escape("Score");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 160)} NOT NULL, {score} {IntType(kind)} NOT NULL)");
+
+        switch (kind)
+        {
+            case ProviderKind.SqlServer:
+                await ExecuteAsync(connection, $"CREATE NONCLUSTERED COLUMNSTORE INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} ({score})");
+                break;
+            case ProviderKind.Postgres:
+                await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} USING hash (lower({name}))");
+                break;
+            case ProviderKind.MySql:
+                await ExecuteAsync(connection, $"CREATE FULLTEXT INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} ({name})");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported provider-specific access-method index test provider.");
+        }
+    }
+
+    private static async Task SetupPostgresExpressionIncludedIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        var score = provider.Escape("Score");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.Postgres)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.Postgres, 160)} NOT NULL, {score} {IntType(ProviderKind.Postgres)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderExpressionIncludedIndex)} ON {table} (lower({name})) INCLUDE ({score})");
+    }
+
+    private static async Task SetupPostgresProviderSpecificBtreeOptionIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.Postgres)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.Postgres, 160)} NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} ({name} ASC NULLS FIRST)");
+    }
+
+    private static async Task SetupPostgresExpressionBtreeOptionIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.Postgres)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.Postgres, 160)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} (lower({name}) text_pattern_ops)");
+    }
+
+    private static async Task SetupPostgresNullsNotDistinctUniqueIndexAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, ProviderIndexTable, provider.Escape(ProviderIndexTable)));
+
+        var table = provider.Escape(ProviderIndexTable);
+        var id = provider.Escape("Id");
+        var name = provider.Escape("Name");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {table} ({id} {IntType(ProviderKind.Postgres)} NOT NULL PRIMARY KEY, {name} {TextType(ProviderKind.Postgres, 160)} NULL)");
+        await ExecuteAsync(connection, $"CREATE UNIQUE INDEX {provider.Escape(ProviderSpecificIndex)} ON {table} ({name}) NULLS NOT DISTINCT");
     }
 
     private static async Task SetupSqlServerNativeTemporalTableAsync(DbConnection connection, DatabaseProvider provider)

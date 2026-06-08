@@ -155,6 +155,22 @@ public class OwnedManyTests
     }
 
     [Fact]
+    public void OM1_OwnedCollectionMapping_PreservesSchemaQualifiedTable()
+    {
+        using var cn = CreatePostDb();
+        using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<Post>()
+                .OwnsMany<Tag>(p => p.Tags, tableName: "Tag", foreignKey: "PostId", schema: "aux")
+        });
+        var map = ctx.GetMapping(typeof(Post));
+        var oc = map.OwnedCollections[0];
+        Assert.Equal("Tag", oc.TableName);
+        Assert.Equal("aux", oc.SchemaName);
+        Assert.Equal("\"aux\".\"Tag\"", oc.EscTable);
+    }
+
+    [Fact]
     public void OM1_OwnedCollectionMapping_FKColumnEscaped()
     {
         using var cn = CreatePostDb();

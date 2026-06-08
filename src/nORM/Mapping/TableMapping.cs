@@ -32,7 +32,7 @@ namespace nORM.Mapping
         /// <summary>Gets all mapped columns.</summary>
         public Column[] Columns { get; }
 
-        /// <summary>Gets a lookup of columns by property name.</summary>
+        /// <summary>Gets a lookup of columns by logical model property name.</summary>
         public Dictionary<string, Column> ColumnsByName { get; }
 
         /// <summary>Gets the columns that form the primary key.</summary>
@@ -116,11 +116,18 @@ namespace nORM.Mapping
             else
             {
                 var tableAttr = t.GetCustomAttribute<TableAttribute>();
-                var tableName = fluentConfig?.TableName ?? GetTableName(t, tableAttr);
-                EscTable = fluentConfig?.TableName is null && tableAttr is not null
-                    ? IdentifierEscaping.EscapeTable(p, tableAttr.Name, tableAttr.Schema)
-                    : p.Escape(tableName);
-                TableName = tableName;
+                if (fluentConfig?.TableName is { } fluentTableName)
+                {
+                    EscTable = IdentifierEscaping.EscapeTable(p, fluentTableName, fluentConfig.SchemaName);
+                    TableName = FormatTableName(fluentTableName, fluentConfig.SchemaName);
+                }
+                else
+                {
+                    TableName = GetTableName(t, tableAttr);
+                    EscTable = tableAttr is not null
+                        ? IdentifierEscaping.EscapeTable(p, tableAttr.Name, tableAttr.Schema)
+                        : p.Escape(TableName);
+                }
             }
 
             var cols = ColumnMappingCache.GetCachedColumns(t, p, fluentConfig).ToList();
@@ -132,6 +139,7 @@ namespace nORM.Mapping
                     cols.Add(new Column(sp.Key, sp.Value.ClrType, t, p, sp.Value.ColumnName));
                 }
             }
+            AddOwnedNavigationShadowColumns(cols, t, p, fluentConfig);
 
             var discriminatorAttr = t.GetCustomAttribute<DiscriminatorColumnAttribute>();
             if (discriminatorAttr != null)
@@ -183,7 +191,7 @@ namespace nORM.Mapping
                 || t.GetCustomAttribute<ReadOnlyEntityAttribute>(inherit: true) != null;
 
             Columns = cols.ToArray();
-            ColumnsByName = Columns.ToDictionary(c => c.Prop.Name, StringComparer.Ordinal);
+            ColumnsByName = BuildColumnsByName(Columns, t);
 
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
@@ -208,6 +216,92 @@ namespace nORM.Mapping
             DiscoverRelations(ctx);
             BuildOwnedCollections(fluentConfig, p);
             BuildManyToManyJoins(fluentConfig, p, ctx);
+        }
+
+        private static Dictionary<string, Column> BuildColumnsByName(IEnumerable<Column> columns, Type entityType)
+        {
+            var byName = new Dictionary<string, Column>(StringComparer.Ordinal);
+            foreach (var column in columns)
+            {
+                if (byName.TryGetValue(column.PropName, out var existing))
+                {
+                    if (ReferenceEquals(existing, column))
+                        continue;
+
+                    throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
+                        $"Entity '{entityType.Name}' maps multiple columns to logical property '{column.PropName}' " +
+                        $"('{existing.Name}' and '{column.Name}'). Use distinct property or owned-navigation names."));
+                }
+
+                byName[column.PropName] = column;
+            }
+
+            return byName;
+        }
+
+        internal bool TryGetColumnForMemberAccess(MemberExpression member, out Column column)
+        {
+            if (TryGetMemberAccessPath(member, out var path) && ColumnsByName.TryGetValue(path, out column!))
+                return true;
+
+            column = null!;
+            return false;
+        }
+
+        internal static bool TryGetMemberAccessRoot(MemberExpression member, out ParameterExpression parameter)
+        {
+            Expression? current = member;
+            while (true)
+            {
+                current = UnwrapConversion(current);
+                if (current is MemberExpression nested)
+                {
+                    current = nested.Expression;
+                    continue;
+                }
+
+                if (current is ParameterExpression root)
+                {
+                    parameter = root;
+                    return true;
+                }
+
+                parameter = null!;
+                return false;
+            }
+        }
+
+        internal static bool TryGetMemberAccessPath(MemberExpression member, out string path)
+        {
+            var names = new List<string>();
+            Expression? current = member;
+            while (true)
+            {
+                current = UnwrapConversion(current);
+                if (current is not MemberExpression nested)
+                    break;
+
+                names.Add(nested.Member.Name);
+                current = nested.Expression;
+            }
+
+            if (current is not ParameterExpression || names.Count == 0)
+            {
+                path = string.Empty;
+                return false;
+            }
+
+            names.Reverse();
+            path = string.Join("_", names);
+            return true;
+        }
+
+        private static Expression? UnwrapConversion(Expression? expression)
+        {
+            while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                expression = convert.Operand;
+
+            return expression;
         }
 
         private string BuildSqlShapeKey()
@@ -271,7 +365,8 @@ namespace nORM.Mapping
                         rel.CascadeDelete)
                     {
                         OnDelete = rel.OnDelete,
-                        OnUpdate = rel.OnUpdate
+                        OnUpdate = rel.OnUpdate,
+                        ConstraintName = rel.ConstraintName
                     };
                 }
             }
@@ -280,9 +375,11 @@ namespace nORM.Mapping
             {
                 if (Relations.ContainsKey(prop.Name))
                     continue;
-                if (typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) && prop.PropertyType.IsGenericType)
+                if (TryGetCollectionElementType(prop, out var dependentType))
                 {
-                    var dependentType = prop.PropertyType.GetGenericArguments()[0];
+                    if (HasCollectionNavigationTo(dependentType, Type))
+                        continue;
+
                     var dependentMap = ctx.GetMapping(dependentType);
 
                     Column? foreignKeyProp = dependentMap.Columns
@@ -308,6 +405,22 @@ namespace nORM.Mapping
                 }
             }
         }
+
+        private static bool TryGetCollectionElementType(PropertyInfo prop, out Type elementType)
+        {
+            elementType = null!;
+            if (!typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) || !prop.PropertyType.IsGenericType)
+                return false;
+
+            elementType = prop.PropertyType.GetGenericArguments()[0];
+            return elementType != typeof(string);
+        }
+
+        private static bool HasCollectionNavigationTo(Type type, Type targetType)
+            => type.GetProperties()
+                .Where(static prop => prop.GetCustomAttribute<NotMappedAttribute>() == null)
+                .Any(prop => TryGetCollectionElementType(prop, out var elementType)
+                             && elementType == targetType);
 
         /// <summary>
         /// Sets the value of the primary key on the provided entity for key columns that are
@@ -370,11 +483,58 @@ namespace nORM.Mapping
                 var ownedType = nav.OwnedType;
 
                 // Build columns for the owned type (excluding the FK column itself)
-                var ownedCols = ColumnMappingCache.GetCachedColumns(ownedType, p, nav.Configuration);
+                var ownedCols = ColumnMappingCache.GetCachedColumns(ownedType, p, nav.Configuration).ToList();
+                if (nav.Configuration?.ShadowProperties.Count > 0)
+                {
+                    foreach (var sp in nav.Configuration.ShadowProperties)
+                    {
+                        ownedCols.Add(new Column(sp.Key, sp.Value.ClrType, ownedType, p, sp.Value.ColumnName));
+                    }
+                }
+
                 var keyColumns = ownedCols.Where(c => c.IsKey).ToArray();
 
                 OwnedCollections.Add(new OwnedCollectionMapping(
-                    navProp, ownedType, nav.TableName, nav.ForeignKeyName, ownedCols, keyColumns, p));
+                    navProp,
+                    ownedType,
+                    nav.TableName,
+                    nav.SchemaName,
+                    nav.ForeignKeyName,
+                    ownedCols.ToArray(),
+                    keyColumns,
+                    nav.Configuration,
+                    p));
+            }
+        }
+
+        private static void AddOwnedNavigationShadowColumns(
+            List<Column> columns,
+            Type ownerType,
+            DatabaseProvider provider,
+            IEntityTypeConfiguration? fluentConfig)
+        {
+            if (fluentConfig is null || fluentConfig.OwnedNavigations.Count == 0)
+                return;
+
+            foreach (var (navigationProperty, ownedNavigation) in fluentConfig.OwnedNavigations)
+            {
+                var shadowProperties = ownedNavigation.Configuration?.ShadowProperties;
+                if (shadowProperties is null || shadowProperties.Count == 0)
+                    continue;
+
+                foreach (var sp in shadowProperties)
+                {
+                    var logicalName = navigationProperty.Name + "_" + sp.Key;
+                    if (columns.Any(c => string.Equals(c.PropName, logicalName, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    columns.Add(new Column(
+                        logicalName,
+                        sp.Value.ClrType,
+                        ownerType,
+                        provider,
+                        sp.Value.ColumnName ?? logicalName));
+                }
             }
         }
 
@@ -484,6 +644,9 @@ namespace nORM.Mapping
             /// <summary>Database referential action emitted for principal key updates.</summary>
             public ReferentialAction OnUpdate { get; init; } = ReferentialAction.NoAction;
 
+            /// <summary>Optional database foreign key constraint name to preserve in migration snapshots.</summary>
+            public string? ConstraintName { get; init; }
+
             /// <summary>Gets whether the relationship spans more than one key column.</summary>
             public bool IsComposite => PrincipalKeys.Count > 1 || ForeignKeys.Count > 1;
 
@@ -509,10 +672,11 @@ namespace nORM.Mapping
             if (tableAttribute is null)
                 return type.Name;
 
-            return string.IsNullOrWhiteSpace(tableAttribute.Schema)
-                ? tableAttribute.Name
-                : tableAttribute.Schema + "." + tableAttribute.Name;
+            return FormatTableName(tableAttribute.Name, tableAttribute.Schema);
         }
+
+        private static string FormatTableName(string tableName, string? schemaName)
+            => string.IsNullOrWhiteSpace(schemaName) ? tableName : schemaName + "." + tableName;
     }
 
     /// <summary>
@@ -532,6 +696,9 @@ namespace nORM.Mapping
         /// <summary>Plain name of the child table.</summary>
         public string TableName { get; }
 
+        /// <summary>Optional schema containing the child table.</summary>
+        public string? SchemaName { get; }
+
         /// <summary>Column name in the child table that holds the FK to the owner's PK.</summary>
         public string ForeignKeyColumn { get; }
 
@@ -544,6 +711,8 @@ namespace nORM.Mapping
         /// <summary>PK columns of the owned item (used for UPDATE/DELETE targeting).</summary>
         public Column[] KeyColumns { get; }
 
+        internal IEntityTypeConfiguration? Configuration { get; }
+
         /// <summary>Getter that reads the collection from an owner instance.</summary>
         public Func<object, object?> CollectionGetter { get; }
 
@@ -554,19 +723,23 @@ namespace nORM.Mapping
             PropertyInfo navProp,
             Type ownedType,
             string tableName,
+            string? schemaName,
             string foreignKeyColumn,
             Column[] columns,
             Column[] keyColumns,
+            IEntityTypeConfiguration? configuration,
             DatabaseProvider provider)
         {
             NavigationProperty = navProp;
             OwnedType = ownedType;
             TableName = tableName;
-            EscTable = provider.Escape(tableName);
+            SchemaName = schemaName;
+            EscTable = IdentifierEscaping.EscapeTable(provider, tableName, schemaName);
             ForeignKeyColumn = foreignKeyColumn;
             EscForeignKeyColumn = IdentifierEscaping.EscapeSingle(provider, foreignKeyColumn);
             Columns = columns;
             KeyColumns = keyColumns;
+            Configuration = configuration;
 
             var entityParam = Expression.Parameter(typeof(object), "e");
             var cast = Expression.Convert(entityParam, navProp.DeclaringType!);

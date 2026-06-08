@@ -26,7 +26,7 @@ public static class MigrationCodeWriter
         if (warnings is { Count: > 0 })
         {
             sb.AppendLine();
-            sb.AppendLine("    // WARNING: destructive schema changes were detected when this migration was generated.");
+            sb.AppendLine("    // WARNING: destructive schema changes or integrity risks were detected when this migration was generated.");
             foreach (var warning in warnings)
                 sb.AppendLine($"    // TODO: {warning}");
         }

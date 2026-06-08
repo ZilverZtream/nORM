@@ -308,7 +308,7 @@ namespace nORM.Query
                 }
             }
 
-            if (_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+            if (_mapping.TryGetColumnForMemberAccess(node, out var col))
             {
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
                 if (CoerceDecimalProjectionsToReal && memberType == typeof(decimal))
@@ -1137,7 +1137,7 @@ namespace nORM.Query
                         $"Expected a lambda expression as argument 1 of '{node.Method.Name}', but got '{node.Arguments[1].NodeType}'.");
                 if (lambda.Body is MemberExpression me)
                 {
-                    if (!_mapping.ColumnsByName.TryGetValue(me.Member.Name, out var col))
+                    if (!_mapping.TryGetColumnForMemberAccess(me, out var col))
                         throw new InvalidOperationException(
                             $"Member '{me.Member.Name}' on type '{me.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
                             $"Ensure the property is read/write and not a navigation collection.");

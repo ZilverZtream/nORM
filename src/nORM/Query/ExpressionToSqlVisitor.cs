@@ -1022,9 +1022,9 @@ namespace nORM.Query
                 return CouldBeNull(ue.Operand);
 
             if (expr is MemberExpression columnMember &&
-                columnMember.Expression is ParameterExpression columnParameter &&
+                TableMapping.TryGetMemberAccessRoot(columnMember, out var columnParameter) &&
                 _parameterMappings.TryGetValue(columnParameter, out var mappedParameter) &&
-                mappedParameter.Mapping.ColumnsByName.TryGetValue(columnMember.Member.Name, out var column))
+                mappedParameter.Mapping.TryGetColumnForMemberAccess(columnMember, out var column))
             {
                 return column.IsNullable;
             }
@@ -1061,9 +1061,9 @@ namespace nORM.Query
 
             if (expression.Type != typeof(bool) ||
                 expression is not MemberExpression member ||
-                member.Expression is not ParameterExpression parameter ||
+                !TableMapping.TryGetMemberAccessRoot(member, out var parameter) ||
                 !_parameterMappings.TryGetValue(parameter, out var info) ||
-                !info.Mapping.ColumnsByName.ContainsKey(member.Member.Name))
+                !info.Mapping.TryGetColumnForMemberAccess(member, out _))
             {
                 return false;
             }
@@ -1176,20 +1176,22 @@ namespace nORM.Query
                     return node;
                 }
             }
-            if (node.Expression is ParameterExpression pe && _parameterMappings.TryGetValue(pe, out var info))
+            if (node.Expression is ParameterExpression groupParameter &&
+                _parameterMappings.TryGetValue(groupParameter, out _) &&
+                _groupingKeys.TryGetValue(groupParameter, out var groupKey) &&
+                node.Member.Name == "Key")
             {
-                if (_groupingKeys.TryGetValue(pe, out var groupKey) && node.Member.Name == "Key")
-                {
-                    _sql.Append(groupKey);
-                    return node;
-                }
-                if (info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var column))
-                {
-                    // Table aliases are generated internally and escaped when created,
-                    // allowing them to be used safely without additional validation.
-                    _sql.Append($"{info.Alias}.{column.EscCol}");
-                    return node;
-                }
+                _sql.Append(groupKey);
+                return node;
+            }
+            if (TableMapping.TryGetMemberAccessRoot(node, out var mappedRoot) &&
+                _parameterMappings.TryGetValue(mappedRoot, out var info) &&
+                info.Mapping.TryGetColumnForMemberAccess(node, out var column))
+            {
+                // Table aliases are generated internally and escaped when created,
+                // allowing them to be used safely without additional validation.
+                _sql.Append($"{info.Alias}.{column.EscCol}");
+                return node;
             }
             if (node.Expression is ParameterExpression p && !_parameterMappings.ContainsKey(p))
             {

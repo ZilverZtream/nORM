@@ -56,9 +56,10 @@ must be reviewed and edited like handwritten model code.
   base system type when available so reviewers can preserve or remodel
   provider-owned type semantics.
   MySQL unsigned integer columns scaffold as exact unsigned CLR widths where
-  provider metadata exposes them (`uint`, `ulong`, etc.) and are still reported
-  as provider-specific storage because SQL Server, PostgreSQL, and SQLite do
-  not share MySQL's unsigned integer DDL semantics.
+  provider metadata exposes them (`uint`, `ulong`, etc.), including metadata
+  that still includes legacy display widths such as `int(10) unsigned`, and
+  are still reported as provider-specific storage because SQL Server,
+  PostgreSQL, and SQLite do not share MySQL's unsigned integer DDL semantics.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
   the reverse-engineered model carries the full key shape explicitly.
@@ -95,17 +96,38 @@ must be reviewed and edited like handwritten model code.
   schema-qualified identifiers unless a schema is supplied separately.
 - Dynamic table generation also rejects ambiguous dotted names when the same
   input could mean either a literal table name or a schema-qualified table.
+  Fluent entity configuration supports `ToTable(name, schema)` so runtime
+  models and design-time migrations can carry the same schema-qualified table
+  identity as `[Table(..., Schema = ...)]` and scaffolded entities.
+  Unqualified dynamic table names fail deterministically when the same object
+  name exists in multiple SQLite attached databases, SQL Server schemas, or
+  PostgreSQL schemas; use a schema-qualified name so supplemental metadata
+  probes cannot mix key/generated-column metadata from another object. When a
+  SQL Server or PostgreSQL catalog probe finds exactly one matching schema,
+  dynamic generation uses that schema in the emitted table mapping so the
+  zero-row schema probe and supplemental metadata probes resolve the same
+  object even outside the default schema/search path.
   Runtime-generated dynamic types for keyless tables are marked with
   `[ReadOnlyEntity]`, matching static scaffolding's fail-closed write contract.
-  Composite primary-key ordinals are included in dynamic schema signatures and
-  emitted property order so dynamic key handling follows provider metadata
-  rather than table column order.
+  Resolved schema/table identity, composite primary-key ordinals, and emitted
+  property order are included in dynamic schema signatures so dynamic cache
+  keys distinguish literal dotted table names from schema-qualified objects and
+  key handling follows provider metadata rather than table column order.
+  Computed/generated-column expression and stored/virtual metadata are included
+  in dynamic schema signatures so runtime cache keys change when provider-owned
+  generated-column shape changes, while dynamic CLR attributes still only mark
+  the property as database-generated.
+  MySQL runtime dynamic table names that include a catalog qualifier use that
+  catalog for generated-key, primary-key, unsigned-integer, decimal, and
+  computed-column metadata probes instead of falling back to the current
+  `DATABASE()`.
 - Generated C# identifiers are sanitized: invalid characters become `_`,
   leading digits are prefixed with `_`, and C# keywords use `@`.
 - Generated class and property names are de-duplicated deterministically when
   different database identifiers normalize to the same C# identifier. Property
-  and navigation names also avoid inherited `object` member names such as
-  `ToString`, `Equals`, `GetHashCode`, and `GetType`.
+  and navigation names also avoid the enclosing entity type name and inherited
+  `object` member names such as `ToString`, `Equals`, `GetHashCode`, and
+  `GetType`.
 - When the same table name appears in multiple schemas, generated entity names
   include the schema name instead of relying on opaque numeric suffixes.
 - The requested namespace is validated before files are written, and the
@@ -119,13 +141,16 @@ must be reviewed and edited like handwritten model code.
   navigations; single-column references include `[ForeignKey]` metadata, and
   composite references are wired through ordered fluent `HasForeignKey`
   selectors. The generated `DbContext` preserves caller-supplied model
-  configuration. `ON DELETE CASCADE` is preserved as nORM tracked-graph
+  configuration, including provider-reported foreign key constraint names when
+  the provider exposes real names. SQLite `PRAGMA foreign_key_list` does not
+  expose declared constraint names, so synthetic SQLite FK ids are not emitted
+  into generated source. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; valid database referential actions (`NO ACTION`,
   `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
   fluent configuration, including `ON UPDATE` actions. Relationships are emitted when the FK targets the
-  generated principal primary key or an exact ordered unfiltered unique index exposed by provider
+  generated principal primary key or an exact ordered unfiltered non-null unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
-  reference the exact generated composite primary key or an exact ordered unfiltered unique index;
+  reference the exact generated composite primary key or an exact ordered unfiltered non-null unique index;
   FK shapes targeting keyless principals, keyless dependents, or non-unique
   alternate columns are reported for manual configuration instead of emitting
   unsafe fluent code.
@@ -138,35 +163,64 @@ must be reviewed and edited like handwritten model code.
   SQL Server, PostgreSQL, and SQLite filtered/partial indexes are preserved
   with `IndexAttribute.FilterSql`; SQL Server and PostgreSQL included-column
   indexes are preserved with `IndexAttribute.IsIncluded`. Expression index
-  semantics remain diagnostics rather than portable `[Index]` attributes.
+  semantics remain diagnostics rather than portable `[Index]` attributes, but
+  SQLite expression indexes and ordinary PostgreSQL B-tree expression indexes
+  are emitted as provider-bound `HasExpressionIndex(...)` metadata, including
+  filtered/partial predicates when present.
   SQLite attached-schema partial index predicates are read from the owning
   schema instead of assuming `main.sqlite_master`.
   MySQL prefix indexes are diagnostics and are not used as unique alternate-key
-  evidence because prefix uniqueness is not full-column uniqueness.
+  evidence when the prefix is shorter than the declared column length because
+  prefix uniqueness is not full-column uniqueness. Prefix indexes whose prefix
+  covers the full declared column length are emitted as normal indexes.
 - Decimal precision/scale preservation for SQL Server, PostgreSQL, and MySQL
-  `decimal`/`numeric` columns. Scaffolding emits
-  `[Column(TypeName = "decimal(p,s)")]`; schema snapshots read that metadata,
-  and provider migration generators round-trip it instead of falling back to
+  `decimal`/`numeric` columns. Static and runtime dynamic scaffolding emit
+  `[Column(TypeName = "decimal(p,s)")]`; dynamic schema signatures include
+  precision/scale, schema snapshots read the static metadata, and provider
+  migration generators round-trip it instead of falling back to
   `DECIMAL(18,2)`. SQLite remains on its provider-neutral `NUMERIC` mapping.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   non-null foreign-key constraints, no payload columns, a join-table primary
   key made exactly from those FK columns, and both references targeting the
-  exact generated primary keys or exact ordered unfiltered unique indexes. Single-column,
+  exact generated primary keys or exact ordered unfiltered non-null unique indexes. Single-column,
   composite-key, shared-column tenant, and alternate-key pure junction tables
   are supported. Both entity sides receive collection navigations, and the join
   table is emitted as fluent `HasMany().WithMany(inverse).UsingTable(...)`
   configuration instead of a join entity. Alternate-key bridges use the
   key-selector `UsingTable` overload so runtime include/loading and join-table
   sync use the referenced unique columns instead of assuming primary keys.
+  Configured `UsingTable` bridges are included in `SchemaSnapshotBuilder.Build(ctx)`
+  as migration tables with non-null FK columns, a composite primary key, and
+  FK constraints so generated migrations create the bridge table instead of
+  requiring manual DDL.
+- Fluent `OwnsMany` owned collection mappings are included in
+  `SchemaSnapshotBuilder.Build(ctx)` as child migration tables for the runtime
+  v1 shape: one non-null owner FK column, the owned item columns, owned item
+  primary-key metadata, and a cascade FK back to the owner key that runtime
+  persistence uses. Owned element fluent metadata for defaults, collations,
+  computed columns, table CHECK constraints, expression indexes, and shadow
+  columns is preserved in the child-table snapshot.
+  Schema-qualified owned collection tables use the schema-aware `OwnsMany`
+  overload so runtime persistence and generated migrations target the qualified
+  child table rather than a literal dotted table name.
+- Fluent `OwnsOne` owned scalar mappings are included in
+  `SchemaSnapshotBuilder.Build(ctx)` as inline columns on the owner table, and
+  owned-builder metadata for column names, defaults, collations, computed
+  columns, table CHECK constraints, expression indexes, and shadow columns is
+  preserved in the owner-table snapshot.
   Database-generated bridge columns such as computed values and
   rowversion/timestamp metadata do not force an otherwise pure bridge to become
   a payload entity.
   Schema-qualified join tables use the schema-aware `UsingTable` overload so
   generated SQL targets the qualified bridge table rather than a literal dotted
-  table name. Self-referencing pure join tables receive distinct role-based
-  navigations from the join FK columns and are consumer-build tested.
+  table name. SQL Server and PostgreSQL migration SQL generation emits
+  idempotent schema creation before creating schema-qualified added tables.
+  SQLite attached-schema foreign-key clauses use the unqualified referenced
+  table name required by SQLite's `REFERENCES` grammar.
+  Self-referencing pure join tables receive distinct role-based navigations
+  from the join FK columns and are consumer-build tested.
   A generated single-column surrogate primary key is also allowed when the
-  table has no payload columns and an exact unfiltered unique index covers the FK columns;
+  table has no payload columns and an exact unfiltered non-null unique index covers the FK columns;
   the generated `UsingTable` mapping writes only the FK columns and leaves the
   surrogate key database-owned.
 - Payload bridge tables are emitted as explicit join entities with payload
@@ -182,6 +236,9 @@ must be reviewed and edited like handwritten model code.
   schema-qualified filter in that case. If a literal dotted table name collides
   with the same display string as a schema-qualified table, scaffolding fails
   deterministically because v1 filter syntax cannot disambiguate those objects.
+  Relationship and index metadata is scoped to selected tables; FKs whose
+  dependent or principal table is intentionally filtered out are not emitted as
+  navigations and do not create unrelated scaffold warnings.
 - Optional overwrite protection through `ScaffoldOptions.OverwriteFiles` and
   CLI `--no-overwrite`. Output file conflicts are preflighted before any file
   is written, so a later collision does not leave a partially generated model.
@@ -265,7 +322,9 @@ must be reviewed and edited like handwritten model code.
   value type metadata where the provider exposes it, and generated context
   methods retrieve the next value with provider SQL (`NEXT VALUE FOR` or
   PostgreSQL `nextval(...::regclass)`). Sequence DDL, allocation/caching, and
-  cross-provider migration remain provider-owned.
+  cross-provider migration remain provider-owned. Sequence warning metadata
+  records the provider, discovered data type, generated CLR value type, and
+  whether nORM can emit an opt-in next-value stub for that provider.
 - Optional query-artifact entities through
   `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
   `EmitViewEntities`) and CLI `--emit-query-artifacts` or
@@ -289,7 +348,7 @@ must be reviewed and edited like handwritten model code.
   discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
   that are not converted into runnable model code. Composite foreign keys that
-  do not target the generated principal primary key or an exact ordered unfiltered unique index
+  do not target the generated principal primary key or an exact ordered unfiltered non-null unique index
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
   unsafe/provider-specific defaults that fail the safe default allowlist,
@@ -298,7 +357,7 @@ must be reviewed and edited like handwritten model code.
   SQL Server rowversion/timestamp columns,
   unparsed provider-specific identity strategy metadata, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
-  exact ordered unfiltered unique index,
+  exact ordered unfiltered non-null unique index,
   and triggers are inventoried for review; SQL Server provider-native temporal tables
   are reported as provider-owned schema, and provider-native temporal history
   tables are emitted as `[ReadOnlyEntity]` so generated write paths fail closed;
@@ -325,7 +384,7 @@ must be reviewed and edited like handwritten model code.
   schema snapshots, and migration SQL generators,
   SQL Server identity seed/increment emission through generated
   `HasIdentityOptions(...)` configuration,
-  single-column and composite alternate-key FK generation when the target is an exact ordered unfiltered unique index,
+  single-column and composite alternate-key FK generation when the target is an exact ordered unfiltered non-null unique index,
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
@@ -404,11 +463,12 @@ must be reviewed and edited like handwritten model code.
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
   `[ReadOnlyEntity]` parity, composite primary-key ordinal parity,
-  computed/identity/rowversion metadata in the dynamic cache key and generated
-  attributes, PostgreSQL domain-column schema probes with base-type
-  preservation, non-null
-  reference-column `[Required]` parity, and connection
-  ownership for sync/async dynamic scaffolding calls.
+  computed expression/storage, identity, and rowversion metadata in the dynamic
+  cache key and generated attributes, normalized dynamic `MaxLength` metadata
+  for generated string and binary properties, dynamic decimal precision/scale `Column(TypeName)`
+  metadata, PostgreSQL domain-column schema probes with base-type preservation,
+  non-null reference-column `[Required]` parity, and connection ownership for
+  sync/async dynamic scaffolding calls.
 - `DynamicTypeQueryTests` proves `DbContext.Query(string)` materializes rows
   when runtime-generated table or column mappings contain literal dotted
   identifiers and that keyless runtime-generated types reject generated write
@@ -433,9 +493,9 @@ must be reviewed and edited like handwritten model code.
 
 ## Not Yet Stable
 
-- Relationship generation beyond primary keys and exact ordered unfiltered unique indexes.
+- Relationship generation beyond primary keys and exact ordered unfiltered non-null unique indexes.
   Single-column and composite FK constraints that target the exact generated
-  primary key or an exact ordered unfiltered unique index are emitted as navigations and fluent
+  primary key or an exact ordered unfiltered non-null unique index are emitted as navigations and fluent
   model configuration. FKs that target keyless principals, start from keyless
   dependents, or target non-unique alternate columns are discovered and reported
   in scaffold diagnostics.
@@ -449,7 +509,7 @@ must be reviewed and edited like handwritten model code.
   navigations. Many-to-many joins whose bridge columns are nullable, whose key
   shape is neither an exact FK-column primary key nor a generated surrogate key
   plus exact FK-column unique index, or whose foreign keys do not target the
-  generated primary keys or exact ordered unfiltered unique indexes are reported in scaffold
+  generated primary keys or exact ordered unfiltered non-null unique indexes are reported in scaffold
   diagnostics rather than converted into unsafe fluent mappings.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
@@ -480,13 +540,28 @@ must be reviewed and edited like handwritten model code.
   providers expose them, SQL Server first-result-set columns where metadata is
   available, and result/data type hints so stored procedures/functions are not
   lost during provider-mobility review.
-- Provider-specific expression indexes on SQLite and PostgreSQL are emitted as
-  provider-bound `HasExpressionIndex` migration metadata. SQL Server and MySQL
-  expression-index shapes require generated/computed columns plus ordinary
-  indexes or provider-specific migration code. v1 scaffolding emits
+- Provider-specific expression indexes on SQLite and ordinary PostgreSQL B-tree
+  expression indexes are emitted as provider-bound `HasExpressionIndex`
+  migration metadata, including filtered/partial predicates for the same
+  expression index. SQL Server, MySQL, and PostgreSQL expression indexes that
+  depend on provider-specific access methods or non-default B-tree key options
+  require generated/computed columns plus ordinary indexes or provider-specific migration code; MySQL expression
+  indexes are inventoried as diagnostics when the server exposes expression
+  metadata through index inspection. v1 scaffolding emits
   provider-neutral key-column indexes, including descending key order for ordinary column indexes, provider-bound
   filtered/partial index metadata for SQL Server, PostgreSQL, and SQLite, and
   provider-bound included-column index metadata for SQL Server and PostgreSQL.
+  Mixed functional indexes are not partially emitted as ordinary column indexes;
+  the whole index remains provider-owned once any key part is expression-based.
+  Expression indexes with included columns or descending expression keys also
+  remain provider-owned because generated `HasExpressionIndex(...)` metadata
+  cannot preserve those facets.
+  Provider-specific index implementations such as SQL Server columnstore/XML,
+  PostgreSQL GIN/GiST/hash/BRIN, PostgreSQL B-tree indexes with non-default
+  operator classes, index-level collations, non-default NULLS FIRST/LAST
+  ordering, or `NULLS NOT DISTINCT` uniqueness, and MySQL
+  FULLTEXT/SPATIAL/HASH indexes remain diagnostics instead of being flattened
+  into portable `[Index]` attributes.
 
 ## v1 Guidance
 
@@ -543,10 +618,52 @@ Each row also includes stable diagnostic metadata:
 - `category`: a coarse bucket such as `relationship`, `schema-feature`,
   `index`, `database-object`, `query-object`, or `virtual-table`.
 - `metadata`: a structured object for rows that have provider-owned details.
+  For `SCF001` composite-FK rows this includes
+  `relationshipSuppressed`, the suppression `reason`, ordered
+  dependent/principal columns, and whether the FK references the generated
+  primary key or a scaffoldable unique index.
+  For `SCF002` possible many-to-many rows this includes bridge evidence such
+  as `foreignKeyColumns`, `primaryKeyColumns`, `payloadColumns`,
+  `databaseGeneratedColumns`, `identityColumns`, `nullableForeignKeyColumns`,
+  bridge-key booleans, and per-constraint principal/dependent column maps.
+  For `providerOwnedSchemaFeatures` rows this includes stable kind-specific
+  facts where nORM can derive them, such as keyless-table
+  `readOnlyEntity`/`generatedWritesSupported`, `table`, ordered `columns`,
+  generated `properties`, `columnCount`, and the `missing-primary-key`
+  `reason`, suppressed-relationship
+  `navigationSuppressed`/`generatedNavigationSupported`,
+  dependent/principal table and column details, referential
+  `onDelete`/`onUpdate` actions, decimal `precision`/`scale`, computed-column
+  `computedSql`/`stored`, provider `collation`, rowversion concurrency flags,
+  parsed identity `seed`/`increment`, and index-shape flags plus parsed
+  `indexSql`/`keySql`/`expressionSql`/`filterSql`/`isUnique` and MySQL
+  prefix-column lengths when the provider exposes them. Provider-specific
+  index rows also include `indexType`/`accessMethod` and PostgreSQL B-tree
+  reason flags such as `hasNullsNotDistinct`,
+  `hasNonDefaultOperatorClass`, `hasIndexCollation`, and
+  `hasNonDefaultNullOrdering` when available. Trigger rows include
+  provider/object-kind metadata, `table`, `triggerName`, `providerOwnedDdl`,
+  `generatedModelConfigurationSupported`, optional
+  `timing`/`event`/`orientation`, SQL Server
+  `isDisabled`/`isInsteadOf`, and SQLite `triggerSql` when the provider
+  exposes the definition. Provider-native temporal table rows include
+  provider/object-kind metadata, `table`, `providerNativeTemporal`,
+  `generatedTemporalConfigurationSupported`, `temporalType`, and optional
+  SQL Server `historyTable`.
+  For `SCF200`/`SCF204`/`SCF206` query-object rows this includes `provider`,
+  `targetKind`, and `queryArtifactSupported`; `SCF207` SQLite virtual-table
+  shadow rows also include `shadowOf` when the owning virtual table can be
+  inferred from SQLite's shadow-table naming convention.
   For `SCF201` routine rows this includes `provider`, `routineType`,
   `parameterCount`, `outputParameterCount`, optional routine `dataType`, and
   ordered `parameters` entries with `name`, `mode`, and provider `dataType`
-  when the database exposes it.
+  when the database exposes it. For `SCF202` sequence rows this includes
+  `provider`, `stubSupported`, generated value `clrType`, and optional
+  provider `dataType`. For SQL Server `SCF203` synonym rows this includes
+  `provider`, `baseObject`, `baseType`, `targetKind`, and
+  `queryArtifactSupported`. For `SCF205` MySQL event rows this includes
+  `provider`, `eventType`, `status`, and optional schedule fields such as
+  `intervalValue`, `intervalField`, `executeAt`, `starts`, and `ends`.
 - `reasons`: present on `SCF002` possible many-to-many rows. Values explain
   why the bridge was not emitted as `UsingTable`, for example
   `payload-columns`, `nullable-foreign-key`,
@@ -555,14 +672,17 @@ Each row also includes stable diagnostic metadata:
   `principal-key-not-scaffoldable`.
 
 Use `code` and `category` for CI baselines, owner routing, and remediation
-dashboards. Use routine `metadata` for stored procedure/function migration
-inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
+dashboards. Use provider-owned feature, query-object, routine, sequence,
+synonym, and event `metadata` for schema remediation, query artifact review,
+stored procedure/function/sequence migration inventory, synonym target review,
+and scheduled-event ownership review. Do not parse `detail` or
+`suggestedAction` text as a stable API.
 
 ### Diagnostic Code Catalog
 
 | Code | Category | Meaning |
 | --- | --- | --- |
-| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unfiltered unique index. |
+| `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unfiltered non-null unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
@@ -570,18 +690,19 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integers preserve exact unsigned CLR widths but remain diagnostics because the DDL is provider-specific. provider-specific declarations such as `GEOMETRY` remain diagnostics. |
 | `SCF106` | `relationship` | Non-default FK referential action discovered. |
-| `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered unique index. |
+| `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered non-null unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics. |
 | `SCF110` | `database-object` | Trigger discovered. |
 | `SCF111` | `index` | Filtered/partial index discovered. |
-| `SCF112` | `index` | Expression index discovered but not emitted. SQLite/PostgreSQL expression indexes are emitted as `HasExpressionIndex`. |
+| `SCF112` | `index` | Expression index discovered but not emitted. SQLite and ordinary PostgreSQL B-tree expression indexes are emitted as `HasExpressionIndex`; MySQL, provider-specific-access-method expression indexes, expression indexes with non-default B-tree key options, and expression indexes with included columns or descending expression keys remain provider-owned diagnostics. |
 | `SCF113` | `index` | Included-column index discovered. |
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
-| `SCF117` | `index` | MySQL prefix index discovered. Prefix indexes stay provider-owned and are not used as full-column unique alternate-key evidence. |
+| `SCF117` | `index` | MySQL prefix index discovered. Prefix indexes stay provider-owned and are not used as full-column unique alternate-key evidence unless every prefix covers the full declared column length. |
 | `SCF118` | `relationship` | FK dependent table has no primary key, so generated navigations are suppressed. |
+| `SCF119` | `index` | Provider-specific index implementation discovered. Non-rowstore/non-B-tree access methods, provider-specific B-tree key options on column or expression indexes, and PostgreSQL `NULLS NOT DISTINCT` uniqueness remain provider-owned diagnostics. |
 | `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
 | `SCF200` | `query-object` | View discovered; skipped unless emitted through `--emit-query-artifacts` / `--emit-view-entities`. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |
@@ -595,7 +716,7 @@ inventory. Do not parse `detail` or `suggestedAction` text as a stable API.
 
 For v1 runtime mapping, `UsingTable` skip navigations support single-column,
 composite-key, shared-column tenant, and alternate-key pure junction tables when
-both sides reference either the generated primary keys or exact ordered unfiltered unique indexes.
+both sides reference either the generated primary keys or exact ordered unfiltered non-null unique indexes.
 Unsafe bridge shapes remain explicit join entities.
 
 The report is additive: new fields may be added in later versions, but v1 tools

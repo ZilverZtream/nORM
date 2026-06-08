@@ -1347,27 +1347,35 @@ namespace nORM.Query
 
         private static string BuildSimpleWhereCacheKey(LambdaExpression lambda)
         {
-            if (lambda.Body is MemberExpression { Type: var memberType } member && memberType == typeof(bool))
-                return member.Member.Name;
+            if (lambda.Body is MemberExpression { Type: var memberType } member &&
+                memberType == typeof(bool) &&
+                TableMapping.TryGetMemberAccessPath(member, out var boolPath))
+            {
+                return boolPath;
+            }
 
             if (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression { Type: var negatedType } negatedMember }
-                && negatedType == typeof(bool))
-                return string.Concat(negatedMember.Member.Name, ":BOOL_FALSE");
+                && negatedType == typeof(bool) &&
+                TableMapping.TryGetMemberAccessPath(negatedMember, out var negatedPath))
+            {
+                return string.Concat(negatedPath, ":BOOL_FALSE");
+            }
 
             if (lambda.Body is BinaryExpression { NodeType: ExpressionType.Equal } binary
-                && binary.Left is MemberExpression comparedMember)
+                && binary.Left is MemberExpression comparedMember &&
+                TableMapping.TryGetMemberAccessPath(comparedMember, out var comparedPath))
             {
                 if (comparedMember.Type == typeof(bool) &&
                     ExpressionValueExtractor.TryGetConstantValue(binary.Right, out var boolValue) &&
                     boolValue is bool expected)
                     return expected
-                        ? comparedMember.Member.Name
-                        : string.Concat(comparedMember.Member.Name, ":BOOL_FALSE");
+                        ? comparedPath
+                        : string.Concat(comparedPath, ":BOOL_FALSE");
 
                 if (IsNullConstant(binary.Right))
-                    return string.Concat(comparedMember.Member.Name, ":NULL");
+                    return string.Concat(comparedPath, ":NULL");
 
-                return string.Concat(comparedMember.Member.Name, ":EQ");
+                return string.Concat(comparedPath, ":EQ");
             }
 
             return lambda.Body.ToString();
@@ -1453,7 +1461,7 @@ namespace nORM.Query
                     // Support boolean member: u => u.IsActive
                     if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
                     {
-                        if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
+                        if (!map.TryGetColumnForMemberAccess(boolMember, out var boolCol))
                             return false;
                         whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                     }
@@ -1462,7 +1470,7 @@ namespace nORM.Query
                              && notExpr.Operand is MemberExpression negBoolMember
                              && negBoolMember.Type == typeof(bool))
                     {
-                        if (!map.ColumnsByName.TryGetValue(negBoolMember.Member.Name, out var boolCol))
+                        if (!map.TryGetColumnForMemberAccess(negBoolMember, out var boolCol))
                             return false;
                         whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: false)}";
                     }
@@ -1472,7 +1480,7 @@ namespace nORM.Query
                             return false;
                         if (be.Left is not MemberExpression me)
                             return false;
-                        if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
+                        if (!map.TryGetColumnForMemberAccess(me, out var column))
                             return false;
                         // Use ExpressionValueExtractor instead of Compile().DynamicInvoke();
                         // DynamicInvoke is significantly slower and poses RCE risks.

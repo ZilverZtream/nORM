@@ -164,6 +164,31 @@ public class RelationshipConfigurationTests
     }
 
     [Fact]
+    public void Fluent_relationship_configuration_preserves_constraint_name()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Blog>()
+                    .HasKey(b => b.Key)
+                    .HasMany(b => b.Posts)
+                    .WithOne(p => p.Parent)
+                    .HasForeignKey(p => p.ParentKey, b => b.Key, constraintName: "FK_Blog_Post_ParentKey", cascadeDelete: false);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var blogMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(Blog) })!;
+
+        var rel = blogMap.Relations[nameof(Blog.Posts)];
+        Assert.False(rel.CascadeDelete);
+        Assert.Equal("FK_Blog_Post_ParentKey", rel.ConstraintName);
+    }
+
+    [Fact]
     public void Fluent_composite_relationship_configuration_preserves_ordered_key_pairs()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

@@ -280,7 +280,10 @@ namespace nORM.Query
             {
                 var propLambda = (LambdaExpression)StripQuotes(call.Arguments[0]);
                 var member = (MemberExpression)propLambda.Body;
-                var column = mapping.ColumnsByName[member.Member.Name].EscCol;
+                if (!mapping.TryGetColumnForMemberAccess(member, out var targetColumn))
+                    throw new NormQueryException(
+                        $"Property path '{member}' on type '{mapping.Type.Name}' is not mapped to a database column.");
+                var column = targetColumn.EscCol;
 
                 var valueArg = StripQuotes(call.Arguments[1]);
                 if (valueArg is LambdaExpression valueLambda)
@@ -343,8 +346,8 @@ namespace nORM.Query
             {
                 switch (e)
                 {
-                    case MemberExpression me when me.Expression == rowParam:
-                        if (!mapping.ColumnsByName.TryGetValue(me.Member.Name, out var col))
+                    case MemberExpression me when TableMapping.TryGetMemberAccessRoot(me, out var rootParam) && rootParam == rowParam:
+                        if (!mapping.TryGetColumnForMemberAccess(me, out var col))
                             throw new NormUnsupportedFeatureException(
                                 $"Member '{me.Member.Name}' is not a mapped column on '{mapping.TableName}'.");
                         return col.EscCol;

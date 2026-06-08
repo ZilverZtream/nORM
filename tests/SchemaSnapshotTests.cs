@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -95,6 +96,19 @@ public class SchemaSnapshotTests
         public string Status { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotOwnsOneOwner")]
+    private class SnapshotOwnsOneOwner
+    {
+        [Key] public int Id { get; set; }
+        public SnapshotOwnsOneAddress Address { get; set; } = new();
+    }
+
+    private class SnapshotOwnsOneAddress
+    {
+        public string City { get; set; } = string.Empty;
+        public int CityLength { get; set; }
+    }
+
     [Table("SnapshotFkParent")]
     private class SnapshotFkParent
     {
@@ -107,6 +121,59 @@ public class SchemaSnapshotTests
     {
         [Key] public int Id { get; set; }
         public int ParentId { get; set; }
+    }
+
+    [Table("SnapshotOwnedOwner")]
+    private class SnapshotOwnedOwner
+    {
+        [Key] public int Id { get; set; }
+        [NotMapped] public List<SnapshotOwnedLine> Lines { get; set; } = new();
+    }
+
+    private class SnapshotOwnedLine
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int LineId { get; set; }
+        [Index("IX_SnapshotOwnedLines_Sku", IsUnique = true)]
+        public string Sku { get; set; } = string.Empty;
+        public int SkuLength { get; set; }
+        [Column(TypeName = "decimal(12,2)")]
+        public decimal Amount { get; set; }
+    }
+
+    [Table("SnapshotM2MPost")]
+    private class SnapshotM2MPost
+    {
+        [Key] public int Id { get; set; }
+        [NotMapped]
+        public List<SnapshotM2MLabel> Labels { get; set; } = new();
+    }
+
+    [Table("SnapshotM2MLabel")]
+    private class SnapshotM2MLabel
+    {
+        [Key] public int Id { get; set; }
+        [NotMapped]
+        public List<SnapshotM2MPost> Posts { get; set; } = new();
+    }
+
+    [Table("SnapshotM2MStudent")]
+    private class SnapshotM2MStudent
+    {
+        public int TenantId { get; set; }
+        public int StudentId { get; set; }
+        [NotMapped]
+        public List<SnapshotM2MCourse> Courses { get; set; } = new();
+    }
+
+    [Table("SnapshotM2MCourse")]
+    private class SnapshotM2MCourse
+    {
+        public int TenantId { get; set; }
+        public int CourseId { get; set; }
+        [NotMapped]
+        public List<SnapshotM2MStudent> Students { get; set; } = new();
     }
 
  // Helper: build a single-type snapshot using the assembly of the test type
@@ -270,6 +337,128 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_IncludesOwnsOneFluentMetadata()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotOwnsOneOwner>()
+                    .OwnsOne(o => o.Address, owned =>
+                    {
+                        owned.Property(a => a.City)
+                            .HasColumnName("Ship_City")
+                            .HasDefaultValueSql("''")
+                            .HasCollation("NOCASE");
+                        owned.Property(a => a.CityLength)
+                            .HasColumnName("Ship_CityLength")
+                            .HasComputedColumnSql("length(Ship_City)", stored: true);
+                        owned.Property<string>("AuditTag")
+                            .HasColumnName("Ship_AuditTag");
+                        owned.HasCheckConstraint("CK_SnapshotOwnsOneOwner_ShipCity", "length(Ship_City) > 0");
+                        owned.HasExpressionIndex("IX_SnapshotOwnsOneOwner_LowerShipCity", "lower(Ship_City)", filterSql: "Ship_City <> ''");
+                    })
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotOwnsOneOwner");
+        var city = table.Columns.Single(c => c.Name == "Ship_City");
+        Assert.Equal("''", city.DefaultValue);
+        Assert.Equal("NOCASE", city.Collation);
+
+        var cityLength = table.Columns.Single(c => c.Name == "Ship_CityLength");
+        Assert.Equal("length(Ship_City)", cityLength.ComputedColumnSql);
+        Assert.True(cityLength.IsStoredComputedColumn);
+
+        var auditTag = table.Columns.Single(c => c.Name == "Ship_AuditTag");
+        Assert.Equal(typeof(string).FullName, auditTag.ClrType);
+        Assert.True(auditTag.IsNullable);
+
+        var check = Assert.Single(table.CheckConstraints);
+        Assert.Equal("CK_SnapshotOwnsOneOwner_ShipCity", check.ConstraintName);
+        Assert.Equal("length(Ship_City) > 0", check.Sql);
+
+        var expressionIndex = Assert.Single(table.ExpressionIndexes);
+        Assert.Equal("IX_SnapshotOwnsOneOwner_LowerShipCity", expressionIndex.Name);
+        Assert.Equal("lower(Ship_City)", expressionIndex.ExpressionSql);
+        Assert.Equal("Ship_City <> ''", expressionIndex.FilterSql);
+
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot(), snapshot);
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff).Up;
+        var createOwner = Assert.Single(sql, statement => statement.StartsWith("CREATE TABLE \"SnapshotOwnsOneOwner\"", StringComparison.Ordinal));
+        Assert.Contains("\"Ship_City\" TEXT COLLATE NOCASE NULL DEFAULT ''", createOwner, StringComparison.Ordinal);
+        Assert.Contains("\"Ship_CityLength\" INTEGER GENERATED ALWAYS AS (length(Ship_City)) STORED", createOwner, StringComparison.Ordinal);
+        Assert.Contains("\"Ship_AuditTag\" TEXT NULL", createOwner, StringComparison.Ordinal);
+        Assert.Contains("CONSTRAINT \"CK_SnapshotOwnsOneOwner_ShipCity\" CHECK (length(Ship_City) > 0)", createOwner, StringComparison.Ordinal);
+        Assert.Contains(sql, statement =>
+            statement.Contains("CREATE INDEX \"IX_SnapshotOwnsOneOwner_LowerShipCity\" ON \"SnapshotOwnsOneOwner\" (lower(Ship_City)) WHERE Ship_City <> ''", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesIndexAttributes()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<SnapshotIndexedEntity>();
+                mb.Entity<SnapshotDescendingIndexedEntity>();
+                mb.Entity<SnapshotIncludedIndexedEntity>();
+                mb.Entity<SnapshotCompositeIndexedEntity>();
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var indexed = snapshot.Tables.Single(t => t.Name == "SnapshotIndexedEntity");
+        var code = indexed.Columns.Single(c => c.Name == "Code");
+        Assert.Equal("IX_SnapshotIndexedEntity_Code", code.IndexName);
+        Assert.True(code.IsUnique);
+
+        var descending = snapshot.Tables.Single(t => t.Name == "SnapshotDescendingIndexedEntity");
+        var descendingCode = descending.Columns.Single(c => c.Name == "Code");
+        Assert.True(Assert.Single(descendingCode.Indexes).IsDescending);
+
+        var included = snapshot.Tables.Single(t => t.Name == "SnapshotIncludedIndexedEntity");
+        var includedCode = included.Columns.Single(c => c.Name == "Code");
+        var includedDisplayName = included.Columns.Single(c => c.Name == "DisplayName");
+        Assert.False(Assert.Single(includedCode.Indexes).IsIncluded);
+        Assert.True(Assert.Single(includedDisplayName.Indexes).IsIncluded);
+
+        var composite = snapshot.Tables.Single(t => t.Name == "SnapshotCompositeIndexedEntity");
+        var tenant = composite.Columns.Single(c => c.Name == "TenantId");
+        Assert.False(tenant.IsUnique);
+        Assert.Equal(2, tenant.Indexes.Count);
+        Assert.Contains(tenant.Indexes, i => i.Name == "IX_SnapshotComposite_Tenant");
+        Assert.Contains(tenant.Indexes, i => i.Name == "IX_SnapshotComposite_Tenant_Code" && i.IsUnique && i.Order == 0);
+
+        var oldSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = composite.Name,
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_" + composite.Name },
+                        new ColumnSchema { Name = "TenantId", ClrType = typeof(int).FullName!, IsNullable = false },
+                        new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false }
+                    }
+                }
+            }
+        };
+        var diff = SchemaDiffer.Diff(oldSnapshot, snapshot);
+        var addedComposite = Assert.Single(diff.AddedIndexes, x => x.IndexName == "IX_SnapshotComposite_Tenant_Code");
+        Assert.True(addedComposite.IsUnique);
+        Assert.Equal(new[] { "TenantId", "Code" }, addedComposite.ColumnNames);
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesExplicitReferentialActions()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -289,6 +478,236 @@ public class SchemaSnapshotTests
         var fk = Assert.Single(child.ForeignKeys);
         Assert.Equal("SET NULL", fk.OnDelete);
         Assert.Equal("RESTRICT", fk.OnUpdate);
+    }
+
+    [Fact]
+    public void BuildFromContext_PreservesExplicitForeignKeyConstraintName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotFkParent>()
+                    .HasMany(p => p.Children)
+                    .WithOne()
+                    .HasForeignKey(c => c.ParentId, p => p.Id, constraintName: "FK_Custom_SnapshotFkChild_Parent", cascadeDelete: false)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var child = snapshot.Tables.Single(t => t.Name == "SnapshotFkChild");
+        var fk = Assert.Single(child.ForeignKeys);
+        Assert.Equal("FK_Custom_SnapshotFkChild_Parent", fk.ConstraintName);
+        Assert.Equal("NO ACTION", fk.OnDelete);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesOwnedCollectionTable()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotOwnedOwner>()
+                    .OwnsMany<SnapshotOwnedLine>(
+                        o => o.Lines,
+                        tableName: "SnapshotOwnedLines",
+                        foreignKey: "OwnerId",
+                        buildAction: owned =>
+                        {
+                            owned.Property(l => l.Sku)
+                                .HasDefaultValueSql("''")
+                                .HasCollation("NOCASE");
+                            owned.Property(l => l.SkuLength)
+                                .HasComputedColumnSql("length(Sku)", stored: true);
+                            owned.Property<string>("AuditTag")
+                                .HasColumnName("Audit_Tag");
+                            owned.HasCheckConstraint("CK_SnapshotOwnedLines_Sku", "length(Sku) > 0");
+                            owned.HasExpressionIndex("IX_SnapshotOwnedLines_LowerSku", "lower(Sku)", filterSql: "Sku <> ''");
+                        })
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var owned = snapshot.Tables.Single(t => t.Name == "SnapshotOwnedLines");
+        Assert.Equal(new[] { "OwnerId", "LineId", "Sku", "SkuLength", "Amount", "Audit_Tag" }, owned.Columns.Select(c => c.Name).ToArray());
+        var ownerId = owned.Columns.Single(c => c.Name == "OwnerId");
+        Assert.Equal(typeof(int).FullName, ownerId.ClrType);
+        Assert.False(ownerId.IsNullable);
+        Assert.False(ownerId.IsPrimaryKey);
+
+        var lineId = owned.Columns.Single(c => c.Name == "LineId");
+        Assert.True(lineId.IsPrimaryKey);
+        Assert.True(lineId.IsUnique);
+        Assert.True(lineId.IsIdentity);
+        Assert.Equal("PK_SnapshotOwnedLines", lineId.IndexName);
+
+        var sku = owned.Columns.Single(c => c.Name == "Sku");
+        Assert.Equal("''", sku.DefaultValue);
+        Assert.Equal("NOCASE", sku.Collation);
+        Assert.False(sku.IsNullable);
+        Assert.Equal("IX_SnapshotOwnedLines_Sku", sku.IndexName);
+        Assert.True(sku.IsUnique);
+        Assert.Contains(sku.Indexes, i => i.Name == "IX_SnapshotOwnedLines_Sku" && i.IsUnique);
+
+        var skuLength = owned.Columns.Single(c => c.Name == "SkuLength");
+        Assert.Equal("length(Sku)", skuLength.ComputedColumnSql);
+        Assert.True(skuLength.IsStoredComputedColumn);
+
+        var amount = owned.Columns.Single(c => c.Name == "Amount");
+        Assert.Equal(12, amount.Precision);
+        Assert.Equal(2, amount.Scale);
+
+        var shadow = owned.Columns.Single(c => c.Name == "Audit_Tag");
+        Assert.Equal(typeof(string).FullName, shadow.ClrType);
+        Assert.True(shadow.IsNullable);
+
+        var check = Assert.Single(owned.CheckConstraints);
+        Assert.Equal("CK_SnapshotOwnedLines_Sku", check.ConstraintName);
+        Assert.Equal("length(Sku) > 0", check.Sql);
+
+        var expressionIndex = Assert.Single(owned.ExpressionIndexes);
+        Assert.Equal("IX_SnapshotOwnedLines_LowerSku", expressionIndex.Name);
+        Assert.Equal("lower(Sku)", expressionIndex.ExpressionSql);
+        Assert.Equal("Sku <> ''", expressionIndex.FilterSql);
+
+        var fk = Assert.Single(owned.ForeignKeys);
+        Assert.Equal("FK_SnapshotOwnedLines_SnapshotOwnedOwner_OwnerId", fk.ConstraintName);
+        Assert.Equal(new[] { "OwnerId" }, fk.DependentColumns);
+        Assert.Equal("SnapshotOwnedOwner", fk.PrincipalTable);
+        Assert.Equal(new[] { "Id" }, fk.PrincipalColumns);
+        Assert.Equal("CASCADE", fk.OnDelete);
+
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot(), snapshot);
+        Assert.Contains(diff.AddedTables, table => table.Name == "SnapshotOwnedLines");
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff).Up;
+        var createOwned = Assert.Single(sql, statement => statement.StartsWith("CREATE TABLE \"SnapshotOwnedLines\"", StringComparison.Ordinal));
+        Assert.Contains("\"OwnerId\" INTEGER NOT NULL", createOwned, StringComparison.Ordinal);
+        Assert.Contains("\"LineId\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT", createOwned, StringComparison.Ordinal);
+        Assert.Contains("\"Sku\" TEXT COLLATE NOCASE NOT NULL DEFAULT ''", createOwned, StringComparison.Ordinal);
+        Assert.Contains("\"SkuLength\" INTEGER GENERATED ALWAYS AS (length(Sku)) STORED", createOwned, StringComparison.Ordinal);
+        Assert.Contains("\"Audit_Tag\" TEXT NULL", createOwned, StringComparison.Ordinal);
+        Assert.Contains("CONSTRAINT \"CK_SnapshotOwnedLines_Sku\" CHECK (length(Sku) > 0)", createOwned, StringComparison.Ordinal);
+        Assert.Contains("CONSTRAINT \"FK_SnapshotOwnedLines_SnapshotOwnedOwner_OwnerId\" FOREIGN KEY", createOwned, StringComparison.Ordinal);
+        Assert.Contains("ON DELETE CASCADE", createOwned, StringComparison.Ordinal);
+        Assert.Contains(sql, statement =>
+            statement.Contains("CREATE INDEX \"IX_SnapshotOwnedLines_LowerSku\" ON \"SnapshotOwnedLines\" (lower(Sku)) WHERE Sku <> ''", StringComparison.Ordinal));
+        Assert.Contains(sql, statement =>
+            statement.Contains("CREATE UNIQUE INDEX \"IX_SnapshotOwnedLines_Sku\" ON \"SnapshotOwnedLines\" (\"Sku\")", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesSchemaQualifiedOwnedCollectionTable()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotOwnedOwner>()
+                    .OwnsMany<SnapshotOwnedLine>(
+                        o => o.Lines,
+                        tableName: "SnapshotOwnedLines",
+                        foreignKey: "OwnerId",
+                        schema: "tenant")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var owned = snapshot.Tables.Single(t => t.Name == "tenant.SnapshotOwnedLines");
+        var fk = Assert.Single(owned.ForeignKeys);
+        Assert.Equal("SnapshotOwnedOwner", fk.PrincipalTable);
+        Assert.Equal(new[] { "OwnerId" }, fk.DependentColumns);
+
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot(), snapshot);
+        Assert.Contains(diff.AddedTables, table => table.Name == "tenant.SnapshotOwnedLines");
+        var sql = new PostgresMigrationSqlGenerator().GenerateSql(diff).Up;
+        Assert.Contains("CREATE SCHEMA IF NOT EXISTS \"tenant\"", sql);
+        Assert.Contains(sql, statement =>
+            statement.StartsWith("CREATE TABLE \"tenant\".\"SnapshotOwnedLines\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesManyToManyJoinTable()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotM2MPost>()
+                    .HasMany<SnapshotM2MLabel>(p => p.Labels)
+                    .WithMany(l => l.Posts)
+                    .UsingTable("SnapshotPostLabel", "PostId", "LabelId")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var join = snapshot.Tables.Single(t => t.Name == "SnapshotPostLabel");
+        Assert.Equal(new[] { "PostId", "LabelId" }, join.Columns.Select(c => c.Name).ToArray());
+        Assert.All(join.Columns, c =>
+        {
+            Assert.False(c.IsNullable);
+            Assert.True(c.IsPrimaryKey);
+            Assert.Equal(typeof(int).FullName, c.ClrType);
+        });
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.ConstraintName == "FK_SnapshotPostLabel_SnapshotM2MPost_PostId" &&
+            fk.PrincipalTable == "SnapshotM2MPost" &&
+            fk.DependentColumns.SequenceEqual(new[] { "PostId" }) &&
+            fk.PrincipalColumns.SequenceEqual(new[] { "Id" }));
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.ConstraintName == "FK_SnapshotPostLabel_SnapshotM2MLabel_LabelId" &&
+            fk.PrincipalTable == "SnapshotM2MLabel" &&
+            fk.DependentColumns.SequenceEqual(new[] { "LabelId" }) &&
+            fk.PrincipalColumns.SequenceEqual(new[] { "Id" }));
+
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot(), snapshot);
+        Assert.Contains(diff.AddedTables, table => table.Name == "SnapshotPostLabel");
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff).Up;
+        Assert.Contains(sql, statement =>
+            statement.Contains("CREATE TABLE \"SnapshotPostLabel\"", System.StringComparison.Ordinal) &&
+            statement.Contains("PRIMARY KEY (\"PostId\", \"LabelId\")", System.StringComparison.Ordinal) &&
+            statement.Contains("CONSTRAINT \"FK_SnapshotPostLabel_SnapshotM2MPost_PostId\" FOREIGN KEY", System.StringComparison.Ordinal) &&
+            statement.Contains("CONSTRAINT \"FK_SnapshotPostLabel_SnapshotM2MLabel_LabelId\" FOREIGN KEY", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildFromContext_ManyToManyJoinTable_DeduplicatesSharedTenantColumn()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<SnapshotM2MStudent>().HasKey(s => new { s.TenantId, s.StudentId });
+                mb.Entity<SnapshotM2MCourse>().HasKey(c => new { c.TenantId, c.CourseId });
+                mb.Entity<SnapshotM2MStudent>()
+                    .HasMany<SnapshotM2MCourse>(s => s.Courses)
+                    .WithMany(c => c.Students)
+                    .UsingTable(
+                        "SnapshotStudentCourse",
+                        new[] { "TenantId", "StudentId" },
+                        new[] { "TenantId", "CourseId" });
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var join = snapshot.Tables.Single(t => t.Name == "SnapshotStudentCourse");
+        Assert.Equal(new[] { "TenantId", "StudentId", "CourseId" }, join.Columns.Select(c => c.Name).ToArray());
+        Assert.All(join.Columns, c => Assert.True(c.IsPrimaryKey));
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.PrincipalTable == "SnapshotM2MStudent" &&
+            fk.DependentColumns.SequenceEqual(new[] { "TenantId", "StudentId" }) &&
+            fk.PrincipalColumns.SequenceEqual(new[] { "TenantId", "StudentId" }));
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.PrincipalTable == "SnapshotM2MCourse" &&
+            fk.DependentColumns.SequenceEqual(new[] { "TenantId", "CourseId" }) &&
+            fk.PrincipalColumns.SequenceEqual(new[] { "TenantId", "CourseId" }));
     }
 
     [Fact]
@@ -519,6 +938,105 @@ public class SchemaSnapshotTests
         Assert.Contains("Orders.TotalCost", warning);
         Assert.Contains("Possible rename candidate", warning);
         Assert.Contains("Orders.TotalAmount", warning);
+    }
+
+    [Fact]
+    public void SchemaDiff_destructive_warnings_include_integrity_drops()
+    {
+        var table = new TableSchema
+        {
+            Name = "Orders",
+            Columns =
+            {
+                new ColumnSchema { Name = "Email", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "UX_Orders_Email", IsUnique = true },
+                new ColumnSchema { Name = "Title", ClrType = typeof(string).FullName!, IsNullable = false, IndexName = "IX_Orders_Title", IsUnique = false },
+                new ColumnSchema { Name = "CustomerId", ClrType = typeof(int).FullName!, IsNullable = false }
+            }
+        };
+
+        var diff = new SchemaDiff();
+        diff.DroppedForeignKeys.Add((table, new ForeignKeySchema
+        {
+            ConstraintName = "FK_Orders_Customers_CustomerId",
+            DependentColumns = new[] { "CustomerId" },
+            PrincipalTable = "Customers",
+            PrincipalColumns = new[] { "Id" }
+        }));
+        diff.DroppedCheckConstraints.Add((table, new CheckConstraintSchema
+        {
+            ConstraintName = "CK_Orders_Email",
+            Sql = "length(Email) > 0"
+        }));
+        diff.DroppedIndexes.Add((table, "UX_Orders_Email"));
+        diff.DroppedIndexes.Add((table, "IX_Orders_Title"));
+        diff.DroppedExpressionIndexes.Add((table, new ExpressionIndexSchema
+        {
+            Name = "UX_Orders_LowerEmail",
+            ExpressionSql = "lower(Email)",
+            IsUnique = true
+        }));
+        diff.DroppedExpressionIndexes.Add((table, new ExpressionIndexSchema
+        {
+            Name = "IX_Orders_TitleLength",
+            ExpressionSql = "length(Title)",
+            IsUnique = false
+        }));
+
+        Assert.True(diff.HasDestructiveChanges);
+        var warnings = diff.GetDestructiveChangeWarnings();
+        Assert.Contains(warnings, w => w.Contains("FK_Orders_Customers_CustomerId", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("CK_Orders_Email", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("UX_Orders_Email", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("UX_Orders_LowerEmail", StringComparison.Ordinal));
+        Assert.DoesNotContain(warnings, w => w.Contains("IX_Orders_Title", StringComparison.Ordinal));
+        Assert.DoesNotContain(warnings, w => w.Contains("IX_Orders_TitleLength", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SchemaDiff_destructive_warnings_include_risky_column_alters()
+    {
+        var table = new TableSchema { Name = "Accounts" };
+        var oldColumn = new ColumnSchema
+        {
+            Name = "Balance",
+            ClrType = typeof(decimal).FullName!,
+            IsNullable = true,
+            Precision = 18,
+            Scale = 4,
+            IsPrimaryKey = true,
+            IsUnique = true,
+            IsIdentity = true,
+            IdentitySeed = 1,
+            IdentityIncrement = 1,
+            ComputedColumnSql = "Amount + Fees",
+            IsStoredComputedColumn = true
+        };
+        var newColumn = new ColumnSchema
+        {
+            Name = "Balance",
+            ClrType = typeof(double).FullName!,
+            IsNullable = false,
+            Precision = 10,
+            Scale = 2,
+            IsPrimaryKey = false,
+            IsUnique = false,
+            IsIdentity = false,
+            ComputedColumnSql = "Amount - Fees",
+            IsStoredComputedColumn = false
+        };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newColumn, oldColumn));
+
+        Assert.True(diff.HasDestructiveChanges);
+        var warnings = diff.GetDestructiveChangeWarnings();
+        Assert.Contains(warnings, w => w.Contains("changes type", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("nullable to required", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("narrows precision/scale", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("drops primary key", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("drops uniqueness", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("changes identity metadata", StringComparison.Ordinal));
+        Assert.Contains(warnings, w => w.Contains("changes computed column SQL", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -767,6 +1285,8 @@ public class SchemaSnapshotTests
             new SchemaSnapshot { Tables = { newTable } });
 
         Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Code");
+        Assert.DoesNotContain(diff.AddedIndexes, ix => ix.IndexName.StartsWith("__UQ__", StringComparison.Ordinal));
+        Assert.DoesNotContain(diff.DroppedIndexes, ix => ix.IndexName.StartsWith("__UQ__", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -795,6 +1315,8 @@ public class SchemaSnapshotTests
             new SchemaSnapshot { Tables = { newTable } });
 
         Assert.Single(diff.AlteredColumns, ac => ac.NewColumn.Name == "Code");
+        Assert.DoesNotContain(diff.AddedIndexes, ix => ix.IndexName.StartsWith("__PK__", StringComparison.Ordinal));
+        Assert.DoesNotContain(diff.DroppedIndexes, ix => ix.IndexName.StartsWith("__PK__", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -234,6 +234,51 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void ComputedColumn_ExpressionAndStorage_AffectDynamicSchemaSignature()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE T5ComputedShape (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE T5ComputedShape (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name) + 1) VIRTUAL
+            )
+            """;
+        cmd2.ExecuteNonQuery();
+
+        using var cn3 = OpenMemory();
+        using var cmd3 = cn3.CreateCommand();
+        cmd3.CommandText = """
+            CREATE TABLE T5ComputedShape (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                NameLength INTEGER GENERATED ALWAYS AS (length(Name)) STORED
+            )
+            """;
+        cmd3.ExecuteNonQuery();
+
+        var gen = Gen();
+        var virtualSig = gen.ComputeSchemaSignature(cn, "T5ComputedShape");
+        var changedExpressionSig = gen.ComputeSchemaSignature(cn2, "T5ComputedShape");
+        var storedSig = gen.ComputeSchemaSignature(cn3, "T5ComputedShape");
+
+        Assert.NotEqual(virtualSig, changedExpressionSig);
+        Assert.NotEqual(virtualSig, storedSig);
+    }
+
+    [Fact]
     public void DifferentPrimaryKey_DifferentSignature()
     {
         using var cn = OpenMemory();
@@ -343,6 +388,26 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void GenerateEntityType_WithPropertyMatchingEntityName_GeneratesUniqueProperty()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Customer (
+                Id INTEGER PRIMARY KEY,
+                Customer TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "Customer");
+        var propertyNames = type.GetProperties().Select(p => p.Name).ToArray();
+
+        Assert.DoesNotContain("Customer", propertyNames);
+        Assert.Contains("Customer2", propertyNames);
+    }
+
+    [Fact]
     public void GenerateEntityType_WithNonNullableReferenceColumn_AddsRequiredAttribute()
     {
         using var cn = OpenMemory();
@@ -378,8 +443,12 @@ public class SchemaSignatureTests
 
         var type = Gen().GenerateEntityType(cn, "DynamicUuid");
 
-        Assert.Equal(typeof(Guid), type.GetProperty("ExternalId")!.PropertyType);
-        Assert.Equal(typeof(Guid?), type.GetProperty("OptionalExternalId")!.PropertyType);
+        var externalId = type.GetProperty("ExternalId")!;
+        var optionalExternalId = type.GetProperty("OptionalExternalId")!;
+        Assert.Equal(typeof(Guid), externalId.PropertyType);
+        Assert.Equal(typeof(Guid?), optionalExternalId.PropertyType);
+        Assert.Empty(externalId.GetCustomAttributes(typeof(MaxLengthAttribute), inherit: false));
+        Assert.Empty(optionalExternalId.GetCustomAttributes(typeof(MaxLengthAttribute), inherit: false));
     }
 
     [Fact]
@@ -472,6 +541,51 @@ public class SchemaSignatureTests
     }
 
     [Fact]
+    public void ComputeSchemaSignature_IncludesResolvedDottedTableIdentity()
+    {
+        using var literal = OpenMemory();
+        using (var cmd = literal.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE "aux.orders" (
+                    Id INTEGER PRIMARY KEY,
+                    Message TEXT NOT NULL
+                )
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        using var qualified = OpenMemory();
+        using (var cmd = qualified.CreateCommand())
+        {
+            cmd.CommandText = """
+                ATTACH DATABASE ':memory:' AS aux;
+                CREATE TABLE "aux"."orders" (
+                    Id INTEGER PRIMARY KEY,
+                    Message TEXT NOT NULL
+                )
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var gen = Gen();
+        var literalSignature = gen.ComputeSchemaSignature(literal, "aux.orders");
+        var qualifiedSignature = gen.ComputeSchemaSignature(qualified, "aux.orders");
+        var literalTable = Assert.Single(gen.GenerateEntityType(literal, "aux.orders")
+            .GetCustomAttributes(typeof(TableAttribute), inherit: false)
+            .Cast<TableAttribute>());
+        var qualifiedTable = Assert.Single(gen.GenerateEntityType(qualified, "aux.orders")
+            .GetCustomAttributes(typeof(TableAttribute), inherit: false)
+            .Cast<TableAttribute>());
+
+        Assert.NotEqual(literalSignature, qualifiedSignature);
+        Assert.Equal("aux.orders", literalTable.Name);
+        Assert.Null(literalTable.Schema);
+        Assert.Equal("orders", qualifiedTable.Name);
+        Assert.Equal("aux", qualifiedTable.Schema);
+    }
+
+    [Fact]
     public void GenerateEntityType_WithLiteralAndSchemaQualifiedDottedCollision_Throws()
     {
         using var cn = OpenMemory();
@@ -488,6 +602,47 @@ public class SchemaSignatureTests
         Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("literal table name", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("schema-qualified", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithUnqualifiedNameAcrossAttachedSchemas_Throws()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE main.DuplicateDynamic (Id INTEGER PRIMARY KEY, MainValue TEXT NOT NULL);
+            CREATE TABLE aux.DuplicateDynamic (Id INTEGER PRIMARY KEY, AuxValue TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var ex = Assert.Throws<NormConfigurationException>(() => Gen().GenerateEntityType(cn, "DuplicateDynamic"));
+
+        Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("multiple schemas", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("schema-qualified", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithQualifiedNameAcrossAttachedSchemas_UsesRequestedSchema()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE main.QualifiedDynamic (Id INTEGER PRIMARY KEY, MainValue TEXT NOT NULL);
+            CREATE TABLE aux.QualifiedDynamic (Id INTEGER PRIMARY KEY, AuxValue TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var type = Gen().GenerateEntityType(cn, "aux.QualifiedDynamic");
+        var table = Assert.Single(type.GetCustomAttributes(typeof(TableAttribute), inherit: false).Cast<TableAttribute>());
+        var propertyNames = type.GetProperties().Select(prop => prop.Name).ToArray();
+
+        Assert.Equal("QualifiedDynamic", table.Name);
+        Assert.Equal("aux", table.Schema);
+        Assert.Contains("AuxValue", propertyNames);
+        Assert.DoesNotContain("MainValue", propertyNames);
     }
 
     [Fact]

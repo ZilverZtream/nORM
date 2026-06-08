@@ -161,7 +161,9 @@ M:nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configurati
 M:nORM.Configuration.DbContextOptions.Validate():System.Void
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasConversion``1(nORM.Mapping.ValueConverter{`1,`0}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String,System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0,`1}.HasForeignKey(System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0,`1}.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String):nORM.Configuration.EntityTypeBuilder{`0}
@@ -185,12 +187,14 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expres
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0,`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.IsReadOnly():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}},System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{`0}}):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{`0}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.OwnsOne``1(System.Linq.Expressions.Expression{System.Func{`0,`0}},System.Action{nORM.Configuration.EntityTypeBuilder{`0}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Configuration.EntityTypeBuilder{`0,`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.SharesTableWith``1():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.ToTable(System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.ToTable(System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.ExpressionIndexConfiguration.#ctor(System.String,System.String,System.Boolean,System.String)
 M:nORM.Configuration.ExpressionIndexConfiguration.<Clone>$():nORM.Configuration.ExpressionIndexConfiguration
 M:nORM.Configuration.ExpressionIndexConfiguration.Deconstruct(System.String&,System.String&,System.Boolean&,System.String&):System.Void
@@ -1076,6 +1080,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships:System.Col
 P:nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedCollectionNavigation}
 P:nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.OwnedNavigation}
 P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.Generic.IReadOnlyList{nORM.Configuration.RelationshipConfiguration}
+P:nORM.Configuration.IEntityTypeConfiguration.SchemaName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
@@ -1101,6 +1106,7 @@ P:nORM.Configuration.ManyToManyConfiguration.RightKeyProperties:System.Collectio
 P:nORM.Configuration.OwnedCollectionNavigation.Configuration:nORM.Configuration.IEntityTypeConfiguration
 P:nORM.Configuration.OwnedCollectionNavigation.ForeignKeyName:System.String
 P:nORM.Configuration.OwnedCollectionNavigation.OwnedType:System.Type
+P:nORM.Configuration.OwnedCollectionNavigation.SchemaName:System.String
 P:nORM.Configuration.OwnedCollectionNavigation.TableName:System.String
 P:nORM.Configuration.OwnedNavigation.Configuration:nORM.Configuration.IEntityTypeConfiguration
 P:nORM.Configuration.OwnedNavigation.OwnedType:System.Type
@@ -1121,6 +1127,7 @@ P:nORM.Configuration.ProviderMobilityTranslationDecision.SuggestedFix:System.Str
 P:nORM.Configuration.ProviderMobilityTranslationDecision.Support:nORM.Configuration.ProviderMobilitySupport
 P:nORM.Configuration.ProviderMobilityTranslator.Decisions:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityTranslationDecision}
 P:nORM.Configuration.RelationshipConfiguration.CascadeDelete:System.Boolean
+P:nORM.Configuration.RelationshipConfiguration.ConstraintName:System.String
 P:nORM.Configuration.RelationshipConfiguration.DependentNavigation:System.Reflection.PropertyInfo
 P:nORM.Configuration.RelationshipConfiguration.DependentType:System.Type
 P:nORM.Configuration.RelationshipConfiguration.ForeignKey:System.Reflection.PropertyInfo
@@ -1259,6 +1266,7 @@ P:nORM.Mapping.OwnedCollectionMapping.ForeignKeyColumn:System.String
 P:nORM.Mapping.OwnedCollectionMapping.KeyColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.OwnedCollectionMapping.NavigationProperty:System.Reflection.PropertyInfo
 P:nORM.Mapping.OwnedCollectionMapping.OwnedType:System.Type
+P:nORM.Mapping.OwnedCollectionMapping.SchemaName:System.String
 P:nORM.Mapping.OwnedCollectionMapping.TableName:System.String
 P:nORM.Mapping.RenameColumnAttribute.OldName:System.String
 P:nORM.Mapping.TableMapping.Columns:nORM.Mapping.Column[]
@@ -1273,6 +1281,7 @@ P:nORM.Mapping.TableMapping.ManyToManyJoins:System.Collections.Generic.List{nORM
 P:nORM.Mapping.TableMapping.OwnedCollections:System.Collections.Generic.List{nORM.Mapping.OwnedCollectionMapping}
 P:nORM.Mapping.TableMapping.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Mapping.TableMapping.Relation.CascadeDelete:System.Boolean
+P:nORM.Mapping.TableMapping.Relation.ConstraintName:System.String
 P:nORM.Mapping.TableMapping.Relation.DependentType:System.Type
 P:nORM.Mapping.TableMapping.Relation.ForeignKey:nORM.Mapping.Column
 P:nORM.Mapping.TableMapping.Relation.ForeignKeys:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}

@@ -20,6 +20,7 @@ namespace nORM.Configuration
         internal class MappingConfiguration : IEntityTypeConfiguration
         {
             public string? TableName { get; private set; }
+            public string? SchemaName { get; private set; }
             public bool IsReadOnly { get; private set; }
             public List<PropertyInfo> KeyProperties { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
@@ -60,12 +61,17 @@ namespace nORM.Configuration
             /// Sets the database table name that <typeparamref name="TEntity"/> maps to.
             /// </summary>
             /// <param name="name">The unescaped table name.</param>
+            /// <param name="schema">Optional unescaped schema containing the table.</param>
             /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or whitespace.</exception>
-            public void SetTableName(string name)
+            public void SetTableName(string name, string? schema = null)
             {
                 if (string.IsNullOrWhiteSpace(name))
                     throw new ArgumentException("Table name cannot be null or whitespace.", nameof(name));
+                if (schema is not null && string.IsNullOrWhiteSpace(schema))
+                    throw new ArgumentException("Table schema cannot be whitespace.", nameof(schema));
+
                 TableName = name;
+                SchemaName = schema;
             }
 
             /// <summary>
@@ -301,6 +307,19 @@ namespace nORM.Configuration
         }
 
         /// <summary>
+        /// Specifies the schema-qualified database table that <typeparamref name="TEntity"/> maps to.
+        /// </summary>
+        /// <param name="name">The unqualified table name.</param>
+        /// <param name="schema">The unescaped database schema containing the table.</param>
+        /// <returns>The same <see cref="EntityTypeBuilder{TEntity}"/> instance for chaining.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or whitespace, or <paramref name="schema"/> is whitespace.</exception>
+        public EntityTypeBuilder<TEntity> ToTable(string name, string? schema)
+        {
+            _config.SetTableName(name, schema);
+            return this;
+        }
+
+        /// <summary>
         /// Maps <typeparamref name="TEntity"/> to the same table as another principal entity type.
         /// </summary>
         /// <typeparam name="TPrincipal">The principal entity that owns the table.</typeparam>
@@ -473,8 +492,41 @@ namespace nORM.Configuration
             string? tableName = null,
             string? foreignKey = null,
             Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
+            => OwnsMany(navigation, tableName, foreignKey, schema: null, buildAction);
+
+        /// <summary>
+        /// Configures a collection navigation property as an owned collection stored in a separate schema-qualified child table.
+        /// </summary>
+        /// <typeparam name="TOwned">CLR element type of the owned collection.</typeparam>
+        /// <param name="navigation">Expression selecting the collection navigation property.</param>
+        /// <param name="tableName">
+        /// Name of the child table without schema qualification. Defaults to the owned type name.
+        /// Must be supplied explicitly when <typeparamref name="TOwned"/> is a generic type.
+        /// </param>
+        /// <param name="foreignKey">
+        /// FK column name referencing owner's PK. Defaults to owner type name + "Id".
+        /// Must be supplied explicitly when <typeparamref name="TEntity"/> is a generic type.
+        /// </param>
+        /// <param name="schema">Optional schema containing the child table.</param>
+        /// <param name="buildAction">Optional configuration for the owned element type.</param>
+        /// <returns>The same builder instance for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="navigation"/> is null.</exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="tableName"/> is omitted and the owned type is generic,
+        /// when <paramref name="foreignKey"/> is omitted and the owning type is generic, or when
+        /// <paramref name="schema"/> is whitespace.
+        /// </exception>
+        public EntityTypeBuilder<TEntity> OwnsMany<TOwned>(
+            Expression<Func<TEntity, IEnumerable<TOwned>>> navigation,
+            string? tableName,
+            string? foreignKey,
+            string? schema,
+            Action<EntityTypeBuilder<TOwned>>? buildAction = null) where TOwned : class
         {
             ArgumentNullException.ThrowIfNull(navigation);
+            if (schema is not null && string.IsNullOrWhiteSpace(schema))
+                throw new ArgumentException("Owned collection table schema cannot be whitespace.", nameof(schema));
+
             var prop = GetProperty(navigation);
             var ownedBuilder = new EntityTypeBuilder<TOwned>();
             buildAction?.Invoke(ownedBuilder);
@@ -492,7 +544,10 @@ namespace nORM.Configuration
 
             var childTable = tableName ?? typeof(TOwned).Name;
             var fkCol = foreignKey ?? typeof(TEntity).Name + "Id";
-            _config.AddOwnedCollection(prop, new OwnedCollectionNavigation(typeof(TOwned), childTable, fkCol, ownedBuilder.Configuration));
+            _config.AddOwnedCollection(prop, new OwnedCollectionNavigation(typeof(TOwned), childTable, fkCol, ownedBuilder.Configuration)
+            {
+                SchemaName = schema
+            });
             return this;
         }
 
@@ -1045,6 +1100,36 @@ namespace nORM.Configuration
                 }
 
                 /// <summary>
+                /// Defines the foreign key used by the dependent entity and preserves an explicit database constraint name.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="constraintName">Database foreign key constraint name to preserve in migration snapshots.</param>
+                /// <param name="cascadeDelete">Whether nORM should cascade deletes through the tracked object graph.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    string? constraintName,
+                    bool cascadeDelete = true)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        cascadeDelete)
+                    {
+                        ConstraintName = NormalizeConstraintName(constraintName)
+                    });
+                    return _parent;
+                }
+
+                /// <summary>
                 /// Defines the foreign key used by the dependent entity and the database
                 /// referential actions emitted for migration snapshots and provider DDL.
                 /// </summary>
@@ -1070,6 +1155,40 @@ namespace nORM.Configuration
                         fkProps,
                         onDelete,
                         onUpdate));
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity, explicit database referential actions,
+                /// and an explicit database constraint name.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="onDelete">Database action for principal deletes.</param>
+                /// <param name="onUpdate">Database action for principal key updates.</param>
+                /// <param name="constraintName">Database foreign key constraint name to preserve in migration snapshots.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    ReferentialAction onDelete,
+                    ReferentialAction onUpdate,
+                    string? constraintName)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        onDelete,
+                        onUpdate)
+                    {
+                        ConstraintName = NormalizeConstraintName(constraintName)
+                    });
                     return _parent;
                 }
 
@@ -1099,6 +1218,9 @@ namespace nORM.Configuration
 
                     return (principalKeys, fkProps);
                 }
+
+                private static string? NormalizeConstraintName(string? constraintName)
+                    => string.IsNullOrWhiteSpace(constraintName) ? null : constraintName;
             }
         }
     }

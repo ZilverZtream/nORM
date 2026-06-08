@@ -121,6 +121,10 @@ namespace nORM.Query
             }
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
+                var map = ctx.GetMapping(typeof(T));
+                if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
+                    return false;
+
                 // Use async/await wrapper instead of ContinueWith to avoid closure allocation
                 result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount, ct);
                 return true;
@@ -151,6 +155,10 @@ namespace nORM.Query
 
             if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
             {
+                var map = ctx.GetMapping(typeof(T));
+                if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
+                    return false;
+
                 result = ExecuteSimpleWhereList<T>(ctx, whereInfo, takeCount, ct);
                 return true;
             }
@@ -162,6 +170,10 @@ namespace nORM.Query
             if (ctx.Options.CommandInterceptors.Count == 0 &&
                 IsFilteredOrderedPagePattern(expr, out var pageInfo))
             {
+                var map = ctx.GetMapping(typeof(T));
+                if (!HasFilteredOrderedPageColumns(map, pageInfo))
+                    return false;
+
                 result = ExecuteFilteredOrderedPageList<T>(ctx, pageInfo, ct);
                 return true;
             }
@@ -251,17 +263,14 @@ namespace nORM.Query
             var body = lambda.Body;
             // Support boolean member access: u => u.IsActive
             if (body is MemberExpression meBoolean && meBoolean.Type == typeof(bool)
-                && meBoolean.Expression is ParameterExpression)
+                && TableMapping.TryGetMemberAccessPath(meBoolean, out var boolPath))
             {
-                info = new WhereInfo(meBoolean.Member.Name, true);
+                info = new WhereInfo(boolPath, true);
                 return true;
             }
             if (body is BinaryExpression be && be.NodeType == ExpressionType.Equal && be.Left is MemberExpression me)
             {
-                // Reject nested member access (a.Name.Length) so the slow translator handles
-                // method/function translations like LENGTH(name) instead of the fast path trying
-                // to look up "Length" as a column.
-                if (me.Expression is not ParameterExpression)
+                if (!TableMapping.TryGetMemberAccessPath(me, out var propertyPath))
                     return false;
 
                 // Only accept ConstantExpression or simple MemberExpression.
@@ -270,7 +279,7 @@ namespace nORM.Query
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
-                info = new WhereInfo(me.Member.Name, value);
+                info = new WhereInfo(propertyPath, value);
                 return true;
             }
             return false;
@@ -355,7 +364,8 @@ namespace nORM.Query
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression orderLambda ||
                             orderLambda.Body is not MemberExpression orderMember)
                             return false;
-                        orderProperty = orderMember.Member.Name;
+                        if (!TableMapping.TryGetMemberAccessPath(orderMember, out orderProperty))
+                            return false;
                         orderDescending = call.Method.Name == nameof(Queryable.OrderByDescending);
                         sawPagingOrOrdering = true;
                         expr = call.Arguments[0];
@@ -396,17 +406,17 @@ namespace nORM.Query
 
             if (expression is MemberExpression boolMember
                 && boolMember.Type == typeof(bool)
-                && boolMember.Expression is ParameterExpression)
+                && TableMapping.TryGetMemberAccessPath(boolMember, out var boolPath))
             {
-                predicates.Add(new PredicateInfo(boolMember.Member.Name, ExpressionType.Equal, true));
+                predicates.Add(new PredicateInfo(boolPath, ExpressionType.Equal, true));
                 return true;
             }
 
             if (expression is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression negatedMember }
                 && negatedMember.Type == typeof(bool)
-                && negatedMember.Expression is ParameterExpression)
+                && TableMapping.TryGetMemberAccessPath(negatedMember, out var negatedPath))
             {
-                predicates.Add(new PredicateInfo(negatedMember.Member.Name, ExpressionType.Equal, false));
+                predicates.Add(new PredicateInfo(negatedPath, ExpressionType.Equal, false));
                 return true;
             }
 
@@ -420,11 +430,7 @@ namespace nORM.Query
             if (binary.Left is not MemberExpression member)
                 return false;
 
-            // Reject nested member access (e.g., `a.Name.Length` where the immediate parent is
-            // another MemberExpression, not the entity parameter). Without this guard, the
-            // fast path records "Length" as a property name and later fails the column lookup
-            // with a hard exception instead of falling back to the full translator.
-            if (member.Expression is not ParameterExpression)
+            if (!TableMapping.TryGetMemberAccessPath(member, out var propertyPath))
                 return false;
 
             if (!TryGetSimpleValue(binary.Right, out var value))
@@ -441,8 +447,19 @@ namespace nORM.Query
             if (memberType == typeof(DateTimeOffset) && value is DateTime)
                 return false;
 
-            predicates.Add(new PredicateInfo(member.Member.Name, binary.NodeType, value));
+            predicates.Add(new PredicateInfo(propertyPath, binary.NodeType, value));
             return true;
+        }
+
+        private static bool HasFilteredOrderedPageColumns(TableMapping map, ComplexQueryInfo info)
+        {
+            foreach (var predicate in info.Predicates)
+            {
+                if (!map.ColumnsByName.ContainsKey(predicate.Property))
+                    return false;
+            }
+
+            return info.OrderProperty is null || map.ColumnsByName.ContainsKey(info.OrderProperty);
         }
 
         private static string SqlOperator(ExpressionType operation)

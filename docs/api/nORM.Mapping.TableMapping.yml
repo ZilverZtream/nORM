@@ -198,7 +198,7 @@ items:
   assemblies:
   - nORM
   namespace: nORM.Mapping
-  summary: Gets a lookup of columns by property name.
+  summary: Gets a lookup of columns by logical model property name.
   example: []
   syntax:
     content: public Dictionary<string, Column> ColumnsByName { get; }

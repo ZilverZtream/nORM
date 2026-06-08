@@ -9,6 +9,7 @@ items:
   - nORM.Configuration.OwnedCollectionNavigation.Configuration
   - nORM.Configuration.OwnedCollectionNavigation.ForeignKeyName
   - nORM.Configuration.OwnedCollectionNavigation.OwnedType
+  - nORM.Configuration.OwnedCollectionNavigation.SchemaName
   - nORM.Configuration.OwnedCollectionNavigation.TableName
   langs:
   - csharp
@@ -125,6 +126,37 @@ items:
       type: System.Type
     content.vb: Public Property OwnedType As Type
   overload: nORM.Configuration.OwnedCollectionNavigation.OwnedType*
+- uid: nORM.Configuration.OwnedCollectionNavigation.SchemaName
+  commentId: P:nORM.Configuration.OwnedCollectionNavigation.SchemaName
+  id: SchemaName
+  parent: nORM.Configuration.OwnedCollectionNavigation
+  langs:
+  - csharp
+  - vb
+  name: SchemaName
+  nameWithType: OwnedCollectionNavigation.SchemaName
+  fullName: nORM.Configuration.OwnedCollectionNavigation.SchemaName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaName
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 239
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Optional schema containing the child table.
+  example: []
+  syntax:
+    content: public string? SchemaName { get; init; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property SchemaName As String
+  overload: nORM.Configuration.OwnedCollectionNavigation.SchemaName*
 - uid: nORM.Configuration.OwnedCollectionNavigation.TableName
   commentId: P:nORM.Configuration.OwnedCollectionNavigation.TableName
   id: TableName

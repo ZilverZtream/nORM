@@ -12,6 +12,7 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.OwnedCollectionNavigations
   - nORM.Configuration.IEntityTypeConfiguration.OwnedNavigations
   - nORM.Configuration.IEntityTypeConfiguration.Relationships
+  - nORM.Configuration.IEntityTypeConfiguration.SchemaName
   - nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
   - nORM.Configuration.IEntityTypeConfiguration.TableName
   - nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
@@ -77,6 +78,37 @@ items:
       type: System.String
     content.vb: ReadOnly Property TableName As String
   overload: nORM.Configuration.IEntityTypeConfiguration.TableName*
+- uid: nORM.Configuration.IEntityTypeConfiguration.SchemaName
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.SchemaName
+  id: SchemaName
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: SchemaName
+  nameWithType: IEntityTypeConfiguration.SchemaName
+  fullName: nORM.Configuration.IEntityTypeConfiguration.SchemaName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaName
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 25
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets the optional database schema that contains <xref href="nORM.Configuration.IEntityTypeConfiguration.TableName" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: string? SchemaName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: ReadOnly Property SchemaName As String
+  overload: nORM.Configuration.IEntityTypeConfiguration.SchemaName*
 - uid: nORM.Configuration.IEntityTypeConfiguration.KeyProperties
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.KeyProperties
   id: KeyProperties
@@ -1092,6 +1124,12 @@ references:
   name: TableName
   nameWithType: IEntityTypeConfiguration.TableName
   fullName: nORM.Configuration.IEntityTypeConfiguration.TableName
+- uid: nORM.Configuration.IEntityTypeConfiguration.SchemaName*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.SchemaName
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_SchemaName
+  name: SchemaName
+  nameWithType: IEntityTypeConfiguration.SchemaName
+  fullName: nORM.Configuration.IEntityTypeConfiguration.SchemaName
 - uid: System.String
   commentId: T:System.String
   parent: System

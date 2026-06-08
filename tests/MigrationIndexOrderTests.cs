@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using nORM.Migration;
 using Xunit;
@@ -160,4 +161,159 @@ public class MigrationIndexOrderTests
         Assert.Empty(diff.DroppedIndexes);
         Assert.Empty(diff.AddedIndexes);
     }
+
+    [Fact]
+    public void AllGenerators_AddedIndex_EmitsCreateIndexAndDownDropIndex()
+    {
+        var table = BuildTableWithNamedIndex("T", "IX_T_Name");
+        var diff = new SchemaDiff();
+        diff.AddedIndexes.Add((table, "IX_T_Name", false, new[] { "Name" }, new[] { false }));
+
+        foreach (var (generator, createPrefix, dropSql) in IndexSqlExpectations())
+        {
+            var sql = generator.GenerateSql(diff);
+
+            Assert.Contains(sql.Up, s => s.StartsWith(createPrefix, StringComparison.Ordinal));
+            Assert.Contains(dropSql, sql.Down);
+        }
+    }
+
+    [Fact]
+    public void AllGenerators_DroppedIndex_EmitsDropIndexAndDownCreateIndex()
+    {
+        var table = BuildTableWithNamedIndex("T", "IX_T_Name");
+        var diff = new SchemaDiff();
+        diff.DroppedIndexes.Add((table, "IX_T_Name"));
+
+        foreach (var (generator, createPrefix, dropSql) in IndexSqlExpectations())
+        {
+            var sql = generator.GenerateSql(diff);
+
+            Assert.Contains(dropSql, sql.Up);
+            Assert.Contains(sql.Down, s => s.StartsWith(createPrefix, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void SqlServerAndPostgres_AddedIndex_ResolvesIncludedColumnsAndFilterFromTable()
+    {
+        var sqlServerTable = BuildTableWithFilteredIncludedIndex("Orders", "IX_Orders_Code", "[Code] IS NOT NULL");
+        var sqlServerDiff = new SchemaDiff();
+        sqlServerDiff.AddedIndexes.Add((sqlServerTable, "IX_Orders_Code", false, new[] { "Code" }, new[] { false }));
+
+        var sqlServerUp = string.Join(" ", new SqlServerMigrationSqlGenerator().GenerateSql(sqlServerDiff).Up);
+        Assert.Contains("CREATE INDEX [IX_Orders_Code] ON [Orders] ([Code]) INCLUDE ([Description]) WHERE [Code] IS NOT NULL", sqlServerUp);
+
+        var postgresTable = BuildTableWithFilteredIncludedIndex("Orders", "IX_Orders_Code", "\"Code\" IS NOT NULL");
+        var postgresDiff = new SchemaDiff();
+        postgresDiff.AddedIndexes.Add((postgresTable, "IX_Orders_Code", false, new[] { "Code" }, new[] { false }));
+
+        var postgresUp = string.Join(" ", new PostgresMigrationSqlGenerator().GenerateSql(postgresDiff).Up);
+        Assert.Contains("CREATE INDEX \"IX_Orders_Code\" ON \"Orders\" (\"Code\") INCLUDE (\"Description\") WHERE \"Code\" IS NOT NULL", postgresUp);
+    }
+
+    [Fact]
+    public void Providers_AddedAlternateKeyIndex_IsCreatedBeforeForeignKey()
+    {
+        foreach (var generator in RelationalIndexFkOrderGenerators())
+        {
+            var diff = BuildAlternateKeyIndexAndForeignKeyDiff(add: true);
+            var up = generator.GenerateSql(diff).Up.ToArray();
+
+            var createIndex = Array.FindIndex(up, s => s.Contains("IX_Users_Code", StringComparison.Ordinal));
+            var addForeignKey = Array.FindIndex(up, s => s.Contains("FK_Orders_Users_Code", StringComparison.Ordinal));
+
+            Assert.True(createIndex >= 0, $"{generator.GetType().Name} did not create the alternate-key index.");
+            Assert.True(addForeignKey >= 0, $"{generator.GetType().Name} did not add the foreign key.");
+            Assert.True(createIndex < addForeignKey, $"{generator.GetType().Name} added the FK before creating the referenced index.");
+        }
+    }
+
+    [Fact]
+    public void Providers_DroppedAlternateKeyIndex_IsRestoredBeforeForeignKeyInDown()
+    {
+        foreach (var generator in RelationalIndexFkOrderGenerators())
+        {
+            var diff = BuildAlternateKeyIndexAndForeignKeyDiff(add: false);
+            var down = generator.GenerateSql(diff).Down.ToArray();
+
+            var createIndex = Array.FindIndex(down, s => s.Contains("IX_Users_Code", StringComparison.Ordinal));
+            var addForeignKey = Array.FindIndex(down, s => s.Contains("FK_Orders_Users_Code", StringComparison.Ordinal));
+
+            Assert.True(createIndex >= 0, $"{generator.GetType().Name} did not restore the alternate-key index.");
+            Assert.True(addForeignKey >= 0, $"{generator.GetType().Name} did not restore the foreign key.");
+            Assert.True(createIndex < addForeignKey, $"{generator.GetType().Name} restored the FK before recreating the referenced index.");
+        }
+    }
+
+    private static TableSchema BuildTableWithNamedIndex(string tableName, string indexName)
+    {
+        var table = new TableSchema { Name = tableName };
+        table.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+        table.Columns.Add(new ColumnSchema { Name = "Name", ClrType = "System.String", IsNullable = false, IndexName = indexName });
+        return table;
+    }
+
+    private static TableSchema BuildTableWithFilteredIncludedIndex(string tableName, string indexName, string filterSql)
+    {
+        var table = new TableSchema { Name = tableName };
+        table.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+
+        var code = new ColumnSchema { Name = "Code", ClrType = "System.String", IsNullable = false };
+        code.Indexes.Add(new ColumnIndexSchema { Name = indexName, FilterSql = filterSql });
+        table.Columns.Add(code);
+
+        var description = new ColumnSchema { Name = "Description", ClrType = "System.String", IsNullable = true };
+        description.Indexes.Add(new ColumnIndexSchema { Name = indexName, IsIncluded = true });
+        table.Columns.Add(description);
+
+        return table;
+    }
+
+    private static SchemaDiff BuildAlternateKeyIndexAndForeignKeyDiff(bool add)
+    {
+        var users = new TableSchema { Name = "Users" };
+        users.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+        users.Columns.Add(new ColumnSchema { Name = "Code", ClrType = "System.String", IsNullable = false, IsUnique = true, IndexName = "IX_Users_Code" });
+
+        var orders = new TableSchema { Name = "Orders" };
+        orders.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+        orders.Columns.Add(new ColumnSchema { Name = "UserCode", ClrType = "System.String", IsNullable = false });
+        var foreignKey = new ForeignKeySchema
+        {
+            ConstraintName = "FK_Orders_Users_Code",
+            DependentColumns = new[] { "UserCode" },
+            PrincipalTable = "Users",
+            PrincipalColumns = new[] { "Code" }
+        };
+
+        var diff = new SchemaDiff();
+        if (add)
+        {
+            diff.AddedIndexes.Add((users, "IX_Users_Code", true, new[] { "Code" }, new[] { false }));
+            diff.AddedForeignKeys.Add((orders, foreignKey));
+        }
+        else
+        {
+            diff.DroppedIndexes.Add((users, "IX_Users_Code"));
+            diff.DroppedForeignKeys.Add((orders, foreignKey));
+        }
+
+        return diff;
+    }
+
+    private static IMigrationSqlGenerator[] RelationalIndexFkOrderGenerators() =>
+    [
+        new SqlServerMigrationSqlGenerator(),
+        new MySqlMigrationSqlGenerator(),
+        new PostgresMigrationSqlGenerator()
+    ];
+
+    private static (IMigrationSqlGenerator Generator, string CreatePrefix, string DropSql)[] IndexSqlExpectations() =>
+    [
+        (new SqlServerMigrationSqlGenerator(), "CREATE INDEX [IX_T_Name] ON [T] ([Name])", "DROP INDEX [IX_T_Name] ON [T]"),
+        (new MySqlMigrationSqlGenerator(), "CREATE INDEX `IX_T_Name` ON `T` (`Name`)", "DROP INDEX `IX_T_Name` ON `T`"),
+        (new PostgresMigrationSqlGenerator(), "CREATE INDEX \"IX_T_Name\" ON \"T\" (\"Name\")", "DROP INDEX \"IX_T_Name\""),
+        (new SqliteMigrationSqlGenerator(), "CREATE INDEX \"IX_T_Name\" ON \"T\" (\"Name\")", "DROP INDEX IF EXISTS \"IX_T_Name\"")
+    ];
 }

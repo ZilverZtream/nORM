@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Data.Sqlite;
 using nORM.Migration;
 using Xunit;
 
@@ -297,12 +298,337 @@ public class MigrationMetadataEscapingTests
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
+    [Fact]
+    public void AllProviders_QualifiedTableName_EscapesEachPartForCreateTable()
+    {
+        var table = BuildTable("tenant.Users", ColPk("Id"));
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        foreach (var (name, gen) in AllGenerators())
+        {
+            var createStmt = gen.GenerateSql(diff).Up.First(s => s.StartsWith("CREATE TABLE"));
+            var expected = name switch
+            {
+                "SqlServer" => "CREATE TABLE [tenant].[Users]",
+                "MySQL"     => "CREATE TABLE `tenant`.`Users`",
+                "Postgres"  => "CREATE TABLE \"tenant\".\"Users\"",
+                "SQLite"    => "CREATE TABLE \"tenant\".\"Users\"",
+                _           => throw new InvalidOperationException(name)
+            };
+
+            Assert.Contains(expected, createStmt);
+        }
+    }
+
+    [Fact]
+    public void SqlServer_QualifiedAddedTable_EnsuresSchemaBeforeCreateTable()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildTable("tenant.Users", ColPk("Id")));
+        diff.AddedTables.Add(BuildTable("tenant.Orders", ColPk("Id")));
+
+        var up = new SqlServerMigrationSqlGenerator().GenerateSql(diff).Up;
+
+        Assert.Equal("IF SCHEMA_ID(N'tenant') IS NULL EXEC(N'CREATE SCHEMA [tenant]')", up[0]);
+        Assert.Single(up.Where(s => s.StartsWith("IF SCHEMA_ID", StringComparison.Ordinal)));
+        Assert.Contains(up.Skip(1), s => s.StartsWith("CREATE TABLE [tenant].[Users]", StringComparison.Ordinal));
+        Assert.Contains(up.Skip(1), s => s.StartsWith("CREATE TABLE [tenant].[Orders]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SqlServer_QualifiedAddedTable_EnsureSchemaEscapesIdentifierAndLiteral()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildTable("O'Brien].Users", ColPk("Id")));
+
+        var ensureSchema = new SqlServerMigrationSqlGenerator().GenerateSql(diff).Up[0];
+
+        Assert.Contains("SCHEMA_ID(N'O''Brien]')", ensureSchema);
+        Assert.Contains("CREATE SCHEMA [O''Brien]]]", ensureSchema);
+    }
+
+    [Fact]
+    public void Postgres_QualifiedAddedTable_EnsuresSchemaBeforeCreateTable()
+    {
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(BuildTable("tenant.Users", ColPk("Id")));
+
+        var up = new PostgresMigrationSqlGenerator().GenerateSql(diff).Up;
+
+        Assert.Equal("CREATE SCHEMA IF NOT EXISTS \"tenant\"", up[0]);
+        Assert.Contains(up.Skip(1), s => s.StartsWith("CREATE TABLE \"tenant\".\"Users\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Postgres_QualifiedTableName_QualifiesIndexNames()
+    {
+        var table = BuildTable(
+            "tenant.Users",
+            ColPk("Id"),
+            new ColumnSchema
+            {
+                Name = "Email",
+                ClrType = "System.String",
+                IsNullable = false,
+                IndexName = "IX_Users_Email"
+            });
+        table.ExpressionIndexes.Add(new ExpressionIndexSchema
+        {
+            Name = "IX_Users_LowerEmail",
+            ExpressionSql = "lower(\"Email\")"
+        });
+
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var up = new PostgresMigrationSqlGenerator().GenerateSql(diff).Up;
+
+        Assert.Contains(up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_Email\" ON \"tenant\".\"Users\"", StringComparison.Ordinal));
+        Assert.Contains(up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_LowerEmail\" ON \"tenant\".\"Users\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Sqlite_QualifiedTableName_QualifiesIndexNameAndLeavesTargetTableUnqualified()
+    {
+        var table = BuildTable(
+            "tenant.Users",
+            ColPk("Id"),
+            new ColumnSchema
+            {
+                Name = "Email",
+                ClrType = "System.String",
+                IsNullable = false,
+                IndexName = "IX_Users_Email"
+            });
+        table.ExpressionIndexes.Add(new ExpressionIndexSchema
+        {
+            Name = "IX_Users_LowerEmail",
+            ExpressionSql = "lower(Email)"
+        });
+
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var up = new SqliteMigrationSqlGenerator().GenerateSql(diff).Up;
+
+        Assert.Contains(up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_Email\" ON \"Users\"", StringComparison.Ordinal));
+        Assert.Contains(up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_LowerEmail\" ON \"Users\"", StringComparison.Ordinal));
+        Assert.DoesNotContain(up, s => s.StartsWith("CREATE INDEX", StringComparison.Ordinal) && s.Contains("ON \"tenant\".\"Users\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Sqlite_QualifiedTableWithForeignKeyAndIndexes_GeneratedDdlExecutesInAttachedSchema()
+    {
+        var users = BuildTable(
+            "tenant.Users",
+            ColPk("Id"),
+            new ColumnSchema
+            {
+                Name = "Email",
+                ClrType = "System.String",
+                IsNullable = false,
+                IndexName = "IX_Users_Email"
+            });
+        users.ExpressionIndexes.Add(new ExpressionIndexSchema
+        {
+            Name = "IX_Users_LowerEmail",
+            ExpressionSql = "lower(Email)"
+        });
+
+        var orders = BuildTable(
+            "tenant.Orders",
+            ColPk("Id"),
+            new ColumnSchema { Name = "UserId", ClrType = "System.Int32", IsNullable = false });
+        orders.ForeignKeys.Add(new ForeignKeySchema
+        {
+            ConstraintName = "FK_Orders_Users",
+            DependentColumns = new[] { "UserId" },
+            PrincipalTable = "tenant.Users",
+            PrincipalColumns = new[] { "Id" }
+        });
+
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(users);
+        diff.AddedTables.Add(orders);
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        ExecuteSqlite(connection, "PRAGMA foreign_keys=ON");
+        ExecuteSqlite(connection, "ATTACH DATABASE ':memory:' AS tenant");
+        foreach (var statement in sql.Up)
+            ExecuteSqlite(connection, statement);
+
+        using var fkCommand = connection.CreateCommand();
+        fkCommand.CommandText = "PRAGMA tenant.foreign_key_list(Orders)";
+        using var fkReader = fkCommand.ExecuteReader();
+        Assert.True(fkReader.Read());
+        Assert.Equal("Users", fkReader["table"]);
+
+        using var indexCommand = connection.CreateCommand();
+        indexCommand.CommandText = "SELECT COUNT(*) FROM tenant.sqlite_master WHERE type = 'index' AND name IN ('IX_Users_Email', 'IX_Users_LowerEmail')";
+        Assert.Equal(2L, (long)indexCommand.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Sqlite_AddedColumnWithAddedIndex_DownExecutesAfterTableRecreationDropsIndex()
+    {
+        var table = BuildTable(
+            "Posts",
+            ColPk("Id"),
+            new ColumnSchema { Name = "Name", ClrType = "System.String", IsNullable = false },
+            new ColumnSchema { Name = "Slug", ClrType = "System.String", IsNullable = true, IndexName = "IX_Posts_Slug" });
+        var slug = table.Columns.Single(column => column.Name == "Slug");
+        var diff = new SchemaDiff();
+        diff.AddedColumns.Add((table, slug));
+        diff.AddedIndexes.Add((table, "IX_Posts_Slug", false, new[] { "Slug" }, new[] { false }));
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Assert.Contains("DROP INDEX IF EXISTS \"IX_Posts_Slug\"", sql.Down);
+
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        ExecuteSqlite(connection, "CREATE TABLE Posts (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)");
+        ExecuteSqlite(connection, "INSERT INTO Posts (Id, Name) VALUES (1, 'first')");
+        foreach (var statement in sql.Up)
+            ExecuteSqlite(connection, statement);
+        foreach (var statement in sql.PreTransactionDown ?? Array.Empty<string>())
+            ExecuteSqlite(connection, statement);
+        foreach (var statement in sql.Down)
+            ExecuteSqlite(connection, statement);
+        foreach (var statement in sql.PostTransactionDown ?? Array.Empty<string>())
+            ExecuteSqlite(connection, statement);
+
+        using var columnCommand = connection.CreateCommand();
+        columnCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Posts') WHERE name = 'Slug'";
+        Assert.Equal(0L, (long)columnCommand.ExecuteScalar()!);
+
+        using var indexCommand = connection.CreateCommand();
+        indexCommand.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'IX_Posts_Slug'";
+        Assert.Equal(0L, (long)indexCommand.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void SupportedGenerators_QualifiedExpressionIndexDrop_QualifiesIndexName()
+    {
+        var table = BuildTable("tenant.Users", ColPk("Id"));
+        var sqliteExpressionIndex = new ExpressionIndexSchema
+        {
+            Name = "IX_Users_LowerEmail",
+            ExpressionSql = "lower(Email)"
+        };
+        var postgresExpressionIndex = new ExpressionIndexSchema
+        {
+            Name = "IX_Users_LowerEmail",
+            ExpressionSql = "lower(\"Email\")"
+        };
+
+        var sqliteDiff = new SchemaDiff();
+        sqliteDiff.AddedExpressionIndexes.Add((table, sqliteExpressionIndex));
+        var sqliteSql = new SqliteMigrationSqlGenerator().GenerateSql(sqliteDiff);
+        Assert.Contains(sqliteSql.Up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_LowerEmail\" ON \"Users\"", StringComparison.Ordinal));
+        Assert.Contains("DROP INDEX IF EXISTS \"tenant\".\"IX_Users_LowerEmail\"", sqliteSql.Down);
+
+        var postgresDiff = new SchemaDiff();
+        postgresDiff.AddedExpressionIndexes.Add((table, postgresExpressionIndex));
+        var postgresSql = new PostgresMigrationSqlGenerator().GenerateSql(postgresDiff);
+        Assert.Contains(postgresSql.Up, s => s.StartsWith("CREATE INDEX \"tenant\".\"IX_Users_LowerEmail\" ON \"tenant\".\"Users\"", StringComparison.Ordinal));
+        Assert.Contains("DROP INDEX \"tenant\".\"IX_Users_LowerEmail\"", postgresSql.Down);
+    }
+
+    [Fact]
+    public void AllProviders_QualifiedForeignKeyPrincipalTable_UsesProviderSupportedReference()
+    {
+        var table = BuildTable(
+            "tenant.Orders",
+            ColPk("Id"),
+            new ColumnSchema { Name = "UserId", ClrType = "System.Int32", IsNullable = false });
+        table.ForeignKeys.Add(new ForeignKeySchema
+        {
+            ConstraintName = "FK_Orders_Users",
+            DependentColumns = new[] { "UserId" },
+            PrincipalTable = "tenant.Users",
+            PrincipalColumns = new[] { "Id" }
+        });
+
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        foreach (var (name, gen) in AllGenerators())
+        {
+            var createStmt = gen.GenerateSql(diff).Up.First(s => s.StartsWith("CREATE TABLE"));
+            var expected = name switch
+            {
+                "SqlServer" => "REFERENCES [tenant].[Users]([Id])",
+                "MySQL"     => "REFERENCES `tenant`.`Users`(`Id`)",
+                "Postgres"  => "REFERENCES \"tenant\".\"Users\"(\"Id\")",
+                "SQLite"    => "REFERENCES \"Users\"(\"Id\")",
+                _           => throw new InvalidOperationException(name)
+            };
+
+            Assert.Contains(expected, createStmt);
+            if (name == "SQLite")
+                Assert.DoesNotContain("REFERENCES \"tenant\".\"Users\"", createStmt, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void AllProviders_DottedColumnName_RemainsSingleIdentifier()
+    {
+        var table = BuildTable("SafeTable", ColPk("Id"), Col("Audit.CreatedOn"));
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        foreach (var (name, gen) in AllGenerators())
+        {
+            var createStmt = gen.GenerateSql(diff).Up.First(s => s.StartsWith("CREATE TABLE"));
+            var expected = name switch
+            {
+                "SqlServer" => "[Audit.CreatedOn]",
+                "MySQL"     => "`Audit.CreatedOn`",
+                "Postgres"  => "\"Audit.CreatedOn\"",
+                "SQLite"    => "\"Audit.CreatedOn\"",
+                _           => throw new InvalidOperationException(name)
+            };
+
+            Assert.Contains(expected, createStmt);
+        }
+    }
+
+    [Fact]
+    public void Sqlite_QualifiedTableName_RecreateUsesSameSchemaTempAndUnqualifiedRenameTarget()
+    {
+        var table = BuildTable("tenant.Users", ColPk("Id"), Col("Name", "System.String", true));
+        var oldCol = new ColumnSchema { Name = "Name", ClrType = "System.String", IsNullable = true };
+        var newCol = new ColumnSchema { Name = "Name", ClrType = "System.String", IsNullable = false };
+
+        var diff = new SchemaDiff();
+        diff.AlteredColumns.Add((table, newCol, oldCol));
+
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.StartsWith("DROP TABLE IF EXISTS \"tenant\".\"__temp__Users\""));
+        Assert.Contains(sql.Up, s => s.StartsWith("CREATE TABLE \"tenant\".\"__temp__Users\""));
+        Assert.Contains(sql.Up, s => s.Contains("FROM \"tenant\".\"Users\""));
+        Assert.Contains(sql.Up, s => s == "DROP TABLE \"tenant\".\"Users\"");
+        Assert.Contains(sql.Up, s => s == "ALTER TABLE \"tenant\".\"__temp__Users\" RENAME TO \"Users\"");
+        Assert.DoesNotContain(sql.Up, s => s.Contains("RENAME TO \"tenant\".\"Users\""));
+    }
+
     private static IEnumerable<(string Name, IMigrationSqlGenerator Gen)> AllGenerators()
     {
         yield return ("SqlServer", new SqlServerMigrationSqlGenerator());
         yield return ("MySQL",     new MySqlMigrationSqlGenerator());
         yield return ("Postgres",  new PostgresMigrationSqlGenerator());
         yield return ("SQLite",    new SqliteMigrationSqlGenerator());
+    }
+
+    private static void ExecuteSqlite(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 
     /// <summary>

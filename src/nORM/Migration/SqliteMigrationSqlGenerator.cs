@@ -54,6 +54,284 @@ namespace nORM.Migration
             return $"\"{id.Replace("\"", "\"\"")}\"";
         }
 
+        private static string EscTable(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return string.Join(".", id.Split('.').Select(Esc));
+        }
+
+        private static (string? Schema, string Table) SplitTableName(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            var dot = id.IndexOf('.');
+            return dot <= 0
+                ? (null, id)
+                : (id[..dot], id[(dot + 1)..]);
+        }
+
+        private static string EscTempTable(string id)
+        {
+            var (schema, table) = SplitTableName(id);
+            var tempTable = "__temp__" + table;
+            return schema is null ? Esc(tempTable) : $"{Esc(schema)}.{Esc(tempTable)}";
+        }
+
+        private static string EscTableNameOnly(string id)
+        {
+            var (_, table) = SplitTableName(id);
+            return Esc(table);
+        }
+
+        private static string EscIndexName(string tableName, string indexName)
+        {
+            var (schema, _) = SplitTableName(tableName);
+            return schema is null ? Esc(indexName) : $"{Esc(schema)}.{Esc(indexName)}";
+        }
+
+        private static string EscIndexTargetTable(string tableName)
+        {
+            var (_, table) = SplitTableName(tableName);
+            return Esc(table);
+        }
+
+        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql) ResolveIndex(
+            TableSchema table,
+            string indexName,
+            bool isUnique,
+            string[] columnNames,
+            bool[] descending)
+        {
+            foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+            {
+                if (string.Equals(index.IndexName, indexName, StringComparison.OrdinalIgnoreCase))
+                    return index;
+            }
+
+            return (indexName, isUnique, columnNames, descending, Array.Empty<string>(), null);
+        }
+
+        private static string BuildIndexSql(TableSchema table, string indexName, bool isUnique, string[] columnNames, bool[] descending)
+        {
+            var index = ResolveIndex(table, indexName, isUnique, columnNames, descending);
+            EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+            var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+            return $"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}";
+        }
+
+        private static string BuildImplicitUniqueIndexSql(TableSchema table, ColumnSchema column)
+            => BuildIndexSql(table, GetUniqueConstraintName(table, column), true, new[] { column.Name }, new[] { false });
+
+        private static bool IsImplicitUniqueColumn(ColumnSchema column)
+            => column.IsUnique
+               && !column.IsPrimaryKey
+               && string.IsNullOrWhiteSpace(column.IndexName)
+               && column.Indexes.Count == 0;
+
+        private static string GetPrimaryKeyConstraintName(TableSchema table, IReadOnlyList<ColumnSchema> pkCols)
+            => pkCols.FirstOrDefault(static c => c.IsPrimaryKey && !string.IsNullOrWhiteSpace(c.IndexName))?.IndexName
+               ?? $"PK_{table.Name}";
+
+        private static string GetUniqueConstraintName(TableSchema table, ColumnSchema column)
+            => $"UQ_{table.Name}_{column.Name}";
+
+        private static string BuildPrimaryKeyConstraintSql(TableSchema table, IReadOnlyList<ColumnSchema> pkCols)
+            => $"CONSTRAINT {Esc(GetPrimaryKeyConstraintName(table, pkCols))} PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})";
+
+        private static string BuildUniqueConstraintSql(TableSchema table, ColumnSchema column)
+            => $"CONSTRAINT {Esc(GetUniqueConstraintName(table, column))} UNIQUE ({Esc(column.Name)})";
+
+        private static bool RequiresRecreateForAddedColumn(ColumnSchema column)
+            => column.IsPrimaryKey;
+
+        private static void ValidateSqliteIdentityMetadata(SchemaDiff diff)
+        {
+            foreach (var table in EnumerateTablesForIdentityValidation(diff))
+                ValidateSqliteIdentityColumns(table.Name, table.Columns);
+
+            foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                ValidateSqliteIdentityColumns(table.Name, MergeColumnsForIdentityValidation(table.Columns, group.Select(static item => item.Column)));
+            }
+
+            foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                ValidateSqliteIdentityColumns(table.Name, MergeColumnsForIdentityValidation(table.Columns, group.Select(static item => item.Column)));
+            }
+
+            foreach (var group in diff.AlteredColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                var oldColumnsByName = group.ToDictionary(static item => item.NewColumn.Name, static item => item.OldColumn, StringComparer.OrdinalIgnoreCase);
+                var oldColumns = table.Columns
+                    .Select(column => oldColumnsByName.TryGetValue(column.Name, out var oldColumn) ? oldColumn : column)
+                    .ToArray();
+                ValidateSqliteIdentityColumns(table.Name, oldColumns);
+            }
+        }
+
+        private static IEnumerable<TableSchema> EnumerateTablesForIdentityValidation(SchemaDiff diff)
+        {
+            foreach (var table in diff.AddedTables)
+                yield return table;
+            foreach (var table in diff.DroppedTables)
+                yield return table;
+            foreach (var (table, _) in diff.AddedColumns)
+                yield return table;
+            foreach (var (table, _) in diff.DroppedColumns)
+                yield return table;
+            foreach (var (table, _, _) in diff.AlteredColumns)
+                yield return table;
+            foreach (var (table, _) in diff.AddedForeignKeys)
+                yield return table;
+            foreach (var (table, _) in diff.DroppedForeignKeys)
+                yield return table;
+            foreach (var (table, _) in diff.AddedCheckConstraints)
+                yield return table;
+            foreach (var (table, _) in diff.DroppedCheckConstraints)
+                yield return table;
+            foreach (var (table, _) in diff.AddedExpressionIndexes)
+                yield return table;
+            foreach (var (table, _) in diff.DroppedExpressionIndexes)
+                yield return table;
+            foreach (var (table, _, _, _, _) in diff.AddedIndexes)
+                yield return table;
+            foreach (var (table, _) in diff.DroppedIndexes)
+                yield return table;
+        }
+
+        private static IReadOnlyList<ColumnSchema> MergeColumnsForIdentityValidation(
+            IEnumerable<ColumnSchema> tableColumns,
+            IEnumerable<ColumnSchema> operationColumns)
+        {
+            var columns = tableColumns.ToDictionary(static column => column.Name, StringComparer.OrdinalIgnoreCase);
+            foreach (var column in operationColumns)
+                columns[column.Name] = column;
+            return columns.Values.ToArray();
+        }
+
+        private static void ValidateSqliteIdentityColumns(string tableName, IReadOnlyList<ColumnSchema> columns)
+        {
+            var identityColumns = columns.Where(static column => column.IsIdentity).ToArray();
+            if (identityColumns.Length == 0)
+                return;
+
+            if (identityColumns.Length > 1)
+                throw new NotSupportedException($"SQLite supports at most one identity column per table. Table '{tableName}' has identity metadata on: {string.Join(", ", identityColumns.Select(static column => column.Name))}.");
+
+            var identityColumn = identityColumns[0];
+            var primaryKeyColumns = columns.Where(static column => column.IsPrimaryKey).ToArray();
+            if (!identityColumn.IsPrimaryKey)
+                throw new NotSupportedException($"SQLite identity column '{tableName}.{identityColumn.Name}' must also be the single primary key column; otherwise AUTOINCREMENT would be ignored.");
+
+            if (primaryKeyColumns.Length != 1)
+                throw new NotSupportedException($"SQLite identity column '{tableName}.{identityColumn.Name}' cannot be part of a composite primary key because AUTOINCREMENT requires a single INTEGER PRIMARY KEY column.");
+
+            if (!IsSqliteIntegerIdentityType(identityColumn))
+                throw new NotSupportedException($"SQLite identity column '{tableName}.{identityColumn.Name}' must map to INTEGER PRIMARY KEY. CLR type '{identityColumn.ClrType}' maps to '{GetSqlType(identityColumn)}'.");
+
+            if (identityColumn.IdentitySeed is not null || identityColumn.IdentityIncrement is not null)
+                throw new NotSupportedException($"SQLite identity column '{tableName}.{identityColumn.Name}' cannot use identity seed or increment options.");
+
+            if (!string.IsNullOrWhiteSpace(identityColumn.DefaultValue))
+                throw new NotSupportedException($"SQLite identity column '{tableName}.{identityColumn.Name}' cannot also define a default value.");
+        }
+
+        private static bool IsSqliteIntegerIdentityType(ColumnSchema column)
+            => !string.Equals(column.ClrType, typeof(bool).FullName, StringComparison.Ordinal)
+               && string.Equals(GetSqlType(column), "INTEGER", StringComparison.OrdinalIgnoreCase);
+
+        private static HashSet<string> GetUpRecreatedTableNames(SchemaDiff diff)
+            => diff.AlteredColumns.Select(static item => item.Table.Name)
+                .Concat(diff.AddedColumns
+                    .Where(static item => RequiresRecreateForAddedColumn(item.Column))
+                    .Select(static item => item.Table.Name))
+                .Concat(diff.DroppedColumns.Select(static item => item.Table.Name))
+                .Concat(diff.AddedForeignKeys.Select(static item => item.Table.Name))
+                .Concat(diff.DroppedForeignKeys.Select(static item => item.Table.Name))
+                .Concat(diff.AddedCheckConstraints.Select(static item => item.Table.Name))
+                .Concat(diff.DroppedCheckConstraints.Select(static item => item.Table.Name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        private static HashSet<string> GetDownRecreatedTableNames(SchemaDiff diff)
+            => diff.AlteredColumns.Select(static item => item.Table.Name)
+                .Concat(diff.AddedColumns.Select(static item => item.Table.Name))
+                .Concat(diff.DroppedColumns
+                    .Where(static item => RequiresRecreateForAddedColumn(item.Column))
+                    .Select(static item => item.Table.Name))
+                .Concat(diff.AddedForeignKeys.Select(static item => item.Table.Name))
+                .Concat(diff.DroppedForeignKeys.Select(static item => item.Table.Name))
+                .Concat(diff.AddedCheckConstraints.Select(static item => item.Table.Name))
+                .Concat(diff.DroppedCheckConstraints.Select(static item => item.Table.Name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        private static IReadOnlyList<ExpressionIndexSchema> GetExpressionIndexesForUp(TableSchema table, SchemaDiff diff)
+            => ResolveExpressionIndexesForRecreate(
+                table,
+                diff.DroppedExpressionIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.ExpressionIndex),
+                diff.AddedExpressionIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.ExpressionIndex));
+
+        private static IReadOnlyList<ExpressionIndexSchema> GetExpressionIndexesForDown(TableSchema table, SchemaDiff diff)
+            => ResolveExpressionIndexesForRecreate(
+                table,
+                diff.AddedExpressionIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.ExpressionIndex),
+                diff.DroppedExpressionIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.ExpressionIndex));
+
+        private static IReadOnlyList<ExpressionIndexSchema> ResolveExpressionIndexesForRecreate(
+            TableSchema table,
+            IEnumerable<ExpressionIndexSchema> removed,
+            IEnumerable<ExpressionIndexSchema> added)
+        {
+            var indexes = table.ExpressionIndexes.ToDictionary(static index => index.Name, StringComparer.OrdinalIgnoreCase);
+            foreach (var index in removed)
+                indexes.Remove(index.Name);
+            foreach (var index in added)
+                indexes[index.Name] = index;
+            return indexes.Values.ToArray();
+        }
+
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexesForUp(TableSchema table, SchemaDiff diff)
+            => ResolveExplicitIndexesForRecreate(
+                table,
+                diff.DroppedIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.IndexName),
+                diff.AddedIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => ResolveIndex(item.Table, item.IndexName, item.IsUnique, item.ColumnNames, item.Descending)));
+
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexesForDown(TableSchema table, SchemaDiff diff)
+            => ResolveExplicitIndexesForRecreate(
+                table,
+                diff.AddedIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.IndexName),
+                diff.DroppedIndexes
+                    .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => ResolveIndex(item.Table, item.IndexName, false, Array.Empty<string>(), Array.Empty<bool>())));
+
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> ResolveExplicitIndexesForRecreate(
+            TableSchema table,
+            IEnumerable<string> removed,
+            IEnumerable<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> added)
+        {
+            var indexes = SchemaDiffer.GetExplicitIndexes(table).ToDictionary(static index => index.IndexName, StringComparer.OrdinalIgnoreCase);
+            foreach (var indexName in removed)
+                indexes.Remove(indexName);
+            foreach (var index in added)
+                indexes[index.IndexName] = index;
+            return indexes.Values.ToArray();
+        }
+
         /// <summary>
         /// Creates SQLite SQL statements for the operations described by the schema diff.
         /// PRAGMA foreign_keys=off/on are returned in PreTransactionUp/Down and PostTransactionUp/Down
@@ -63,11 +341,14 @@ namespace nORM.Migration
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             ArgumentNullException.ThrowIfNull(diff);
+            ValidateSqliteIdentityMetadata(diff);
 
             var up = new List<string>();
             var down = new List<string>();
             bool needsUpFkPragma = false;
             bool needsDownFkPragma = false;
+            var upRecreatedTables = GetUpRecreatedTableNames(diff);
+            var downRecreatedTables = GetDownRecreatedTableNames(diff);
 
             foreach (var table in diff.AddedTables)
             {
@@ -90,12 +371,11 @@ namespace nORM.Migration
                 {
                     // SQLite AUTOINCREMENT requires "INTEGER PRIMARY KEY AUTOINCREMENT" inline, not table-level constraint
                     if (!pkCols.Any(c => c.IsIdentity))
-                        colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                        colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
                 }
 
-                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
-                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
-                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
+                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
+                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
 
                 // MG-1: Emit inline FOREIGN KEY constraints
                 foreach (var fk in table.ForeignKeys)
@@ -103,42 +383,64 @@ namespace nORM.Migration
                 foreach (var check in table.CheckConstraints)
                     colDefs.Add(BuildCheckConstraintSql(check));
 
-                up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
+                up.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
 
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     up.Add(BuildExpressionIndexSql(table, expressionIndex));
 
-                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
+                down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
             }
 
             foreach (var group in diff.AddedColumns.GroupBy(x => x.Table))
             {
                 var table = group.Key;
                 var addedColumnNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var addedColumns = group.Select(static g => g.Column).ToArray();
+                var recreateForAdd = addedColumns.Any(RequiresRecreateForAddedColumn);
 
-                foreach (var (_, column) in group)
+                foreach (var column in addedColumns)
                 {
-                    if (IsComputedColumn(column))
-                    {
-                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
-                        continue;
-                    }
-
                     // NOT NULL column without a DefaultValue cannot be added to a populated table.
-                    if (!column.IsNullable && column.DefaultValue == null)
+                    if (!IsComputedColumn(column) && !column.IsNullable && column.DefaultValue == null)
                         throw new InvalidOperationException(
                             $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                             "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
+                }
 
-                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                    var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
-                    up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+                if (recreateForAdd)
+                {
+                    RecreateTable(
+                        up,
+                        table,
+                        table.Columns.ToList(),
+                        null,
+                        explicitIndexes: GetExplicitIndexesForUp(table, diff),
+                        expressionIndexes: GetExpressionIndexesForUp(table, diff),
+                        addedColumnNames: addedColumnNames);
+                    needsUpFkPragma = true;
+                }
+                else
+                {
+                    foreach (var column in addedColumns)
+                    {
+                        if (IsComputedColumn(column))
+                        {
+                            up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
+                            continue;
+                        }
+
+                        var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
+                        var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
+                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+                    }
+                    foreach (var column in addedColumns.Where(IsImplicitUniqueColumn))
+                        up.Add(BuildImplicitUniqueIndexSql(table, column));
                 }
 
                 // Down: undo the ADD COLUMN by recreating the table without those columns.
@@ -146,8 +448,17 @@ namespace nORM.Migration
                 var remainingColumns = table.Columns
                     .Where(c => !addedColumnNames.Contains(c.Name))
                     .ToList();
-                RecreateTable(down, table, remainingColumns, null);
-                needsDownFkPragma = true;
+                if (remainingColumns.Count > 0)
+                {
+                    RecreateTable(
+                        down,
+                        table,
+                        remainingColumns,
+                        null,
+                        explicitIndexes: GetExplicitIndexesForDown(table, diff),
+                        expressionIndexes: GetExpressionIndexesForDown(table, diff));
+                    needsDownFkPragma = true;
+                }
             }
 
             // G2: SQLite does not support ALTER COLUMN; use the standard table-recreation workaround.
@@ -157,8 +468,8 @@ namespace nORM.Migration
                 var alteredMap    = group.ToDictionary(x => x.NewColumn.Name, x => x.NewColumn, StringComparer.OrdinalIgnoreCase);
                 var oldAlteredMap = group.ToDictionary(x => x.OldColumn.Name, x => x.OldColumn, StringComparer.OrdinalIgnoreCase);
 
-                AddRecreate(up,   table, alteredMap);
-                AddRecreate(down, table, oldAlteredMap);
+                AddRecreate(up,   table, alteredMap, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
+                AddRecreate(down, table, oldAlteredMap, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
                 needsUpFkPragma = true;
                 needsDownFkPragma = true;
             }
@@ -166,7 +477,7 @@ namespace nORM.Migration
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot
             foreach (var table in diff.DroppedTables)
             {
-                up.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
+                up.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
                 // Down: recreate the table with full constraint metadata
                 var colDefs = table.Columns.Select(c =>
                 {
@@ -183,22 +494,21 @@ namespace nORM.Migration
                 if (pkCols.Count > 0)
                 {
                     if (!pkCols.Any(c => c.IsIdentity))
-                        colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                        colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
                 }
-                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
-                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
-                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
+                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
+                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
                 // MG-1: Restore FK constraints in Down recreation
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 foreach (var check in table.CheckConstraints)
                     colDefs.Add(BuildCheckConstraintSql(check));
-                down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
+                down.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     down.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -220,16 +530,36 @@ namespace nORM.Migration
 
                 // Up: recreate table without dropped columns — use RecreateTable for full constraint preservation
                 // MG-2: RecreateTable no longer emits PRAGMA inline.
-                RecreateTable(up, newTable, remainingCols, null);
+                RecreateTable(
+                    up,
+                    newTable,
+                    remainingCols,
+                    null,
+                    explicitIndexes: GetExplicitIndexesForUp(newTable, diff),
+                    expressionIndexes: GetExpressionIndexesForUp(newTable, diff));
                 needsUpFkPragma = true;
 
                 // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
                 // C: include DefaultValue so NOT NULL columns can be restored to populated tables.
+                if (droppedCols.Any(RequiresRecreateForAddedColumn))
+                {
+                    RecreateTable(
+                        down,
+                        newTable,
+                        newTable.Columns.ToList(),
+                        null,
+                        explicitIndexes: GetExplicitIndexesForDown(newTable, diff),
+                        expressionIndexes: GetExpressionIndexesForDown(newTable, diff),
+                        addedColumnNames: droppedColNames);
+                    needsDownFkPragma = true;
+                    continue;
+                }
+
                 foreach (var droppedCol in droppedCols)
                 {
                     if (IsComputedColumn(droppedCol))
                     {
-                        down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {BuildComputedColumnDefinition(droppedCol)}");
+                        down.Add($"ALTER TABLE {EscTable(newTable.Name)} ADD COLUMN {BuildComputedColumnDefinition(droppedCol)}");
                         continue;
                     }
 
@@ -237,8 +567,10 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(droppedCol.DefaultValue)}"
                         : "";
                     var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)}{FormatCollation(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
-                    down.Add($"ALTER TABLE {Esc(newTable.Name)} ADD COLUMN {colDef}");
+                    down.Add($"ALTER TABLE {EscTable(newTable.Name)} ADD COLUMN {colDef}");
                 }
+                foreach (var droppedCol in droppedCols.Where(IsImplicitUniqueColumn))
+                    down.Add(BuildImplicitUniqueIndexSql(newTable, droppedCol));
             }
 
             // MG-1: FK constraint changes on existing SQLite tables require table recreation.
@@ -256,13 +588,13 @@ namespace nORM.Migration
                 var table = diff.AddedForeignKeys
                     .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
                 // Up: recreate with the new FK set (table.ForeignKeys reflects post-diff state)
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys);
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, explicitIndexes: GetExplicitIndexesForUp(table, diff), expressionIndexes: GetExpressionIndexesForUp(table, diff));
                 // Down: recreate without the newly added FKs
                 var addedNames = tableGroup.Select(x => x.ForeignKey.ConstraintName)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var oldFks = table.ForeignKeys
                     .Where(fk => !addedNames.Contains(fk.ConstraintName)).ToList();
-                RecreateTable(down, table, table.Columns, null, oldFks);
+                RecreateTable(down, table, table.Columns, null, oldFks, explicitIndexes: GetExplicitIndexesForDown(table, diff), expressionIndexes: GetExpressionIndexesForDown(table, diff));
                 needsUpFkPragma = true;
                 needsDownFkPragma = true;
             }
@@ -274,10 +606,10 @@ namespace nORM.Migration
                     .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
                 var droppedFks = tableGroup.Select(x => x.ForeignKey).ToList();
                 // Up: recreate without the dropped FKs (table.ForeignKeys already excludes them)
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys);
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, explicitIndexes: GetExplicitIndexesForUp(table, diff), expressionIndexes: GetExpressionIndexesForUp(table, diff));
                 // Down: recreate with the dropped FKs restored
                 var restoredFks = table.ForeignKeys.Concat(droppedFks).ToList();
-                RecreateTable(down, table, table.Columns, null, restoredFks);
+                RecreateTable(down, table, table.Columns, null, restoredFks, explicitIndexes: GetExplicitIndexesForDown(table, diff), expressionIndexes: GetExpressionIndexesForDown(table, diff));
                 needsUpFkPragma = true;
                 needsDownFkPragma = true;
             }
@@ -289,12 +621,12 @@ namespace nORM.Migration
             {
                 var table = diff.AddedCheckConstraints
                     .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints);
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
                 var addedNames = tableGroup.Select(x => x.CheckConstraint.ConstraintName)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var oldChecks = table.CheckConstraints
                     .Where(check => !addedNames.Contains(check.ConstraintName)).ToList();
-                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, oldChecks);
+                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, oldChecks, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
                 needsUpFkPragma = true;
                 needsDownFkPragma = true;
             }
@@ -305,29 +637,83 @@ namespace nORM.Migration
                 var table = diff.DroppedCheckConstraints
                     .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
                 var droppedChecks = tableGroup.Select(x => x.CheckConstraint).ToList();
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints);
+                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
                 var restoredChecks = table.CheckConstraints.Concat(droppedChecks).ToList();
-                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, restoredChecks);
+                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, restoredChecks, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
                 needsUpFkPragma = true;
                 needsDownFkPragma = true;
             }
 
-            foreach (var (_, expressionIndex) in diff.DroppedExpressionIndexes)
-                up.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
-            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
-                up.Add(BuildExpressionIndexSql(table, expressionIndex));
-
-            foreach (var (_, expressionIndex) in diff.AddedExpressionIndexes)
-                down.Add($"DROP INDEX {Esc(expressionIndex.Name)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
-                down.Add(BuildExpressionIndexSql(table, expressionIndex));
+            {
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add($"DROP INDEX IF EXISTS {EscIndexName(table.Name, expressionIndex.Name)}");
+            }
+            foreach (var (table, indexName) in diff.DroppedIndexes)
+            {
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add($"DROP INDEX IF EXISTS {EscIndexName(table.Name, indexName)}");
+            }
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+            {
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add(BuildExpressionIndexSql(table, expressionIndex));
+            }
+            foreach (var (table, indexName, isUnique, columnNames, descending) in diff.AddedIndexes)
+            {
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
+            }
+
+            var droppedExpressionIndexNamesByTable = diff.DroppedExpressionIndexes
+                .GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    static group => group.Key,
+                    static group => group.Select(static item => item.ExpressionIndex.Name).ToHashSet(StringComparer.OrdinalIgnoreCase),
+                    StringComparer.OrdinalIgnoreCase);
+            var droppedIndexNamesByTable = diff.DroppedIndexes
+                .GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    static group => group.Key,
+                    static group => group.Select(static item => item.IndexName).ToHashSet(StringComparer.OrdinalIgnoreCase),
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+            {
+                var restoredSameName = droppedExpressionIndexNamesByTable.TryGetValue(table.Name, out var droppedNames)
+                    && droppedNames.Contains(expressionIndex.Name);
+                if (!downRecreatedTables.Contains(table.Name) || !restoredSameName)
+                    down.Add($"DROP INDEX IF EXISTS {EscIndexName(table.Name, expressionIndex.Name)}");
+            }
+            foreach (var (table, indexName, _, _, _) in diff.AddedIndexes)
+            {
+                var restoredSameName = droppedIndexNamesByTable.TryGetValue(table.Name, out var droppedNames)
+                    && droppedNames.Contains(indexName);
+                if (!downRecreatedTables.Contains(table.Name) || !restoredSameName)
+                    down.Add($"DROP INDEX IF EXISTS {EscIndexName(table.Name, indexName)}");
+            }
+            foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
+            {
+                if (!downRecreatedTables.Contains(table.Name))
+                    down.Add(BuildExpressionIndexSql(table, expressionIndex));
+            }
+            foreach (var (table, indexName, isUnique, columnNames, descending) in diff.DroppedIndexes
+                .Select(droppedIndex =>
+                {
+                    var resolved = ResolveIndex(droppedIndex.Table, droppedIndex.IndexName, false, Array.Empty<string>(), Array.Empty<bool>());
+                    return (droppedIndex.Table, resolved.IndexName, resolved.IsUnique, resolved.ColumnNames, resolved.Descending);
+                }))
+            {
+                if (!downRecreatedTables.Contains(table.Name))
+                    down.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
+            }
 
             // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
             {
-                up.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
                 // Down: rename back
-                down.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
             }
 
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can
@@ -344,10 +730,15 @@ namespace nORM.Migration
         /// Generates the SQLite table-recreation DDL sequence for changed columns.
         /// Emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints.
         /// </summary>
-        private static void AddRecreate(List<string> stmts, TableSchema table, Dictionary<string, ColumnSchema> overrides)
+        private static void AddRecreate(
+            List<string> stmts,
+            TableSchema table,
+            Dictionary<string, ColumnSchema> overrides,
+            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> explicitIndexes,
+            IReadOnlyList<ExpressionIndexSchema> expressionIndexes)
         {
             var cols = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
-            RecreateTable(stmts, table, cols, null);
+            RecreateTable(stmts, table, cols, null, explicitIndexes: explicitIndexes, expressionIndexes: expressionIndexes);
         }
 
         /// <summary>
@@ -360,14 +751,33 @@ namespace nORM.Migration
         /// </summary>
         private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols,
             Dictionary<string, ColumnSchema>? overrides, IReadOnlyList<ForeignKeySchema>? fks = null,
-            IReadOnlyList<CheckConstraintSchema>? checks = null)
+            IReadOnlyList<CheckConstraintSchema>? checks = null,
+            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)>? explicitIndexes = null,
+            IReadOnlyList<ExpressionIndexSchema>? expressionIndexes = null,
+            IReadOnlySet<string>? addedColumnNames = null)
         {
             // Apply overrides if supplied
             if (overrides != null)
                 cols = cols.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
 
             // F: compute names AFTER overrides have been applied so the SELECT list uses the correct column set.
-            var names = cols.Select(c => Esc(c.Name)).ToList();
+            var insertColumns = new List<string>(cols.Count);
+            var selectExpressions = new List<string>(cols.Count);
+            foreach (var col in cols)
+            {
+                if (IsComputedColumn(col))
+                    continue;
+
+                insertColumns.Add(Esc(col.Name));
+                selectExpressions.Add(addedColumnNames?.Contains(col.Name) == true
+                    ? GetAddedColumnInsertExpression(table, col)
+                    : Esc(col.Name));
+            }
+            if (cols.Count > 0 && insertColumns.Count == 0)
+                throw new NotSupportedException($"Cannot recreate table '{table.Name}' because all retained columns are computed/generated columns.");
+            var recreatedTable = new TableSchema { Name = table.Name };
+            foreach (var col in cols)
+                recreatedTable.Columns.Add(col);
 
             // Build column definitions with full constraint metadata (same as AddedTables path).
             var colDefs = cols.Select(c =>
@@ -388,12 +798,11 @@ namespace nORM.Migration
             {
                 // SQLite AUTOINCREMENT requires "INTEGER PRIMARY KEY AUTOINCREMENT" inline, not table-level constraint
                 if (!pkCols.Any(c => c.IsIdentity))
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                    colDefs.Add(BuildPrimaryKeyConstraintSql(recreatedTable, pkCols));
             }
 
-            // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
-            foreach (var uc in cols.Where(c => c.IsUnique && !c.IsPrimaryKey))
-                colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
+            foreach (var uc in cols.Where(IsImplicitUniqueColumn))
+                colDefs.Add(BuildUniqueConstraintSql(recreatedTable, uc));
 
             // MG-1: Emit inline FOREIGN KEY constraints (explicit list or fall back to table.ForeignKeys)
             foreach (var fk in fks ?? table.ForeignKeys)
@@ -402,25 +811,35 @@ namespace nORM.Migration
                 colDefs.Add(BuildCheckConstraintSql(check));
 
             // MG-2: No PRAGMA here — PRAGMA foreign_keys=off/on is returned in the pre/post transaction segments.
-            var tempName = $"\"__temp__{table.Name.Replace("\"", "\"\"")}\"";
+            var tempName = EscTempTable(table.Name);
+            var renameTarget = EscTableNameOnly(table.Name);
             // G: Drop the temp table if it already exists (handles interrupted prior migration).
             stmts.Add($"DROP TABLE IF EXISTS {tempName}");
             stmts.Add($"CREATE TABLE {tempName} ({string.Join(", ", colDefs)})");
-            stmts.Add($"INSERT INTO {tempName} SELECT {string.Join(", ", names)} FROM {Esc(table.Name)}");
-            stmts.Add($"DROP TABLE {Esc(table.Name)}");
-            stmts.Add($"ALTER TABLE {tempName} RENAME TO {Esc(table.Name)}");
+            stmts.Add($"INSERT INTO {tempName} ({string.Join(", ", insertColumns)}) SELECT {string.Join(", ", selectExpressions)} FROM {EscTable(table.Name)}");
+            stmts.Add($"DROP TABLE {EscTable(table.Name)}");
+            stmts.Add($"ALTER TABLE {tempName} RENAME TO {renameTarget}");
 
-            var recreatedTable = new TableSchema { Name = table.Name };
-            foreach (var col in cols)
-                recreatedTable.Columns.Add(col);
-            foreach (var index in SchemaDiffer.GetExplicitIndexes(recreatedTable))
+            foreach (var index in explicitIndexes ?? SchemaDiffer.GetExplicitIndexes(recreatedTable))
             {
                 var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                 EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                stmts.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                stmts.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
             }
-            foreach (var expressionIndex in table.ExpressionIndexes)
+            foreach (var expressionIndex in expressionIndexes ?? table.ExpressionIndexes)
                 stmts.Add(BuildExpressionIndexSql(table, expressionIndex));
+        }
+
+        private static string GetAddedColumnInsertExpression(TableSchema table, ColumnSchema column)
+        {
+            var defaultValue = column.DefaultValue;
+            if (!string.IsNullOrEmpty(defaultValue))
+                return DefaultValueValidator.Validate(defaultValue)!;
+            if (column.IsNullable)
+                return "NULL";
+
+            throw new InvalidOperationException(
+                $"Cannot recreate table '{table.Name}' with added column '{column.Name}' because it is NOT NULL and has no DefaultValue.");
         }
 
         // M1/X1: Allowlist for FK referential action tokens. Free-form strings are not safe
@@ -456,7 +875,7 @@ namespace nORM.Migration
         private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
         {
             var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
-            return $"CREATE {unique}INDEX {Esc(expressionIndex.Name)} ON {Esc(table.Name)} ({expressionIndex.ExpressionSql.Trim()}){FormatFilter(expressionIndex.FilterSql)}";
+            return $"CREATE {unique}INDEX {EscIndexName(table.Name, expressionIndex.Name)} ON {EscIndexTargetTable(table.Name)} ({expressionIndex.ExpressionSql.Trim()}){FormatFilter(expressionIndex.FilterSql)}";
         }
 
         /// <summary>
@@ -469,7 +888,7 @@ namespace nORM.Migration
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
             var onUpdate = ValidateFkAction(fk.OnUpdate, fk.ConstraintName);
-            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
+            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {EscTableNameOnly(fk.PrincipalTable)}({refCols})";
             if (!string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON DELETE {onDelete}";
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))

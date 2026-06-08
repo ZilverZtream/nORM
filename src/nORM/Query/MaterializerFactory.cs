@@ -807,7 +807,7 @@ namespace nORM.Query
                         var dmap = kvp.Value;
                         var indices = dmap.Columns.Select(c =>
                         {
-                            if (mapping.ColumnsByName.TryGetValue(c.Prop.Name, out var baseCol))
+                            if (mapping.ColumnsByName.TryGetValue(c.PropName, out var baseCol))
                                 return startOffset + Array.IndexOf(mapping.Columns, baseCol);
                             return UnmappedOrdinal; // column not found in base mapping
                         }).ToArray();
@@ -1395,7 +1395,7 @@ namespace nORM.Query
                         }
 
                         // Try to resolve against the current mapping first
-                        if (mapping.ColumnsByName.TryGetValue(m.Member.Name, out var col))
+                        if (mapping.TryGetColumnForMemberAccess(m, out var col))
                         {
                             cols.Add(col);
                         }

@@ -270,7 +270,7 @@ namespace nORM.Query
 
             if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
             {
-                if (!map.ColumnsByName.TryGetValue(boolMember.Member.Name, out var boolCol))
+                if (!map.TryGetColumnForMemberAccess(boolMember, out var boolCol))
                     return false;
 
                 whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
@@ -281,7 +281,7 @@ namespace nORM.Query
                 && notExpr2.Operand is MemberExpression negBoolMember2
                 && negBoolMember2.Type == typeof(bool))
             {
-                if (!map.ColumnsByName.TryGetValue(negBoolMember2.Member.Name, out var boolCol2))
+                if (!map.TryGetColumnForMemberAccess(negBoolMember2, out var boolCol2))
                     return false;
 
                 whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol2.EscCol, expectedValue: false)}";
@@ -290,7 +290,7 @@ namespace nORM.Query
 
             if (lambda.Body is BinaryExpression be && TryGetMemberEquality(be, out var me, out var valueExpression))
             {
-                if (!map.ColumnsByName.TryGetValue(me.Member.Name, out var column))
+                if (!map.TryGetColumnForMemberAccess(me, out var column))
                     return false;
 
                 if (!ExpressionValueExtractor.TryGetConstantValue(valueExpression, out var constValue))

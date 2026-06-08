@@ -106,42 +106,48 @@ namespace nORM.Scaffolding
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables);
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
-                var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable);
+                var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables, entityByTable).ConfigureAwait(false);
+                var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable, entityByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var nonNullableColumnsByTable = await GetNonNullableColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var sqliteDeclaredTypesByTable = provider is SqliteProvider
                     ? await GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false)
                     : new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
                 var identityColumnsByTable = await GetIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var indexes = await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
-                var foreignKeys = await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
+                var scaffoldedTableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var indexes = FilterIndexesToScaffoldedTables(
+                    await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false),
+                    scaffoldedTableKeys);
+                var foreignKeys = FilterForeignKeysToScaffoldedTables(
+                    await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false),
+                    scaffoldedTableKeys);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
+                var generatedModelFeatureDiagnostics = new List<ScaffoldUnsupportedFeature>();
                 unsupportedFeatures.AddRange(await GetPostgresEnumColumnFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
                 RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedPartialIndexDiagnostics(unsupportedFeatures, indexes);
-                AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable);
+                AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable, columnPropertiesByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
-                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
+                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
                 AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
                 var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
                 var enumCheckConstraintConfigurations = BuildEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable);
+                RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable, generatedModelFeatureDiagnostics);
                 var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
                     && defaultValuesByTable.TryGetValue(feature.TableKey, out var defaults)
                     && defaults.ContainsKey(feature.Name));
                 var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, unsupportedFeatures)
                     .Concat(enumCheckConstraintConfigurations)
                     .ToArray();
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
                     && checkConstraints.Any(check =>
                         string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
                     && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
                     && properties.TryGetValue(feature.Name, out var propertyName)
@@ -149,26 +155,32 @@ namespace nORM.Scaffolding
                         string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && check.Name.EndsWith("_" + propertyName + "_Enum", StringComparison.Ordinal)));
                 var expressionIndexConfigurations = BuildExpressionIndexConfigurations(entityByTable, unsupportedFeatures);
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
                     && expressionIndexConfigurations.Any(index =>
                         string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
+                    string.Equals(feature.Kind, "PartialIndex", StringComparison.OrdinalIgnoreCase)
+                    && expressionIndexConfigurations.Any(index =>
+                        !string.IsNullOrWhiteSpace(index.FilterSql)
+                        && string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var collationConfigurations = BuildCollationConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "Collation", StringComparison.OrdinalIgnoreCase)
                     && collationConfigurations.Any(collation =>
                         string.Equals(collation.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(collation.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
                 var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "Computed", StringComparison.OrdinalIgnoreCase)
                     && computedColumnConfigurations.Any(computed =>
                         string.Equals(computed.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(computed.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
                 var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
-                unsupportedFeatures.RemoveAll(static feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, static feature =>
                     string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
                     && TryParseDecimalPrecision(feature.Detail, out _, out _));
                 var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
@@ -181,15 +193,17 @@ namespace nORM.Scaffolding
                     columnPropertiesByTable,
                     primaryKeyColumnsByTable,
                     indexes,
+                    nonNullableColumnsByTable,
                     memberNamesByTable);
                 var compositePrimaryKeys = BuildCompositePrimaryKeys(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
                 var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, defaultValuesByTable);
                 var identityOptionConfigurations = BuildIdentityOptionConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                unsupportedFeatures.RemoveAll(feature =>
+                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                     string.Equals(feature.Kind, "IdentityStrategy", StringComparison.OrdinalIgnoreCase)
                     && identityOptionConfigurations.Any(identity =>
                         string.Equals(identity.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(identity.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
+                RestoreGeneratedManyToManyUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, manyToManyJoinTableKeys);
                 defaultValueConfigurations = defaultValueConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
@@ -1069,7 +1083,14 @@ namespace nORM.Scaffolding
                     FROM information_schema.routines r
                     WHERE r.routine_schema = DATABASE()
                     UNION ALL
-                    SELECT NULL, event_name, 'Event', 'MySQL event'
+                    SELECT NULL, event_name, 'Event',
+                           CONCAT('MySQL event; eventType=', COALESCE(event_type, ''),
+                                  '; status=', COALESCE(status, ''),
+                                  '; intervalValue=', COALESCE(interval_value, ''),
+                                  '; intervalField=', COALESCE(interval_field, ''),
+                                  '; executeAt=', COALESCE(DATE_FORMAT(execute_at, '%Y-%m-%d %H:%i:%s'), ''),
+                                  '; starts=', COALESCE(DATE_FORMAT(starts, '%Y-%m-%d %H:%i:%s'), ''),
+                                  '; ends=', COALESCE(DATE_FORMAT(ends, '%Y-%m-%d %H:%i:%s'), ''))
                     FROM information_schema.events
                     WHERE event_schema = DATABASE()
                     ORDER BY ObjectSchema, ObjectName
@@ -1480,6 +1501,7 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND i.is_primary_key = 0
                       AND i.is_hypothetical = 0
+                      AND i.type IN (1, 2)
                       AND i.name IS NOT NULL
                     ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
                     """).ConfigureAwait(false);
@@ -1503,18 +1525,42 @@ namespace nORM.Scaffolding
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
                     INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    INNER JOIN pg_am am ON am.oid = idx.relam
                     INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
                     INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
                     WHERE ix.indisprimary = false
                       AND ix.indexprs IS NULL
+                      AND am.amname = 'btree'
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) = false
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
+                          INNER JOIN pg_attribute option_att
+                              ON option_att.attrelid = tbl.oid
+                             AND option_att.attnum = option_key.attnum
+                          INNER JOIN pg_opclass option_opclass
+                              ON option_opclass.oid = ix.indclass[option_key.ord - 1]
+                          WHERE option_key.ord <= ix.indnkeyatts
+                            AND (
+                                option_opclass.opcdefault = false
+                                OR (
+                                    ix.indcollation[option_key.ord - 1] <> 0
+                                    AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
+                                )
+                                OR (
+                                    ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
+                                    OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
+                                )
+                            )
+                      )
                     ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
                     """).ConfigureAwait(false);
             }
 
             if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
             {
-                return await QueryIndexesAsync(connection, """
+                var indexes = await QueryIndexesAsync(connection, """
                     SELECT
                         NULL AS TableSchema,
                         s.table_name AS TableName,
@@ -1525,15 +1571,51 @@ namespace nORM.Scaffolding
                         s.seq_in_index - 1 AS Ordinal,
                         CASE WHEN UPPER(COALESCE(s.collation, 'A')) = 'D' THEN 1 ELSE 0 END AS IsDescending
                     FROM information_schema.statistics s
+                    INNER JOIN information_schema.columns c
+                        ON c.table_schema = s.table_schema
+                       AND c.table_name = s.table_name
+                       AND c.column_name = s.column_name
                     WHERE s.table_schema = DATABASE()
                       AND s.index_name <> 'PRIMARY'
-                      AND s.sub_part IS NULL
+                      AND UPPER(COALESCE(NULLIF(s.index_type, ''), 'BTREE')) = 'BTREE'
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM information_schema.statistics bad
+                          INNER JOIN information_schema.columns bad_col
+                              ON bad_col.table_schema = bad.table_schema
+                             AND bad_col.table_name = bad.table_name
+                             AND bad_col.column_name = bad.column_name
+                          WHERE bad.table_schema = s.table_schema
+                            AND bad.table_name = s.table_name
+                            AND bad.index_name = s.index_name
+                            AND bad.sub_part IS NOT NULL
+                            AND (
+                                bad_col.character_maximum_length IS NULL
+                                OR bad.sub_part < bad_col.character_maximum_length
+                            )
+                      )
                     ORDER BY s.table_schema, s.table_name, s.index_name, s.seq_in_index
                     """).ConfigureAwait(false);
+                var expressionIndexKeys = (await GetMySqlExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false))
+                    .Select(static feature => feature.TableKey + "\u001f" + feature.Name)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (expressionIndexKeys.Count == 0)
+                    return indexes;
+
+                return indexes
+                    .Where(index => !expressionIndexKeys.Contains(index.TableKey + "\u001f" + index.IndexName))
+                    .ToArray();
             }
 
             return Array.Empty<ScaffoldIndex>();
         }
+
+        private static IReadOnlyList<ScaffoldIndex> FilterIndexesToScaffoldedTables(
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlySet<string> scaffoldedTableKeys)
+            => indexes
+                .Where(index => scaffoldedTableKeys.Contains(index.TableKey))
+                .ToArray();
 
         private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
         {
@@ -1643,7 +1725,8 @@ namespace nORM.Scaffolding
                                 ConstraintName: "sqlite_fk_" + row.Id,
                                 ColumnCount: groupRows.Length,
                                 OnDelete: NormalizeReferentialAction(row.OnDelete),
-                                OnUpdate: NormalizeReferentialAction(row.OnUpdate)));
+                                OnUpdate: NormalizeReferentialAction(row.OnUpdate),
+                                IsSyntheticConstraintName: true));
                         }
                     }
                 }
@@ -1780,6 +1863,14 @@ namespace nORM.Scaffolding
             return foreignKeys;
         }
 
+        private static IReadOnlyList<ScaffoldForeignKey> FilterForeignKeysToScaffoldedTables(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlySet<string> scaffoldedTableKeys)
+            => foreignKeys
+                .Where(fk => scaffoldedTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))
+                             && scaffoldedTableKeys.Contains(TableKey(fk.PrincipalSchema, fk.PrincipalTable)))
+                .ToArray();
+
         private static string NormalizeReferentialAction(string? action)
         {
             if (string.IsNullOrWhiteSpace(action))
@@ -1879,7 +1970,7 @@ namespace nORM.Scaffolding
                 foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
                 {
                     await using var triggerCmd = connection.CreateCommand();
-                    triggerCmd.CommandText = $"SELECT {SqliteSchemaResult(schema)} AS TableSchema, tbl_name AS TableName, name AS TriggerName FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'trigger'";
+                    triggerCmd.CommandText = $"SELECT {SqliteSchemaResult(schema)} AS TableSchema, tbl_name AS TableName, name AS TriggerName, sql AS TriggerSql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'trigger'";
                     await using var triggerReader = await triggerCmd.ExecuteReaderAsync().ConfigureAwait(false);
                     while (await triggerReader.ReadAsync().ConfigureAwait(false))
                     {
@@ -1887,7 +1978,26 @@ namespace nORM.Scaffolding
                         var triggerName = Convert.ToString(triggerReader["TriggerName"]);
                         var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(triggerReader["TableSchema"])), tableName ?? string.Empty);
                         if (!string.IsNullOrWhiteSpace(tableName) && tableKeys.Contains(tableKey))
-                            features.Add(new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger"));
+                        {
+                            var triggerSql = NullIfWhiteSpace(Convert.ToString(triggerReader["TriggerSql"]));
+                            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+                            {
+                                ["provider"] = "SQLite",
+                                ["providerObjectKind"] = "Trigger",
+                                ["table"] = tableKey,
+                                ["triggerName"] = triggerName ?? string.Empty,
+                                ["providerOwnedDdl"] = true,
+                                ["generatedModelConfigurationSupported"] = false,
+                                ["definitionAvailable"] = triggerSql is not null
+                            };
+                            if (triggerSql is not null)
+                                metadata["triggerSql"] = triggerSql;
+                            var feature = new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger")
+                            {
+                                Metadata = metadata
+                            };
+                            features.Add(feature);
+                        }
                     }
                 }
 
@@ -1915,10 +2025,11 @@ namespace nORM.Scaffolding
                         if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
                             continue;
 
+                        string? indexSql = null;
                         if (isPartial)
                         {
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "PartialIndex", indexName, "SQLite partial index"));
-                            continue;
+                            indexSql = await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
+                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "PartialIndex", indexName, indexSql ?? "SQLite partial index"));
                         }
 
                         await using var infoCommand = connection.CreateCommand();
@@ -1936,8 +2047,16 @@ namespace nORM.Scaffolding
                             if (ReaderHasColumn(infoReader, "cid")
                                 && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
                             {
-                                var indexSql = await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
-                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, ExtractCreateIndexExpressionSql(indexSql) ?? "SQLite expression index"));
+                                indexSql ??= await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
+                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, indexSql ?? "SQLite expression index"));
+                                if (!reportedDescending
+                                    && ReaderHasColumn(infoReader, "desc")
+                                    && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0)
+                                {
+                                    features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "DescendingIndex", indexName, indexSql ?? "SQLite descending expression index key"));
+                                    reportedDescending = true;
+                                }
+
                                 break;
                             }
 
@@ -2028,14 +2147,30 @@ namespace nORM.Scaffolding
                     WHERE t.is_ms_shipped = 0
                       AND (CONVERT(decimal(38,0), ic.seed_value) <> 1 OR CONVERT(decimal(38,0), ic.increment_value) <> 1)
                     UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger', 'SQL Server trigger'
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger',
+                        CONCAT(
+                            'SQL Server trigger; timing=',
+                            CASE WHEN tr.is_instead_of_trigger = 1 THEN 'INSTEAD OF' ELSE 'AFTER' END,
+                            '; isDisabled=',
+                            CASE WHEN tr.is_disabled = 1 THEN 'true' ELSE 'false' END,
+                            '; isInsteadOf=',
+                            CASE WHEN tr.is_instead_of_trigger = 1 THEN 'true' ELSE 'false' END)
                     FROM sys.triggers tr
                     INNER JOIN sys.tables t ON t.object_id = tr.parent_id
                     WHERE t.is_ms_shipped = 0
                     UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, t.name, 'TemporalTable',
-                        CASE t.temporal_type WHEN 1 THEN 'SQL Server temporal history table' ELSE 'SQL Server system-versioned temporal table' END
+                        CONCAT(
+                            CASE t.temporal_type WHEN 1 THEN 'SQL Server temporal history table' ELSE 'SQL Server system-versioned temporal table' END,
+                            '; temporalType=',
+                            CASE t.temporal_type WHEN 1 THEN 'history' ELSE 'system-versioned' END,
+                            CASE
+                                WHEN t.history_table_id IS NOT NULL AND t.history_table_id <> 0 AND h.object_id IS NOT NULL
+                                THEN CONCAT('; historyTable=', SCHEMA_NAME(h.schema_id), '.', h.name)
+                                ELSE ''
+                            END)
                     FROM sys.tables t
+                    LEFT JOIN sys.tables h ON h.object_id = t.history_table_id
                     WHERE t.is_ms_shipped = 0 AND t.temporal_type <> 0
                     UNION ALL
                     SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'PartialIndex', 'SQL Server filtered index'
@@ -2074,6 +2209,18 @@ namespace nORM.Scaffolding
                             AND ic.key_ordinal > 0
                             AND ic.is_descending_key = 1
                       )
+                    UNION ALL
+                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'ProviderSpecificIndex',
+                        CONCAT(
+                            'SQL Server provider-specific index; indexType=',
+                            CONVERT(nvarchar(128), i.type_desc) COLLATE DATABASE_DEFAULT)
+                    FROM sys.indexes i
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    WHERE t.is_ms_shipped = 0
+                      AND i.is_primary_key = 0
+                      AND i.is_hypothetical = 0
+                      AND i.name IS NOT NULL
+                      AND i.type NOT IN (1, 2)
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -2081,34 +2228,35 @@ namespace nORM.Scaffolding
             if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
             {
                 await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
+                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default::text AS Detail
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                       AND column_default IS NOT NULL
                       AND is_identity <> 'YES'
                       AND column_default NOT LIKE 'nextval(%'
                     UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Computed', generation_expression || ' STORED'
+                    SELECT table_schema, table_name, column_name, 'Computed', (generation_expression || ' STORED')::text
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND is_generated <> 'NEVER'
                     UNION ALL
-                    SELECT event_object_schema, event_object_table, trigger_name, 'Trigger', 'PostgreSQL trigger'
+                    SELECT event_object_schema, event_object_table, trigger_name, 'Trigger',
+                        ('PostgreSQL trigger; timing=' || action_timing || '; event=' || event_manipulation || '; orientation=' || action_orientation)::text
                     FROM information_schema.triggers
                     WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, con.conname, 'CheckConstraint', pg_get_constraintdef(con.oid)
+                    SELECT ns.nspname, tbl.relname, con.conname, 'CheckConstraint', pg_get_constraintdef(con.oid)::text
                     FROM pg_constraint con
                     INNER JOIN pg_class tbl ON tbl.oid = con.conrelid
                     INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
                     WHERE con.contype = 'c'
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Collation', collation_name
+                    SELECT table_schema, table_name, column_name, 'Collation', collation_name::text
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND collation_name IS NOT NULL
                     UNION ALL
                     SELECT table_schema, table_name, column_name, 'ProviderSpecificColumnType',
-                        CASE
+                        (CASE
                             WHEN domain_name IS NOT NULL AND domain_name <> ''
                             THEN 'DOMAIN (' ||
                                  CASE WHEN domain_schema IS NOT NULL AND domain_schema <> '' THEN domain_schema || '.' ELSE '' END ||
@@ -2139,7 +2287,7 @@ namespace nORM.Scaffolding
                                  ')'
                             WHEN udt_name IS NULL OR udt_name = '' THEN data_type
                             ELSE data_type || ' (' || udt_name || ')'
-                        END
+                        END)::text
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                       AND (
@@ -2150,14 +2298,14 @@ namespace nORM.Scaffolding
                       )
                     UNION ALL
                     SELECT table_schema, table_name, column_name, 'PrecisionScale',
-                        'numeric(' || numeric_precision || ',' || numeric_scale || ')'
+                        ('numeric(' || numeric_precision || ',' || numeric_scale || ')')::text
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                       AND data_type = 'numeric'
                       AND numeric_precision IS NOT NULL
                       AND numeric_scale IS NOT NULL
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'::text
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -2166,7 +2314,7 @@ namespace nORM.Scaffolding
                       AND ix.indpred IS NOT NULL
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', pg_get_indexdef(ix.indexrelid)
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', pg_get_indexdef(ix.indexrelid)::text
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -2175,7 +2323,7 @@ namespace nORM.Scaffolding
                       AND ix.indexprs IS NOT NULL
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'IncludedColumnIndex', 'PostgreSQL index with included columns'
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'IncludedColumnIndex', pg_get_indexdef(ix.indexrelid)::text
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
@@ -2184,14 +2332,101 @@ namespace nORM.Scaffolding
                       AND ix.indnatts <> ix.indnkeyatts
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                     UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'DescendingIndex', 'PostgreSQL descending index key'
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'DescendingIndex', pg_get_indexdef(ix.indexrelid)::text
                     FROM pg_index ix
                     INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
                     INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
                     INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
                     WHERE ix.indisprimary = false
-                      AND pg_get_indexdef(ix.indexrelid) ILIKE '% DESC%'
+                      AND EXISTS (
+                          SELECT 1
+                          FROM unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord)
+                          WHERE key.ord <= ix.indnkeyatts
+                            AND (ix.indoption[key.ord - 1] & 1) = 1
+                      )
                       AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'ProviderSpecificIndex',
+                        ('PostgreSQL provider-specific index; accessMethod=' || am.amname ||
+                         '; indexSql=' || pg_get_indexdef(ix.indexrelid))::text
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    INNER JOIN pg_am am ON am.oid = idx.relam
+                    WHERE ix.indisprimary = false
+                      AND am.amname <> 'btree'
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                    UNION ALL
+                    SELECT ns.nspname, tbl.relname, idx.relname, 'ProviderSpecificIndex',
+                        ('PostgreSQL btree index with provider-specific key options' ||
+                         '; accessMethod=btree' ||
+                         '; hasNullsNotDistinct=' ||
+                         CASE WHEN COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) THEN 'true' ELSE 'false' END ||
+                         '; hasNonDefaultOperatorClass=' ||
+                         CASE WHEN EXISTS (
+                             SELECT 1
+                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
+                             INNER JOIN pg_opclass option_opclass
+                                 ON option_opclass.oid = ix.indclass[option_key.ord - 1]
+                             WHERE option_key.ord <= ix.indnkeyatts
+                               AND option_opclass.opcdefault = false
+                         ) THEN 'true' ELSE 'false' END ||
+                         '; hasIndexCollation=' ||
+                         CASE WHEN EXISTS (
+                             SELECT 1
+                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
+                             INNER JOIN pg_attribute option_att
+                                 ON option_att.attrelid = tbl.oid
+                                AND option_att.attnum = option_key.attnum
+                             WHERE option_key.ord <= ix.indnkeyatts
+                               AND ix.indcollation[option_key.ord - 1] <> 0
+                               AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
+                         ) THEN 'true' ELSE 'false' END ||
+                         '; hasNonDefaultNullOrdering=' ||
+                         CASE WHEN EXISTS (
+                             SELECT 1
+                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
+                             WHERE option_key.ord <= ix.indnkeyatts
+                               AND (
+                                   ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
+                                   OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
+                               )
+                         ) THEN 'true' ELSE 'false' END ||
+                         '; indexSql=' || pg_get_indexdef(ix.indexrelid))::text
+                    FROM pg_index ix
+                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
+                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
+                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                    INNER JOIN pg_am am ON am.oid = idx.relam
+                    WHERE ix.indisprimary = false
+                      AND am.amname = 'btree'
+                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND (
+                          COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) = true
+                          OR EXISTS (
+                              SELECT 1
+                              FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
+                              LEFT JOIN pg_attribute option_att
+                                  ON option_att.attrelid = tbl.oid
+                                 AND option_att.attnum = option_key.attnum
+                              INNER JOIN pg_opclass option_opclass
+                                  ON option_opclass.oid = ix.indclass[option_key.ord - 1]
+                              WHERE option_key.ord <= ix.indnkeyatts
+                                AND (
+                                    option_opclass.opcdefault = false
+                                    OR (
+                                        option_att.attnum IS NOT NULL
+                                        AND ix.indcollation[option_key.ord - 1] <> 0
+                                        AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
+                                    )
+                                    OR (
+                                        ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
+                                        OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
+                                    )
+                                )
+                          )
+                      )
                     """).ConfigureAwait(false);
                 return features;
             }
@@ -2214,7 +2449,8 @@ namespace nORM.Scaffolding
                     FROM information_schema.columns
                     WHERE table_schema = DATABASE() AND generation_expression IS NOT NULL AND generation_expression <> ''
                     UNION ALL
-                    SELECT NULL, event_object_table, trigger_name, 'Trigger', 'MySQL trigger'
+                    SELECT NULL, event_object_table, trigger_name, 'Trigger',
+                        CONCAT('MySQL trigger; timing=', action_timing, '; event=', event_manipulation, '; orientation=', action_orientation)
                     FROM information_schema.triggers
                     WHERE trigger_schema = DATABASE()
                     UNION ALL
@@ -2277,12 +2513,83 @@ namespace nORM.Scaffolding
                       AND index_name <> 'PRIMARY'
                       AND collation = 'D'
                     UNION ALL
-                    SELECT DISTINCT NULL, table_name, index_name, 'PrefixIndex', 'MySQL prefix index'
+                    SELECT NULL, s.table_name, s.index_name, 'PrefixIndex',
+                        CONCAT(
+                            'MySQL prefix index; prefixColumns=',
+                            GROUP_CONCAT(
+                                CONCAT(
+                                    s.column_name,
+                                    ':',
+                                    s.sub_part,
+                                    '/',
+                                    COALESCE(CAST(c.character_maximum_length AS CHAR), '')
+                                )
+                                ORDER BY s.seq_in_index
+                                SEPARATOR ','
+                            )
+                        )
+                    FROM information_schema.statistics s
+                    INNER JOIN information_schema.columns c
+                        ON c.table_schema = s.table_schema
+                       AND c.table_name = s.table_name
+                       AND c.column_name = s.column_name
+                    WHERE s.table_schema = DATABASE()
+                      AND s.index_name <> 'PRIMARY'
+                      AND s.sub_part IS NOT NULL
+                      AND (
+                          c.character_maximum_length IS NULL
+                          OR s.sub_part < c.character_maximum_length
+                      )
+                    GROUP BY s.table_name, s.index_name
+                    UNION ALL
+                    SELECT DISTINCT NULL, table_name, index_name, 'ProviderSpecificIndex',
+                        CONCAT('MySQL provider-specific index; indexType=', index_type)
                     FROM information_schema.statistics
                     WHERE table_schema = DATABASE()
                       AND index_name <> 'PRIMARY'
-                      AND sub_part IS NOT NULL
+                      AND UPPER(COALESCE(NULLIF(index_type, ''), 'BTREE')) <> 'BTREE'
                     """).ConfigureAwait(false);
+                features.AddRange(await GetMySqlExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
+            }
+
+            return features;
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetMySqlExpressionIndexFeaturesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+        {
+            var features = new List<ScaffoldUnsupportedFeature>();
+            foreach (var table in tables)
+            {
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SHOW INDEX FROM {provider.Escape(table.Name)}";
+                await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                if (!ReaderHasColumn(reader, "Expression"))
+                    continue;
+
+                var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    var expression = NullIfWhiteSpace(Convert.ToString(reader["Expression"]));
+                    if (expression is null)
+                        continue;
+
+                    var indexName = Convert.ToString(reader["Key_name"]);
+                    if (string.IsNullOrWhiteSpace(indexName)
+                        || string.Equals(indexName, "PRIMARY", StringComparison.OrdinalIgnoreCase)
+                        || !reported.Add(indexName))
+                    {
+                        continue;
+                    }
+
+                    features.Add(new ScaffoldUnsupportedFeature(
+                        TableKey(table.Schema, table.Name),
+                        "ExpressionIndex",
+                        indexName,
+                        "MySQL expression index; expression=" + expression));
+                }
             }
 
             return features;
@@ -2360,7 +2667,8 @@ namespace nORM.Scaffolding
         private static void AddMissingPrimaryKeyDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldTable> tables,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
         {
             foreach (var table in tables)
             {
@@ -2368,11 +2676,24 @@ namespace nORM.Scaffolding
                 if (primaryKeyColumnsByTable.TryGetValue(tableKey, out var keys) && keys.Count > 0)
                     continue;
 
+                columnPropertiesByTable.TryGetValue(tableKey, out var properties);
+                var columnNames = properties?.Keys.ToArray() ?? Array.Empty<string>();
+                var propertyNames = properties?.Values.ToArray() ?? Array.Empty<string>();
                 features.Add(new ScaffoldUnsupportedFeature(
                     tableKey,
                     "MissingPrimaryKey",
                     table.Name,
-                    "Table has no primary key; generated entity is a query/bootstrap artifact until a key is configured."));
+                    "Table has no primary key; generated entity is a query/bootstrap artifact until a key is configured.")
+                {
+                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["table"] = tableKey,
+                        ["columns"] = columnNames,
+                        ["properties"] = propertyNames,
+                        ["columnCount"] = columnNames.Length,
+                        ["reason"] = "missing-primary-key"
+                    }
+                });
             }
         }
 
@@ -2391,11 +2712,28 @@ namespace nORM.Scaffolding
                     && TryParseReferentialAction(onUpdate, out _))
                     continue;
 
+                var rows = group.ToArray();
+                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
+                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
+                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
+                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
                 features.Add(new ScaffoldUnsupportedFeature(
-                    TableKey(fk.DependentSchema, fk.DependentTable),
+                    dependentKey,
                     "ReferentialAction",
                     fk.ConstraintName,
-                    $"ON DELETE {onDelete}; ON UPDATE {onUpdate}"));
+                    $"ON DELETE {onDelete}; ON UPDATE {onUpdate}")
+                {
+                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["dependentTable"] = dependentKey,
+                        ["dependentColumns"] = dependentColumns,
+                        ["principalTable"] = principalKey,
+                        ["principalColumns"] = principalColumns,
+                        ["columnCount"] = rows.Length,
+                        ["onDelete"] = onDelete,
+                        ["onUpdate"] = onUpdate
+                    }
+                });
             }
         }
 
@@ -2445,22 +2783,36 @@ namespace nORM.Scaffolding
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
         {
             foreach (var group in foreignKeys
                 .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
             {
-                if (ReferencesScaffoldablePrincipalKey(group, primaryKeyColumnsByTable, indexes))
+                if (ReferencesScaffoldablePrincipalKey(group, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
                     continue;
 
                 var fk = group.First();
+                var rows = group.ToArray();
+                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
                 var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                var principalColumns = string.Join(", ", group.Select(row => row.PrincipalColumn));
+                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
+                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
                 features.Add(new ScaffoldUnsupportedFeature(
-                    TableKey(fk.DependentSchema, fk.DependentTable),
+                    dependentKey,
                     "RelationshipPrincipalKey",
                     fk.ConstraintName,
-                    $"FK references {principalKey}.({principalColumns}), which is neither the generated principal primary key nor an exact ordered unfiltered unique index."));
+                    $"FK references {principalKey}.({string.Join(", ", principalColumns)}), which is neither the generated principal primary key nor an exact ordered unfiltered non-null unique index.")
+                {
+                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["dependentTable"] = dependentKey,
+                        ["dependentColumns"] = dependentColumns,
+                        ["principalTable"] = principalKey,
+                        ["principalColumns"] = principalColumns,
+                        ["columnCount"] = rows.Length
+                    }
+                });
             }
         }
 
@@ -2480,11 +2832,25 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
+                var rows = group.ToArray();
+                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
+                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
+                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
                 features.Add(new ScaffoldUnsupportedFeature(
                     dependentKey,
                     "RelationshipDependentKey",
                     fk.ConstraintName,
-                    $"FK dependent table {dependentKey} has no primary key; generated navigations are suppressed because nORM cannot track or include the dependent side safely."));
+                    $"FK dependent table {dependentKey} has no primary key; generated navigations are suppressed because nORM cannot track or include the dependent side safely.")
+                {
+                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["dependentTable"] = dependentKey,
+                        ["dependentColumns"] = dependentColumns,
+                        ["principalTable"] = principalKey,
+                        ["principalColumns"] = principalColumns,
+                        ["columnCount"] = rows.Length
+                    }
+                });
             }
         }
 
@@ -2811,14 +3177,52 @@ namespace nORM.Scaffolding
 
         private static void RemoveSupportedProviderSpecificColumnTypeDiagnostics(
             List<ScaffoldUnsupportedFeature> unsupportedFeatures,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            ICollection<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
         {
-            unsupportedFeatures.RemoveAll(feature =>
+            RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
                 string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
                 && IsScaffoldableProviderSpecificColumnType(feature.Detail)
                 && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
                 && properties.ContainsKey(feature.Name));
         }
+
+        private static void RemoveGeneratedUnsupportedFeatures(
+            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            ICollection<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
+            Predicate<ScaffoldUnsupportedFeature> predicate)
+        {
+            for (var i = unsupportedFeatures.Count - 1; i >= 0; i--)
+            {
+                var feature = unsupportedFeatures[i];
+                if (!predicate(feature))
+                    continue;
+
+                generatedModelFeatureDiagnostics.Add(feature);
+                unsupportedFeatures.RemoveAt(i);
+            }
+        }
+
+        private static void RestoreGeneratedManyToManyUnsupportedFeatures(
+            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IEnumerable<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
+            IReadOnlySet<string> manyToManyJoinTableKeys)
+        {
+            foreach (var feature in generatedModelFeatureDiagnostics)
+            {
+                if (!ShouldRestoreGeneratedManyToManyUnsupportedFeature(feature.Kind)
+                    || !manyToManyJoinTableKeys.Contains(feature.TableKey)
+                    || unsupportedFeatures.Contains(feature))
+                {
+                    continue;
+                }
+
+                unsupportedFeatures.Add(feature);
+            }
+        }
+
+        private static bool ShouldRestoreGeneratedManyToManyUnsupportedFeature(string kind)
+            => !string.Equals(kind, "Computed", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsScaffoldableProviderSpecificColumnType(string? detail)
         {
@@ -2853,7 +3257,7 @@ namespace nORM.Scaffolding
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
                 .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
-                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes))
+                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
                 .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
                 .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
@@ -2884,7 +3288,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Composite Foreign Keys");
                     sb.AppendLine();
-                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact ordered unfiltered unique index, so v1 scaffolding keeps them diagnostic.");
+                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact ordered unfiltered non-null unique index, so v1 scaffolding keeps them diagnostic.");
                     sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
@@ -2917,7 +3321,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine();
                     sb.AppendLine("## Provider-Owned Schema Features");
                     sb.AppendLine();
-                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact ordered unfiltered unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
+                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact ordered unfiltered non-null unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
                     sb.AppendLine();
                     sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
                     sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -2997,12 +3401,129 @@ namespace nORM.Scaffolding
                     var principalTables = rows.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
                     var constraintNames = rows.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
                     var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable, identityColumnsByTable, indexes);
-                    return new ScaffoldPossibleJoinTableDiagnostic(tableKey, principalTables, constraintNames, reasons);
+                    var metadata = BuildPossibleJoinTableMetadata(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable, identityColumnsByTable, indexes);
+                    return new ScaffoldPossibleJoinTableDiagnostic(tableKey, principalTables, constraintNames, reasons, metadata);
                 })
                 .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
                 .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
                 .OrderBy(g => g.TableKey, StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildPossibleJoinTableMetadata(
+            string tableKey,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes)
+        {
+            var foreignKeyColumns = foreignKeys
+                .Select(static fk => fk.DependentColumn)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static column => column, StringComparer.Ordinal)
+                .ToArray();
+            var foreignKeyColumnSet = foreignKeyColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var primaryKeyColumns = primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKey)
+                ? primaryKey.ToArray()
+                : Array.Empty<string>();
+            var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(tableKey, out var generatedColumns)
+                ? generatedColumns.OrderBy(static column => column, StringComparer.Ordinal).ToArray()
+                : Array.Empty<string>();
+            var databaseGeneratedColumnSet = databaseGeneratedColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var identityColumns = identityColumnsByTable.TryGetValue(tableKey, out var identity)
+                ? identity.OrderBy(static column => column, StringComparer.Ordinal).ToArray()
+                : Array.Empty<string>();
+            var identityColumnSet = identityColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var payloadColumns = columnPropertiesByTable.TryGetValue(tableKey, out var columns)
+                ? columns.Keys
+                    .Where(column => !foreignKeyColumnSet.Contains(column)
+                                     && !databaseGeneratedColumnSet.Contains(column)
+                                     && !identityColumnSet.Contains(column))
+                    .OrderBy(static column => column, StringComparer.Ordinal)
+                    .ToArray()
+                : Array.Empty<string>();
+            var nullableForeignKeyColumns = nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
+                ? foreignKeyColumns
+                    .Where(column => !nonNullableColumns.Contains(column))
+                    .OrderBy(static column => column, StringComparer.Ordinal)
+                    .ToArray()
+                : Array.Empty<string>();
+            var hasExactBridgePrimaryKey = primaryKeyColumns.Length == foreignKeyColumns.Length
+                && primaryKeyColumns.All(foreignKeyColumnSet.Contains);
+            var primaryKeyExtraColumns = primaryKeyColumns
+                .Where(column => !foreignKeyColumnSet.Contains(column))
+                .ToArray();
+            var hasGeneratedSurrogatePrimaryKey = primaryKeyColumns.Length == 1
+                && primaryKeyExtraColumns.Length == 1
+                && (databaseGeneratedColumnSet.Contains(primaryKeyExtraColumns[0])
+                    || identityColumnSet.Contains(primaryKeyExtraColumns[0]));
+            var foreignKeyConstraintMetadata = foreignKeys
+                .GroupBy(static fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static group => group.Key, StringComparer.Ordinal)
+                .Select(group =>
+                {
+                    var rows = group.ToArray();
+                    var first = rows[0];
+                    return new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["constraint"] = first.ConstraintName,
+                        ["principalTable"] = TableKey(first.PrincipalSchema, first.PrincipalTable),
+                        ["dependentColumns"] = rows.Select(static row => row.DependentColumn).ToArray(),
+                        ["principalColumns"] = rows.Select(static row => row.PrincipalColumn).ToArray()
+                    };
+                })
+                .ToArray();
+
+            return new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["foreignKeyConstraintCount"] = foreignKeyConstraintMetadata.Length,
+                ["foreignKeyColumns"] = foreignKeyColumns,
+                ["primaryKeyColumns"] = primaryKeyColumns,
+                ["payloadColumns"] = payloadColumns,
+                ["databaseGeneratedColumns"] = databaseGeneratedColumns,
+                ["identityColumns"] = identityColumns,
+                ["nullableForeignKeyColumns"] = nullableForeignKeyColumns,
+                ["hasExactBridgePrimaryKey"] = hasExactBridgePrimaryKey,
+                ["hasGeneratedSurrogatePrimaryKey"] = hasGeneratedSurrogatePrimaryKey,
+                ["hasExactForeignKeyUniqueIndex"] = HasExactUniqueIndex(indexes, tableKey, foreignKeyColumnSet, nonNullableColumnsByTable),
+                ["foreignKeys"] = foreignKeyConstraintMetadata
+            };
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildCompositeForeignKeyMetadata(
+            IReadOnlyList<ScaffoldForeignKey> rows,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
+        {
+            if (rows.Count == 0)
+                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
+
+            var first = rows[0];
+            var dependentTable = TableKey(first.DependentSchema, first.DependentTable);
+            var principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable);
+            var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
+            var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["relationshipSuppressed"] = true,
+                ["reason"] = "principal-key-not-scaffoldable",
+                ["columnCount"] = rows.Count,
+                ["dependentTable"] = dependentTable,
+                ["principalTable"] = principalTable,
+                ["dependentColumns"] = dependentColumns,
+                ["principalColumns"] = principalColumns,
+                ["referencesPrimaryKey"] = HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTable, principalColumns),
+                ["referencesScaffoldableUniqueIndex"] = ReferencesUniqueIndex(rows, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable)
+            };
+
+            if (primaryKeyColumnsByTable.TryGetValue(principalTable, out var principalPrimaryKeyColumns))
+                metadata["principalPrimaryKeyColumns"] = principalPrimaryKeyColumns.ToArray();
+
+            return metadata;
         }
 
         private static string[] BuildPossibleJoinTableReasons(
@@ -3057,7 +3578,7 @@ namespace nORM.Scaffolding
                         && (databaseGeneratedColumns.Contains(primaryKeyExtraColumns[0])
                             || identityColumns.Contains(primaryKeyExtraColumns[0]));
 
-                    reasons.Add(hasGeneratedSurrogatePrimaryKeyShape && !HasExactUniqueIndex(indexes, tableKey, fkColumns)
+                    reasons.Add(hasGeneratedSurrogatePrimaryKeyShape && !HasExactUniqueIndex(indexes, tableKey, fkColumns, nonNullableColumnsByTable)
                         ? "missing-exact-unique-index"
                         : "primary-key-not-exact-bridge-columns");
                 }
@@ -3078,7 +3599,7 @@ namespace nORM.Scaffolding
                     .Select(row => row.PrincipalColumn)
                     .ToArray();
                 if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTableKey, principalColumns)
-                    && !ReferencesUniqueIndex(fkGroup, primaryKeyColumnsByTable, indexes))
+                    && !ReferencesUniqueIndex(fkGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
                 {
                     reasons.Add("principal-key-not-scaffoldable");
                 }
@@ -3105,7 +3626,7 @@ namespace nORM.Scaffolding
             => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
 
         private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact ordered unfiltered unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unfiltered unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
+            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact ordered unfiltered non-null unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unfiltered non-null unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
 
         private static string ScaffoldDiagnosticSeverity()
             => "Warning";
@@ -3143,6 +3664,7 @@ namespace nORM.Scaffolding
                 "TemporalTable" => "SCF115",
                 "MissingPrimaryKey" => "SCF116",
                 "PrefixIndex" => "SCF117",
+                "ProviderSpecificIndex" => "SCF119",
                 _ => "SCF199"
             };
 
@@ -3150,7 +3672,7 @@ namespace nORM.Scaffolding
             => kind switch
             {
                 "ReferentialAction" or "RelationshipPrincipalKey" or "RelationshipDependentKey" => "relationship",
-                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" or "PrefixIndex" => "index",
+                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" or "PrefixIndex" or "ProviderSpecificIndex" => "index",
                 "Trigger" or "TemporalTable" => "database-object",
                 "MissingPrimaryKey" => "table-shape",
                 _ => "schema-feature"
@@ -3189,7 +3711,7 @@ namespace nORM.Scaffolding
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
                 "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
-                "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
+                "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered non-null unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RelationshipDependentKey" => "Add a primary key to the dependent table before relying on generated navigations/includes, or keep the keyless type read-only and configure explicit query projections.",
                 "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
                 "IdentityStrategy" => "Parsed SQL Server IDENTITY(seed, increment) metadata is scaffolded into HasIdentityOptions; review any unparsed provider-specific identity strategy manually.",
@@ -3199,6 +3721,7 @@ namespace nORM.Scaffolding
                 "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
                 "DescendingIndex" => "Review this descending index shape; ordinary column-key descending indexes are generated, but this one was not safe to map as provider-neutral index metadata.",
                 "PrefixIndex" => "Keep the MySQL prefix index in provider migrations; prefix uniqueness is not full-column uniqueness and is not used for generated alternate-key relationships.",
+                "ProviderSpecificIndex" => "Keep this provider-specific index implementation in migrations; v1 scaffolding emits portable B-tree/rowstore column-index metadata only.",
                 "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
                 "MissingPrimaryKey" => "Generated code marks this type with [ReadOnlyEntity] so query materialization works but nORM writes are rejected; add a primary key before using generated writes or navigations.",
                 _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."
@@ -3220,20 +3743,29 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(ScaffoldSkippedObject obj)
         {
+            if (string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase))
+                return BuildSequenceMetadata(obj);
+
+            if (string.Equals(obj.Kind, "Synonym", StringComparison.OrdinalIgnoreCase))
+                return BuildSynonymMetadata(obj);
+
+            if (string.Equals(obj.Kind, "Event", StringComparison.OrdinalIgnoreCase))
+                return BuildEventMetadata(obj);
+
+            if (string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase))
+            {
+                return BuildQueryObjectMetadata(obj);
+            }
+
             if (!string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase))
                 return new Dictionary<string, object?>(0, StringComparer.Ordinal);
 
-            var segments = obj.Detail.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            for (var i = 1; i < segments.Length; i++)
-            {
-                var pair = segments[i].Split('=', 2);
-                if (pair.Length == 2)
-                    values[pair[0].Trim()] = pair[1].Trim();
-            }
-
-            var provider = ParseRoutineProvider(segments.Length > 0 ? segments[0] : string.Empty);
-            var routineType = ParseRoutineType(segments.Length > 0 ? segments[0] : string.Empty);
+            var values = ParseRoutineSemicolonValues(obj.Detail, out var header);
+            var provider = ParseRoutineProvider(header);
+            var routineType = ParseRoutineType(header);
             values.TryGetValue("dataType", out var dataType);
             var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
@@ -3260,6 +3792,504 @@ namespace nORM.Scaffolding
 
             if (values.TryGetValue("resultColumns", out var resultColumns))
                 metadata["resultColumns"] = ParseRoutineResultColumns(resultColumns);
+
+            return metadata;
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(ScaffoldUnsupportedFeature feature)
+        {
+            var metadata = feature.Metadata is null
+                ? new Dictionary<string, object?>(StringComparer.Ordinal)
+                : new Dictionary<string, object?>(feature.Metadata, StringComparer.Ordinal);
+            switch (feature.Kind)
+            {
+                case "MissingPrimaryKey":
+                    metadata["readOnlyEntity"] = true;
+                    metadata["generatedWritesSupported"] = false;
+                    metadata["generatedNavigationSupported"] = false;
+                    if (!metadata.ContainsKey("table"))
+                        metadata["table"] = feature.TableKey;
+                    if (!metadata.ContainsKey("reason"))
+                        metadata["reason"] = "missing-primary-key";
+                    break;
+                case "RelationshipPrincipalKey":
+                    metadata["navigationSuppressed"] = true;
+                    metadata["reason"] = "principal-key-not-scaffoldable";
+                    if (!metadata.ContainsKey("dependentTable"))
+                        metadata["dependentTable"] = feature.TableKey;
+                    if (TryParseRelationshipPrincipalKeyDetail(feature.Detail, out var principalTable, out var principalColumns))
+                    {
+                        if (!metadata.ContainsKey("principalTable"))
+                            metadata["principalTable"] = principalTable;
+                        if (!metadata.ContainsKey("principalColumns"))
+                            metadata["principalColumns"] = principalColumns;
+                    }
+                    break;
+                case "RelationshipDependentKey":
+                    metadata["navigationSuppressed"] = true;
+                    metadata["reason"] = "dependent-table-keyless";
+                    metadata["generatedNavigationSupported"] = false;
+                    if (!metadata.ContainsKey("dependentTable"))
+                        metadata["dependentTable"] = feature.TableKey;
+                    break;
+                case "ReferentialAction":
+                    if (TryParseReferentialActionDetail(feature.Detail, out var onDelete, out var onUpdate))
+                    {
+                        metadata["onDelete"] = onDelete;
+                        metadata["onUpdate"] = onUpdate;
+                    }
+                    break;
+                case "PrecisionScale":
+                    if (TryParseDecimalPrecision(feature.Detail, out var precision, out var scale))
+                    {
+                        metadata["precision"] = precision;
+                        metadata["scale"] = scale;
+                    }
+                    break;
+                case "Computed":
+                    var (sql, stored) = NormalizeScaffoldComputedSql(feature.Detail);
+                    metadata["computedSql"] = sql;
+                    metadata["stored"] = stored;
+                    break;
+                case "RowVersion":
+                    metadata["concurrencyToken"] = true;
+                    metadata["databaseGenerated"] = true;
+                    break;
+                case "IdentityStrategy":
+                    if (TryParseIdentityOptions(feature.Detail, out var seed, out var increment))
+                    {
+                        metadata["seed"] = seed;
+                        metadata["increment"] = increment;
+                    }
+                    break;
+                case "ProviderSpecificColumnType":
+                    metadata["providerType"] = feature.Detail;
+                    break;
+                case "Collation":
+                    metadata["collation"] = feature.Detail;
+                    break;
+                case "Default":
+                    metadata["defaultSql"] = feature.Detail;
+                    break;
+                case "CheckConstraint":
+                    metadata["checkSql"] = NormalizeScaffoldCheckSql(feature.Detail);
+                    break;
+                case "PartialIndex":
+                    metadata["filtered"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "ExpressionIndex":
+                    metadata["expressionBased"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    AddExpressionIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "IncludedColumnIndex":
+                    metadata["includedColumns"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "DescendingIndex":
+                    metadata["descending"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "PrefixIndex":
+                    metadata["prefixIndex"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "ProviderSpecificIndex":
+                    metadata["providerSpecific"] = true;
+                    AddIndexFeatureMetadata(metadata, feature.Detail);
+                    break;
+                case "Trigger":
+                    AddTriggerFeatureMetadata(metadata, feature);
+                    break;
+                case "TemporalTable":
+                    AddTemporalTableFeatureMetadata(metadata, feature);
+                    break;
+            }
+
+            return metadata;
+        }
+
+        private static void AddTriggerFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeature feature)
+        {
+            var values = ParseSemicolonValues(feature.Detail, out var header);
+            var provider = ParseSkippedObjectProvider(header);
+            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
+            metadata["providerObjectKind"] = "Trigger";
+            if (!metadata.ContainsKey("table"))
+                metadata["table"] = feature.TableKey;
+            if (!metadata.ContainsKey("triggerName"))
+                metadata["triggerName"] = feature.Name;
+            metadata["providerOwnedDdl"] = true;
+            metadata["generatedModelConfigurationSupported"] = false;
+            AddMetadataValue(metadata, values, "timing");
+            AddMetadataValue(metadata, values, "event");
+            AddMetadataValue(metadata, values, "orientation");
+            AddMetadataValue(metadata, values, "triggerSql");
+            AddMetadataBooleanValue(metadata, values, "isDisabled");
+            AddMetadataBooleanValue(metadata, values, "isInsteadOf");
+            if (!metadata.ContainsKey("definitionAvailable"))
+                metadata["definitionAvailable"] = metadata.ContainsKey("triggerSql");
+        }
+
+        private static void AddTemporalTableFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeature feature)
+        {
+            var values = ParseSemicolonValues(feature.Detail, out var header);
+            var provider = ParseSkippedObjectProvider(header);
+            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
+            metadata["providerObjectKind"] = "TemporalTable";
+            if (!metadata.ContainsKey("table"))
+                metadata["table"] = feature.TableKey;
+            metadata["providerNativeTemporal"] = true;
+            metadata["generatedTemporalConfigurationSupported"] = false;
+            AddMetadataValue(metadata, values, "temporalType");
+            AddMetadataValue(metadata, values, "historyTable");
+            if (!metadata.ContainsKey("temporalType"))
+            {
+                metadata["temporalType"] = feature.Detail.Contains("history table", StringComparison.OrdinalIgnoreCase)
+                    ? "history"
+                    : "system-versioned";
+            }
+        }
+
+        private static void AddIndexFeatureMetadata(IDictionary<string, object?> metadata, string detail)
+        {
+            if (string.IsNullOrWhiteSpace(detail))
+                return;
+
+            var values = ParseSemicolonValues(detail, out var header);
+            var provider = ParseSkippedObjectProvider(header);
+            if (IsKnownProviderName(provider))
+                metadata["provider"] = provider;
+
+            AddMetadataValue(metadata, values, "indexType");
+            AddMetadataValue(metadata, values, "accessMethod");
+            AddMetadataValue(metadata, values, "filterSql");
+            AddMetadataBooleanValue(metadata, values, "hasNullsNotDistinct");
+            AddMetadataBooleanValue(metadata, values, "hasNonDefaultOperatorClass");
+            AddMetadataBooleanValue(metadata, values, "hasIndexCollation");
+            AddMetadataBooleanValue(metadata, values, "hasNonDefaultNullOrdering");
+
+            if (values.TryGetValue("prefixColumns", out var prefixColumns)
+                && !string.IsNullOrWhiteSpace(prefixColumns))
+            {
+                metadata["prefixColumns"] = ParsePrefixIndexColumns(prefixColumns);
+            }
+
+            var indexSql = values.TryGetValue("indexSql", out var explicitIndexSql)
+                ? NullIfWhiteSpace(explicitIndexSql)
+                : ExtractCreateIndexStatement(detail);
+            if (string.IsNullOrWhiteSpace(indexSql))
+                return;
+
+            metadata["indexSql"] = indexSql;
+            metadata["isUnique"] = IsCreateIndexUnique(indexSql);
+            var keySql = ExtractCreateIndexExpressionSql(indexSql);
+            if (!string.IsNullOrWhiteSpace(keySql))
+                metadata["keySql"] = keySql;
+            var filterSql = ExtractCreateIndexWhereClause(indexSql);
+            if (!string.IsNullOrWhiteSpace(filterSql))
+                metadata["filterSql"] = filterSql;
+        }
+
+        private static void AddMetadataBooleanValue(
+            IDictionary<string, object?> metadata,
+            IReadOnlyDictionary<string, string> values,
+            string key)
+        {
+            if (!values.TryGetValue(key, out var value)
+                || !TryParseMetadataBoolean(value, out var parsed))
+            {
+                return;
+            }
+
+            metadata[key] = parsed;
+        }
+
+        private static bool TryParseMetadataBoolean(string value, out bool parsed)
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || trimmed.Equals("1", StringComparison.Ordinal))
+            {
+                parsed = true;
+                return true;
+            }
+
+            if (trimmed.Equals("false", StringComparison.OrdinalIgnoreCase)
+                || trimmed.Equals("0", StringComparison.Ordinal))
+            {
+                parsed = false;
+                return true;
+            }
+
+            parsed = false;
+            return false;
+        }
+
+        private static void AddExpressionIndexFeatureMetadata(IDictionary<string, object?> metadata, string detail)
+        {
+            var values = ParseSemicolonValues(detail, out _);
+            if (values.TryGetValue("expression", out var expression)
+                && !string.IsNullOrWhiteSpace(expression))
+            {
+                metadata["expressionSql"] = expression.Trim();
+            }
+
+            var indexSql = ExtractCreateIndexStatement(detail);
+            var expressionSql = ExtractCreateIndexExpressionSql(indexSql ?? detail);
+            if (!string.IsNullOrWhiteSpace(expressionSql)
+                && !expressionSql.EndsWith("expression index", StringComparison.OrdinalIgnoreCase))
+            {
+                metadata["expressionSql"] = expressionSql;
+            }
+        }
+
+        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParsePrefixIndexColumns(string prefixColumns)
+        {
+            var result = new List<IReadOnlyDictionary<string, object?>>();
+            foreach (var rawPart in SplitTopLevelCommaSeparated(prefixColumns))
+            {
+                var part = rawPart.Trim();
+                if (part.Length == 0)
+                    continue;
+
+                var separator = part.LastIndexOf(':');
+                if (separator <= 0)
+                    continue;
+
+                var lengths = part[(separator + 1)..];
+                var slash = lengths.IndexOf('/');
+                var prefixLengthText = slash >= 0 ? lengths[..slash] : lengths;
+                var declaredLengthText = slash >= 0 ? lengths[(slash + 1)..] : string.Empty;
+                var column = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["name"] = part[..separator].Trim()
+                };
+
+                var prefixLength = ParseNullableInt(prefixLengthText);
+                if (prefixLength.HasValue)
+                    column["prefixLength"] = prefixLength.Value;
+
+                var declaredLength = ParseNullableInt(declaredLengthText);
+                if (declaredLength.HasValue)
+                    column["declaredLength"] = declaredLength.Value;
+
+                result.Add(column);
+            }
+
+            return result;
+        }
+
+        private static string? ExtractCreateIndexStatement(string detail)
+        {
+            var createIndex = FindSqlKeywordOutsideQuotes(detail, "CREATE", 0);
+            if (createIndex < 0)
+                return null;
+
+            var candidate = detail[createIndex..].Trim();
+            var index = 0;
+            return TryConsumeSqlKeyword(candidate, ref index, "CREATE")
+                ? candidate
+                : null;
+        }
+
+        private static bool IsKnownProviderName(string value)
+            => value.Equals("SQL Server", StringComparison.OrdinalIgnoreCase)
+               || value.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
+               || value.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
+               || value.Equals("SQLite", StringComparison.OrdinalIgnoreCase);
+
+        private static bool TryParseRelationshipPrincipalKeyDetail(
+            string detail,
+            out string principalTable,
+            out string[] principalColumns)
+        {
+            principalTable = string.Empty;
+            principalColumns = Array.Empty<string>();
+            const string prefix = "FK references ";
+            if (!detail.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+
+            var columnsStart = detail.IndexOf(".(", prefix.Length, StringComparison.Ordinal);
+            if (columnsStart < 0)
+                return false;
+
+            var columnsEnd = detail.IndexOf(')', columnsStart + 2);
+            if (columnsEnd <= columnsStart + 2)
+                return false;
+
+            principalTable = detail.Substring(prefix.Length, columnsStart - prefix.Length);
+            principalColumns = detail
+                .Substring(columnsStart + 2, columnsEnd - columnsStart - 2)
+                .Split(',')
+                .Select(static column => column.Trim())
+                .Where(static column => column.Length > 0)
+                .ToArray();
+            return !string.IsNullOrWhiteSpace(principalTable) && principalColumns.Length > 0;
+        }
+
+        private static bool TryParseReferentialActionDetail(
+            string detail,
+            out string onDelete,
+            out string onUpdate)
+        {
+            onDelete = string.Empty;
+            onUpdate = string.Empty;
+            const string deletePrefix = "ON DELETE ";
+            const string updateMarker = "; ON UPDATE ";
+            if (!detail.StartsWith(deletePrefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var updateIndex = detail.IndexOf(updateMarker, deletePrefix.Length, StringComparison.OrdinalIgnoreCase);
+            if (updateIndex < 0)
+                return false;
+
+            onDelete = detail.Substring(deletePrefix.Length, updateIndex - deletePrefix.Length).Trim();
+            onUpdate = detail[(updateIndex + updateMarker.Length)..].Trim();
+            return onDelete.Length > 0 && onUpdate.Length > 0;
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildSequenceMetadata(ScaffoldSkippedObject obj)
+        {
+            var provider = ParseSequenceProvider(obj.Detail);
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["provider"] = FormatSequenceProvider(provider),
+                ["stubSupported"] = provider is "sqlserver" or "postgres",
+                ["clrType"] = GetTypeName(MapSequenceValueType(obj.Detail), allowNull: false)
+            };
+
+            var dataType = ParseSemicolonValue(obj.Detail, "dataType");
+            if (!string.IsNullOrWhiteSpace(dataType))
+                metadata["dataType"] = dataType;
+
+            return metadata;
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildEventMetadata(ScaffoldSkippedObject obj)
+        {
+            if (!obj.Detail.StartsWith("MySQL event", StringComparison.OrdinalIgnoreCase))
+                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
+
+            var values = ParseSemicolonValues(obj.Detail, out _);
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["provider"] = "MySQL"
+            };
+
+            AddMetadataValue(metadata, values, "eventType");
+            AddMetadataValue(metadata, values, "status");
+            AddMetadataValue(metadata, values, "intervalValue");
+            AddMetadataValue(metadata, values, "intervalField");
+            AddMetadataValue(metadata, values, "executeAt");
+            AddMetadataValue(metadata, values, "starts");
+            AddMetadataValue(metadata, values, "ends");
+            return metadata;
+        }
+
+        private static void AddMetadataValue(
+            IDictionary<string, object?> metadata,
+            IReadOnlyDictionary<string, string> values,
+            string key)
+        {
+            if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                metadata[key] = value;
+        }
+
+        private static IReadOnlyDictionary<string, object?> BuildQueryObjectMetadata(ScaffoldSkippedObject obj)
+        {
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["provider"] = ParseSkippedObjectProvider(obj.Detail),
+                ["targetKind"] = obj.Kind,
+                ["queryArtifactSupported"] = IsQueryArtifactObject(obj)
+            };
+
+            if (string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase))
+            {
+                var owner = InferSqliteVirtualTableShadowOwner(obj.Name);
+                if (!string.IsNullOrWhiteSpace(owner))
+                    metadata["shadowOf"] = owner;
+            }
+
+            return metadata;
+        }
+
+        private static string ParseSkippedObjectProvider(string detail)
+        {
+            if (detail.StartsWith("SQL Server", StringComparison.OrdinalIgnoreCase)) return "SQL Server";
+            if (detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase)) return "PostgreSQL";
+            if (detail.StartsWith("MySQL", StringComparison.OrdinalIgnoreCase)) return "MySQL";
+            if (detail.StartsWith("SQLite", StringComparison.OrdinalIgnoreCase)) return "SQLite";
+            var space = detail.IndexOf(' ');
+            return space > 0 ? detail[..space] : detail;
+        }
+
+        private static string InferSqliteVirtualTableShadowOwner(string tableName)
+        {
+            var suffixes = new[]
+            {
+                "_content",
+                "_data",
+                "_idx",
+                "_docsize",
+                "_config",
+                "_segments",
+                "_segdir",
+                "_stat",
+                "_node",
+                "_parent",
+                "_rowid"
+            };
+
+            foreach (var suffix in suffixes)
+            {
+                if (tableName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+                    && tableName.Length > suffix.Length)
+                {
+                    return tableName[..^suffix.Length];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static string FormatSequenceProvider(string provider)
+            => provider switch
+            {
+                "sqlserver" => "SQL Server",
+                "postgres" => "PostgreSQL",
+                _ => provider
+            };
+
+        private static IReadOnlyDictionary<string, object?> BuildSynonymMetadata(ScaffoldSkippedObject obj)
+        {
+            if (!obj.Detail.StartsWith("SQL Server synonym", StringComparison.OrdinalIgnoreCase))
+                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
+
+            var baseObject = ParseSemicolonValue(obj.Detail, "baseObject");
+            var baseType = ParseSemicolonValue(obj.Detail, "baseType");
+            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["provider"] = "SQL Server",
+                ["queryArtifactSupported"] = IsTableLikeSqlServerSynonym(obj.Detail)
+            };
+
+            if (!string.IsNullOrWhiteSpace(baseObject))
+                metadata["baseObject"] = baseObject;
+            if (!string.IsNullOrWhiteSpace(baseType))
+            {
+                metadata["baseType"] = baseType;
+                metadata["targetKind"] = baseType.ToUpperInvariant() switch
+                {
+                    "U" => "Table",
+                    "V" => "View",
+                    "P" => "Procedure",
+                    "FN" or "IF" or "TF" => "Function",
+                    _ => baseType
+                };
+            }
 
             return metadata;
         }
@@ -3309,45 +4339,141 @@ namespace nORM.Scaffolding
                 return Array.Empty<IReadOnlyDictionary<string, object?>>();
 
             return SplitRoutineParameterModes(parameterModes)
-                .Select(raw =>
-                {
-                    var parts = raw.Split(':', 3);
-                    var parameter = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["name"] = parts.Length > 0 ? parts[0] : string.Empty,
-                        ["mode"] = parts.Length > 1 ? parts[1] : string.Empty
-                    };
-                    if (parts.Length > 2 && !string.IsNullOrWhiteSpace(parts[2]))
-                    {
-                        parameter["dataType"] = parts[2];
-                        parameter["clrType"] = GetRoutineParameterTypeName(parts[2]);
-                        parameter["dbType"] = GetRoutineParameterDbTypeName(parts[2]);
-                    }
-                    return (IReadOnlyDictionary<string, object?>)parameter;
-                })
+                .Select(ParseRoutineParameter)
                 .ToArray();
         }
+
+        private static IReadOnlyDictionary<string, object?> ParseRoutineParameter(string raw)
+        {
+            if (!TryParseRoutineParameterMode(raw, out var name, out var mode, out var dataType))
+            {
+                var parts = raw.Split(':', 3);
+                name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+                mode = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                dataType = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+            }
+
+            var parameter = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["name"] = name,
+                ["mode"] = mode
+            };
+            if (!string.IsNullOrWhiteSpace(dataType))
+            {
+                parameter["dataType"] = dataType;
+                parameter["clrType"] = GetRoutineParameterTypeName(dataType);
+                parameter["dbType"] = GetRoutineParameterDbTypeName(dataType);
+            }
+
+            return parameter;
+        }
+
+        private static bool TryParseRoutineParameterMode(
+            string raw,
+            out string name,
+            out string mode,
+            out string dataType)
+        {
+            name = string.Empty;
+            mode = string.Empty;
+            dataType = string.Empty;
+
+            var trimmed = raw.Trim();
+            if (trimmed.Length == 0)
+                return false;
+
+            for (var separator = trimmed.Length - 1; separator >= 0; separator--)
+            {
+                if (trimmed[separator] != ':')
+                    continue;
+
+                var modeStart = separator + 1;
+                var modeEnd = trimmed.IndexOf(':', modeStart);
+                var candidate = modeEnd >= 0
+                    ? trimmed.Substring(modeStart, modeEnd - modeStart).Trim()
+                    : trimmed[modeStart..].Trim();
+                if (!IsRoutineParameterMode(candidate))
+                    continue;
+
+                name = trimmed[..separator].Trim();
+                mode = candidate;
+                dataType = modeEnd >= 0 ? trimmed[(modeEnd + 1)..].Trim() : string.Empty;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsRoutineParameterMode(string mode)
+            => mode.Equals("IN", StringComparison.OrdinalIgnoreCase)
+               || mode.Equals("OUT", StringComparison.OrdinalIgnoreCase)
+               || mode.Equals("INOUT", StringComparison.OrdinalIgnoreCase)
+               || mode.Equals("RETURN", StringComparison.OrdinalIgnoreCase);
 
         private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParseRoutineResultColumns(string resultColumns)
         {
             if (string.IsNullOrWhiteSpace(resultColumns))
                 return Array.Empty<IReadOnlyDictionary<string, object?>>();
 
-            return resultColumns
-                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(raw =>
-                {
-                    var parts = raw.Split(':', 3);
-                    var column = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["name"] = parts.Length > 0 ? parts[0] : string.Empty,
-                        ["dataType"] = parts.Length > 1 ? parts[1] : string.Empty
-                    };
-                    if (parts.Length > 2 && int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var nullable))
-                        column["nullable"] = nullable != 0;
-                    return (IReadOnlyDictionary<string, object?>)column;
-                })
+            return SplitRoutineResultColumns(resultColumns)
+                .Select(ParseRoutineResultColumn)
                 .ToArray();
+        }
+
+        private static IReadOnlyDictionary<string, object?> ParseRoutineResultColumn(string raw)
+        {
+            string name;
+            string dataType;
+            bool? isNullable = null;
+            if (TryParseRoutineResultColumnParts(raw, out name, out dataType, out var nullable))
+            {
+                isNullable = nullable;
+            }
+            else
+            {
+                var parts = raw.Split(':', 3);
+                name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+                dataType = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                if (parts.Length > 2 && int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedNullable))
+                    isNullable = parsedNullable != 0;
+            }
+
+            var column = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["name"] = name,
+                ["dataType"] = dataType
+            };
+            if (isNullable.HasValue)
+                column["nullable"] = isNullable.Value;
+            return column;
+        }
+
+        private static bool TryParseRoutineResultColumnParts(
+            string raw,
+            out string name,
+            out string dataType,
+            out bool nullable)
+        {
+            name = string.Empty;
+            dataType = string.Empty;
+            nullable = false;
+
+            var trimmed = raw.Trim();
+            var nullableSeparator = trimmed.LastIndexOf(':');
+            if (nullableSeparator <= 0
+                || !int.TryParse(trimmed[(nullableSeparator + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedNullable))
+            {
+                return false;
+            }
+
+            var typeSeparator = trimmed.LastIndexOf(':', nullableSeparator - 1);
+            if (typeSeparator < 0)
+                return false;
+
+            name = trimmed[..typeSeparator].Trim();
+            dataType = trimmed.Substring(typeSeparator + 1, nullableSeparator - typeSeparator - 1).Trim();
+            nullable = parsedNullable != 0;
+            return true;
         }
 
         private static IReadOnlyList<string> SplitRoutineParameterModes(string parameterModes)
@@ -3368,16 +4494,41 @@ namespace nORM.Scaffolding
                 }
                 else if (ch == ',' && depth == 0)
                 {
-                    AddRoutineParameterModePart(parts, parameterModes[start..i]);
+                    var candidate = parameterModes[start..i];
+                    if (TryParseRoutineParameterMode(candidate, out _, out _, out _))
+                    {
+                        AddRoutineDelimitedPart(parts, candidate);
+                        start = i + 1;
+                    }
+                }
+            }
+
+            AddRoutineDelimitedPart(parts, parameterModes[start..]);
+            return parts;
+        }
+
+        private static IReadOnlyList<string> SplitRoutineResultColumns(string resultColumns)
+        {
+            var parts = new List<string>();
+            var start = 0;
+            for (var i = 0; i < resultColumns.Length; i++)
+            {
+                if (resultColumns[i] != '|')
+                    continue;
+
+                var candidate = resultColumns[start..i];
+                if (TryParseRoutineResultColumnParts(candidate, out _, out _, out _))
+                {
+                    AddRoutineDelimitedPart(parts, candidate);
                     start = i + 1;
                 }
             }
 
-            AddRoutineParameterModePart(parts, parameterModes[start..]);
+            AddRoutineDelimitedPart(parts, resultColumns[start..]);
             return parts;
         }
 
-        private static void AddRoutineParameterModePart(List<string> parts, string value)
+        private static void AddRoutineDelimitedPart(List<string> parts, string value)
         {
             var trimmed = value.Trim();
             if (!string.IsNullOrWhiteSpace(trimmed))
@@ -3399,7 +4550,7 @@ namespace nORM.Scaffolding
             var compositeForeignKeys = foreignKeys
                 .Where(fk => fk.ColumnCount > 1)
                 .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
-                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes))
+                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
                 .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
                 .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
                 .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
@@ -3417,6 +4568,7 @@ namespace nORM.Scaffolding
                         dependentColumns = rows.Select(r => r.DependentColumn).ToArray(),
                         principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable),
                         principalColumns = rows.Select(r => r.PrincipalColumn).ToArray(),
+                        metadata = BuildCompositeForeignKeyMetadata(rows, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable),
                         suggestedAction = SuggestedActionForCompositeForeignKey()
                     };
                 })
@@ -3440,6 +4592,7 @@ namespace nORM.Scaffolding
                     principalTables = g.PrincipalTables,
                     constraints = g.ConstraintNames,
                     reasons = g.Reasons,
+                    metadata = g.Metadata,
                     suggestedAction = SuggestedActionForPossibleJoinTable()
                 })
                 .ToArray();
@@ -3457,6 +4610,7 @@ namespace nORM.Scaffolding
                     table = f.TableKey,
                     name = f.Name,
                     detail = f.Detail,
+                    metadata = BuildUnsupportedFeatureMetadata(f),
                     suggestedAction = SuggestedActionForUnsupportedFeature(f.Kind)
                 })
                 .ToArray();
@@ -3580,7 +4734,7 @@ namespace nORM.Scaffolding
                     && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
                     && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
                     && identityColumns.Contains(payloadColumns[0])
-                    && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
+                    && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames, nonNullableColumnsByTable);
 
                 if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
                     continue;
@@ -3610,8 +4764,8 @@ namespace nORM.Scaffolding
                 var rightPrincipalColumns = rightGroup.Select(fk => fk.PrincipalColumn).ToArray();
                 var leftUsesPrimaryKey = HasPrimaryKeyColumns(primaryKeyColumnsByTable, leftTableKey, leftPrincipalColumns);
                 var rightUsesPrimaryKey = HasPrimaryKeyColumns(primaryKeyColumnsByTable, rightTableKey, rightPrincipalColumns);
-                if ((!leftUsesPrimaryKey && !ReferencesUniqueIndex(leftGroup, primaryKeyColumnsByTable, indexes))
-                    || (!rightUsesPrimaryKey && !ReferencesUniqueIndex(rightGroup, primaryKeyColumnsByTable, indexes)))
+                if ((!leftUsesPrimaryKey && !ReferencesUniqueIndex(leftGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
+                    || (!rightUsesPrimaryKey && !ReferencesUniqueIndex(rightGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable)))
                 {
                     continue;
                 }
@@ -3728,7 +4882,8 @@ namespace nORM.Scaffolding
         private static bool HasExactUniqueIndex(
             IReadOnlyList<ScaffoldIndex> indexes,
             string tableKey,
-            IReadOnlySet<string> columnNames)
+            IReadOnlySet<string> columnNames,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
         {
             return indexes
                 .Where(index => IsUnfilteredUniqueKeyIndex(index)
@@ -3742,9 +4897,17 @@ namespace nORM.Scaffolding
                         .Select(index => index.ColumnName)
                         .ToArray();
                     return keyColumns.Length == columnNames.Count
+                           && HasNonNullableColumns(nonNullableColumnsByTable, tableKey, keyColumns)
                            && keyColumns.All(columnNames.Contains);
                 });
         }
+
+        private static bool HasNonNullableColumns(
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            string tableKey,
+            IReadOnlyList<string> columnNames)
+            => nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
+               && columnNames.All(nonNullableColumns.Contains);
 
         private static bool ReferencesPrimaryKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
@@ -3764,9 +4927,10 @@ namespace nORM.Scaffolding
         private static bool ReferencesScaffoldablePrincipalKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
             => ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable)
-               || ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes);
+               || ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
 
         private static IReadOnlyList<ScaffoldPrimaryKey> BuildCompositePrimaryKeys(
             IReadOnlyDictionary<string, string> entityByTable,
@@ -3799,13 +4963,15 @@ namespace nORM.Scaffolding
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
-            => ReferencesUniqueIndex(foreignKeyGroup.ToArray(), primaryKeyColumnsByTable, indexes);
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
+            => ReferencesUniqueIndex(foreignKeyGroup.ToArray(), primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
 
         private static bool ReferencesUniqueIndex(
             IReadOnlyList<ScaffoldForeignKey> rows,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
         {
             if (rows.Count == 0)
                 return false;
@@ -3830,6 +4996,7 @@ namespace nORM.Scaffolding
                         .ToArray();
                     return keyColumns.Length == rows.Count
                            && group.All(col => col.ColumnCount == rows.Count)
+                           && HasNonNullableColumns(nonNullableColumnsByTable, principalKey, keyColumns)
                            && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
                 });
         }
@@ -3845,6 +5012,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var relationships = new List<ScaffoldRelationship>();
@@ -3867,7 +5035,7 @@ namespace nORM.Scaffolding
                     continue;
                 }
 
-                if (!ReferencesScaffoldablePrincipalKey(foreignKeyGroup, primaryKeyColumnsByTable, indexes))
+                if (!ReferencesScaffoldablePrincipalKey(foreignKeyGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
                     continue;
 
                 if (!primaryKeyColumnsByTable.TryGetValue(dependentKey, out var dependentPrimaryKeyColumns)
@@ -3921,7 +5089,8 @@ namespace nORM.Scaffolding
                     collectionName,
                     string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase),
                     NormalizeReferentialAction(foreignKey.OnDelete),
-                    NormalizeReferentialAction(foreignKey.OnUpdate))
+                    NormalizeReferentialAction(foreignKey.OnUpdate),
+                    foreignKey.IsSyntheticConstraintName ? null : NullIfWhiteSpace(foreignKey.ConstraintName))
                 {
                     ForeignKeyPropertyNames = foreignKeyProperties,
                     PrincipalKeyPropertyNames = principalKeyProperties
@@ -3996,7 +5165,8 @@ namespace nORM.Scaffolding
         private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetColumnPropertyNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<ScaffoldTable> tables)
+            IReadOnlyList<ScaffoldTable> tables,
+            IReadOnlyDictionary<string, string> entityByTable)
         {
             if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
             {
@@ -4006,7 +5176,7 @@ namespace nORM.Scaffolding
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                     """).ConfigureAwait(false);
-                return BuildColumnPropertyNameMap(orderedColumns);
+                return BuildColumnPropertyNameMap(orderedColumns, entityByTable);
             }
 
             var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -4016,7 +5186,10 @@ namespace nORM.Scaffolding
                 cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
                 await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
                 var schema = reader.GetSchemaTable()!;
+                var tableKey = TableKey(table.Schema, table.Name);
                 var existingNames = CreateReservedMemberNameSet();
+                if (entityByTable.TryGetValue(tableKey, out var entityName))
+                    existingNames.Add(entityName);
                 var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (DataRow row in schema.Rows)
                 {
@@ -4025,19 +5198,22 @@ namespace nORM.Scaffolding
                     properties[columnName] = MakeUnique(baseName, existingNames);
                 }
 
-                result[TableKey(table.Schema, table.Name)] = properties;
+                result[tableKey] = properties;
             }
 
             return result;
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildColumnPropertyNameMap(
-            IReadOnlyDictionary<string, IReadOnlyList<string>> orderedColumns)
+            IReadOnlyDictionary<string, IReadOnlyList<string>> orderedColumns,
+            IReadOnlyDictionary<string, string> entityByTable)
         {
             var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var (tableKey, columns) in orderedColumns)
             {
                 var existingNames = CreateReservedMemberNameSet();
+                if (entityByTable.TryGetValue(tableKey, out var entityName))
+                    existingNames.Add(entityName);
                 var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (var columnName in columns)
                 {
@@ -4052,12 +5228,15 @@ namespace nORM.Scaffolding
         }
 
         private static Dictionary<string, HashSet<string>> BuildMemberNameMap(
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, string> entityByTable)
         {
             var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var (tableKey, columns) in columnPropertiesByTable)
             {
                 var names = CreateReservedMemberNameSet();
+                if (entityByTable.TryGetValue(tableKey, out var entityName))
+                    names.Add(entityName);
                 foreach (var column in columns.Values)
                     names.Add(column);
                 result[tableKey] = names;
@@ -4432,12 +5611,21 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
         {
+            var featureList = features as IReadOnlyList<ScaffoldUnsupportedFeature> ?? features.ToArray();
+            var unrepresentableExpressionIndexes = featureList
+                .Where(static feature => string.Equals(feature.Kind, "ProviderSpecificIndex", StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(feature.Kind, "DescendingIndex", StringComparison.OrdinalIgnoreCase))
+                .Select(static feature => feature.TableKey + "\u001f" + feature.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var result = new List<ScaffoldExpressionIndexConfiguration>();
-            foreach (var feature in features)
+            foreach (var feature in featureList)
             {
                 if (!string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
                     || string.IsNullOrWhiteSpace(feature.Name)
                     || string.IsNullOrWhiteSpace(feature.Detail)
+                    || IsProviderOwnedExpressionIndexDetail(feature.Detail)
+                    || unrepresentableExpressionIndexes.Contains(feature.TableKey + "\u001f" + feature.Name)
                     || !entityByTable.TryGetValue(feature.TableKey, out var entityName))
                 {
                     continue;
@@ -4452,11 +5640,22 @@ namespace nORM.Scaffolding
                     entityName,
                     feature.Name,
                     expressionSql,
-                    IsUnique: feature.Detail.Contains("CREATE UNIQUE", StringComparison.OrdinalIgnoreCase),
-                    FilterSql: ExtractWhereClause(feature.Detail)));
+                    IsUnique: IsCreateIndexUnique(feature.Detail),
+                    FilterSql: ExtractCreateIndexWhereClause(feature.Detail)));
             }
 
             return result;
+        }
+
+        private static bool IsProviderOwnedExpressionIndexDetail(string detail)
+        {
+            if (string.IsNullOrWhiteSpace(detail))
+                return true;
+
+            var values = ParseSemicolonValues(detail, out var header);
+            return values.ContainsKey("expression")
+                   && header.EndsWith("expression index", StringComparison.OrdinalIgnoreCase)
+                   && !header.StartsWith("CREATE", StringComparison.OrdinalIgnoreCase);
         }
 
         private static IReadOnlyList<ScaffoldCollationConfiguration> BuildCollationConfigurations(
@@ -4488,11 +5687,58 @@ namespace nORM.Scaffolding
             return result;
         }
 
-        private static string? ExtractWhereClause(string sql)
+        private static string? ExtractCreateIndexWhereClause(string sql)
         {
-            var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
-            return where < 0 ? null : sql[(where + 7)..].Trim();
+            if (string.IsNullOrWhiteSpace(sql))
+                return null;
+
+            var onIndex = sql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
+            if (onIndex < 0)
+                return null;
+
+            var openIndex = FindCreateIndexKeyListOpen(sql, onIndex);
+            if (openIndex < 0)
+                return null;
+
+            var closeIndex = FindMatchingParenthesis(sql, openIndex);
+            if (closeIndex <= openIndex)
+                return null;
+
+            var where = FindSqlKeywordOutsideQuotes(sql, "WHERE", closeIndex + 1);
+            return where < 0 ? null : sql[(where + 5)..].Trim();
         }
+
+        private static bool IsCreateIndexUnique(string? createIndexSql)
+        {
+            if (string.IsNullOrWhiteSpace(createIndexSql))
+                return false;
+
+            var index = 0;
+            return TryConsumeSqlKeyword(createIndexSql, ref index, "CREATE")
+                   && TryConsumeSqlKeyword(createIndexSql, ref index, "UNIQUE");
+        }
+
+        private static bool TryConsumeSqlKeyword(string sql, ref int index, string keyword)
+        {
+            while (index < sql.Length && char.IsWhiteSpace(sql[index]))
+                index++;
+
+            if (index + keyword.Length > sql.Length
+                || !sql.AsSpan(index, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var end = index + keyword.Length;
+            if (end < sql.Length && IsSqlIdentifierChar(sql[end]))
+                return false;
+
+            index = end;
+            return true;
+        }
+
+        private static bool IsSqlIdentifierChar(char value)
+            => char.IsLetterOrDigit(value) || value == '_' || value == '$';
 
         private static string? ExtractCreateIndexExpressionSql(string? createIndexSql)
         {
@@ -4503,7 +5749,7 @@ namespace nORM.Scaffolding
             if (onIndex < 0)
                 return null;
 
-            var openIndex = createIndexSql.IndexOf('(', onIndex);
+            var openIndex = FindCreateIndexKeyListOpen(createIndexSql, onIndex);
             if (openIndex < 0)
                 return null;
 
@@ -4512,6 +5758,83 @@ namespace nORM.Scaffolding
                 return null;
 
             return createIndexSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+        }
+
+        private static int FindCreateIndexKeyListOpen(string sql, int startIndex)
+        {
+            char? quote = null;
+            for (var i = startIndex; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (ch == '(')
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private static int FindSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
+        {
+            char? quote = null;
+            for (var i = startIndex; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (i + keyword.Length <= sql.Length
+                    && sql.AsSpan(i, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase)
+                    && (i == 0 || !IsSqlIdentifierChar(sql[i - 1]))
+                    && (i + keyword.Length == sql.Length || !IsSqlIdentifierChar(sql[i + keyword.Length])))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private static IReadOnlyList<ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
@@ -4553,23 +5876,38 @@ namespace nORM.Scaffolding
             var candidate = raw.Trim();
             if (candidate.EndsWith("generated column", StringComparison.OrdinalIgnoreCase))
                 return (string.Empty, false);
-            var stored = candidate.Contains("PERSISTED", StringComparison.OrdinalIgnoreCase)
-                || candidate.Contains(" STORED", StringComparison.OrdinalIgnoreCase);
+            var stored = false;
 
             if (candidate.StartsWith("GENERATED", StringComparison.OrdinalIgnoreCase))
             {
                 var open = candidate.IndexOf('(');
-                var close = candidate.LastIndexOf(')');
+                var close = open >= 0 ? FindMatchingParenthesis(candidate, open) : -1;
                 if (open >= 0 && close > open)
+                {
+                    var suffix = candidate[(close + 1)..];
+                    stored = FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
+                             || FindSqlKeywordOutsideQuotes(suffix, "PERSISTED", 0) >= 0;
                     candidate = candidate.Substring(open + 1, close - open - 1).Trim();
+                }
             }
 
             while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
                 candidate = candidate[1..^1].Trim();
 
-            candidate = TrimTrailingComputedStorageToken(candidate, "VIRTUAL");
-            candidate = TrimTrailingComputedStorageToken(candidate, "STORED");
-            candidate = TrimTrailingComputedStorageToken(candidate, "PERSISTED");
+            if (TryTrimTrailingComputedStorageToken(candidate, "VIRTUAL", out var virtualTrimmed))
+            {
+                candidate = virtualTrimmed;
+            }
+            else if (TryTrimTrailingComputedStorageToken(candidate, "STORED", out var storedTrimmed))
+            {
+                candidate = storedTrimmed;
+                stored = true;
+            }
+            else if (TryTrimTrailingComputedStorageToken(candidate, "PERSISTED", out var persistedTrimmed))
+            {
+                candidate = persistedTrimmed;
+                stored = true;
+            }
 
             while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
                 candidate = candidate[1..^1].Trim();
@@ -4577,26 +5915,29 @@ namespace nORM.Scaffolding
             return (candidate, stored);
         }
 
-        private static string TrimTrailingComputedStorageToken(string sql, string token)
+        private static bool TryTrimTrailingComputedStorageToken(string sql, string token, out string trimmedSql)
         {
+            trimmedSql = sql;
             var trimmed = sql.TrimEnd();
             if (!trimmed.EndsWith(token, StringComparison.OrdinalIgnoreCase))
-                return sql;
+                return false;
 
             var tokenStart = trimmed.Length - token.Length;
-            if (tokenStart > 0 && (char.IsLetterOrDigit(trimmed[tokenStart - 1]) || trimmed[tokenStart - 1] == '_'))
-                return sql;
+            if (tokenStart <= 0 || !char.IsWhiteSpace(trimmed[tokenStart - 1]))
+                return false;
 
-            return trimmed[..tokenStart].TrimEnd();
+            trimmedSql = trimmed[..tokenStart].TrimEnd();
+            return true;
         }
 
         private static string NormalizeScaffoldCheckSql(string raw)
         {
             var candidate = raw.Trim();
-            if (candidate.StartsWith("CHECK", StringComparison.OrdinalIgnoreCase))
+            var keywordIndex = 0;
+            if (TryConsumeSqlKeyword(candidate, ref keywordIndex, "CHECK"))
             {
-                var open = candidate.IndexOf('(');
-                var close = candidate.LastIndexOf(')');
+                var open = candidate.IndexOf('(', keywordIndex);
+                var close = open >= 0 ? FindMatchingParenthesis(candidate, open) : -1;
                 if (open >= 0 && close > open)
                     candidate = candidate.Substring(open + 1, close - open - 1).Trim();
             }
@@ -4635,24 +5976,32 @@ namespace nORM.Scaffolding
         private static bool HasBalancedOuterParentheses(string value)
         {
             var depth = 0;
-            var inString = false;
+            char? quote = null;
             for (var i = 0; i < value.Length; i++)
             {
                 var ch = value[i];
-                if (ch == '\'')
+                if (quote is not null)
                 {
-                    if (inString && i + 1 < value.Length && value[i + 1] == '\'')
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
                     {
-                        i++;
-                        continue;
+                        if (i + 1 < value.Length && value[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
                     }
 
-                    inString = !inString;
                     continue;
                 }
 
-                if (inString)
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
                     continue;
+                }
 
                 if (ch == '(')
                     depth++;
@@ -4665,7 +6014,7 @@ namespace nORM.Scaffolding
                     return false;
             }
 
-            return depth == 0 && !inString;
+            return depth == 0 && quote is null;
         }
 
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
@@ -4825,7 +6174,17 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(detail))
                 return false;
 
-            var open = detail.IndexOf('(');
+            var keywordIndex = 0;
+            if (!TryConsumeSqlKeyword(detail, ref keywordIndex, "IDENTITY"))
+                return false;
+
+            while (keywordIndex < detail.Length && char.IsWhiteSpace(detail[keywordIndex]))
+                keywordIndex++;
+
+            if (keywordIndex >= detail.Length || detail[keywordIndex] != '(')
+                return false;
+
+            var open = keywordIndex;
             var comma = detail.IndexOf(',', open + 1);
             var close = detail.IndexOf(')', comma + 1);
             if (open < 0 || comma < 0 || close < 0)
@@ -5215,7 +6574,7 @@ namespace nORM.Scaffolding
                     sb.AppendLine("using System.Threading.Tasks;");
                 }
                 sb.AppendLine("using System.Linq;");
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0)
+                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || (routineStubs?.Count > 0))
                     sb.AppendLine("using System;");
                 sb.AppendLine("using nORM.Core;");
                 sb.AppendLine("using nORM.Configuration;");
@@ -5343,11 +6702,22 @@ namespace nORM.Scaffolding
                         if (IsLegacyCascadeShape(relationship))
                         {
                             var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
+                            if (!string.IsNullOrWhiteSpace(relationship.ConstraintName))
+                            {
+                                var constraintName = EscapeStringLiteral(relationship.ConstraintName);
+                                cascadeSuffix = relationship.CascadeDelete
+                                    ? $", \"{constraintName}\""
+                                    : $", \"{constraintName}\", false";
+                            }
+
                             sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}{cascadeSuffix});");
                         }
                         else
                         {
-                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {FormatReferentialAction(relationship.OnDelete)}, {FormatReferentialAction(relationship.OnUpdate)});");
+                            var constraintNameSuffix = string.IsNullOrWhiteSpace(relationship.ConstraintName)
+                                ? string.Empty
+                                : $", \"{EscapeStringLiteral(relationship.ConstraintName)}\"";
+                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {FormatReferentialAction(relationship.OnDelete)}, {FormatReferentialAction(relationship.OnUpdate)}{constraintNameSuffix});");
                         }
                     }
                     foreach (var join in manyToManyJoins
@@ -6005,16 +7375,246 @@ namespace nORM.Scaffolding
 
         private static string ParseSemicolonValue(string detail, string key)
         {
-            var segments = detail.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            foreach (var segment in segments)
+            var values = ParseSemicolonValues(detail, out _);
+            return values.TryGetValue(key, out var value) ? value : string.Empty;
+        }
+
+        private static IReadOnlyDictionary<string, string> ParseRoutineSemicolonValues(string detail, out string header)
+        {
+            var keyOrders = GetRoutineSemicolonValueKeyOrders(detail);
+            return ParseSemicolonValues(detail, out header, keyOrders);
+        }
+
+        private static IReadOnlyDictionary<string, string> ParseSemicolonValues(
+            string detail,
+            out string header,
+            IReadOnlyList<IReadOnlyList<string>>? keyOrders = null)
+        {
+            var markers = new List<SemicolonValueMarker>();
+            for (var i = 0; i < detail.Length; i++)
             {
-                var pair = segment.Split('=', 2);
-                if (pair.Length == 2 && string.Equals(pair[0].Trim(), key, StringComparison.OrdinalIgnoreCase))
-                    return pair[1].Trim();
+                if (detail[i] == ';' && TryReadSemicolonValueMarker(detail, i, out var key, out var valueStart))
+                    markers.Add(new SemicolonValueMarker(i, key, valueStart));
             }
 
-            return string.Empty;
+            if (keyOrders is { Count: > 0 })
+                markers = SelectBestOrderedSemicolonValueMarkers(detail, markers, keyOrders);
+
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (markers.Count == 0)
+            {
+                header = detail.Trim();
+                return values;
+            }
+
+            header = detail[..markers[0].SemicolonIndex].Trim();
+            for (var i = 0; i < markers.Count; i++)
+            {
+                var marker = markers[i];
+                var valueEnd = i + 1 < markers.Count ? markers[i + 1].SemicolonIndex : detail.Length;
+                values[marker.Key] = detail.Substring(marker.ValueStart, valueEnd - marker.ValueStart).Trim();
+            }
+
+            return values;
         }
+
+        private static List<SemicolonValueMarker> SelectBestOrderedSemicolonValueMarkers(
+            string detail,
+            IReadOnlyList<SemicolonValueMarker> markers,
+            IReadOnlyList<IReadOnlyList<string>> keyOrders)
+        {
+            var best = new List<SemicolonValueMarker>();
+            foreach (var keyOrder in keyOrders)
+            {
+                var candidate = SelectOrderedSemicolonValueMarkers(detail, markers, keyOrder);
+                if (candidate.Count > best.Count)
+                    best = candidate;
+            }
+
+            return best;
+        }
+
+        private static List<SemicolonValueMarker> SelectOrderedSemicolonValueMarkers(
+            string detail,
+            IReadOnlyList<SemicolonValueMarker> markers,
+            IReadOnlyList<string> keyOrder)
+        {
+            var result = new List<SemicolonValueMarker>();
+            var expectedIndex = 0;
+            foreach (var marker in markers)
+            {
+                var matchIndex = IndexOfSemicolonValueKey(keyOrder, marker.Key, expectedIndex);
+                if (matchIndex < 0)
+                    continue;
+
+                if (result.Count > 0)
+                {
+                    var previous = result[^1];
+                    var value = detail.Substring(previous.ValueStart, marker.SemicolonIndex - previous.ValueStart);
+                    if (!IsCompleteSemicolonValue(previous.Key, value))
+                        continue;
+                }
+
+                result.Add(marker);
+                expectedIndex = matchIndex + 1;
+            }
+
+            return result;
+        }
+
+        private static int IndexOfSemicolonValueKey(IReadOnlyList<string> keyOrder, string key, int start)
+        {
+            for (var i = start; i < keyOrder.Count; i++)
+            {
+                if (keyOrder[i].Equals(key, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private static IReadOnlyList<IReadOnlyList<string>> GetRoutineSemicolonValueKeyOrders(string detail)
+        {
+            var firstMarker = detail.IndexOf(';');
+            var header = firstMarker < 0 ? detail.Trim() : detail[..firstMarker].Trim();
+            if (header.StartsWith("SQL Server stored procedure", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    new[] { "parameters", "outputParameters", "parameterModes", "resultColumns" }
+                };
+            }
+
+            if (header.StartsWith("SQL Server ", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    new[] { "parameters", "outputParameters", "callShape", "parameterModes", "dataType", "resultColumns" },
+                    new[] { "parameters", "outputParameters", "parameterModes", "callShape", "dataType", "resultColumns" }
+                };
+            }
+
+            if (header.StartsWith("PostgreSQL ", StringComparison.OrdinalIgnoreCase)
+                || header.StartsWith("MySQL ", StringComparison.OrdinalIgnoreCase))
+            {
+                return new[]
+                {
+                    new[] { "parameters", "outputParameters", "parameterModes", "callShape", "dataType" },
+                    new[] { "parameters", "outputParameters", "callShape", "parameterModes", "dataType" }
+                };
+            }
+
+            return Array.Empty<IReadOnlyList<string>>();
+        }
+
+        private static bool IsCompleteSemicolonValue(string key, string value)
+        {
+            if (key.Equals("parameters", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("outputParameters", StringComparison.OrdinalIgnoreCase))
+            {
+                return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+            }
+
+            if (key.Equals("parameterModes", StringComparison.OrdinalIgnoreCase))
+                return IsCompleteRoutineParameterModes(value);
+
+            if (key.Equals("resultColumns", StringComparison.OrdinalIgnoreCase))
+                return IsCompleteRoutineResultColumns(value);
+
+            return true;
+        }
+
+        private static bool IsCompleteRoutineParameterModes(string parameterModes)
+        {
+            if (string.IsNullOrWhiteSpace(parameterModes))
+                return true;
+
+            var parts = SplitRoutineParameterModes(parameterModes);
+            return parts.Count > 0 && parts.All(part => TryParseRoutineParameterMode(part, out _, out _, out _));
+        }
+
+        private static bool IsCompleteRoutineResultColumns(string resultColumns)
+        {
+            if (string.IsNullOrWhiteSpace(resultColumns))
+                return true;
+
+            var parts = SplitRoutineResultColumns(resultColumns);
+            return parts.Count > 0 && parts.All(part => TryParseRoutineResultColumnParts(part, out _, out _, out _));
+        }
+
+        private static bool TryReadSemicolonValueMarker(
+            string detail,
+            int semicolonIndex,
+            out string key,
+            out int valueStart)
+        {
+            key = string.Empty;
+            valueStart = 0;
+
+            var index = semicolonIndex + 1;
+            var sawWhitespace = false;
+            while (index < detail.Length && char.IsWhiteSpace(detail[index]))
+            {
+                sawWhitespace = true;
+                index++;
+            }
+
+            if (!sawWhitespace || index >= detail.Length || !char.IsLetter(detail[index]))
+                return false;
+
+            var keyStart = index;
+            while (index < detail.Length && char.IsLetterOrDigit(detail[index]))
+                index++;
+
+            var keyEnd = index;
+            while (index < detail.Length && char.IsWhiteSpace(detail[index]))
+                index++;
+
+            if (index >= detail.Length || detail[index] != '=')
+                return false;
+
+            key = detail.Substring(keyStart, keyEnd - keyStart);
+            if (!IsKnownSemicolonValueKey(key))
+                return false;
+
+            valueStart = index + 1;
+            return true;
+        }
+
+        private static bool IsKnownSemicolonValueKey(string key)
+            => key.Equals("parameters", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("outputParameters", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("parameterModes", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("resultColumns", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("callShape", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("dataType", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("baseObject", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("baseType", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("eventType", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("status", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("intervalValue", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("intervalField", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("executeAt", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("starts", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("ends", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("expression", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("filterSql", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("indexSql", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("indexType", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("accessMethod", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("prefixColumns", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("hasNullsNotDistinct", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("hasNonDefaultOperatorClass", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("hasIndexCollation", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("hasNonDefaultNullOrdering", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("timing", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("event", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("orientation", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("triggerSql", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("isDisabled", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("isInsteadOf", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("temporalType", StringComparison.OrdinalIgnoreCase)
+               || key.Equals("historyTable", StringComparison.OrdinalIgnoreCase);
 
         private static string FormatRoutineParameterSummary(IReadOnlyDictionary<string, object?> metadata)
         {
@@ -6660,11 +8260,11 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(detail))
                 return false;
 
-            var normalized = detail.Trim().ToLowerInvariant();
+            var normalized = NormalizeMySqlUnsignedTypeDetail(detail);
             if (!normalized.Contains("unsigned", StringComparison.Ordinal))
                 return false;
 
-            type = normalized.Split('(', 2)[0].Trim() switch
+            type = normalized switch
             {
                 "tinyint unsigned" => typeof(byte),
                 "smallint unsigned" => typeof(ushort),
@@ -6674,6 +8274,21 @@ namespace nORM.Scaffolding
             };
 
             return type != typeof(object);
+        }
+
+        private static string NormalizeMySqlUnsignedTypeDetail(string detail)
+        {
+            var normalized = detail.Trim().ToLowerInvariant();
+            var unsignedIndex = normalized.IndexOf("unsigned", StringComparison.Ordinal);
+            if (unsignedIndex < 0)
+                return normalized;
+
+            var baseType = normalized[..unsignedIndex].Trim();
+            var paren = baseType.IndexOf('(');
+            if (paren >= 0)
+                baseType = baseType[..paren].Trim();
+
+            return baseType.Length == 0 ? normalized : baseType + " unsigned";
         }
 
         private static bool TryMapPostgresArrayType(string? detail, out Type arrayType)
@@ -7090,6 +8705,11 @@ namespace nORM.Scaffolding
             string Name,
             string TypeName);
 
+        private readonly record struct SemicolonValueMarker(
+            int SemicolonIndex,
+            string Key,
+            int ValueStart);
+
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,
             string[] PropertyNames);
@@ -7148,7 +8768,8 @@ namespace nORM.Scaffolding
             string ConstraintName,
             int ColumnCount,
             string OnDelete = "NO ACTION",
-            string OnUpdate = "NO ACTION");
+            string OnUpdate = "NO ACTION",
+            bool IsSyntheticConstraintName = false);
 
         private readonly record struct ScaffoldIndex(
             string TableKey,
@@ -7172,7 +8793,8 @@ namespace nORM.Scaffolding
             string CollectionNavigationName,
             bool CascadeDelete,
             string OnDelete,
-            string OnUpdate)
+            string OnUpdate,
+            string? ConstraintName)
         {
             public IReadOnlyList<string> ForeignKeyPropertyNames { get; init; } = new[] { ForeignKeyPropertyName };
 
@@ -7208,7 +8830,8 @@ namespace nORM.Scaffolding
             string TableKey,
             string[] PrincipalTables,
             string[] ConstraintNames,
-            string[] Reasons);
+            string[] Reasons,
+            IReadOnlyDictionary<string, object?> Metadata);
 
         private readonly record struct ScaffoldManyToManyNavigation(
             string TargetEntityName,
@@ -7222,6 +8845,9 @@ namespace nORM.Scaffolding
             string TableKey,
             string Kind,
             string Name,
-            string Detail);
+            string Detail)
+        {
+            public IReadOnlyDictionary<string, object?>? Metadata { get; init; }
+        }
     }
 }

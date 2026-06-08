@@ -906,7 +906,9 @@ namespace nORM.Query
                     var alias = ne.Members?[i]?.Name ?? $"Item{i + 1}";
                     if (arg is MemberExpression me)
                     {
-                        var col = _mapping.ColumnsByName[me.Member.Name];
+                        if (!_mapping.TryGetColumnForMemberAccess(me, out var col))
+                            throw new NormQueryException(
+                                $"Property path '{me}' on type '{_mapping.Type.Name}' is not mapped to a database column.");
                         sb.Append(col.EscCol).Append(" AS ").Append(_provider.Escape(alias));
                     }
                     else if (arg is ParameterExpression p && paramMap.TryGetValue(p, out var wf))
@@ -1644,15 +1646,15 @@ namespace nORM.Query
         }
         protected override Expression VisitMember(MemberExpression node)
         {
-            if (node.Expression is ParameterExpression pe)
+            if (TableMapping.TryGetMemberAccessRoot(node, out var rootParameter))
             {
-                if (_correlatedParams.TryGetValue(pe, out var info))
+                if (_correlatedParams.TryGetValue(rootParameter, out var info))
                 {
                     // Use TryGetValue to prevent KeyNotFoundException on unmapped properties.
-                    if (!info.Mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    if (!info.Mapping.TryGetColumnForMemberAccess(node, out var col))
                     {
                         // Check if it's a navigation property
-                        if (info.Mapping.Relations.ContainsKey(node.Member.Name))
+                        if (node.Expression is ParameterExpression && info.Mapping.Relations.ContainsKey(node.Member.Name))
                         {
                             throw new NormQueryException(
                                 $"Navigation property '{node.Member.Name}' cannot be used directly in queries. " +
@@ -1668,10 +1670,10 @@ namespace nORM.Query
                 else
                 {
                     // Use TryGetValue to prevent KeyNotFoundException on unmapped properties.
-                    if (!_mapping.ColumnsByName.TryGetValue(node.Member.Name, out var col))
+                    if (!_mapping.TryGetColumnForMemberAccess(node, out var col))
                     {
                         // Check if it's a navigation property
-                        if (_mapping.Relations.ContainsKey(node.Member.Name))
+                        if (node.Expression is ParameterExpression && _mapping.Relations.ContainsKey(node.Member.Name))
                         {
                             throw new NormQueryException(
                                 $"Navigation property '{node.Member.Name}' cannot be used directly in queries. " +

@@ -668,7 +668,7 @@ namespace nORM.Query
                 // fallback path selects ALL columns and the scalar materialiser reads
                 // column 0 — returning the outer's first column instead of the child's.
                 else if (resultSelector.Body is MemberExpression memberSel
-                         && memberSel.Expression is ParameterExpression memParam)
+                         && TableMapping.TryGetMemberAccessRoot(memberSel, out var memParam))
                 {
                     TableMapping? selMapping = null;
                     string? selAlias = null;
@@ -681,7 +681,7 @@ namespace nORM.Query
                         selMapping = innerMapping; selAlias = innerAlias;
                     }
                     if (selMapping != null && selAlias != null
-                        && selMapping.ColumnsByName.TryGetValue(memberSel.Member.Name, out var memCol))
+                        && selMapping.TryGetColumnForMemberAccess(memberSel, out var memCol))
                     {
                         _sql.Append(selAlias).Append('.').Append(memCol.EscCol);
                         wroteColumns = true;

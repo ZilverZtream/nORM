@@ -53,6 +53,85 @@ namespace nORM.Migration
             return $"`{id.Replace("`", "``")}`";
         }
 
+        private static string EscTable(string id)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            return string.Join(".", id.Split('.').Select(Esc));
+        }
+
+        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql) ResolveIndex(
+            TableSchema table,
+            string indexName,
+            bool isUnique,
+            string[] columnNames,
+            bool[] descending)
+        {
+            foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+            {
+                if (string.Equals(index.IndexName, indexName, StringComparison.OrdinalIgnoreCase))
+                    return index;
+            }
+
+            return (indexName, isUnique, columnNames, descending, Array.Empty<string>(), null);
+        }
+
+        private static string BuildIndexSql(TableSchema table, string indexName, bool isUnique, string[] columnNames, bool[] descending)
+        {
+            var index = ResolveIndex(table, indexName, isUnique, columnNames, descending);
+            EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+            EnsureNoFilter(index.FilterSql, index.IndexName);
+            var unique = index.IsUnique ? "UNIQUE " : string.Empty;
+            return $"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})";
+        }
+
+        private static bool IsImplicitUniqueColumn(ColumnSchema column)
+            => column.IsUnique
+               && !column.IsPrimaryKey
+               && string.IsNullOrWhiteSpace(column.IndexName)
+               && column.Indexes.Count == 0;
+
+        private static string GetPrimaryKeyConstraintName(TableSchema table, IReadOnlyList<ColumnSchema> pkCols)
+            => pkCols.FirstOrDefault(static c => c.IsPrimaryKey && !string.IsNullOrWhiteSpace(c.IndexName))?.IndexName
+               ?? $"PK_{table.Name}";
+
+        private static string GetUniqueConstraintName(TableSchema table, ColumnSchema column)
+            => $"UQ_{table.Name}_{column.Name}";
+
+        private static string BuildPrimaryKeyConstraintSql(TableSchema table, IReadOnlyList<ColumnSchema> pkCols)
+            => $"CONSTRAINT {Esc(GetPrimaryKeyConstraintName(table, pkCols))} PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})";
+
+        private static string BuildUniqueConstraintSql(TableSchema table, ColumnSchema column)
+            => $"CONSTRAINT {Esc(GetUniqueConstraintName(table, column))} UNIQUE ({Esc(column.Name)})";
+
+        private static void ValidateUnsupportedIdentityOperations(SchemaDiff diff)
+        {
+            foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
+            {
+                if (oldCol.IsIdentity != newCol.IsIdentity
+                    || oldCol.IdentitySeed != newCol.IdentitySeed
+                    || oldCol.IdentityIncrement != newCol.IdentityIncrement)
+                    throw new NotSupportedException(
+                        $"Changing identity metadata for column '{newCol.Name}' on table '{table.Name}' is not supported by MySQL migration generation. " +
+                        "Drop and recreate the table or use a provider-specific custom migration.");
+            }
+
+            foreach (var (table, column) in diff.AddedColumns)
+            {
+                if (column.IsIdentity)
+                    throw new NotSupportedException(
+                        $"Adding identity column '{column.Name}' to existing table '{table.Name}' is not supported by MySQL migration generation. " +
+                        "Create a new table or use a provider-specific custom migration.");
+            }
+
+            foreach (var (table, column) in diff.DroppedColumns)
+            {
+                if (column.IsIdentity)
+                    throw new NotSupportedException(
+                        $"Dropping identity column '{column.Name}' from table '{table.Name}' is not supported by MySQL migration generation because the Down migration cannot restore identity metadata safely. " +
+                        "Drop and recreate the table or use a provider-specific custom migration.");
+            }
+        }
+
         /// <summary>
         /// Generates MySQL-specific SQL statements that apply the schema changes described by the provided diff.
         /// </summary>
@@ -61,9 +140,11 @@ namespace nORM.Migration
         public MigrationSqlStatements GenerateSql(SchemaDiff diff)
         {
             ArgumentNullException.ThrowIfNull(diff);
+            ValidateUnsupportedIdentityOperations(diff);
 
             var up = new List<string>();
             var down = new List<string>();
+            var primaryKeyChanges = SchemaDiffer.GetPrimaryKeyChanges(diff);
 
             // ─ UP: correct DDL dependency ordering ──────────────────────────────────
             // FK constraints must be dropped BEFORE the columns/tables they reference
@@ -73,35 +154,53 @@ namespace nORM.Migration
             // UP-1: Drop FK constraints first (before columns/tables they depend on).
             // MySQL uses DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
             foreach (var (table, fk) in diff.DroppedForeignKeys)
-                up.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
             foreach (var (table, check) in diff.DroppedCheckConstraints)
-                up.Add($"ALTER TABLE {Esc(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
+            foreach (var (table, indexName) in diff.DroppedIndexes)
+                up.Add($"DROP INDEX {Esc(indexName)} ON {EscTable(table.Name)}");
 
             // UP-2: Drop tables.
             foreach (var table in diff.DroppedTables)
-                up.Add($"DROP TABLE {Esc(table.Name)}");
+                up.Add($"DROP TABLE {EscTable(table.Name)}");
 
             // UP-3: Drop columns (safe — FKs on those columns are removed in UP-1).
+            foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                if (group.Any(static item => item.Column.IsPrimaryKey))
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
+                foreach (var column in group.Select(static item => item.Column).Where(IsImplicitUniqueColumn))
+                    up.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, column))} ON {EscTable(table.Name)}");
+            }
             foreach (var (table, column) in diff.DroppedColumns)
-                up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
 
             // UP-4: Alter existing columns.
+            foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
+                up.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
                 {
-                    up.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(oldCol.Name)}");
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(oldCol.Name)}");
                     if (IsComputedColumn(newCol))
-                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(newCol)}");
+                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(newCol)}");
                     else
-                        up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
+                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
                     continue;
                 }
                 // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
+                if (IsImplicitUniqueColumn(oldCol) && !IsImplicitUniqueColumn(newCol))
+                    up.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, oldCol))} ON {EscTable(table.Name)}");
                 var newDefault = newCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}" : "";
                 var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
-                up.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {newDef}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {newDef}");
+                if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
             }
+            foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
+                up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, newPkCols)}");
 
             // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
@@ -120,25 +219,24 @@ namespace nORM.Migration
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
+                    colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
 
-                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
-                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
-                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
+                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
+                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
 
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 foreach (var check in table.CheckConstraints)
                     colDefs.Add(BuildCheckConstraintSql(check));
 
-                up.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
+                up.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
 
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     EnsureNoFilter(index.FilterSql, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
 
@@ -147,7 +245,7 @@ namespace nORM.Migration
             {
                 if (IsComputedColumn(column))
                 {
-                    up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
                     continue;
                 }
 
@@ -158,14 +256,25 @@ namespace nORM.Migration
 
                 var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
-                up.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+            }
+            foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                var pkCols = table.Columns.Where(static c => c.IsPrimaryKey).ToArray();
+                if (group.Any(static item => item.Column.IsPrimaryKey) && pkCols.Length > 0)
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, pkCols)}");
+                foreach (var column in group.Select(static item => item.Column).Where(IsImplicitUniqueColumn))
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, column)}");
             }
 
             // UP-7: Add FK constraints last (all tables and columns are in place).
             foreach (var (table, check) in diff.AddedCheckConstraints)
-                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildCheckConstraintSql(check)}");
+            foreach (var (table, indexName, isUnique, columnNames, descending) in diff.AddedIndexes)
+                up.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
             foreach (var (table, fk) in diff.AddedForeignKeys)
-                up.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
                 throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
 
@@ -173,35 +282,53 @@ namespace nORM.Migration
 
             // DOWN-1: Drop FK constraints that were added in UP-7 (before touching their columns).
             foreach (var (table, fk) in diff.AddedForeignKeys)
-                down.Add($"ALTER TABLE {Esc(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} DROP FOREIGN KEY {Esc(fk.ConstraintName)}");
             foreach (var (table, check) in diff.AddedCheckConstraints)
-                down.Add($"ALTER TABLE {Esc(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
+            foreach (var (table, indexName, _, _, _) in diff.AddedIndexes)
+                down.Add($"DROP INDEX {Esc(indexName)} ON {EscTable(table.Name)}");
 
             // DOWN-2: Drop columns that were added in UP-6.
+            foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                if (group.Any(static item => item.Column.IsPrimaryKey))
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
+                foreach (var column in group.Select(static item => item.Column).Where(IsImplicitUniqueColumn))
+                    down.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, column))} ON {EscTable(table.Name)}");
+            }
             foreach (var (table, column) in diff.AddedColumns)
-                down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(column.Name)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
 
             // DOWN-3: Drop tables that were created in UP-5.
             foreach (var table in diff.AddedTables)
-                down.Add($"DROP TABLE IF EXISTS {Esc(table.Name)}");
+                down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
 
             // DOWN-4: Reverse column alterations from UP-4.
+            foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
+                down.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
                 {
-                    down.Add($"ALTER TABLE {Esc(table.Name)} DROP COLUMN {Esc(newCol.Name)}");
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(newCol.Name)}");
                     if (IsComputedColumn(oldCol))
-                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(oldCol)}");
+                        down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(oldCol)}");
                     else
-                        down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}");
+                        down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}");
                     continue;
                 }
 
+                if (IsImplicitUniqueColumn(newCol) && !IsImplicitUniqueColumn(oldCol))
+                    down.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, newCol))} ON {EscTable(table.Name)}");
                 var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(oldCol.DefaultValue)}" : "";
                 var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}";
-                down.Add($"ALTER TABLE {Esc(table.Name)} MODIFY COLUMN {oldDef}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {oldDef}");
+                if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
             }
+            foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
+                down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, oldPkCols)}");
 
             // DOWN-5: Restore columns that were dropped in UP-3.
             // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
@@ -209,7 +336,7 @@ namespace nORM.Migration
             {
                 if (IsComputedColumn(column))
                 {
-                    down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
                     continue;
                 }
 
@@ -217,7 +344,16 @@ namespace nORM.Migration
                     ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
                     : "";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
-                down.Add($"ALTER TABLE {Esc(table.Name)} ADD COLUMN {colDef}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+            }
+            foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                var pkCols = table.Columns.Where(static c => c.IsPrimaryKey).ToArray();
+                if (group.Any(static item => item.Column.IsPrimaryKey) && pkCols.Length > 0)
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, pkCols)}");
+                foreach (var column in group.Select(static item => item.Column).Where(IsImplicitUniqueColumn))
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, column)}");
             }
 
             // DOWN-6: Restore tables that were dropped in UP-2.
@@ -236,38 +372,44 @@ namespace nORM.Migration
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
-                    colDefs.Add($"PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})");
-                // A: emit a separate UNIQUE constraint for each individual unique non-PK column.
-                foreach (var uc in table.Columns.Where(c => c.IsUnique && !c.IsPrimaryKey))
-                    colDefs.Add($"UNIQUE ({Esc(uc.Name)})");
+                    colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
+                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
+                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
                 foreach (var fk in table.ForeignKeys)
                     colDefs.Add(BuildFkConstraintSql(fk));
                 foreach (var check in table.CheckConstraints)
                     colDefs.Add(BuildCheckConstraintSql(check));
-                down.Add($"CREATE TABLE {Esc(table.Name)} ({string.Join(", ", colDefs)})");
+                down.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
                     EnsureNoFilter(index.FilterSql, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {Esc(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
                 }
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
             foreach (var (table, check) in diff.DroppedCheckConstraints)
-                down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildCheckConstraintSql(check)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildCheckConstraintSql(check)}");
+            foreach (var (table, indexName, isUnique, columnNames, descending) in diff.DroppedIndexes
+                .Select(droppedIndex =>
+                {
+                    var resolved = ResolveIndex(droppedIndex.Table, droppedIndex.IndexName, false, Array.Empty<string>(), Array.Empty<bool>());
+                    return (droppedIndex.Table, resolved.IndexName, resolved.IsUnique, resolved.ColumnNames, resolved.Descending);
+                }))
+                down.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
             foreach (var (table, fk) in diff.DroppedForeignKeys)
-                down.Add($"ALTER TABLE {Esc(table.Name)} ADD {BuildFkConstraintSql(fk)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
                 throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
 
             // Rename columns — MySQL 8.0+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
             {
-                up.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
                 // Down: rename back
-                down.Add($"ALTER TABLE {Esc(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+                down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
             }
 
             return new MigrationSqlStatements(up, down);
@@ -387,7 +529,7 @@ namespace nORM.Migration
             var refCols = string.Join(", ", fk.PrincipalColumns.Select(Esc));
             var onDelete = ValidateFkAction(fk.OnDelete, fk.ConstraintName);
             var onUpdate = ValidateFkAction(fk.OnUpdate, fk.ConstraintName);
-            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {Esc(fk.PrincipalTable)}({refCols})";
+            var sql = $"CONSTRAINT {Esc(fk.ConstraintName)} FOREIGN KEY ({depCols}) REFERENCES {EscTable(fk.PrincipalTable)}({refCols})";
             if (!string.Equals(onDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                 sql += $" ON DELETE {onDelete}";
             if (!string.Equals(onUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase))

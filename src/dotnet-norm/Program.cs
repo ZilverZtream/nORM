@@ -476,7 +476,7 @@ add.SetAction((ParseResult result) =>
             Console.Error.WriteLine("Destructive schema changes detected. No migration was written.");
             foreach (var warning in destructiveWarnings)
                 Console.Error.WriteLine($"  - {warning}");
-            Console.Error.WriteLine("Re-run with --force after replacing rename-like drops/adds with explicit rename operations or after accepting the data loss.");
+            Console.Error.WriteLine("Re-run with --force after replacing rename-like drops/adds with explicit rename operations or after accepting the data or integrity risk.");
             return 3;
         }
 
@@ -551,7 +551,7 @@ static SchemaSnapshot BuildMigrationSnapshot(Assembly assembly, bool attributeOn
         using var modelCn = new SqliteConnection("Data Source=:memory:");
         modelCn.Open();
         var provider = new SqliteProvider();
-        using var modelCtx = (DbContext)Activator.CreateInstance(ctxType, modelCn, provider)!;
+        using var modelCtx = CreateModelContext(ctxType, modelCn, provider);
         Console.WriteLine($"Using fluent model from {ctxType.Name}.");
         return SchemaSnapshotBuilder.Build(modelCtx);
     }
@@ -563,6 +563,19 @@ static SchemaSnapshot BuildMigrationSnapshot(Assembly assembly, bool attributeOn
             "if you intentionally want to ignore fluent model configuration.",
             ex);
     }
+}
+
+static DbContext CreateModelContext(Type ctxType, DbConnection connection, DatabaseProvider provider)
+{
+    var twoArgConstructor = ctxType.GetConstructor(new[] { typeof(DbConnection), typeof(DatabaseProvider) });
+    if (twoArgConstructor != null)
+        return (DbContext)twoArgConstructor.Invoke(new object[] { connection, provider });
+
+    var threeArgConstructor = ctxType.GetConstructor(new[] { typeof(DbConnection), typeof(DatabaseProvider), typeof(DbContextOptions) });
+    if (threeArgConstructor != null)
+        return (DbContext)threeArgConstructor.Invoke(new object?[] { connection, provider, null });
+
+    throw new MissingMethodException(ctxType.FullName, ".ctor(DbConnection, DatabaseProvider[, DbContextOptions])");
 }
 
 static (Type FactoryType, Type InterfaceType)? FindDesignTimeFactory(Assembly assembly)

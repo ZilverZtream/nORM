@@ -434,7 +434,7 @@ items:
   assemblies:
   - nORM
   namespace: nORM.Migration
-  summary: Indicates whether the diff contains table or column drops that can destroy data.
+  summary: Indicates whether the diff contains operations that can remove data or weaken schema-enforced integrity.
   example: []
   syntax:
     content: public bool HasDestructiveChanges { get; }

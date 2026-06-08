@@ -20,6 +20,11 @@ namespace nORM.Configuration
         string? TableName { get; }
 
         /// <summary>
+        /// Gets the optional database schema that contains <see cref="TableName"/>.
+        /// </summary>
+        string? SchemaName { get; }
+
+        /// <summary>
         /// Gets the collection of properties that compose the primary key.
         /// </summary>
         IReadOnlyList<PropertyInfo> KeyProperties { get; }
@@ -166,6 +171,9 @@ namespace nORM.Configuration
         /// <summary>Database referential action to emit for principal key updates.</summary>
         public ReferentialAction OnUpdate { get; init; } = ReferentialAction.NoAction;
 
+        /// <summary>Optional database foreign key constraint name to preserve in migration snapshots.</summary>
+        public string? ConstraintName { get; init; }
+
         /// <summary>Creates a relationship configuration backed by multiple key columns.</summary>
         public RelationshipConfiguration(
             PropertyInfo principalNavigation,
@@ -225,7 +233,11 @@ namespace nORM.Configuration
     /// <param name="TableName">Name of the child table storing owned items.</param>
     /// <param name="ForeignKeyName">Column name in the child table referencing the owner's PK.</param>
     /// <param name="Configuration">Optional configuration applied to the owned element type.</param>
-    public record OwnedCollectionNavigation(Type OwnedType, string TableName, string ForeignKeyName, IEntityTypeConfiguration? Configuration = null);
+    public record OwnedCollectionNavigation(Type OwnedType, string TableName, string ForeignKeyName, IEntityTypeConfiguration? Configuration = null)
+    {
+        /// <summary>Optional schema containing the child table.</summary>
+        public string? SchemaName { get; init; }
+    }
 
     /// <summary>
     /// Configures a many-to-many relationship between two entity types via a join table.

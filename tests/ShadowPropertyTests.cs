@@ -52,6 +52,22 @@ public class ShadowPropertyTests
         public string Name { get; set; } = "";
     }
 
+    [Xunit.Trait("Category", "Fast")]
+    public class OwnedShadowCustomer
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public OwnedShadowAddress Address { get; set; } = new();
+    }
+
+    [Xunit.Trait("Category", "Fast")]
+    public class OwnedShadowAddress
+    {
+        public string City { get; set; } = "";
+    }
+
     private static SqliteConnection CreateOpenDb(string ddl)
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -512,6 +528,43 @@ public class ShadowPropertyTests
     }
 
     // ── SP-6: Change tracking tests ───────────────────────────────────────
+
+    [Fact]
+    public async Task SP5_OwnsOne_ShadowColumn_RoundTripsOnOwnerTable()
+    {
+        using var cn = CreateOpenDb(
+            "CREATE TABLE OwnedShadowCustomer (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, Ship_City TEXT, Ship_AuditTag TEXT)");
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<OwnedShadowCustomer>()
+                .OwnsOne(c => c.Address, owned =>
+                {
+                    owned.Property(a => a.City).HasColumnName("Ship_City");
+                    owned.Property<string>("AuditTag").HasColumnName("Ship_AuditTag");
+                })
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+        var customer = new OwnedShadowCustomer
+        {
+            Name = "Ada",
+            Address = new OwnedShadowAddress { City = "London" }
+        };
+        ShadowPropertyStore.Set(customer, "Address_AuditTag", "verified");
+        ctx.Add(customer);
+        await ctx.SaveChangesAsync();
+
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT Ship_AuditTag FROM OwnedShadowCustomer WHERE Name = 'Ada'";
+            Assert.Equal("verified", cmd.ExecuteScalar());
+        }
+
+        using var readCtx = new DbContext(cn, new SqliteProvider(), opts);
+        var loaded = await readCtx.Query<OwnedShadowCustomer>().FirstAsync();
+        Assert.Equal("London", loaded.Address.City);
+        Assert.Equal("verified", ShadowPropertyStore.Get(loaded, "Address_AuditTag"));
+    }
 
     [Fact]
     public async Task SP6_ShadowValueChange_DetectedByChangeTracker()

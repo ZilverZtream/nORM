@@ -14,6 +14,7 @@ items:
   - nORM.Mapping.OwnedCollectionMapping.KeyColumns
   - nORM.Mapping.OwnedCollectionMapping.NavigationProperty
   - nORM.Mapping.OwnedCollectionMapping.OwnedType
+  - nORM.Mapping.OwnedCollectionMapping.SchemaName
   - nORM.Mapping.OwnedCollectionMapping.TableName
   langs:
   - csharp
@@ -145,6 +146,37 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property EscTable As String
   overload: nORM.Mapping.OwnedCollectionMapping.EscTable*
+- uid: nORM.Mapping.OwnedCollectionMapping.SchemaName
+  commentId: P:nORM.Mapping.OwnedCollectionMapping.SchemaName
+  id: SchemaName
+  parent: nORM.Mapping.OwnedCollectionMapping
+  langs:
+  - csharp
+  - vb
+  name: SchemaName
+  nameWithType: OwnedCollectionMapping.SchemaName
+  fullName: nORM.Mapping.OwnedCollectionMapping.SchemaName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaName
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 582
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Optional schema containing the child table.
+  example: []
+  syntax:
+    content: public string? SchemaName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property SchemaName As String
+  overload: nORM.Mapping.OwnedCollectionMapping.SchemaName*
 - uid: nORM.Mapping.OwnedCollectionMapping.TableName
   commentId: P:nORM.Mapping.OwnedCollectionMapping.TableName
   id: TableName

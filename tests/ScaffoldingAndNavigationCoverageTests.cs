@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -185,6 +186,20 @@ public class DatabaseScaffolderPrivateMethodTests
         return ((string Sql, bool Stored))m.Invoke(null, new object[] { raw })!;
     }
 
+    private static string InvokeNormalizeScaffoldCheckSql(string raw)
+    {
+        var m = GetMethod("NormalizeScaffoldCheckSql", new[] { typeof(string) });
+        return (string)m.Invoke(null, new object[] { raw })!;
+    }
+
+    private static (bool Parsed, long Seed, long Increment) InvokeTryParseIdentityOptions(string? detail)
+    {
+        var m = GetMethod("TryParseIdentityOptions", new[] { typeof(string), typeof(long).MakeByRefType(), typeof(long).MakeByRefType() });
+        object?[] args = { detail, 0L, 0L };
+        var parsed = (bool)m.Invoke(null, args)!;
+        return (parsed, (long)args[1]!, (long)args[2]!);
+    }
+
     private static int? InvokeGetScaffoldMaxLength(Type type, object? columnSize)
     {
         var m = GetMethod("GetScaffoldMaxLength", new[] { typeof(Type), typeof(DataRow) });
@@ -199,6 +214,88 @@ public class DatabaseScaffolderPrivateMethodTests
         return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
     }
 
+    private static Array CreateDynamicDecimalColumnInfoArray(int precision, int scale)
+    {
+        var generatorType = typeof(DynamicEntityTypeGenerator);
+        var columnInfoType = generatorType.GetNestedType("ColumnInfo", BindingFlags.NonPublic)
+            ?? throw new MissingMemberException(nameof(DynamicEntityTypeGenerator), "ColumnInfo");
+        var decimalPrecisionType = generatorType.GetNestedType("ScaffoldDecimalPrecision", BindingFlags.NonPublic)
+            ?? throw new MissingMemberException(nameof(DynamicEntityTypeGenerator), "ScaffoldDecimalPrecision");
+        var decimalPrecision = Activator.CreateInstance(decimalPrecisionType, precision, scale)!;
+        var ctor = columnInfoType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Single(constructor => constructor.GetParameters().Length == 13);
+        var column = ctor.Invoke(new object?[]
+        {
+            "Amount",
+            "Amount",
+            typeof(decimal),
+            false,
+            false,
+            0,
+            0,
+            false,
+            false,
+            null,
+            false,
+            null,
+            decimalPrecision
+        });
+        var columns = Array.CreateInstance(columnInfoType, 1);
+        columns.SetValue(column, 0);
+        return columns;
+    }
+
+    private static Type InvokeDynamicBuildTypeWithDecimalPrecision(int precision, int scale)
+    {
+        var columns = CreateDynamicDecimalColumnInfoArray(precision, scale);
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("BuildDynamicType", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "BuildDynamicType");
+        return (Type)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns })!;
+    }
+
+    private static string InvokeDynamicSchemaDescriptorWithDecimalPrecision(int precision, int scale)
+    {
+        var columns = CreateDynamicDecimalColumnInfoArray(precision, scale);
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("BuildSchemaDescriptor", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "BuildSchemaDescriptor");
+        return (string)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns })!;
+    }
+
+    private static (bool Mapped, Type Type) InvokeTryMapMySqlUnsignedType(Type declaringType, string detail)
+    {
+        var m = declaringType
+            .GetMethod("TryMapMySqlUnsignedType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
+            ?? throw new MissingMethodException(declaringType.Name, "TryMapMySqlUnsignedType");
+        object?[] args = { detail, typeof(object) };
+        var mapped = (bool)m.Invoke(null, args)!;
+        return (mapped, (Type)args[1]!);
+    }
+
+    private static (string Sql, IReadOnlyDictionary<string, object?> Parameters) InvokeDynamicMySqlMetadataProbe(string methodName)
+    {
+        var connection = new DynamicMySqlMetadataProbeConnection();
+        var method = typeof(DynamicEntityTypeGenerator)
+            .GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(string), typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), methodName);
+
+        method.Invoke(null, new object?[] { connection, "tenant_catalog", "Orders" });
+
+        return (
+            connection.LastCommandText,
+            connection.LastParameters.ToDictionary(pair => pair.Key, pair => pair.Value));
+    }
+
+    private static string? InvokeResolveUniqueUnqualifiedSchema(DbConnection connection, string tableName)
+    {
+        var method = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("ResolveUniqueUnqualifiedSchema", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "ResolveUniqueUnqualifiedSchema");
+
+        return (string?)method.Invoke(null, new object?[] { connection, tableName });
+    }
+
     private static DataRow CreateSchemaRow(object? columnSize)
     {
         var table = new DataTable();
@@ -207,6 +304,283 @@ public class DatabaseScaffolderPrivateMethodTests
         row["ColumnSize"] = columnSize ?? DBNull.Value;
         table.Rows.Add(row);
         return row;
+    }
+
+    private sealed class DynamicMySqlMetadataProbeConnection : DbConnection
+    {
+        private ConnectionState _state = ConnectionState.Open;
+
+        public string LastCommandText { get; private set; } = string.Empty;
+        public Dictionary<string, object?> LastParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string ConnectionString { get; set; } = "Server=localhost;Database=current_catalog;";
+        public override string Database => "current_catalog";
+        public override string DataSource => "metadata-probe";
+        public override string ServerVersion => "8.0";
+        public override ConnectionState State => _state;
+
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() => _state = ConnectionState.Closed;
+        public override void Open() => _state = ConnectionState.Open;
+
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+            => throw new NotSupportedException();
+
+        protected override DbCommand CreateDbCommand()
+            => new DynamicMySqlMetadataProbeCommand(this);
+
+        internal void Capture(string commandText, DbParameterCollection parameters)
+        {
+            LastCommandText = commandText;
+            LastParameters.Clear();
+            foreach (DbParameter parameter in parameters)
+                LastParameters[parameter.ParameterName] = parameter.Value;
+        }
+    }
+
+    private sealed class DynamicMySqlMetadataProbeCommand : DbCommand
+    {
+        private readonly DynamicMySqlMetadataProbeConnection _connection;
+        private readonly SqliteCommand _parameterSource = new();
+
+        public DynamicMySqlMetadataProbeCommand(DynamicMySqlMetadataProbeConnection connection)
+            => _connection = connection;
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string CommandText { get; set; } = string.Empty;
+        public override int CommandTimeout { get; set; }
+        public override CommandType CommandType { get; set; } = CommandType.Text;
+        public override bool DesignTimeVisible { get; set; }
+        public override UpdateRowSource UpdatedRowSource { get; set; }
+
+        protected override DbConnection? DbConnection
+        {
+            get => _connection;
+            set { }
+        }
+
+        protected override DbParameterCollection DbParameterCollection => _parameterSource.Parameters;
+        protected override DbTransaction? DbTransaction { get; set; }
+
+        public override void Cancel() { }
+        public override int ExecuteNonQuery() => 0;
+        public override object? ExecuteScalar() => null;
+        public override void Prepare() { }
+
+        protected override DbParameter CreateDbParameter()
+            => new SqliteParameter();
+
+        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+        {
+            _connection.Capture(CommandText, _parameterSource.Parameters);
+            return new EmptyMetadataReader();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _parameterSource.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    private abstract class DynamicSchemaProbeConnection : DbConnection
+    {
+        private readonly IReadOnlyList<string> _schemas;
+        private ConnectionState _state = ConnectionState.Open;
+
+        protected DynamicSchemaProbeConnection(params string[] schemas)
+            => _schemas = schemas;
+
+        public string LastCommandText { get; private set; } = string.Empty;
+        public Dictionary<string, object?> LastParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string ConnectionString { get; set; } = "Server=localhost;Database=current_catalog;";
+        public override string Database => "current_catalog";
+        public override string DataSource => "schema-probe";
+        public override string ServerVersion => "1.0";
+        public override ConnectionState State => _state;
+
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() => _state = ConnectionState.Closed;
+        public override void Open() => _state = ConnectionState.Open;
+
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+            => throw new NotSupportedException();
+
+        protected override DbCommand CreateDbCommand()
+            => new DynamicSchemaProbeCommand(this);
+
+        internal DbDataReader Execute(string commandText, DbParameterCollection parameters)
+        {
+            LastCommandText = commandText;
+            LastParameters.Clear();
+            foreach (DbParameter parameter in parameters)
+                LastParameters[parameter.ParameterName] = parameter.Value;
+
+            return new SingleColumnMetadataReader("SchemaName", _schemas);
+        }
+    }
+
+    private sealed class DynamicSqlConnectionSchemaProbeConnection : DynamicSchemaProbeConnection
+    {
+        public DynamicSqlConnectionSchemaProbeConnection(params string[] schemas)
+            : base(schemas) { }
+    }
+
+    private sealed class DynamicNpgsqlSchemaProbeConnection : DynamicSchemaProbeConnection
+    {
+        public DynamicNpgsqlSchemaProbeConnection(params string[] schemas)
+            : base(schemas) { }
+    }
+
+    private sealed class DynamicSchemaProbeCommand : DbCommand
+    {
+        private readonly DynamicSchemaProbeConnection _connection;
+        private readonly SqliteCommand _parameterSource = new();
+
+        public DynamicSchemaProbeCommand(DynamicSchemaProbeConnection connection)
+            => _connection = connection;
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string CommandText { get; set; } = string.Empty;
+        public override int CommandTimeout { get; set; }
+        public override CommandType CommandType { get; set; } = CommandType.Text;
+        public override bool DesignTimeVisible { get; set; }
+        public override UpdateRowSource UpdatedRowSource { get; set; }
+
+        protected override DbConnection? DbConnection
+        {
+            get => _connection;
+            set { }
+        }
+
+        protected override DbParameterCollection DbParameterCollection => _parameterSource.Parameters;
+        protected override DbTransaction? DbTransaction { get; set; }
+
+        public override void Cancel() { }
+        public override int ExecuteNonQuery() => 0;
+        public override object? ExecuteScalar() => null;
+        public override void Prepare() { }
+
+        protected override DbParameter CreateDbParameter()
+            => new SqliteParameter();
+
+        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+            => _connection.Execute(CommandText, _parameterSource.Parameters);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _parameterSource.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class SingleColumnMetadataReader : DbDataReader
+    {
+        private readonly string _columnName;
+        private readonly IReadOnlyList<string> _values;
+        private int _index = -1;
+
+        public SingleColumnMetadataReader(string columnName, IReadOnlyList<string> values)
+        {
+            _columnName = columnName;
+            _values = values;
+        }
+
+        public override object this[int ordinal] => GetValue(ordinal);
+        public override object this[string name] => string.Equals(name, _columnName, StringComparison.OrdinalIgnoreCase)
+            ? GetValue(0)
+            : throw new IndexOutOfRangeException(name);
+        public override int Depth => 0;
+        public override int FieldCount => 1;
+        public override bool HasRows => _values.Count > 0;
+        public override bool IsClosed => false;
+        public override int RecordsAffected => 0;
+
+        public override void Close() { }
+        public override bool GetBoolean(int ordinal) => Convert.ToBoolean(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override byte GetByte(int ordinal) => Convert.ToByte(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length) => 0;
+        public override char GetChar(int ordinal) => Convert.ToChar(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length) => 0;
+        public override string GetDataTypeName(int ordinal) => "string";
+        public override DateTime GetDateTime(int ordinal) => Convert.ToDateTime(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override decimal GetDecimal(int ordinal) => Convert.ToDecimal(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override double GetDouble(int ordinal) => Convert.ToDouble(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override System.Collections.IEnumerator GetEnumerator() => _values.GetEnumerator();
+        public override Type GetFieldType(int ordinal) => typeof(string);
+        public override float GetFloat(int ordinal) => Convert.ToSingle(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override Guid GetGuid(int ordinal) => Guid.Parse(GetString(ordinal));
+        public override short GetInt16(int ordinal) => Convert.ToInt16(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override int GetInt32(int ordinal) => Convert.ToInt32(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override long GetInt64(int ordinal) => Convert.ToInt64(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
+        public override string GetName(int ordinal) => ordinal == 0 ? _columnName : throw new IndexOutOfRangeException(nameof(ordinal));
+        public override int GetOrdinal(string name) => string.Equals(name, _columnName, StringComparison.OrdinalIgnoreCase) ? 0 : -1;
+        public override string GetString(int ordinal) => Convert.ToString(GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        public override object GetValue(int ordinal)
+        {
+            if (ordinal != 0)
+                throw new IndexOutOfRangeException(nameof(ordinal));
+
+            return _index >= 0 && _index < _values.Count ? _values[_index] : DBNull.Value;
+        }
+        public override int GetValues(object[] values)
+        {
+            if (values.Length > 0)
+                values[0] = GetValue(0);
+            return Math.Min(values.Length, 1);
+        }
+        public override bool IsDBNull(int ordinal) => GetValue(ordinal) is DBNull;
+        public override bool NextResult() => false;
+        public override bool Read()
+        {
+            if (_index + 1 >= _values.Count)
+                return false;
+
+            _index++;
+            return true;
+        }
+    }
+
+    private sealed class EmptyMetadataReader : DbDataReader
+    {
+        public override object this[int ordinal] => DBNull.Value;
+        public override object this[string name] => DBNull.Value;
+        public override int Depth => 0;
+        public override int FieldCount => 0;
+        public override bool HasRows => false;
+        public override bool IsClosed => false;
+        public override int RecordsAffected => 0;
+
+        public override void Close() { }
+        public override bool GetBoolean(int ordinal) => false;
+        public override byte GetByte(int ordinal) => 0;
+        public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length) => 0;
+        public override char GetChar(int ordinal) => '\0';
+        public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length) => 0;
+        public override string GetDataTypeName(int ordinal) => "object";
+        public override DateTime GetDateTime(int ordinal) => default;
+        public override decimal GetDecimal(int ordinal) => 0m;
+        public override double GetDouble(int ordinal) => 0d;
+        public override System.Collections.IEnumerator GetEnumerator() => Enumerable.Empty<object>().GetEnumerator();
+        public override Type GetFieldType(int ordinal) => typeof(object);
+        public override float GetFloat(int ordinal) => 0f;
+        public override Guid GetGuid(int ordinal) => Guid.Empty;
+        public override short GetInt16(int ordinal) => 0;
+        public override int GetInt32(int ordinal) => 0;
+        public override long GetInt64(int ordinal) => 0;
+        public override string GetName(int ordinal) => string.Empty;
+        public override int GetOrdinal(string name) => -1;
+        public override string GetString(int ordinal) => string.Empty;
+        public override object GetValue(int ordinal) => DBNull.Value;
+        public override int GetValues(object[] values) => 0;
+        public override bool IsDBNull(int ordinal) => true;
+        public override bool NextResult() => false;
+        public override bool Read() => false;
     }
 
     private static string InvokeGetUnqualifiedName(string identifier)
@@ -225,6 +599,52 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var m = GetMethod("ScaffoldContext", new[] { typeof(string), typeof(string), typeof(IEnumerable<string>) });
         return (string)m.Invoke(null, new object[] { ns, ctxName, entities })!;
+    }
+
+    private static string InvokeScaffoldContextWithNamedRelationship()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var relationship = Activator.CreateInstance(
+            relationshipType,
+            "Book",
+            "Author",
+            "Book",
+            "Author",
+            "AuthorId",
+            "Id",
+            "Author",
+            "Books",
+            false,
+            "NO ACTION",
+            "NO ACTION",
+            "FK_Book_Author_Custom")!;
+        var relationships = Array.CreateInstance(relationshipType, 1);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 0);
+        var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
+        var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        relationships.SetValue(relationship, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
+
+        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "Author", "Book" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
     }
 
     private static string InvokeScaffoldContextWithRoutineStub()
@@ -372,6 +792,10 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData("([Total]+[Tax]) PERSISTED", "[Total]+[Tax]", true)]
     [InlineData("GENERATED ALWAYS AS (Price * Quantity) STORED", "Price * Quantity", true)]
     [InlineData("GENERATED ALWAYS AS (Price * Quantity) VIRTUAL", "Price * Quantity", false)]
+    [InlineData("' STORED' VIRTUAL", "' STORED'", false)]
+    [InlineData("GENERATED ALWAYS AS (' STORED') VIRTUAL", "' STORED'", false)]
+    [InlineData("CONCAT(Name, ' PERSISTED')", "CONCAT(Name, ' PERSISTED')", false)]
+    [InlineData("PERSISTED", "PERSISTED", false)]
     public void NormalizeScaffoldComputedSql_StripsStorageTokensAndPreservesStoredFlag(
         string raw,
         string expectedSql,
@@ -381,6 +805,52 @@ public class DatabaseScaffolderPrivateMethodTests
 
         Assert.Equal(expectedSql, sql);
         Assert.Equal(expectedStored, stored);
+    }
+
+    [Theory]
+    [InlineData("(length(\"Paren)Name\") + 1)", "length(\"Paren)Name\") + 1")]
+    [InlineData("([Paren)Name] + 1) PERSISTED", "[Paren)Name] + 1")]
+    [InlineData("(length(`Paren)Name`) + 1) STORED", "length(`Paren)Name`) + 1")]
+    public void NormalizeScaffoldComputedSql_StripsOuterParenthesesAroundQuotedIdentifiers(
+        string raw,
+        string expectedSql)
+    {
+        var (sql, _) = InvokeNormalizeScaffoldComputedSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+    }
+
+    [Theory]
+    [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
+    [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]
+    [InlineData("CHECK (CHECKSUM([Name]) > 0)", "CHECKSUM([Name]) > 0")]
+    [InlineData("CHECKSUM([Name]) > 0", "CHECKSUM([Name]) > 0")]
+    public void NormalizeScaffoldCheckSql_StripsOuterParenthesesAroundQuotedIdentifiers(
+        string raw,
+        string expectedSql)
+    {
+        var sql = InvokeNormalizeScaffoldCheckSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+    }
+
+    [Theory]
+    [InlineData("IDENTITY(1000,25)", true, 1000L, 25L)]
+    [InlineData(" IDENTITY ( -5 , 2 ) NOT FOR REPLICATION", true, -5L, 2L)]
+    [InlineData("GENERATED BY DEFAULT AS IDENTITY (START WITH 1 INCREMENT BY 1)", false, 0L, 0L)]
+    [InlineData("sequence(1000,25)", false, 0L, 0L)]
+    [InlineData("IDENTITY_COMMENT(1000,25)", false, 0L, 0L)]
+    public void TryParseIdentityOptions_OnlyAcceptsSqlServerIdentityMetadata(
+        string detail,
+        bool expectedParsed,
+        long expectedSeed,
+        long expectedIncrement)
+    {
+        var (parsed, seed, increment) = InvokeTryParseIdentityOptions(detail);
+
+        Assert.Equal(expectedParsed, parsed);
+        Assert.Equal(expectedSeed, seed);
+        Assert.Equal(expectedIncrement, increment);
     }
 
     [Fact]
@@ -519,6 +989,33 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("@record", InvokeEscapeCSharpIdentifier("@record"));
         Assert.Equal("@class", InvokeDynamicEscapeCSharpIdentifier("@class"));
         Assert.Equal("@record", InvokeDynamicEscapeCSharpIdentifier("@record"));
+    }
+
+    [Fact]
+    public void BuildColumnPropertyNameMap_Reserves_Enclosing_Entity_Name()
+    {
+        var method = GetMethod(
+            "BuildColumnPropertyNameMap",
+            new[]
+            {
+                typeof(IReadOnlyDictionary<string, IReadOnlyList<string>>),
+                typeof(IReadOnlyDictionary<string, string>)
+            });
+        var orderedColumns = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["User"] = new[] { "User", "Id" }
+        };
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["User"] = "User"
+        };
+
+        var result = (IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>)method.Invoke(
+            null,
+            new object[] { orderedColumns, entityByTable })!;
+
+        Assert.Equal("User2", result["User"]["User"]);
+        Assert.Equal("Id", result["User"]["Id"]);
     }
 
     [Fact]
@@ -671,6 +1168,129 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal(expected, InvokeDynamicGetScaffoldMaxLength(clrType, columnSize));
     }
 
+    [Fact]
+    public void DynamicBuildType_DecimalPrecision_EmitsColumnTypeName()
+    {
+        var type = InvokeDynamicBuildTypeWithDecimalPrecision(28, 6);
+        var amount = type.GetProperty("Amount")!;
+        var column = Assert.Single(amount.GetCustomAttributes(typeof(ColumnAttribute), inherit: false).Cast<ColumnAttribute>());
+
+        Assert.Equal(typeof(decimal), amount.PropertyType);
+        Assert.Equal("Amount", column.Name);
+        Assert.Equal("decimal(28,6)", column.TypeName);
+    }
+
+    [Fact]
+    public void DynamicSchemaDescriptor_DecimalPrecision_AffectsCacheIdentity()
+    {
+        var first = InvokeDynamicSchemaDescriptorWithDecimalPrecision(18, 2);
+        var second = InvokeDynamicSchemaDescriptorWithDecimalPrecision(28, 6);
+
+        Assert.NotEqual(first, second);
+        Assert.Contains("18,2", first, StringComparison.Ordinal);
+        Assert.Contains("28,6", second, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DynamicMySqlIdentityProbe_UsesSchemaQualifiedCatalogWhenProvided()
+    {
+        var (sql, parameters) = InvokeDynamicMySqlMetadataProbe("GetIdentityColumns");
+
+        Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
+        Assert.Equal("tenant_catalog", parameters["@schemaName"]);
+        Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Fact]
+    public void DynamicMySqlPrimaryKeyProbe_UsesSchemaQualifiedCatalogWhenProvided()
+    {
+        var (sql, parameters) = InvokeDynamicMySqlMetadataProbe("GetPrimaryKeyOrdinals");
+
+        Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
+        Assert.Equal("tenant_catalog", parameters["@schemaName"]);
+        Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Fact]
+    public void DynamicSqlServerUnqualifiedResolver_UsesUniqueCatalogSchema()
+    {
+        var connection = new DynamicSqlConnectionSchemaProbeConnection("sales");
+
+        var schema = InvokeResolveUniqueUnqualifiedSchema(connection, "Orders");
+
+        Assert.Equal("sales", schema);
+        Assert.Contains("sys.objects", connection.LastCommandText, StringComparison.Ordinal);
+        Assert.Equal("Orders", connection.LastParameters["@tableName"]);
+    }
+
+    [Fact]
+    public void DynamicPostgresUnqualifiedResolver_UsesUniqueCatalogSchema()
+    {
+        var connection = new DynamicNpgsqlSchemaProbeConnection("inventory");
+
+        var schema = InvokeResolveUniqueUnqualifiedSchema(connection, "Products");
+
+        Assert.Equal("inventory", schema);
+        Assert.Contains("information_schema.tables", connection.LastCommandText, StringComparison.Ordinal);
+        Assert.Equal("Products", connection.LastParameters["@tableName"]);
+    }
+
+    [Fact]
+    public void DynamicSqlServerUnqualifiedResolver_ThrowsWhenCatalogSchemaAmbiguous()
+    {
+        var connection = new DynamicSqlConnectionSchemaProbeConnection("dbo", "sales");
+
+        var ex = Assert.Throws<TargetInvocationException>(
+            () => InvokeResolveUniqueUnqualifiedSchema(connection, "Orders"));
+        var configurationException = Assert.IsType<NormConfigurationException>(ex.InnerException);
+
+        Assert.Contains("'dbo'", configurationException.Message, StringComparison.Ordinal);
+        Assert.Contains("'sales'", configurationException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DynamicPostgresUnqualifiedResolver_ThrowsWhenCatalogSchemaAmbiguous()
+    {
+        var connection = new DynamicNpgsqlSchemaProbeConnection("inventory", "reporting");
+
+        var ex = Assert.Throws<TargetInvocationException>(
+            () => InvokeResolveUniqueUnqualifiedSchema(connection, "Products"));
+        var configurationException = Assert.IsType<NormConfigurationException>(ex.InnerException);
+
+        Assert.Contains("'inventory'", configurationException.Message, StringComparison.Ordinal);
+        Assert.Contains("'reporting'", configurationException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DynamicMySqlUnqualifiedResolver_KeepsCurrentDatabaseSemantics()
+    {
+        var connection = new DynamicMySqlMetadataProbeConnection();
+
+        var schema = InvokeResolveUniqueUnqualifiedSchema(connection, "Orders");
+
+        Assert.Null(schema);
+        Assert.Equal(string.Empty, connection.LastCommandText);
+    }
+
+    [Theory]
+    [InlineData("tinyint(3) unsigned", typeof(byte))]
+    [InlineData("smallint(5) unsigned", typeof(ushort))]
+    [InlineData("mediumint(8) unsigned", typeof(uint))]
+    [InlineData("int(10) unsigned", typeof(uint))]
+    [InlineData("integer(10) unsigned", typeof(uint))]
+    [InlineData("bigint(20) unsigned", typeof(ulong))]
+    [InlineData("int unsigned", typeof(uint))]
+    public void TryMapMySqlUnsignedType_StaticAndDynamic_IgnoreDisplayWidth(string detail, Type expected)
+    {
+        var staticResult = InvokeTryMapMySqlUnsignedType(typeof(DatabaseScaffolder), detail);
+        var dynamicResult = InvokeTryMapMySqlUnsignedType(typeof(DynamicEntityTypeGenerator), detail);
+
+        Assert.True(staticResult.Mapped);
+        Assert.True(dynamicResult.Mapped);
+        Assert.Equal(expected, staticResult.Type);
+        Assert.Equal(expected, dynamicResult.Type);
+    }
+
     [Theory]
     [InlineData("JSON", false)]
     [InlineData("XML", false)]
@@ -710,6 +1330,255 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
     }
 
+    [Fact]
+    public void BuildExpressionIndexConfigurations_SuppressesProviderSpecificAccessMethods()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents"] = "Document"
+        };
+
+        var ordinaryExpressionFeatures = Array.CreateInstance(featureType, 1);
+        ordinaryExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LowerName",
+            "CREATE INDEX \"IX_Documents_LowerName\" ON public.\"Documents\" USING btree (lower(\"Name\"))")!, 0);
+
+        var ordinaryResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, ordinaryExpressionFeatures })!;
+
+        var providerSpecificExpressionFeatures = Array.CreateInstance(featureType, 2);
+        providerSpecificExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_Search",
+            "CREATE INDEX \"IX_Documents_Search\" ON public.\"Documents\" USING gin (to_tsvector('simple'::regconfig, \"Name\"))")!, 0);
+        providerSpecificExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ProviderSpecificIndex",
+            "IX_Documents_Search",
+            "gin index")!, 1);
+
+        var providerSpecificResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, providerSpecificExpressionFeatures })!;
+
+        var includedExpressionFeatures = Array.CreateInstance(featureType, 2);
+        includedExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LowerName_Include",
+            "CREATE INDEX \"IX_Documents_LowerName_Include\" ON public.\"Documents\" USING btree (lower(\"Name\")) INCLUDE (\"Score\")")!, 0);
+        includedExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "IncludedColumnIndex",
+            "IX_Documents_LowerName_Include",
+            "PostgreSQL index with included columns")!, 1);
+
+        var includedExpressionResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, includedExpressionFeatures })!;
+
+        var descendingExpressionFeatures = Array.CreateInstance(featureType, 2);
+        descendingExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LowerName_Desc",
+            "CREATE INDEX \"IX_Documents_LowerName_Desc\" ON public.\"Documents\" USING btree (lower(\"Name\") DESC)")!, 0);
+        descendingExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "DescendingIndex",
+            "IX_Documents_LowerName_Desc",
+            "PostgreSQL descending expression index key")!, 1);
+
+        var descendingExpressionResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, descendingExpressionFeatures })!;
+
+        var mySqlExpressionFeatures = Array.CreateInstance(featureType, 1);
+        mySqlExpressionFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_MySqlExpression",
+            "MySQL expression index; expression=LOWER(`Name`)")!, 0);
+
+        var mySqlExpressionResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, mySqlExpressionFeatures })!;
+
+        Assert.Single((System.Collections.IEnumerable)ordinaryResult);
+        Assert.Empty((System.Collections.IEnumerable)providerSpecificResult);
+        Assert.Empty((System.Collections.IEnumerable)includedExpressionResult);
+        Assert.Empty((System.Collections.IEnumerable)descendingExpressionResult);
+        Assert.Empty((System.Collections.IEnumerable)mySqlExpressionResult);
+    }
+
+    [Fact]
+    public void BuildExpressionIndexConfigurations_ExtractsFilterAfterExpressionBody()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents"] = "Document"
+        };
+        var features = Array.CreateInstance(featureType, 2);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LiteralWhere",
+            "CREATE INDEX \"IX_Documents_LiteralWhere\" ON public.\"Documents\" USING btree (strpos(\"Name\", ' WHERE '))")!, 0);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LiteralWhere_Filtered",
+            "CREATE INDEX \"IX_Documents_LiteralWhere_Filtered\" ON public.\"Documents\" USING btree (strpos(\"Name\", ' WHERE ')) WHERE \"Name\" IS NOT NULL")!, 1);
+
+        var result = ((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>()
+            .ToDictionary(
+                item => (string)item.GetType().GetProperty("Name")!.GetValue(item)!,
+                StringComparer.Ordinal);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(
+            "strpos(\"Name\", ' WHERE ')",
+            result["IX_Documents_LiteralWhere"].GetType().GetProperty("ExpressionSql")!.GetValue(result["IX_Documents_LiteralWhere"]));
+        Assert.Null(result["IX_Documents_LiteralWhere"].GetType().GetProperty("FilterSql")!.GetValue(result["IX_Documents_LiteralWhere"]));
+        Assert.Equal(
+            "strpos(\"Name\", ' WHERE ')",
+            result["IX_Documents_LiteralWhere_Filtered"].GetType().GetProperty("ExpressionSql")!.GetValue(result["IX_Documents_LiteralWhere_Filtered"]));
+        Assert.Equal(
+            "\"Name\" IS NOT NULL",
+            result["IX_Documents_LiteralWhere_Filtered"].GetType().GetProperty("FilterSql")!.GetValue(result["IX_Documents_LiteralWhere_Filtered"]));
+    }
+
+    [Fact]
+    public void BuildExpressionIndexConfigurations_ExtractsFilterAcrossWhitespace()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["main.Documents"] = "Document"
+        };
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "main.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LowerName_Filtered",
+            "CREATE INDEX \"IX_Documents_LowerName_Filtered\" ON \"Documents\" (lower(\"Name\"))\r\nWHERE \"Name\" IS NOT NULL")!, 0);
+
+        var result = Assert.Single(((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>());
+
+        Assert.Equal(
+            "lower(\"Name\")",
+            result.GetType().GetProperty("ExpressionSql")!.GetValue(result));
+        Assert.Equal(
+            "\"Name\" IS NOT NULL",
+            result.GetType().GetProperty("FilterSql")!.GetValue(result));
+    }
+
+    [Fact]
+    public void BuildExpressionIndexConfigurations_DetectsUniqueOnlyFromCreateIndexPrefix()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents"] = "Document"
+        };
+        var features = Array.CreateInstance(featureType, 2);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_CreateUniqueLiteral",
+            "CREATE INDEX \"IX_Documents_CreateUniqueLiteral\" ON public.\"Documents\" USING btree (strpos(\"Name\", 'CREATE UNIQUE'))")!, 0);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "UX_Documents_LowerName",
+            "CREATE UNIQUE INDEX \"UX_Documents_LowerName\" ON public.\"Documents\" USING btree (lower(\"Name\"))")!, 1);
+
+        var result = ((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>()
+            .ToDictionary(
+                item => (string)item.GetType().GetProperty("Name")!.GetValue(item)!,
+                StringComparer.Ordinal);
+
+        Assert.False((bool)result["IX_Documents_CreateUniqueLiteral"].GetType().GetProperty("IsUnique")!.GetValue(result["IX_Documents_CreateUniqueLiteral"])!);
+        Assert.True((bool)result["UX_Documents_LowerName"].GetType().GetProperty("IsUnique")!.GetValue(result["UX_Documents_LowerName"])!);
+    }
+
+    [Fact]
+    public void BuildExpressionIndexConfigurations_ParsesKeyListAfterQuotedTableName()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents(Archive)"] = "DocumentArchive"
+        };
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents(Archive)",
+            "ExpressionIndex",
+            "IX_Documents_Archive_LowerName",
+            "CREATE INDEX \"IX_Documents_Archive_LowerName\" ON public.\"Documents(Archive)\" USING btree (lower(\"Name\")) WHERE \"Name\" IS NOT NULL")!, 0);
+
+        var result = Assert.Single(((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>());
+
+        Assert.Equal(
+            "lower(\"Name\")",
+            result.GetType().GetProperty("ExpressionSql")!.GetValue(result));
+        Assert.Equal(
+            "\"Name\" IS NOT NULL",
+            result.GetType().GetProperty("FilterSql")!.GetValue(result));
+    }
+
     [Theory]
     [InlineData("ARRAY (_int4)", typeof(int[]))]
     [InlineData("ARRAY (_text)", typeof(string[]))]
@@ -742,6 +1611,7 @@ public class DatabaseScaffolderPrivateMethodTests
     [Theory]
     [InlineData("SQL Server synonym; baseObject=[dbo].[Orders]; baseType=U", true)]
     [InlineData("SQL Server synonym; baseObject=[dbo].[OrderView]; baseType=V", true)]
+    [InlineData("SQL Server synonym; baseObject=[dbo].[Orders; note=retained]; baseType=U", true)]
     [InlineData("SQL Server synonym; baseObject=[dbo].[Rebuild]; baseType=P", false)]
     [InlineData("SQL Server synonym; baseObject=[remote].[dbo].[Orders]; baseType=", false)]
     public void IsTableLikeSqlServerSynonym_AllowsOnlyResolvedTableOrViewTargets(string detail, bool expected)
@@ -834,6 +1704,14 @@ public class DatabaseScaffolderPrivateMethodTests
         var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Category", "Class" });
         Assert.Contains("IQueryable<Category> Categories", code);
         Assert.Contains("IQueryable<Class> Classes", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithForeignKeyConstraintName_EmitsNamedRelationshipConfiguration()
+    {
+        var code = InvokeScaffoldContextWithNamedRelationship();
+
+        Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, \"FK_Book_Author_Custom\", false);", code);
     }
 
     [Fact]
@@ -1131,6 +2009,7 @@ public class DatabaseScaffolderPrivateMethodTests
             "calculate_campaign",
             "PostgreSQL function; parameters=6; outputParameters=0; parameterModes=tenant_id:IN:integer,duration:IN:interval,customer_ids:IN:ARRAY (_int4),labels:IN:ARRAY (_text),note:IN:USER-DEFINED (citext),trace_id:IN:USER-DEFINED (uuid); dataType=integer");
 
+        Assert.Contains("using System;", code);
         Assert.Contains("public int? tenant_id { get; init; }", code);
         Assert.Contains("public TimeSpan? duration { get; init; }", code);
         Assert.Contains("public int[]? customer_ids { get; init; }", code);
@@ -1189,6 +2068,151 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithColonDelimitedFunctionParameterNames_ParsesModeTokenBeforePositionalFallback()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=2; outputParameters=0; parameterModes=tenant:id:IN:integer,search:text:IN:text; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("if (args.Length != 2)", code);
+        Assert.Contains("var casts = new[] { \"integer\", \"text\" };", code);
+        Assert.Contains("Parameters discovered at scaffold time: tenant:id IN integer, search:text IN text", code);
+        Assert.DoesNotContain("public object? tenant", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_colon_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithModeLikeTextInsideFunctionParameterName_UsesTerminalModeToken()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=tenant:IN:name:IN:integer; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("if (args.Length != 1)", code);
+        Assert.Contains("var casts = new[] { \"integer\" };", code);
+        Assert.Contains("Parameters discovered at scaffold time: tenant:IN:name IN integer", code);
+        Assert.DoesNotContain("public object? tenant", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_mode_text_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithSemicolonDelimitedFunctionParameterNames_PreservesGeneratedMetadataFields()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=2; outputParameters=0; parameterModes=tenant;id:IN:integer,search;text:IN:text; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("if (args.Length != 2)", code);
+        Assert.Contains("var casts = new[] { \"integer\", \"text\" };", code);
+        Assert.Contains("Parameters discovered at scaffold time: tenant;id IN integer, search;text IN text", code);
+        Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_semicolon_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithAllowListedKeyTextInsideFunctionParameterName_KeepsRoutineFieldsIntact()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=tenant; dataType=retained:IN:integer; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("if (args.Length != 1)", code);
+        Assert.Contains("var casts = new[] { \"integer\" };", code);
+        Assert.Contains("Parameters discovered at scaffold time: tenant; dataType=retained IN integer", code);
+        Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_key_text_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithCommaDelimitedFunctionParameterNames_SplitsOnlyCompleteParameters()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "calculate odd",
+            "PostgreSQL function; parameters=2; outputParameters=0; parameterModes=tenant,id:IN:integer,search,text:IN:text; dataType=integer");
+
+        Assert.DoesNotContain("public sealed class CalculateOddParameters", code);
+        Assert.Contains("Task<TValue?> CalculateOddValueAsync<TValue>(object?[]? arguments = null, CancellationToken ct = default)", code);
+        Assert.Contains("if (args.Length != 2)", code);
+        Assert.Contains("var casts = new[] { \"integer\", \"text\" };", code);
+        Assert.Contains("Parameters discovered at scaffold time: tenant,id IN integer, search,text IN text", code);
+        Assert.DoesNotContain("var args = System.Array.Empty<object>();", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_comma_function_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithStoredProcedureParametersThatCannotBecomeDto_UsesDictionaryArguments()
     {
         var code = InvokeScaffoldContextWithRoutine(
@@ -1233,6 +2257,87 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation", code);
         Assert.Contains("QueryUnchangedAsync<CustomerOrdersResult>", code);
         Assert.DoesNotContain("ExecuteStoredProcedureAsync<TResult>", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithResultColumnNamesContainingColon_PreservesNameBeforeTypeMapping()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "GetOrderLines",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenantId:IN:int; resultColumns=Order:Id:int:0|Line:Name:nvarchar(40):1");
+
+        Assert.Contains("public sealed class GetOrderLinesResult", code);
+        Assert.Contains("public int OrderId { get; set; }", code);
+        Assert.Contains("public string? LineName { get; set; }", code);
+        Assert.DoesNotContain("public object? Order", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_colon_result_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithResultColumnNamesContainingSemicolon_PreservesMetadataFields()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "GetOrderLines",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenantId:IN:int; resultColumns=Order;Id:int:0|Line;Name:nvarchar(40):1");
+
+        Assert.Contains("public sealed class GetOrderLinesResult", code);
+        Assert.Contains("public int OrderId { get; set; }", code);
+        Assert.Contains("public string? LineName { get; set; }", code);
+        Assert.DoesNotContain("public object? Order", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_semicolon_result_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithResultColumnNamesContainingPipe_SplitsOnlyCompleteColumns()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "GetOrderLines",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenantId:IN:int; resultColumns=Order|Id:int:0|Line|Name:nvarchar(40):1");
+
+        Assert.Contains("public sealed class GetOrderLinesResult", code);
+        Assert.Contains("public int OrderId { get; set; }", code);
+        Assert.Contains("public string? LineName { get; set; }", code);
+        Assert.DoesNotContain("public object? Order", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_pipe_result_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]
@@ -1564,7 +2669,11 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Default");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Trigger");
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
-            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("name").GetString() == "aux.SchemaBookView");
+            Assert.Contains(skippedObjects.EnumerateArray(), item =>
+                item.GetProperty("name").GetString() == "aux.SchemaBookView" &&
+                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
+                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "View" &&
+                item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean());
         }
         finally
         {
@@ -1976,6 +3085,7 @@ public class DatabaseScaffolderPrivateMethodTests
             );
             CREATE INDEX IX_IndexedProviderSpecific_Name_Active ON IndexedProviderSpecific(Name) WHERE Active = 1;
             CREATE INDEX IX_IndexedProviderSpecific_LowerName ON IndexedProviderSpecific(lower(Name));
+            CREATE INDEX IX_IndexedProviderSpecific_LowerName_Active ON IndexedProviderSpecific(lower(Name)) WHERE Active = 1;
             """;
         cmd.ExecuteNonQuery();
 
@@ -1990,6 +3100,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Index(\"IX_IndexedProviderSpecific_Name_Active\", FilterSql = \"Active = 1\")]", entityCode);
             Assert.DoesNotContain("[Index(\"IX_IndexedProviderSpecific_LowerName\")]", entityCode);
             Assert.Contains("mb.Entity<IndexedProviderSpecific>().HasExpressionIndex(\"IX_IndexedProviderSpecific_LowerName\", \"lower(Name)\");", contextCode);
+            Assert.Contains("mb.Entity<IndexedProviderSpecific>().HasExpressionIndex(\"IX_IndexedProviderSpecific_LowerName_Active\", \"lower(Name)\", filterSql: \"Active = 1\");", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
         }
@@ -2024,6 +3135,61 @@ public class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("[Index(\"IX_IndexedDirection_Name_Desc\", IsDescending = true)]", entityCode);
             Assert.False(File.Exists(warningPath), "Descending ordinary column indexes should scaffold as portable index metadata.");
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithDescendingPartialExpressionIndex_ReportsStructuredIndexMetadata()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IndexedExpressionWarning (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                Active INTEGER NOT NULL
+            );
+            CREATE UNIQUE INDEX IX_IndexedExpressionWarning_LowerName_Desc
+                ON IndexedExpressionWarning(lower(Name) DESC)
+                WHERE Active = 1;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ExpressionWarningIndexCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ExpressionWarningIndexCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain("HasExpressionIndex(\"IX_IndexedExpressionWarning_LowerName_Desc\"", contextCode, StringComparison.Ordinal);
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            var expressionIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ExpressionIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
+            var expressionMetadata = expressionIndex.GetProperty("metadata");
+            Assert.True(expressionMetadata.GetProperty("expressionBased").GetBoolean());
+            Assert.Equal("lower(Name) DESC", expressionMetadata.GetProperty("expressionSql").GetString());
+            Assert.Equal("Active = 1", expressionMetadata.GetProperty("filterSql").GetString());
+            Assert.True(expressionMetadata.GetProperty("isUnique").GetBoolean());
+            Assert.Contains("CREATE UNIQUE INDEX IX_IndexedExpressionWarning_LowerName_Desc", expressionMetadata.GetProperty("indexSql").GetString(), StringComparison.Ordinal);
+
+            var partialIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "PartialIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
+            Assert.Equal("Active = 1", partialIndex.GetProperty("metadata").GetProperty("filterSql").GetString());
+
+            var descendingIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "DescendingIndex" &&
+                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
+            Assert.True(descendingIndex.GetProperty("metadata").GetProperty("descending").GetBoolean());
+            Assert.Equal("lower(Name) DESC", descendingIndex.GetProperty("metadata").GetProperty("keySql").GetString());
         }
         finally
         {
@@ -2168,6 +3334,58 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithForeignKeyToNullableUniqueIndex_DoesNotEmitUnsafeNavigation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE NullableAltCustomer (
+                Id INTEGER PRIMARY KEY,
+                ExternalId TEXT NULL,
+                Name TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX UX_NullableAltCustomer_ExternalId ON NullableAltCustomer(ExternalId);
+            CREATE TABLE NullableAltOrder (
+                Id INTEGER PRIMARY KEY,
+                CustomerExternalId TEXT NOT NULL,
+                CONSTRAINT FK_NullableAltOrder_Customer
+                    FOREIGN KEY (CustomerExternalId) REFERENCES NullableAltCustomer(ExternalId)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "NullableUniqueFkCtx");
+
+            var principalCode = File.ReadAllText(Path.Combine(dir, "NullableAltCustomer.cs"));
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "NullableAltOrder.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "NullableUniqueFkCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[Index(\"UX_NullableAltCustomer_ExternalId\", IsUnique = true)]", principalCode);
+            Assert.DoesNotContain("List<NullableAltOrder>", principalCode);
+            Assert.DoesNotContain("[ForeignKey(", dependentCode);
+            Assert.DoesNotContain("public NullableAltCustomer?", dependentCode);
+            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.Contains("RelationshipPrincipalKey", warnings);
+            Assert.Contains("exact ordered unfiltered non-null unique index", warnings);
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
+                item.GetProperty("name").GetString() == "sqlite_fk_0");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithProviderOwnedSchemaFeatures_EmitsDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -2233,14 +3451,29 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Collation");
-            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
+            var triggerDiagnostic = Assert.Single(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("name").GetString() == "TR_FeatureOwned_Audit");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "CheckConstraint");
-            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Trigger" && item.GetProperty("code").GetString() == "SCF110" && item.GetProperty("category").GetString() == "database-object");
+            Assert.Equal("SCF110", triggerDiagnostic.GetProperty("code").GetString());
+            Assert.Equal("database-object", triggerDiagnostic.GetProperty("category").GetString());
+            var triggerMetadata = triggerDiagnostic.GetProperty("metadata");
+            Assert.Equal("SQLite", triggerMetadata.GetProperty("provider").GetString());
+            Assert.Equal("Trigger", triggerMetadata.GetProperty("providerObjectKind").GetString());
+            Assert.Equal("FeatureOwned", triggerMetadata.GetProperty("table").GetString());
+            Assert.Equal("TR_FeatureOwned_Audit", triggerMetadata.GetProperty("triggerName").GetString());
+            Assert.True(triggerMetadata.GetProperty("providerOwnedDdl").GetBoolean());
+            Assert.False(triggerMetadata.GetProperty("generatedModelConfigurationSupported").GetBoolean());
+            Assert.True(triggerMetadata.GetProperty("definitionAvailable").GetBoolean());
+            Assert.Contains("CREATE TRIGGER TR_FeatureOwned_Audit", triggerMetadata.GetProperty("triggerSql").GetString(), StringComparison.OrdinalIgnoreCase);
             Assert.All(providerOwned.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
             Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("code").GetString() == "SCF200" && item.GetProperty("category").GetString() == "query-object");
+            Assert.Contains(skippedObjects.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "View" &&
+                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
+                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "View" &&
+                item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean());
             Assert.All(skippedObjects.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(skippedObjects.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
         }
@@ -2282,6 +3515,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("XmlPayload |", warnings);
             Assert.Contains("Shape", warnings);
             Assert.DoesNotContain("PortableText |", warnings);
+            Assert.Contains("using System;", entityCode);
             Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
             Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
             Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
@@ -2290,7 +3524,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                 item.GetProperty("name").GetString() == "Shape" &&
-                item.GetProperty("category").GetString() == "schema-feature");
+                item.GetProperty("category").GetString() == "schema-feature" &&
+                item.GetProperty("metadata").GetProperty("providerType").GetString() == "GEOMETRY");
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -2365,10 +3600,17 @@ public class DatabaseScaffolderPrivateMethodTests
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
             Assert.Contains(skippedObjects.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "VirtualTable" &&
-                item.GetProperty("name").GetString() == "SearchDocs");
+                item.GetProperty("name").GetString() == "SearchDocs" &&
+                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
+                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "VirtualTable" &&
+                item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean());
             Assert.Contains(skippedObjects.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
-                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal));
+                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal) &&
+                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
+                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "VirtualTableShadow" &&
+                !item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean() &&
+                item.GetProperty("metadata").GetProperty("shadowOf").GetString() == "SearchDocs");
         }
         finally
         {
@@ -2420,7 +3662,9 @@ public class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("name").GetString() == "SearchDocs");
             Assert.Contains(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
-                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal));
+                item.GetProperty("name").GetString()!.StartsWith("SearchDocs_", StringComparison.Ordinal) &&
+                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
+                item.GetProperty("metadata").GetProperty("shadowOf").GetString() == "SearchDocs");
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -2499,6 +3743,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id);", contextCode);
             Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade);", contextCode);
             Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.NoAction);", contextCode);
+            Assert.DoesNotContain("sqlite_fk_", contextCode);
             Assert.False(File.Exists(warningPath), "Valid referential actions should scaffold into fluent configuration rather than warning-only diagnostics.");
         }
         finally
@@ -2535,6 +3780,15 @@ public class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "KeylessImport");
             Assert.Contains("read", missingPrimaryKey.GetProperty("suggestedAction").GetString(), StringComparison.OrdinalIgnoreCase);
+            var metadata = missingPrimaryKey.GetProperty("metadata");
+            Assert.True(metadata.GetProperty("readOnlyEntity").GetBoolean());
+            Assert.False(metadata.GetProperty("generatedWritesSupported").GetBoolean());
+            Assert.False(metadata.GetProperty("generatedNavigationSupported").GetBoolean());
+            Assert.Equal("KeylessImport", metadata.GetProperty("table").GetString());
+            Assert.Equal("missing-primary-key", metadata.GetProperty("reason").GetString());
+            Assert.Equal(2, metadata.GetProperty("columnCount").GetInt32());
+            Assert.Equal(new[] { "ExternalId", "Payload" }, metadata.GetProperty("columns").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Equal(new[] { "ExternalId", "Payload" }, metadata.GetProperty("properties").EnumerateArray().Select(item => item.GetString()).ToArray());
         }
         finally
         {
@@ -2612,7 +3866,13 @@ public class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
-                item.GetProperty("name").GetString() == "sqlite_fk_0");
+                item.GetProperty("name").GetString() == "sqlite_fk_0" &&
+                item.GetProperty("metadata").GetProperty("navigationSuppressed").GetBoolean() &&
+                item.GetProperty("metadata").GetProperty("dependentTable").GetString() == "ImportedOrder" &&
+                item.GetProperty("metadata").GetProperty("dependentColumns").EnumerateArray().Single().GetString() == "CustomerExternalId" &&
+                item.GetProperty("metadata").GetProperty("principalTable").GetString() == "ExternalCustomer" &&
+                item.GetProperty("metadata").GetProperty("principalColumns").EnumerateArray().Single().GetString() == "ExternalId" &&
+                item.GetProperty("metadata").GetProperty("columnCount").GetInt32() == 1);
         }
         finally
         {
@@ -2661,7 +3921,14 @@ public class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "RelationshipDependentKey" &&
-                item.GetProperty("table").GetString() == "ImportLine");
+                item.GetProperty("table").GetString() == "ImportLine" &&
+                item.GetProperty("metadata").GetProperty("navigationSuppressed").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedNavigationSupported").GetBoolean() &&
+                item.GetProperty("metadata").GetProperty("dependentTable").GetString() == "ImportLine" &&
+                item.GetProperty("metadata").GetProperty("dependentColumns").EnumerateArray().Single().GetString() == "CustomerId" &&
+                item.GetProperty("metadata").GetProperty("principalTable").GetString() == "Customer" &&
+                item.GetProperty("metadata").GetProperty("principalColumns").EnumerateArray().Single().GetString() == "Id" &&
+                item.GetProperty("metadata").GetProperty("columnCount").GetInt32() == 1);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -2707,9 +3974,26 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("[ForeignKey(", dependentCode);
             Assert.DoesNotContain("HasForeignKey", contextCode);
             Assert.Contains("RelationshipPrincipalKey", warnings);
+            var compositeFk = warningJson.RootElement.GetProperty("compositeForeignKeys").EnumerateArray().Single();
+            var compositeMetadata = compositeFk.GetProperty("metadata");
+            Assert.Equal("SCF001", compositeFk.GetProperty("code").GetString());
+            Assert.Equal("relationship", compositeFk.GetProperty("category").GetString());
+            Assert.Equal("Dependent", compositeMetadata.GetProperty("dependentTable").GetString());
+            Assert.Equal("Principal", compositeMetadata.GetProperty("principalTable").GetString());
+            Assert.True(compositeMetadata.GetProperty("relationshipSuppressed").GetBoolean());
+            Assert.Equal("principal-key-not-scaffoldable", compositeMetadata.GetProperty("reason").GetString());
+            Assert.Equal(2, compositeMetadata.GetProperty("columnCount").GetInt32());
+            Assert.Equal(new[] { "TenantId", "Code" }, compositeMetadata.GetProperty("dependentColumns").EnumerateArray().Select(column => column.GetString()).ToArray());
+            Assert.Equal(new[] { "TenantId", "Code" }, compositeMetadata.GetProperty("principalColumns").EnumerateArray().Select(column => column.GetString()).ToArray());
+            Assert.Equal(new[] { "Id" }, compositeMetadata.GetProperty("principalPrimaryKeyColumns").EnumerateArray().Select(column => column.GetString()).ToArray());
+            Assert.False(compositeMetadata.GetProperty("referencesPrimaryKey").GetBoolean());
+            Assert.False(compositeMetadata.GetProperty("referencesScaffoldableUniqueIndex").GetBoolean());
             Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
-                item.GetProperty("name").GetString() == "sqlite_fk_0");
+                item.GetProperty("name").GetString() == "sqlite_fk_0" &&
+                item.GetProperty("metadata").GetProperty("reason").GetString() == "principal-key-not-scaffoldable" &&
+                string.Join(",", item.GetProperty("metadata").GetProperty("dependentColumns").EnumerateArray().Select(column => column.GetString())) == "TenantId,Code" &&
+                string.Join(",", item.GetProperty("metadata").GetProperty("principalColumns").EnumerateArray().Select(column => column.GetString())) == "TenantId,Code");
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -2792,6 +4076,55 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(".HasMany<Book>(p => p.Books)", contextCode);
             Assert.Contains(".WithMany(p => p.Authors)", contextCode);
             Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorId\", \"BookId\");", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithPureJoinTableProviderOwnedFeature_RestoresDiagnostics()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT CK_AuthorBook_Positive CHECK (AuthorId > 0 AND BookId > 0),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinFeatureCtx");
+
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "JoinFeatureCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains(".UsingTable(\"AuthorBook\", \"AuthorId\", \"BookId\");", contextCode);
+            Assert.DoesNotContain("HasCheckConstraint(\"CK_AuthorBook_Positive\"", contextCode, StringComparison.Ordinal);
+            var summary = warningJson.RootElement.GetProperty("summary");
+            Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("providerOwnedSchemaFeatures").GetInt32());
+            Assert.Equal(0, summary.GetProperty("sectionCounts").GetProperty("possibleManyToManyJoinTables").GetInt32());
+            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "CheckConstraint" &&
+                item.GetProperty("table").GetString() == "AuthorBook" &&
+                item.GetProperty("name").GetString() == "CK_AuthorBook_Positive" &&
+                item.GetProperty("metadata").GetProperty("checkSql").GetString() == "AuthorId > 0 AND BookId > 0");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {
@@ -2979,8 +4312,23 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "payload-columns");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated primary keys or exact ordered unfiltered unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated surrogate primary key plus an exact unfiltered unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated primary keys or exact ordered unfiltered non-null unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated surrogate primary key plus an exact unfiltered non-null unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            var metadata = joinTables[0].GetProperty("metadata");
+            Assert.Equal(2, metadata.GetProperty("foreignKeyConstraintCount").GetInt32());
+            Assert.Equal(new[] { "AuthorId", "BookId" }, metadata.GetProperty("foreignKeyColumns").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Equal(new[] { "AuthorId", "BookId" }, metadata.GetProperty("primaryKeyColumns").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Equal(new[] { "CreatedAt" }, metadata.GetProperty("payloadColumns").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Empty(metadata.GetProperty("databaseGeneratedColumns").EnumerateArray());
+            Assert.Empty(metadata.GetProperty("identityColumns").EnumerateArray());
+            Assert.Empty(metadata.GetProperty("nullableForeignKeyColumns").EnumerateArray());
+            Assert.True(metadata.GetProperty("hasExactBridgePrimaryKey").GetBoolean());
+            Assert.False(metadata.GetProperty("hasGeneratedSurrogatePrimaryKey").GetBoolean());
+            Assert.False(metadata.GetProperty("hasExactForeignKeyUniqueIndex").GetBoolean());
+            Assert.Contains(metadata.GetProperty("foreignKeys").EnumerateArray(), item =>
+                item.GetProperty("principalTable").GetString() == "Author" &&
+                string.Join(",", item.GetProperty("dependentColumns").EnumerateArray().Select(column => column.GetString())) == "AuthorId" &&
+                string.Join(",", item.GetProperty("principalColumns").EnumerateArray().Select(column => column.GetString())) == "Id");
         }
         finally
         {
@@ -3508,6 +4856,11 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("possibleManyToManyJoinTables").GetInt32());
             var keylessJoin = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables")[0];
             Assert.Contains(keylessJoin.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "missing-primary-key");
+            var keylessMetadata = keylessJoin.GetProperty("metadata");
+            Assert.Equal(new[] { "AuthorId", "BookId" }, keylessMetadata.GetProperty("foreignKeyColumns").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Empty(keylessMetadata.GetProperty("primaryKeyColumns").EnumerateArray());
+            Assert.False(keylessMetadata.GetProperty("hasExactBridgePrimaryKey").GetBoolean());
+            Assert.False(keylessMetadata.GetProperty("hasGeneratedSurrogatePrimaryKey").GetBoolean());
             Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "AuthorBook");
@@ -3948,6 +5301,52 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredCtx.cs"));
             Assert.Contains("IQueryable<KeepMe> KeepMes", contextCode);
             Assert.DoesNotContain("SkipMes", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithTableFilter_SuppressesRelationshipsToUnselectedTables()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE SkipPrincipal (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE KeepDependent (
+                Id INTEGER PRIMARY KEY,
+                PrincipalId INTEGER NOT NULL,
+                CONSTRAINT FK_KeepDependent_SkipPrincipal
+                    FOREIGN KEY (PrincipalId) REFERENCES SkipPrincipal(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "FilteredRelationshipCtx",
+                new ScaffoldOptions { Tables = new[] { "KeepDependent" } });
+
+            Assert.True(File.Exists(Path.Combine(dir, "KeepDependent.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "SkipPrincipal.cs")));
+            var dependentCode = File.ReadAllText(Path.Combine(dir, "KeepDependent.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredRelationshipCtx.cs"));
+            Assert.DoesNotContain("[ForeignKey(", dependentCode);
+            Assert.DoesNotContain("SkipPrincipal", dependentCode);
+            Assert.DoesNotContain("SkipPrincipals", contextCode);
+            Assert.DoesNotContain("HasForeignKey", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
         }
         finally
         {
@@ -4430,7 +5829,7 @@ public class DatabaseScaffolderPrivateMethodTests
               <PropertyGroup>
                 <TargetFramework>net8.0</TargetFramework>
                 <Nullable>enable</Nullable>
-                <ImplicitUsings>enable</ImplicitUsings>
+                <ImplicitUsings>disable</ImplicitUsings>
               </PropertyGroup>
               <ItemGroup>
                 <Reference Include="nORM">

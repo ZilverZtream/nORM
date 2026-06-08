@@ -465,7 +465,7 @@ public class CliIntegrationTests
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <Nullable>enable</Nullable>
-                    <ImplicitUsings>enable</ImplicitUsings>
+                    <ImplicitUsings>disable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="nORM">
@@ -476,6 +476,19 @@ public class CliIntegrationTests
                 """, Encoding.UTF8);
 
             RunDotNet("build -c Release --nologo", output);
+
+            var scaffoldAssembly = Path.Combine(output, "bin", "Release", "net8.0", "CliScaffolded.dll");
+            var migrationsDir = Path.Combine(output, "Migrations");
+            var migration = RunCli(
+                $"migrations add ScaffoldedInitial --provider sqlite --assembly {Quote(scaffoldAssembly)} --output {Quote(migrationsDir)}",
+                root);
+
+            Assert.True(migration.ExitCode == 0,
+                $"Migration CLI failed with exit code {migration.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{migration.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{migration.Stderr}");
+
+            var generatedMigration = Directory.EnumerateFiles(migrationsDir, "Migration_*_ScaffoldedInitial.cs").Single();
+            var migrationSource = File.ReadAllText(generatedMigration);
+            Assert.Contains("CREATE INDEX \\\"IX_Book_Author_Title\\\" ON \\\"Book\\\" (\\\"Author_Id\\\", \\\"Title\\\")", migrationSource, StringComparison.Ordinal);
         }
         finally
         {
@@ -530,7 +543,7 @@ public class CliIntegrationTests
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <Nullable>enable</Nullable>
-                    <ImplicitUsings>enable</ImplicitUsings>
+                    <ImplicitUsings>disable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="nORM">

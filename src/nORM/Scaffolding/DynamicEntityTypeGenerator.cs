@@ -26,7 +26,10 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, bool IsRowVersion, int? MaxLength);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, ScaffoldDecimalPrecision? DecimalPrecision);
+
+        private readonly record struct ScaffoldComputedColumn(string Sql, bool Stored);
+        private readonly record struct ScaffoldDecimalPrecision(int Precision, int Scale);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -178,7 +181,16 @@ namespace nORM.Scaffolding
 
                     // Add [Column] attribute mapping to the original database column name
                     var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
-                    var columnAttr = new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
+                    var columnAttr = col.DecimalPrecision is { } decimalPrecision
+                        ? new CustomAttributeBuilder(
+                            columnAttrCtor,
+                            new object[] { col.ColumnName },
+                            new[] { typeof(ColumnAttribute).GetProperty(nameof(ColumnAttribute.TypeName))! },
+                            new object[]
+                            {
+                                $"decimal({decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
+                            })
+                        : new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
                     propertyBuilder.SetCustomAttribute(columnAttr);
 
                     // Add [Key] attribute for primary key columns
@@ -283,10 +295,10 @@ namespace nORM.Scaffolding
                 connection.Open();
             try
             {
-                var (_, _, columns) = ResolveTableSchema(connection, tableName);
+                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
                 // Include every metadata field that changes the emitted CLR surface. Omitting one can return
                 // a stale dynamic type after a schema change even though the generated C# would differ.
-                var descriptor = BuildSchemaDescriptor(columns);
+                var descriptor = BuildSchemaDescriptor(schemaName, bareTable, columns);
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
                 return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
             }
@@ -297,9 +309,11 @@ namespace nORM.Scaffolding
             }
         }
 
-        private static string BuildSchemaDescriptor(IReadOnlyList<ColumnInfo> columns)
+        private static string BuildSchemaDescriptor(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns)
         {
             var sb = new StringBuilder();
+            AppendDescriptorPart(sb, schemaName ?? string.Empty);
+            AppendDescriptorPart(sb, tableName);
             foreach (var column in columns)
             {
                 AppendDescriptorPart(sb, column.ColumnName);
@@ -309,8 +323,15 @@ namespace nORM.Scaffolding
                 AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
                 AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
                 AppendDescriptorPart(sb, column.IsComputed ? "CMP" : "NCMP");
+                AppendDescriptorPart(sb, column.ComputedColumn?.Sql ?? "-");
+                AppendDescriptorPart(sb, column.ComputedColumn is { } computedColumn ? computedColumn.Stored ? "STORED" : "VIRTUAL" : "-");
                 AppendDescriptorPart(sb, column.IsRowVersion ? "RV" : "NRV");
                 AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
+                AppendDescriptorPart(
+                    sb,
+                    column.DecimalPrecision is { } decimalPrecision
+                        ? $"{decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+                        : "-");
             }
 
             return sb.ToString();
@@ -339,11 +360,13 @@ namespace nORM.Scaffolding
             if (schema is null)
                 return Array.Empty<ColumnInfo>();
             var existingPropertyNames = CreateReservedMemberNameSet();
+            existingPropertyNames.Add(EscapeCSharpIdentifier(ToPascalCase(tableName)));
             var computedColumns = GetComputedColumns(connection, schemaName, tableName);
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
             var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
+            var decimalPrecisions = GetDecimalPrecisions(connection, schemaName, tableName);
             var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
             var columns = new List<ColumnInfo>(schema.Rows.Count);
             var sourceOrdinal = 0;
@@ -364,7 +387,10 @@ namespace nORM.Scaffolding
                 var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
                     || identityColumns.Contains(colName);
                 var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
-                    || computedColumns.Contains(colName);
+                    || computedColumns.ContainsKey(colName);
+                var computedColumn = computedColumns.TryGetValue(colName, out var computed)
+                    ? computed
+                    : (ScaffoldComputedColumn?)null;
                 var isRowVersion = rowVersionColumns.Contains(colName);
                 var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                 sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
@@ -385,9 +411,13 @@ namespace nORM.Scaffolding
 
                 var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
 
-                var maxLength = GetScaffoldMaxLength(clrType, row);
+                var maxLength = GetScaffoldMaxLength(normalizedClrType, row);
+                var decimalPrecision = normalizedClrType == typeof(decimal)
+                    && decimalPrecisions.TryGetValue(colName, out var precision)
+                    ? precision
+                    : (ScaffoldDecimalPrecision?)null;
 
-                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, isRowVersion, maxLength));
+                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, computedColumn, isRowVersion, maxLength, decimalPrecision));
             }
 
             return columns;
@@ -431,13 +461,103 @@ namespace nORM.Scaffolding
                 : null;
         }
 
-        private static IReadOnlySet<string> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
+        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> GetDecimalPrecisions(DbConnection connection, string? schemaName, string tableName)
+        {
+            var connectionName = connection.GetType().Name;
+            if (IsSqlServerConnection(connectionName))
+            {
+                return QueryDecimalPrecisionMap(connection, """
+                    SELECT c.name AS ColumnName,
+                           CONVERT(int, c.precision) AS DecimalPrecision,
+                           CONVERT(int, c.scale) AS DecimalScale
+                    FROM sys.columns c
+                    INNER JOIN sys.tables t ON t.object_id = c.object_id
+                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                    WHERE t.name = @tableName
+                      AND (@schemaName IS NULL OR s.name = @schemaName)
+                      AND ty.name IN ('decimal', 'numeric')
+                    """, schemaName, tableName);
+            }
+
+            if (IsPostgresConnection(connectionName))
+            {
+                return QueryDecimalPrecisionMap(connection, """
+                    SELECT column_name AS ColumnName,
+                           numeric_precision AS DecimalPrecision,
+                           numeric_scale AS DecimalScale
+                    FROM information_schema.columns
+                    WHERE table_name = @tableName
+                      AND (@schemaName IS NULL OR table_schema = @schemaName)
+                      AND data_type = 'numeric'
+                      AND numeric_precision IS NOT NULL
+                      AND numeric_scale IS NOT NULL
+                    """, schemaName, tableName);
+            }
+
+            if (IsMySqlConnection(connectionName))
+            {
+                return QueryDecimalPrecisionMap(connection, """
+                    SELECT column_name AS ColumnName,
+                           numeric_precision AS DecimalPrecision,
+                           numeric_scale AS DecimalScale
+                    FROM information_schema.columns
+                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
+                      AND table_name = @tableName
+                      AND data_type IN ('decimal', 'numeric')
+                      AND numeric_precision IS NOT NULL
+                      AND numeric_scale IS NOT NULL
+                    """, schemaName, tableName);
+            }
+
+            return new Dictionary<string, ScaffoldDecimalPrecision>(0, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> QueryDecimalPrecisionMap(DbConnection connection, string sql, string? schemaName, string tableName)
+        {
+            var result = new Dictionary<string, ScaffoldDecimalPrecision>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName)
+                    || reader["DecimalPrecision"] == DBNull.Value
+                    || reader["DecimalScale"] == DBNull.Value)
+                {
+                    continue;
+                }
+
+                var precision = Convert.ToInt32(reader["DecimalPrecision"], System.Globalization.CultureInfo.InvariantCulture);
+                var scale = Convert.ToInt32(reader["DecimalScale"], System.Globalization.CultureInfo.InvariantCulture);
+                if (precision > 0 && scale >= 0 && scale <= precision)
+                    result[columnName] = new ScaffoldDecimalPrecision(precision, scale);
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
         {
             var connectionName = connection.GetType().Name;
 
             if (IsSqliteConnection(connectionName))
             {
-                var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var result = new Dictionary<string, ScaffoldComputedColumn>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (columnName, computed) in ExtractSqliteGeneratedColumns(GetSqliteCreateTableSql(connection, schemaName, tableName)))
+                    result[columnName] = computed;
+
                 using var cmd = connection.CreateCommand();
                 var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                     ? string.Empty
@@ -455,7 +575,10 @@ namespace nORM.Scaffolding
 
                     var name = Convert.ToString(reader["name"]);
                     if (!string.IsNullOrWhiteSpace(name))
-                        result.Add(name);
+                    {
+                        if (!result.ContainsKey(name))
+                            result[name] = new ScaffoldComputedColumn(string.Empty, Stored: false);
+                    }
                 }
 
                 return result;
@@ -463,8 +586,10 @@ namespace nORM.Scaffolding
 
             if (IsSqlServerConnection(connectionName))
             {
-                return QueryColumnNameSet(connection, """
-                    SELECT c.name AS ColumnName
+                return QueryComputedColumnMap(connection, """
+                    SELECT c.name AS ColumnName,
+                           CONVERT(nvarchar(max), cc.definition) AS ComputedSql,
+                           CONVERT(bit, cc.is_persisted) AS IsStored
                     FROM sys.computed_columns cc
                     INNER JOIN sys.columns c ON c.object_id = cc.object_id AND c.column_id = cc.column_id
                     INNER JOIN sys.tables t ON t.object_id = cc.object_id
@@ -476,8 +601,10 @@ namespace nORM.Scaffolding
 
             if (IsPostgresConnection(connectionName))
             {
-                return QueryColumnNameSet(connection, """
-                    SELECT column_name AS ColumnName
+                return QueryComputedColumnMap(connection, """
+                    SELECT column_name AS ColumnName,
+                           generation_expression AS ComputedSql,
+                           1 AS IsStored
                     FROM information_schema.columns
                     WHERE table_name = @tableName
                       AND (@schemaName IS NULL OR table_schema = @schemaName)
@@ -487,17 +614,22 @@ namespace nORM.Scaffolding
 
             if (IsMySqlConnection(connectionName))
             {
-                return QueryColumnNameSet(connection, """
-                    SELECT column_name AS ColumnName
+                return QueryComputedColumnMap(connection, """
+                    SELECT column_name AS ColumnName,
+                           generation_expression AS ComputedSql,
+                           CASE
+                               WHEN LOWER(COALESCE(extra, '')) LIKE '%stored generated%' THEN 1
+                               ELSE 0
+                           END AS IsStored
                     FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
+                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
                       AND table_name = @tableName
                       AND generation_expression IS NOT NULL
                       AND generation_expression <> ''
                     """, schemaName, tableName);
             }
 
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return new Dictionary<string, ScaffoldComputedColumn>(0, StringComparer.OrdinalIgnoreCase);
         }
 
         private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
@@ -591,7 +723,7 @@ namespace nORM.Scaffolding
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
                     FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
+                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
                       AND table_name = @tableName
                       AND LOWER(extra) LIKE '%auto_increment%'
                     """, schemaName, tableName);
@@ -661,7 +793,7 @@ namespace nORM.Scaffolding
                 return QueryColumnOrdinalMap(connection, """
                     SELECT column_name AS ColumnName, ordinal_position AS Ordinal
                     FROM information_schema.key_column_usage
-                    WHERE table_schema = DATABASE()
+                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
                       AND table_name = @tableName
                       AND constraint_name = 'PRIMARY'
                     """, schemaName, tableName);
@@ -789,11 +921,11 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(detail))
                 return false;
 
-            var normalized = detail.Trim().ToLowerInvariant();
+            var normalized = NormalizeMySqlUnsignedTypeDetail(detail);
             if (!normalized.Contains("unsigned", StringComparison.Ordinal))
                 return false;
 
-            type = normalized.Split('(', 2)[0].Trim() switch
+            type = normalized switch
             {
                 "tinyint unsigned" => typeof(byte),
                 "smallint unsigned" => typeof(ushort),
@@ -803,6 +935,21 @@ namespace nORM.Scaffolding
             };
 
             return type != typeof(object);
+        }
+
+        private static string NormalizeMySqlUnsignedTypeDetail(string detail)
+        {
+            var normalized = detail.Trim().ToLowerInvariant();
+            var unsignedIndex = normalized.IndexOf("unsigned", StringComparison.Ordinal);
+            if (unsignedIndex < 0)
+                return normalized;
+
+            var baseType = normalized[..unsignedIndex].Trim();
+            var paren = baseType.IndexOf('(');
+            if (paren >= 0)
+                baseType = baseType[..paren].Trim();
+
+            return baseType.Length == 0 ? normalized : baseType + " unsigned";
         }
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
@@ -1006,6 +1153,379 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> QueryComputedColumnMap(DbConnection connection, string sql, string? schemaName, string tableName)
+        {
+            var result = new Dictionary<string, ScaffoldComputedColumn>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            var schemaParameter = cmd.CreateParameter();
+            schemaParameter.ParameterName = "@schemaName";
+            schemaParameter.DbType = DbType.String;
+            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
+            cmd.Parameters.Add(schemaParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["ColumnName"]);
+                if (string.IsNullOrWhiteSpace(columnName))
+                    continue;
+
+                var rawSql = Convert.ToString(reader["ComputedSql"]) ?? string.Empty;
+                var isStored = ReaderHasColumn(reader, "IsStored")
+                               && reader["IsStored"] != DBNull.Value
+                               && ConvertMetadataBoolean(reader["IsStored"]);
+                var (computedSql, stored) = NormalizeComputedColumnSql(rawSql + (isStored ? " STORED" : string.Empty));
+                result[columnName] = new ScaffoldComputedColumn(computedSql, stored);
+            }
+
+            return result;
+        }
+
+        private static string? GetSqliteCreateTableSql(DbConnection connection, string? schemaName, string tableName)
+        {
+            using var command = connection.CreateCommand();
+            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
+                ? string.Empty
+                : EscapeIdentifier(connection, schemaName!) + ".";
+            command.CommandText = $"SELECT sql FROM {schemaPrefix}sqlite_master WHERE type = 'table' AND name = @tableName";
+            var tableParameter = command.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            command.Parameters.Add(tableParameter);
+            return Convert.ToString(command.ExecuteScalar());
+        }
+
+        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> ExtractSqliteGeneratedColumns(string? createTableSql)
+        {
+            var result = new Dictionary<string, ScaffoldComputedColumn>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return result;
+
+            var bodyOpen = createTableSql.IndexOf('(');
+            if (bodyOpen < 0)
+                return result;
+
+            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
+            if (bodyClose <= bodyOpen)
+                return result;
+
+            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
+                    continue;
+
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out var afterIdentifier))
+                    continue;
+
+                var generatedIndex = FindSqlKeywordOutsideQuotes(trimmed, "GENERATED", afterIdentifier);
+                if (generatedIndex < 0)
+                    continue;
+
+                var openIndex = trimmed.IndexOf('(', generatedIndex);
+                if (openIndex < 0)
+                    continue;
+
+                var closeIndex = FindMatchingParenthesis(trimmed, openIndex);
+                if (closeIndex <= openIndex)
+                    continue;
+
+                var rawSql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                var suffix = trimmed[(closeIndex + 1)..];
+                var stored = FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
+                             || FindSqlKeywordOutsideQuotes(suffix, "PERSISTED", 0) >= 0;
+                var (computedSql, normalizedStored) = NormalizeComputedColumnSql(rawSql + (stored ? " STORED" : string.Empty));
+                if (!string.IsNullOrWhiteSpace(computedSql))
+                    result[columnName] = new ScaffoldComputedColumn(computedSql, normalizedStored);
+            }
+
+            return result;
+        }
+
+        private static (string Sql, bool Stored) NormalizeComputedColumnSql(string raw)
+        {
+            var candidate = raw.Trim();
+            if (candidate.EndsWith("generated column", StringComparison.OrdinalIgnoreCase))
+                return (string.Empty, false);
+
+            var stored = false;
+            if (candidate.StartsWith("GENERATED", StringComparison.OrdinalIgnoreCase))
+            {
+                var open = candidate.IndexOf('(');
+                var close = open >= 0 ? FindMatchingParenthesis(candidate, open) : -1;
+                if (open >= 0 && close > open)
+                {
+                    var suffix = candidate[(close + 1)..];
+                    stored = FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
+                             || FindSqlKeywordOutsideQuotes(suffix, "PERSISTED", 0) >= 0;
+                    candidate = candidate.Substring(open + 1, close - open - 1).Trim();
+                }
+            }
+
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
+
+            if (TryTrimTrailingComputedStorageToken(candidate, "VIRTUAL", out var virtualTrimmed))
+            {
+                candidate = virtualTrimmed;
+            }
+            else if (TryTrimTrailingComputedStorageToken(candidate, "STORED", out var storedTrimmed))
+            {
+                candidate = storedTrimmed;
+                stored = true;
+            }
+            else if (TryTrimTrailingComputedStorageToken(candidate, "PERSISTED", out var persistedTrimmed))
+            {
+                candidate = persistedTrimmed;
+                stored = true;
+            }
+
+            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
+                candidate = candidate[1..^1].Trim();
+
+            return (candidate, stored);
+        }
+
+        private static bool TryTrimTrailingComputedStorageToken(string sql, string token, out string trimmedSql)
+        {
+            trimmedSql = sql;
+            var trimmed = sql.TrimEnd();
+            if (!trimmed.EndsWith(token, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var tokenStart = trimmed.Length - token.Length;
+            if (tokenStart <= 0 || !char.IsWhiteSpace(trimmed[tokenStart - 1]))
+                return false;
+
+            trimmedSql = trimmed[..tokenStart].TrimEnd();
+            return true;
+        }
+
+        private static bool HasBalancedOuterParentheses(string value)
+            => FindMatchingParenthesis(value, 0) == value.Length - 1;
+
+        private static int FindMatchingParenthesis(string sql, int openIndex)
+        {
+            var depth = 0;
+            char? quote = null;
+            for (var i = openIndex; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (ch == '(')
+                {
+                    depth++;
+                }
+                else if (ch == ')')
+                {
+                    depth--;
+                    if (depth == 0)
+                        return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int FindSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
+        {
+            char? quote = null;
+            for (var i = Math.Max(0, startIndex); i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (i + keyword.Length <= sql.Length
+                    && sql.AsSpan(i, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase)
+                    && (i == 0 || !IsSqlIdentifierChar(sql[i - 1]))
+                    && (i + keyword.Length == sql.Length || !IsSqlIdentifierChar(sql[i + keyword.Length])))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool IsSqlIdentifierChar(char value)
+            => char.IsLetterOrDigit(value) || value == '_' || value == '$';
+
+        private static IReadOnlyList<string> SplitTopLevelCommaSeparated(string text)
+        {
+            var result = new List<string>();
+            var start = 0;
+            var depth = 0;
+            char? quote = null;
+            for (var i = 0; i < text.Length; i++)
+            {
+                var ch = text[i];
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < text.Length && text[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (ch == '(')
+                {
+                    depth++;
+                    continue;
+                }
+
+                if (ch == ')' && depth > 0)
+                {
+                    depth--;
+                    continue;
+                }
+
+                if (ch == ',' && depth == 0)
+                {
+                    result.Add(text.Substring(start, i - start));
+                    start = i + 1;
+                }
+            }
+
+            result.Add(text[start..]);
+            return result;
+        }
+
+        private static bool StartsWithTableConstraint(string value)
+            => value.StartsWith("CONSTRAINT ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("PRIMARY ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("FOREIGN ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("UNIQUE ", StringComparison.OrdinalIgnoreCase)
+               || value.StartsWith("CHECK ", StringComparison.OrdinalIgnoreCase);
+
+        private static bool TryReadLeadingSqlIdentifier(string value, out string identifier, out int nextIndex)
+        {
+            identifier = string.Empty;
+            nextIndex = 0;
+            while (nextIndex < value.Length && char.IsWhiteSpace(value[nextIndex]))
+                nextIndex++;
+
+            if (nextIndex >= value.Length)
+                return false;
+
+            var start = nextIndex;
+            var quote = value[nextIndex];
+            if (quote is '"' or '`' or '[')
+            {
+                var close = quote == '[' ? ']' : quote;
+                nextIndex++;
+                var sb = new StringBuilder();
+                while (nextIndex < value.Length)
+                {
+                    var ch = value[nextIndex++];
+                    if (ch == close)
+                    {
+                        if (nextIndex < value.Length && value[nextIndex] == close)
+                        {
+                            sb.Append(close);
+                            nextIndex++;
+                            continue;
+                        }
+
+                        identifier = sb.ToString();
+                        return identifier.Length > 0;
+                    }
+
+                    sb.Append(ch);
+                }
+
+                nextIndex = start;
+                return false;
+            }
+
+            if (!(char.IsLetter(quote) || quote == '_'))
+                return false;
+
+            nextIndex++;
+            while (nextIndex < value.Length && IsSqlIdentifierChar(value[nextIndex]))
+                nextIndex++;
+
+            identifier = value.Substring(start, nextIndex - start);
+            return identifier.Length > 0;
+        }
+
+        private static bool ConvertMetadataBoolean(object value)
+            => value switch
+            {
+                bool b => b,
+                byte b => b != 0,
+                short s => s != 0,
+                int i => i != 0,
+                long l => l != 0,
+                string s => s.Equals("true", StringComparison.OrdinalIgnoreCase)
+                            || s.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                            || s.Equals("1", StringComparison.OrdinalIgnoreCase),
+                _ => Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) != 0
+            };
+
         private static (string? schema, string table) SplitSchema(string identifier)
         {
             var idx = identifier.IndexOf('.');
@@ -1037,8 +1557,124 @@ namespace nORM.Scaffolding
             }
 
             var (fallbackSchemaName, fallbackBareTable) = SplitSchema(tableName);
+            if (fallbackSchemaName is null)
+                fallbackSchemaName = ResolveUniqueUnqualifiedSchema(connection, fallbackBareTable);
+
             var columns = GetTableSchema(connection, fallbackSchemaName, fallbackBareTable).ToList();
             return (fallbackSchemaName, fallbackBareTable, columns);
+        }
+
+        private static string? ResolveUniqueUnqualifiedSchema(DbConnection connection, string tableName)
+        {
+            var schemas = GetMatchingObjectSchemas(connection, tableName);
+            if (schemas.Count > 1)
+            {
+                throw new NormConfigurationException(
+                    $"Dynamic scaffolding table name '{tableName}' is ambiguous because it exists in multiple schemas/catalogs: " +
+                    string.Join(", ", schemas.Select(schema => "'" + schema + "'")) +
+                    ". Use a schema-qualified table name before using Query(string).");
+            }
+
+            if (schemas.Count == 1)
+            {
+                var connectionName = connection.GetType().Name;
+                if (IsSqlServerConnection(connectionName) || IsPostgresConnection(connectionName))
+                    return schemas[0];
+            }
+
+            return null;
+        }
+
+        private static IReadOnlyList<string> GetMatchingObjectSchemas(DbConnection connection, string tableName)
+        {
+            var connectionName = connection.GetType().Name;
+            if (IsSqliteConnection(connectionName))
+                return GetSqliteMatchingObjectSchemas(connection, tableName);
+
+            if (IsSqlServerConnection(connectionName))
+            {
+                return QuerySchemaNameList(connection, """
+                    SELECT s.name AS SchemaName
+                    FROM sys.objects o
+                    INNER JOIN sys.schemas s ON s.schema_id = o.schema_id
+                    WHERE o.name = @tableName
+                      AND o.type IN ('U', 'V')
+                      AND o.is_ms_shipped = 0
+                    ORDER BY s.name
+                    """, tableName);
+            }
+
+            if (IsPostgresConnection(connectionName))
+            {
+                return QuerySchemaNameList(connection, """
+                    SELECT table_schema AS SchemaName
+                    FROM information_schema.tables
+                    WHERE table_name = @tableName
+                      AND table_schema NOT IN ('pg_catalog', 'information_schema')
+                      AND table_type IN ('BASE TABLE', 'VIEW')
+                    ORDER BY table_schema
+                    """, tableName);
+            }
+
+            return Array.Empty<string>();
+        }
+
+        private static IReadOnlyList<string> GetSqliteMatchingObjectSchemas(DbConnection connection, string tableName)
+        {
+            var schemas = new List<string>();
+            using (var schemaCommand = connection.CreateCommand())
+            {
+                schemaCommand.CommandText = "PRAGMA database_list";
+                using var reader = schemaCommand.ExecuteReader();
+                while (reader.Read())
+                {
+                    var schemaName = ReaderHasColumn(reader, "name")
+                        ? Convert.ToString(reader["name"])
+                        : reader.FieldCount > 1 ? Convert.ToString(reader[1]) : null;
+                    if (!string.IsNullOrWhiteSpace(schemaName))
+                        schemas.Add(schemaName);
+                }
+            }
+
+            var matches = new List<string>();
+            foreach (var schema in schemas.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = $"SELECT name FROM {EscapeIdentifier(connection, schema)}.sqlite_master WHERE type IN ('table', 'view') AND name = @tableName LIMIT 1";
+                var tableParameter = command.CreateParameter();
+                tableParameter.ParameterName = "@tableName";
+                tableParameter.DbType = DbType.String;
+                tableParameter.Value = tableName;
+                command.Parameters.Add(tableParameter);
+                if (command.ExecuteScalar() is not null)
+                    matches.Add(schema);
+            }
+
+            return matches;
+        }
+
+        private static IReadOnlyList<string> QuerySchemaNameList(DbConnection connection, string sql, string tableName)
+        {
+            var result = new List<string>();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            var tableParameter = cmd.CreateParameter();
+            tableParameter.ParameterName = "@tableName";
+            tableParameter.DbType = DbType.String;
+            tableParameter.Value = tableName;
+            cmd.Parameters.Add(tableParameter);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var schemaName = Convert.ToString(reader["SchemaName"]);
+                if (!string.IsNullOrWhiteSpace(schemaName))
+                    result.Add(schemaName);
+            }
+
+            return result
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(schema => schema, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         private static bool TryGetTableSchema(DbConnection connection, string? schemaName, string tableName, out List<ColumnInfo> columns)
