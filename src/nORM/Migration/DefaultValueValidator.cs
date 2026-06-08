@@ -22,7 +22,8 @@ namespace nORM.Migration
     ///         NOW(), GETDATE(), GETUTCDATE(), NEWID(), NEWSEQUENTIALID(), UUID(),
     ///         GEN_RANDOM_UUID(), SYSDATE(), SYSDATETIME(), SYSUTCDATETIME(),
     ///         SYSDATETIMEOFFSET(), UTC_TIMESTAMP(), RANDOM(), LAST_INSERT_ID(),
-    ///         CLOCK_TIMESTAMP(), TRANSACTION_TIMESTAMP(), NEXTVAL</item>
+    ///         CLOCK_TIMESTAMP(), TRANSACTION_TIMESTAMP(), NEXTVAL('sequence') and
+    ///         NEXTVAL('schema.sequence'::regclass)</item>
     /// </list>
     /// All other values (including any string containing semicolons, comments, unbalanced quotes,
     /// or keywords such as DROP/SELECT/INSERT) are rejected with <see cref="ArgumentException"/>.
@@ -48,8 +49,8 @@ namespace nORM.Migration
             @"|random\(\)" +                                            // H: SQLite / PostgreSQL random value
             @"|last_insert_id\(\)" +                                    // H: MySQL last inserted row ID
             @"|clock_timestamp\(\)|transaction_timestamp\(\)" +          // H: PostgreSQL clock functions
-            // H: PostgreSQL/MySQL NEXTVAL — handles both NEXTVAL('seq') and NEXTVAL( 'seq' ) with optional spaces
-            @"|nextval\s*\(\s*'[^']*'\s*\)" +                          // sequence nextval (Postgres + MySQL)
+            // H: PostgreSQL/MySQL NEXTVAL — allow only simple optional schema-qualified identifiers.
+            @"|nextval\s*\(\s*'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?'\s*(?:::regclass)?\s*\)" +
             @")\z",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

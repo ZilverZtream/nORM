@@ -90,6 +90,10 @@ public class DefaultValueValidatorTests
         new object[] { "CURRENT_TIMESTAMP; DELETE FROM Users" },
         new object[] { "'; EXEC xp_cmdshell('cmd')--" },
         new object[] { "0 UNION SELECT password FROM Users" },
+        new object[] { "nextval('')" },
+        new object[] { "nextval('public.orders; DROP')" },
+        new object[] { "nextval('public.orders_id_seq'::text)" },
+        new object[] { "nextval('public.orders_id_seq'); DROP TABLE Users" },
     };
 
     [Theory]
@@ -141,6 +145,8 @@ public class DefaultValueValidatorTests
         new object[] { "UTC_TIMESTAMP()" },
         new object[] { "CLOCK_TIMESTAMP()" },
         new object[] { "TRANSACTION_TIMESTAMP()" },
+        new object[] { "nextval('orders_id_seq')" },
+        new object[] { "NEXTVAL( 'public.orders_id_seq'::regclass )" },
     };
 
     [Theory]
