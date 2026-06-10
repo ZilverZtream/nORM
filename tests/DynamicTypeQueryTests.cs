@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
@@ -451,6 +451,7 @@ public class DynamicTypeQueryTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void GateC_AdversarialHashCollision_NewKeyDistinguishesThem()
     {
         // Gate C adversarial: Verify the normalized full-string key is used (not GetHashCode).

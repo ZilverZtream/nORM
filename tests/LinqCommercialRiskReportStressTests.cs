@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -13,6 +13,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Trait("Category", TestCategory.Fast)]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public sealed class LinqCommercialRiskReportStressTests : IAsyncLifetime
 {
     private SqliteConnection _cn = null!;

@@ -6,16 +6,26 @@ items:
   parent: nORM.Migration
   children:
   - nORM.Migration.ColumnSchema.ClrType
+  - nORM.Migration.ColumnSchema.Collation
+  - nORM.Migration.ColumnSchema.ComputedColumnSql
   - nORM.Migration.ColumnSchema.DefaultValue
+  - nORM.Migration.ColumnSchema.IdentityIncrement
+  - nORM.Migration.ColumnSchema.IdentitySeed
   - nORM.Migration.ColumnSchema.IndexName
   - nORM.Migration.ColumnSchema.IndexOrder
   - nORM.Migration.ColumnSchema.Indexes
+  - nORM.Migration.ColumnSchema.IsFixedLength
   - nORM.Migration.ColumnSchema.IsIdentity
   - nORM.Migration.ColumnSchema.IsNullable
   - nORM.Migration.ColumnSchema.IsPrimaryKey
+  - nORM.Migration.ColumnSchema.IsStoredComputedColumn
+  - nORM.Migration.ColumnSchema.IsUnicode
   - nORM.Migration.ColumnSchema.IsUnique
+  - nORM.Migration.ColumnSchema.MaxLength
   - nORM.Migration.ColumnSchema.Name
+  - nORM.Migration.ColumnSchema.Precision
   - nORM.Migration.ColumnSchema.PreviousName
+  - nORM.Migration.ColumnSchema.Scale
   langs:
   - csharp
   - vb
@@ -30,7 +40,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 68
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -72,7 +82,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 71
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -103,7 +113,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PreviousName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 78
+    startLine: 109
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -141,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClrType
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 90
+    startLine: 121
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -165,6 +175,164 @@ items:
       type: System.String
     content.vb: Public Property ClrType As String
   overload: nORM.Migration.ColumnSchema.ClrType*
+- uid: nORM.Migration.ColumnSchema.MaxLength
+  commentId: P:nORM.Migration.ColumnSchema.MaxLength
+  id: MaxLength
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: MaxLength
+  nameWithType: ColumnSchema.MaxLength
+  fullName: nORM.Migration.ColumnSchema.MaxLength
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxLength
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 123
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional maximum length for bounded text or binary columns.
+  example: []
+  syntax:
+    content: public int? MaxLength { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property MaxLength As Integer?
+  overload: nORM.Migration.ColumnSchema.MaxLength*
+- uid: nORM.Migration.ColumnSchema.IsUnicode
+  commentId: P:nORM.Migration.ColumnSchema.IsUnicode
+  id: IsUnicode
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsUnicode
+  nameWithType: ColumnSchema.IsUnicode
+  fullName: nORM.Migration.ColumnSchema.IsUnicode
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsUnicode
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 128
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    Optional Unicode text storage hint. <code>false</code> requests non-Unicode text where the provider distinguishes it;
+
+    <code>true</code> requests Unicode text; <code>null</code> uses the provider default.
+  example: []
+  syntax:
+    content: public bool? IsUnicode { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Boolean}
+    content.vb: Public Property IsUnicode As Boolean?
+  overload: nORM.Migration.ColumnSchema.IsUnicode*
+- uid: nORM.Migration.ColumnSchema.IsFixedLength
+  commentId: P:nORM.Migration.ColumnSchema.IsFixedLength
+  id: IsFixedLength
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsFixedLength
+  nameWithType: ColumnSchema.IsFixedLength
+  fullName: nORM.Migration.ColumnSchema.IsFixedLength
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsFixedLength
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 130
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when bounded text or binary storage should use a fixed-length provider type.
+  example: []
+  syntax:
+    content: public bool IsFixedLength { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsFixedLength As Boolean
+  overload: nORM.Migration.ColumnSchema.IsFixedLength*
+- uid: nORM.Migration.ColumnSchema.Precision
+  commentId: P:nORM.Migration.ColumnSchema.Precision
+  id: Precision
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: Precision
+  nameWithType: ColumnSchema.Precision
+  fullName: nORM.Migration.ColumnSchema.Precision
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Precision
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 132
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional decimal/numeric precision for providers that support fixed-precision decimals.
+  example: []
+  syntax:
+    content: public int? Precision { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property Precision As Integer?
+  overload: nORM.Migration.ColumnSchema.Precision*
+- uid: nORM.Migration.ColumnSchema.Scale
+  commentId: P:nORM.Migration.ColumnSchema.Scale
+  id: Scale
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: Scale
+  nameWithType: ColumnSchema.Scale
+  fullName: nORM.Migration.ColumnSchema.Scale
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Scale
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 134
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional decimal/numeric scale for providers that support fixed-precision decimals.
+  example: []
+  syntax:
+    content: public int? Scale { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property Scale As Integer?
+  overload: nORM.Migration.ColumnSchema.Scale*
 - uid: nORM.Migration.ColumnSchema.IsNullable
   commentId: P:nORM.Migration.ColumnSchema.IsNullable
   id: IsNullable
@@ -183,7 +351,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 92
+    startLine: 136
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -214,7 +382,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsPrimaryKey
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 94
+    startLine: 138
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -245,7 +413,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 96
+    startLine: 140
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -276,7 +444,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 98
+    startLine: 142
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -307,7 +475,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOrder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 100
+    startLine: 144
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -338,7 +506,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Indexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 102
+    startLine: 146
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -369,7 +537,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValue
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 104
+    startLine: 148
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -382,6 +550,37 @@ items:
       type: System.String
     content.vb: Public Property DefaultValue As String
   overload: nORM.Migration.ColumnSchema.DefaultValue*
+- uid: nORM.Migration.ColumnSchema.Collation
+  commentId: P:nORM.Migration.ColumnSchema.Collation
+  id: Collation
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: Collation
+  nameWithType: ColumnSchema.Collation
+  fullName: nORM.Migration.ColumnSchema.Collation
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Collation
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 150
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Provider collation identifier applied to text comparison and ordering for this column.
+  example: []
+  syntax:
+    content: public string? Collation { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property Collation As String
+  overload: nORM.Migration.ColumnSchema.Collation*
 - uid: nORM.Migration.ColumnSchema.IsIdentity
   commentId: P:nORM.Migration.ColumnSchema.IsIdentity
   id: IsIdentity
@@ -400,7 +599,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsIdentity
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 106
+    startLine: 152
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -413,6 +612,130 @@ items:
       type: System.Boolean
     content.vb: Public Property IsIdentity As Boolean
   overload: nORM.Migration.ColumnSchema.IsIdentity*
+- uid: nORM.Migration.ColumnSchema.IdentitySeed
+  commentId: P:nORM.Migration.ColumnSchema.IdentitySeed
+  id: IdentitySeed
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IdentitySeed
+  nameWithType: ColumnSchema.IdentitySeed
+  fullName: nORM.Migration.ColumnSchema.IdentitySeed
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IdentitySeed
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 154
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional provider identity seed/start value.
+  example: []
+  syntax:
+    content: public long? IdentitySeed { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int64}
+    content.vb: Public Property IdentitySeed As Long?
+  overload: nORM.Migration.ColumnSchema.IdentitySeed*
+- uid: nORM.Migration.ColumnSchema.IdentityIncrement
+  commentId: P:nORM.Migration.ColumnSchema.IdentityIncrement
+  id: IdentityIncrement
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IdentityIncrement
+  nameWithType: ColumnSchema.IdentityIncrement
+  fullName: nORM.Migration.ColumnSchema.IdentityIncrement
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IdentityIncrement
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 156
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional provider identity increment value.
+  example: []
+  syntax:
+    content: public long? IdentityIncrement { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int64}
+    content.vb: Public Property IdentityIncrement As Long?
+  overload: nORM.Migration.ColumnSchema.IdentityIncrement*
+- uid: nORM.Migration.ColumnSchema.ComputedColumnSql
+  commentId: P:nORM.Migration.ColumnSchema.ComputedColumnSql
+  id: ComputedColumnSql
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: ComputedColumnSql
+  nameWithType: ColumnSchema.ComputedColumnSql
+  fullName: nORM.Migration.ColumnSchema.ComputedColumnSql
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ComputedColumnSql
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 158
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Provider SQL expression for a computed/generated column.
+  example: []
+  syntax:
+    content: public string? ComputedColumnSql { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property ComputedColumnSql As String
+  overload: nORM.Migration.ColumnSchema.ComputedColumnSql*
+- uid: nORM.Migration.ColumnSchema.IsStoredComputedColumn
+  commentId: P:nORM.Migration.ColumnSchema.IsStoredComputedColumn
+  id: IsStoredComputedColumn
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: IsStoredComputedColumn
+  nameWithType: ColumnSchema.IsStoredComputedColumn
+  fullName: nORM.Migration.ColumnSchema.IsStoredComputedColumn
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsStoredComputedColumn
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 160
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when a computed/generated column should be physically stored where supported.
+  example: []
+  syntax:
+    content: public bool IsStoredComputedColumn { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsStoredComputedColumn As Boolean
+  overload: nORM.Migration.ColumnSchema.IsStoredComputedColumn*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1424,47 +1747,12 @@ references:
   name: ClrType
   nameWithType: ColumnSchema.ClrType
   fullName: nORM.Migration.ColumnSchema.ClrType
-- uid: nORM.Migration.ColumnSchema.IsNullable*
-  commentId: Overload:nORM.Migration.ColumnSchema.IsNullable
-  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsNullable
-  name: IsNullable
-  nameWithType: ColumnSchema.IsNullable
-  fullName: nORM.Migration.ColumnSchema.IsNullable
-- uid: System.Boolean
-  commentId: T:System.Boolean
-  parent: System
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.boolean
-  name: bool
-  nameWithType: bool
-  fullName: bool
-  nameWithType.vb: Boolean
-  fullName.vb: Boolean
-  name.vb: Boolean
-- uid: nORM.Migration.ColumnSchema.IsPrimaryKey*
-  commentId: Overload:nORM.Migration.ColumnSchema.IsPrimaryKey
-  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsPrimaryKey
-  name: IsPrimaryKey
-  nameWithType: ColumnSchema.IsPrimaryKey
-  fullName: nORM.Migration.ColumnSchema.IsPrimaryKey
-- uid: nORM.Migration.ColumnSchema.IsUnique*
-  commentId: Overload:nORM.Migration.ColumnSchema.IsUnique
-  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsUnique
-  name: IsUnique
-  nameWithType: ColumnSchema.IsUnique
-  fullName: nORM.Migration.ColumnSchema.IsUnique
-- uid: nORM.Migration.ColumnSchema.IndexName*
-  commentId: Overload:nORM.Migration.ColumnSchema.IndexName
-  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexName
-  name: IndexName
-  nameWithType: ColumnSchema.IndexName
-  fullName: nORM.Migration.ColumnSchema.IndexName
-- uid: nORM.Migration.ColumnSchema.IndexOrder*
-  commentId: Overload:nORM.Migration.ColumnSchema.IndexOrder
-  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexOrder
-  name: IndexOrder
-  nameWithType: ColumnSchema.IndexOrder
-  fullName: nORM.Migration.ColumnSchema.IndexOrder
+- uid: nORM.Migration.ColumnSchema.MaxLength*
+  commentId: Overload:nORM.Migration.ColumnSchema.MaxLength
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_MaxLength
+  name: MaxLength
+  nameWithType: ColumnSchema.MaxLength
+  fullName: nORM.Migration.ColumnSchema.MaxLength
 - uid: System.Nullable{System.Int32}
   commentId: T:System.Nullable{System.Int32}
   parent: System
@@ -1516,6 +1804,94 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Migration.ColumnSchema.IsUnicode*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsUnicode
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsUnicode
+  name: IsUnicode
+  nameWithType: ColumnSchema.IsUnicode
+  fullName: nORM.Migration.ColumnSchema.IsUnicode
+- uid: System.Nullable{System.Boolean}
+  commentId: T:System.Nullable{System.Boolean}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool?
+  nameWithType: bool?
+  fullName: bool?
+  nameWithType.vb: Boolean?
+  fullName.vb: Boolean?
+  name.vb: Boolean?
+  spec.csharp:
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '?'
+  spec.vb:
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '?'
+- uid: nORM.Migration.ColumnSchema.IsFixedLength*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsFixedLength
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsFixedLength
+  name: IsFixedLength
+  nameWithType: ColumnSchema.IsFixedLength
+  fullName: nORM.Migration.ColumnSchema.IsFixedLength
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Migration.ColumnSchema.Precision*
+  commentId: Overload:nORM.Migration.ColumnSchema.Precision
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Precision
+  name: Precision
+  nameWithType: ColumnSchema.Precision
+  fullName: nORM.Migration.ColumnSchema.Precision
+- uid: nORM.Migration.ColumnSchema.Scale*
+  commentId: Overload:nORM.Migration.ColumnSchema.Scale
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Scale
+  name: Scale
+  nameWithType: ColumnSchema.Scale
+  fullName: nORM.Migration.ColumnSchema.Scale
+- uid: nORM.Migration.ColumnSchema.IsNullable*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsNullable
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsNullable
+  name: IsNullable
+  nameWithType: ColumnSchema.IsNullable
+  fullName: nORM.Migration.ColumnSchema.IsNullable
+- uid: nORM.Migration.ColumnSchema.IsPrimaryKey*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsPrimaryKey
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsPrimaryKey
+  name: IsPrimaryKey
+  nameWithType: ColumnSchema.IsPrimaryKey
+  fullName: nORM.Migration.ColumnSchema.IsPrimaryKey
+- uid: nORM.Migration.ColumnSchema.IsUnique*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsUnique
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsUnique
+  name: IsUnique
+  nameWithType: ColumnSchema.IsUnique
+  fullName: nORM.Migration.ColumnSchema.IsUnique
+- uid: nORM.Migration.ColumnSchema.IndexName*
+  commentId: Overload:nORM.Migration.ColumnSchema.IndexName
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexName
+  name: IndexName
+  nameWithType: ColumnSchema.IndexName
+  fullName: nORM.Migration.ColumnSchema.IndexName
+- uid: nORM.Migration.ColumnSchema.IndexOrder*
+  commentId: Overload:nORM.Migration.ColumnSchema.IndexOrder
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IndexOrder
+  name: IndexOrder
+  nameWithType: ColumnSchema.IndexOrder
+  fullName: nORM.Migration.ColumnSchema.IndexOrder
 - uid: nORM.Migration.ColumnSchema.Indexes*
   commentId: Overload:nORM.Migration.ColumnSchema.Indexes
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Indexes
@@ -1626,9 +2002,62 @@ references:
   name: DefaultValue
   nameWithType: ColumnSchema.DefaultValue
   fullName: nORM.Migration.ColumnSchema.DefaultValue
+- uid: nORM.Migration.ColumnSchema.Collation*
+  commentId: Overload:nORM.Migration.ColumnSchema.Collation
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Collation
+  name: Collation
+  nameWithType: ColumnSchema.Collation
+  fullName: nORM.Migration.ColumnSchema.Collation
 - uid: nORM.Migration.ColumnSchema.IsIdentity*
   commentId: Overload:nORM.Migration.ColumnSchema.IsIdentity
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsIdentity
   name: IsIdentity
   nameWithType: ColumnSchema.IsIdentity
   fullName: nORM.Migration.ColumnSchema.IsIdentity
+- uid: nORM.Migration.ColumnSchema.IdentitySeed*
+  commentId: Overload:nORM.Migration.ColumnSchema.IdentitySeed
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IdentitySeed
+  name: IdentitySeed
+  nameWithType: ColumnSchema.IdentitySeed
+  fullName: nORM.Migration.ColumnSchema.IdentitySeed
+- uid: System.Nullable{System.Int64}
+  commentId: T:System.Nullable{System.Int64}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.int64
+  name: long?
+  nameWithType: long?
+  fullName: long?
+  nameWithType.vb: Long?
+  fullName.vb: Long?
+  name.vb: Long?
+  spec.csharp:
+  - uid: System.Int64
+    name: long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: '?'
+  spec.vb:
+  - uid: System.Int64
+    name: Long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: '?'
+- uid: nORM.Migration.ColumnSchema.IdentityIncrement*
+  commentId: Overload:nORM.Migration.ColumnSchema.IdentityIncrement
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IdentityIncrement
+  name: IdentityIncrement
+  nameWithType: ColumnSchema.IdentityIncrement
+  fullName: nORM.Migration.ColumnSchema.IdentityIncrement
+- uid: nORM.Migration.ColumnSchema.ComputedColumnSql*
+  commentId: Overload:nORM.Migration.ColumnSchema.ComputedColumnSql
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_ComputedColumnSql
+  name: ComputedColumnSql
+  nameWithType: ColumnSchema.ComputedColumnSql
+  fullName: nORM.Migration.ColumnSchema.ComputedColumnSql
+- uid: nORM.Migration.ColumnSchema.IsStoredComputedColumn*
+  commentId: Overload:nORM.Migration.ColumnSchema.IsStoredComputedColumn
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_IsStoredComputedColumn
+  name: IsStoredComputedColumn
+  nameWithType: ColumnSchema.IsStoredComputedColumn
+  fullName: nORM.Migration.ColumnSchema.IsStoredComputedColumn

@@ -132,6 +132,42 @@ public class LiveProviderTemporalParityTests
         return Convert.ToInt64(await cmd.ExecuteScalarAsync());
     }
 
+    private static bool SkipIfProtectedTemporalDatabase(DbConnection connection, ProviderKind kind)
+    {
+        var databaseName = connection.Database;
+        if (!IsProtectedDatabaseName(kind, databaseName))
+            return false;
+
+        return Skip.If(true,
+            $"Live temporal tests require an application database/schema; current {kind} database '{databaseName}' is provider-owned and rejects temporal trigger DDL.");
+    }
+
+    private static bool IsProtectedDatabaseName(ProviderKind kind, string? databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            return false;
+
+        var name = databaseName.Trim();
+        return kind switch
+        {
+            ProviderKind.SqlServer =>
+                name.Equals("master", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("model", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+            ProviderKind.Postgres =>
+                name.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("template0", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("template1", StringComparison.OrdinalIgnoreCase),
+            ProviderKind.MySql =>
+                name.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("sys", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
     private static async Task<string?> ReadPayloadRawAsync(DbContext ctx, int idValue)
     {
         await using var cmd = ctx.Connection.CreateCommand();
@@ -172,6 +208,8 @@ public class LiveProviderTemporalParityTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
+            if (SkipIfProtectedTemporalDatabase(connection, kind)) return;
+
             var options = new DbContextOptions
             {
                 OnModelCreating = mb => mb.Entity<TlpLiveRow>()
@@ -219,6 +257,8 @@ public class LiveProviderTemporalParityTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
+            if (SkipIfProtectedTemporalDatabase(connection, kind)) return;
+
             var options = new DbContextOptions
             {
                 OnModelCreating = mb => mb.Entity<TlpLiveRow>()
@@ -272,6 +312,8 @@ public class LiveProviderTemporalParityTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
+            if (SkipIfProtectedTemporalDatabase(connection, kind)) return;
+
             var options = new DbContextOptions
             {
                 OnModelCreating = mb => mb.Entity<TlpLiveRow>()
@@ -332,6 +374,8 @@ public class LiveProviderTemporalParityTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
+            if (SkipIfProtectedTemporalDatabase(connection, kind)) return;
+
             var options = new DbContextOptions
             {
                 OnModelCreating = mb => mb.Entity<TlpLiveRow>()

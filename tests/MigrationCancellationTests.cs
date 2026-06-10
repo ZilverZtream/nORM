@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// it and had no way to abort an in-progress DDL step.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.MigrationParity)]
 public class MigrationCancellationTests
 {
     // ── Infrastructure ────────────────────────────────────────────────────────

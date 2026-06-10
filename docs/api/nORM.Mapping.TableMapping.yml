@@ -12,6 +12,7 @@ items:
   - nORM.Mapping.TableMapping.DiscriminatorColumn
   - nORM.Mapping.TableMapping.EscTable
   - nORM.Mapping.TableMapping.InsertColumns
+  - nORM.Mapping.TableMapping.IsReadOnly
   - nORM.Mapping.TableMapping.KeyColumns
   - nORM.Mapping.TableMapping.ManyToManyJoins
   - nORM.Mapping.TableMapping.OwnedCollections
@@ -238,6 +239,37 @@ items:
       type: nORM.Mapping.Column[]
     content.vb: Public ReadOnly Property KeyColumns As Column()
   overload: nORM.Mapping.TableMapping.KeyColumns*
+- uid: nORM.Mapping.TableMapping.IsReadOnly
+  commentId: P:nORM.Mapping.TableMapping.IsReadOnly
+  id: IsReadOnly
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: IsReadOnly
+  nameWithType: TableMapping.IsReadOnly
+  fullName: nORM.Mapping.TableMapping.IsReadOnly
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsReadOnly
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets whether this mapping is query-only and rejects writes.
+  example: []
+  syntax:
+    content: public bool IsReadOnly { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsReadOnly As Boolean
+  overload: nORM.Mapping.TableMapping.IsReadOnly*
 - uid: nORM.Mapping.TableMapping.TimestampColumn
   commentId: P:nORM.Mapping.TableMapping.TimestampColumn
   id: TimestampColumn
@@ -256,7 +288,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimestampColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 41
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -287,7 +319,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 44
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -318,7 +350,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InsertColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 47
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -349,7 +381,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 50
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -380,7 +412,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 53
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -411,7 +443,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relations
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 56
+    startLine: 59
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -442,7 +474,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 59
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -473,7 +505,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DiscriminatorColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 62
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -504,7 +536,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TphMappings
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 65
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -535,7 +567,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConverterFingerprint
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 68
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -566,7 +598,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowFingerprint
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 71
+    startLine: 74
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -597,7 +629,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollections
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 74
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -628,7 +660,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyJoins
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 77
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -659,7 +691,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 95
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -703,7 +735,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPrimaryKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 302
+    startLine: 430
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1852,6 +1884,23 @@ references:
   name: KeyColumns
   nameWithType: TableMapping.KeyColumns
   fullName: nORM.Mapping.TableMapping.KeyColumns
+- uid: nORM.Mapping.TableMapping.IsReadOnly*
+  commentId: Overload:nORM.Mapping.TableMapping.IsReadOnly
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_IsReadOnly
+  name: IsReadOnly
+  nameWithType: TableMapping.IsReadOnly
+  fullName: nORM.Mapping.TableMapping.IsReadOnly
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
 - uid: nORM.Mapping.TableMapping.TimestampColumn*
   commentId: Overload:nORM.Mapping.TableMapping.TimestampColumn
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TimestampColumn

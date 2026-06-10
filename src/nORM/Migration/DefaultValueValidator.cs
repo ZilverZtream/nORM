@@ -18,12 +18,19 @@ namespace nORM.Migration
     ///   <item>Integer and decimal numeric literals (optional leading minus)</item>
     ///   <item>Single-quoted ANSI/Unicode string literals with SQL-escaped interior quotes</item>
     ///   <item>Standard SQL no-argument functions: CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME,
-    ///         LOCALTIME, LOCALTIMESTAMP, CURRENT_USER,
-    ///         NOW(), GETDATE(), GETUTCDATE(), NEWID(), NEWSEQUENTIALID(), UUID(),
-    ///         GEN_RANDOM_UUID(), SYSDATE(), SYSDATETIME(), SYSUTCDATETIME(),
-    ///         SYSDATETIMEOFFSET(), UTC_TIMESTAMP(), RANDOM(), LAST_INSERT_ID(),
+    ///         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(6), CURRENT_DATE(),
+    ///         CURRENT_TIME(), CURRENT_TIME(6), LOCALTIME, LOCALTIME(6),
+    ///         LOCALTIMESTAMP, LOCALTIMESTAMP(6), CURRENT_USER,
+    ///         NOW(), NOW(6), GETDATE(), GETUTCDATE(), NEWID(), NEWSEQUENTIALID(), UUID(),
+    ///         GEN_RANDOM_UUID(), UUID_GENERATE_V4(), SYSDATE(), SYSDATE(6), SYSDATETIME(), SYSUTCDATETIME(),
+    ///         SYSDATETIMEOFFSET(), UTC_TIMESTAMP(), UTC_TIMESTAMP(6), RANDOM(), LAST_INSERT_ID(),
     ///         CLOCK_TIMESTAMP(), TRANSACTION_TIMESTAMP(), NEXTVAL('sequence') and
     ///         NEXTVAL('schema.sequence'::regclass)</item>
+    ///   <item>Strict PostgreSQL UTC timestamp defaults:
+    ///         NOW() AT TIME ZONE 'utc', CURRENT_TIMESTAMP AT TIME ZONE 'utc',
+    ///         and TIMEZONE('utc', NOW())</item>
+    ///   <item>Safe PostgreSQL cast suffixes after one of those literals/functions,
+    ///         such as 'draft'::text, 42::integer, or now()::timestamp without time zone</item>
     /// </list>
     /// All other values (including any string containing semicolons, comments, unbalanced quotes,
     /// or keywords such as DROP/SELECT/INSERT) are rejected with <see cref="ArgumentException"/>.
@@ -38,20 +45,28 @@ namespace nORM.Migration
             @"|true|false" +                                            // boolean keywords
             @"|-?[0-9]+(?:\.[0-9]+)?" +                                 // numeric literal (int or decimal)
             @"|n?'(?:[^']|'')*'" +                                       // single-quoted ANSI/Unicode string literal
-            @"|current_timestamp|current_date|current_time" +           // ANSI standard date/time functions
-            @"|localtime|localtimestamp" +                              // H: ANSI local date/time keywords
+            @"|current_timestamp(?:\([0-6]?\))?|current_date(?:\(\))?|current_time(?:\([0-6]?\))?" + // ANSI standard date/time functions
+            @"|localtime(?:\([0-6]?\))?|localtimestamp(?:\([0-6]?\))?" + // H: ANSI local date/time keywords
             @"|current_user" +                                          // H: ANSI current user keyword
-            @"|now\(\)|getdate\(\)|getutcdate\(\)" +                    // common date functions
+            @"|now\([0-6]?\)|getdate\(\)|getutcdate\(\)" +              // common date functions
             @"|newid\(\)|newsequentialid\(\)" +                         // SQL Server UUID generators
             @"|uuid\(\)|gen_random_uuid\(\)|uuid_generate_v4\(\)" +       // PostgreSQL / MySQL UUID generators
-            @"|sysdate\(\)|sysdatetime\(\)|sysutcdatetime\(\)|sysdatetimeoffset\(\)" + // Oracle / SQL Server variants
-            @"|utc_timestamp\(\)" +                                      // MySQL UTC timestamp
+            @"|sysdate\([0-6]?\)|sysdatetime\(\)|sysutcdatetime\(\)|sysdatetimeoffset\(\)" + // Oracle / SQL Server variants
+            @"|utc_timestamp\([0-6]?\)" +                                // MySQL UTC timestamp
             @"|random\(\)" +                                            // H: SQLite / PostgreSQL random value
             @"|last_insert_id\(\)" +                                    // H: MySQL last inserted row ID
             @"|clock_timestamp\(\)|transaction_timestamp\(\)" +          // H: PostgreSQL clock functions
+            @"|(?:now\(\)|current_timestamp(?:\([0-6]?\))?)\s+at\s+time\s+zone\s+'utc'(?:\s*::\s*text)?" + // H: PostgreSQL UTC timestamp defaults
+            @"|timezone\s*\(\s*'utc'(?:\s*::\s*text)?\s*,\s*(?:now\(\)|current_timestamp(?:\([0-6]?\))?)\s*\)" +
             // H: PostgreSQL/MySQL NEXTVAL — allow only simple optional schema-qualified identifiers.
             @"|nextval\s*\(\s*'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?'\s*(?:::regclass)?\s*\)" +
-            @")\z",
+            @")(?:\s*::\s*(?:" +
+            @"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?(?:\s*\(\s*[0-9]+(?:\s*,\s*[0-9]+)?\s*\))?(?:\[\])?" +
+            @"|character\s+varying(?:\s*\(\s*[0-9]+\s*\))?" +
+            @"|timestamp\s+(?:with|without)\s+time\s+zone" +
+            @"|time\s+(?:with|without)\s+time\s+zone" +
+            @"|double\s+precision" +
+            @"))?\z",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
@@ -75,7 +90,8 @@ namespace nORM.Migration
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted ANSI/Unicode strings, boolean literals (TRUE/FALSE), NULL, " +
-                    "and standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.) are allowed. " +
+                    "standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.), " +
+                    "and safe PostgreSQL cast suffixes on those values are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
 
             return trimmed;

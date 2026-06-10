@@ -106,6 +106,7 @@ public class CompiledQueryTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.CompiledQueryStress)]
     public async Task Compiled_query_multi_param_object_binds_members_independently()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -137,6 +138,7 @@ public class CompiledQueryTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.CompiledQueryStress)]
     public async Task Compiled_query_multi_param_object_null_parameter_throws_clear_error()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

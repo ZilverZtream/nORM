@@ -14,9 +14,15 @@ items:
   - uid: nORM.Configuration.AmbientTransactionEnlistmentPolicy
     name: AmbientTransactionEnlistmentPolicy
     type: Enum
+  - uid: nORM.Configuration.CheckConstraintConfiguration
+    name: CheckConstraintConfiguration
+    type: Class
   - uid: nORM.Configuration.ClientEvaluationPolicy
     name: ClientEvaluationPolicy
     type: Enum
+  - uid: nORM.Configuration.ComputedColumnConfiguration
+    name: ComputedColumnConfiguration
+    type: Class
   - uid: nORM.Configuration.ConverterConfiguration
     name: ConverterConfiguration
     type: Class
@@ -41,15 +47,30 @@ items:
   - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
     name: EntityTypeBuilder<TEntity>.PropertyBuilder<TProperty>
     type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+    type: Class
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
+    name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>.ReferenceReferenceBuilder
+    type: Class
   - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
     name: EntityTypeBuilder<TEntity>.ShadowPropertyBuilder
+    type: Class
+  - uid: nORM.Configuration.ExpressionIndexConfiguration
+    name: ExpressionIndexConfiguration
     type: Class
   - uid: nORM.Configuration.IEntityTypeConfiguration
     name: IEntityTypeConfiguration
     type: Interface
+  - uid: nORM.Configuration.IdentityOptionsConfiguration
+    name: IdentityOptionsConfiguration
+    type: Class
   - uid: nORM.Configuration.IndexAttribute
     name: IndexAttribute
     type: Class
+  - uid: nORM.Configuration.IndexNullSortOrder
+    name: IndexNullSortOrder
+    type: Enum
   - uid: nORM.Configuration.ManyToManyConfiguration
     name: ManyToManyConfiguration
     type: Class
@@ -64,6 +85,9 @@ items:
     type: Class
   - uid: nORM.Configuration.OwnedNavigation
     name: OwnedNavigation
+    type: Class
+  - uid: nORM.Configuration.PrecisionConfiguration
+    name: PrecisionConfiguration
     type: Class
   - uid: nORM.Configuration.ProviderMobilityFeature
     name: ProviderMobilityFeature
@@ -86,6 +110,12 @@ items:
   - uid: nORM.Configuration.ProviderMobilityTranslator
     name: ProviderMobilityTranslator
     type: Class
+  - uid: nORM.Configuration.ReadOnlyEntityAttribute
+    name: ReadOnlyEntityAttribute
+    type: Class
+  - uid: nORM.Configuration.ReferentialAction
+    name: ReferentialAction
+    type: Enum
   - uid: nORM.Configuration.RelationshipConfiguration
     name: RelationshipConfiguration
     type: Class
@@ -210,6 +240,9 @@ items:
   - uid: nORM.Core.SetPropertyCalls`1
     name: SetPropertyCalls<T>
     type: Class
+  - uid: nORM.Core.StoredProcedureNonQueryResult
+    name: StoredProcedureNonQueryResult
+    type: Class
   - uid: nORM.Core.StoredProcedureResult`1
     name: StoredProcedureResult<T>
     type: Class
@@ -329,11 +362,17 @@ items:
   name: nORM.Migration
   type: Namespace
   items:
+  - uid: nORM.Migration.CheckConstraintSchema
+    name: CheckConstraintSchema
+    type: Class
   - uid: nORM.Migration.ColumnIndexSchema
     name: ColumnIndexSchema
     type: Class
   - uid: nORM.Migration.ColumnSchema
     name: ColumnSchema
+    type: Class
+  - uid: nORM.Migration.ExpressionIndexSchema
+    name: ExpressionIndexSchema
     type: Class
   - uid: nORM.Migration.ForeignKeySchema
     name: ForeignKeySchema

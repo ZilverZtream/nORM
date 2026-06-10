@@ -1,4 +1,4 @@
-using nORM.Core;
+﻿using nORM.Core;
 using nORM.Providers;
 using Xunit;
 
@@ -27,6 +27,7 @@ namespace nORM.Tests;
 /// - Adds provider-escaping round-trip assertions for all three providers.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialSqlSafetyMatrixTests
 {
     // ── DDL: CREATE variants ──────────────────────────────────────────────────

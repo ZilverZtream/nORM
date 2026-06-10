@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Data.Sqlite;
@@ -113,6 +113,7 @@ public class MigrationMetadataEscapingTests
     /// must be properly escaped.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SqlServer_AlteredDefault_AdversarialTableName_LiteralContextEscaped()
     {
         var table = BuildTable("O'Brien"); // table name with single quote
@@ -144,6 +145,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("Table; DROP TABLE X; --")]
     [InlineData("Table\nWith\nNewline")]
     [InlineData("TableWith\u0000Null")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void AllProviders_AdversarialTableName_GeneratesWithoutException(string tableName)
     {
         var table = BuildTable(tableName, ColPk("Id"));
@@ -166,6 +168,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("Col]Bracket")]
     [InlineData("Col--Injection")]
     [InlineData("'; DROP TABLE T; --")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void AllProviders_AdversarialColumnName_GeneratesWithoutException(string colName)
     {
         var table = BuildTable("SafeTable", ColPk("Id"), Col(colName));
@@ -190,6 +193,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("A]]B]]C")]
     [InlineData("]Leading")]
     [InlineData("Trailing]")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SqlServer_AdversarialBracketInName_IdentifierCorrectlyEscaped(string tableName)
     {
         var table = BuildTable(tableName, ColPk("Id"));
@@ -213,6 +217,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("Table`With`Backtick")]
     [InlineData("``Leading")]
     [InlineData("Trailing``")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void MySql_AdversarialBacktickInName_IdentifierCorrectlyEscaped(string tableName)
     {
         var table = BuildTable(tableName, ColPk("Id"));
@@ -235,6 +240,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("Table\"With\"DblQuotes")]
     [InlineData("\"\"Leading")]
     [InlineData("Trailing\"\"")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Postgres_AdversarialDoubleQuoteInName_IdentifierCorrectlyEscaped(string tableName)
     {
         var table = BuildTable(tableName, ColPk("Id"));
@@ -256,6 +262,7 @@ public class MigrationMetadataEscapingTests
     [Theory]
     [InlineData("Table\"With\"DblQuotes")]
     [InlineData("\"\"Leading")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Sqlite_AdversarialDoubleQuoteInName_IdentifierCorrectlyEscaped(string tableName)
     {
         var table = BuildTable(tableName, ColPk("Id"));
@@ -279,6 +286,7 @@ public class MigrationMetadataEscapingTests
     [InlineData("Col]Name")]
     [InlineData("Col`Name")]
     [InlineData("Col\"Name")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void AllProviders_AdversarialColumnInAlterColumn_NoException(string colName)
     {
         var table = BuildTable("SafeTable", ColPk("Id"));

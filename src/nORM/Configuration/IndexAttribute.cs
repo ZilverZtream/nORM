@@ -4,6 +4,19 @@ using System;
 namespace nORM.Configuration
 {
     /// <summary>
+    /// Specifies explicit null ordering for provider index keys.
+    /// </summary>
+    public enum IndexNullSortOrder
+    {
+        /// <summary>Use the provider default null ordering for the key direction.</summary>
+        Default = 0,
+        /// <summary>Sort null values before non-null values.</summary>
+        First = 1,
+        /// <summary>Sort null values after non-null values.</summary>
+        Last = 2
+    }
+
+    /// <summary>
     /// Marks a property as participating in a named database index for migration
     /// snapshot generation.
     /// </summary>
@@ -43,6 +56,16 @@ namespace nORM.Configuration
         /// Gets or sets whether this column is an included, non-key column in the index.
         /// </summary>
         public bool IsIncluded { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether a unique PostgreSQL index treats null values as equal.
+        /// </summary>
+        public bool NullsNotDistinct { get; set; }
+
+        /// <summary>
+        /// Gets or sets explicit null ordering for this index key column.
+        /// </summary>
+        public IndexNullSortOrder NullSortOrder { get; set; }
 
         /// <summary>
         /// Gets or sets the provider-specific filter predicate for a filtered/partial index.

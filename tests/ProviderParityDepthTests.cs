@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -33,6 +33,8 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class ProviderParityDepthTests
 {
     // ── Shared entities ───────────────────────────────────────────────────────
@@ -292,6 +294,7 @@ public class ProviderParityDepthTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task OCC_StaleToken_AllProviders_ThrowsConcurrencyException(string providerKind)
     {
         var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl, OccOpts(providerKind));
@@ -316,6 +319,7 @@ public class ProviderParityDepthTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task OCC_Delete_StaleToken_AllProviders_ThrowsConcurrencyException(string providerKind)
     {
         var (cn, ctx) = CreateDb(MakeProvider(providerKind), OccDdl, OccOpts(providerKind));
@@ -527,6 +531,7 @@ public class ProviderParityDepthTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyStress_MultipleContexts_AllInsert_AllProviders(string providerKind)
     {
         // 5 contexts in parallel each insert 10 rows — total must be 50.
@@ -570,6 +575,7 @@ public class ProviderParityDepthTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyStress_PreCancelledToken_AllProviders_ThrowsOCE(string providerKind)
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -593,6 +599,7 @@ public class ProviderParityDepthTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyStress_QueryAfterSave_AllProviders_ReturnsCorrectData(string providerKind)
     {
         // Named shared-memory DB so parallel query contexts each use their own connection.

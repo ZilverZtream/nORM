@@ -1,0 +1,147 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  id: IndexNullSortOrder
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.IndexNullSortOrder.Default
+  - nORM.Configuration.IndexNullSortOrder.First
+  - nORM.Configuration.IndexNullSortOrder.Last
+  langs:
+  - csharp
+  - vb
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IndexNullSortOrder
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 8
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies explicit null ordering for provider index keys.
+  example: []
+  syntax:
+    content: public enum IndexNullSortOrder
+    content.vb: Public Enum IndexNullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder.Default
+  commentId: F:nORM.Configuration.IndexNullSortOrder.Default
+  id: Default
+  parent: nORM.Configuration.IndexNullSortOrder
+  langs:
+  - csharp
+  - vb
+  name: Default
+  nameWithType: IndexNullSortOrder.Default
+  fullName: nORM.Configuration.IndexNullSortOrder.Default
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Default
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Use the provider default null ordering for the key direction.
+  example: []
+  syntax:
+    content: Default = 0
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder.First
+  commentId: F:nORM.Configuration.IndexNullSortOrder.First
+  id: First
+  parent: nORM.Configuration.IndexNullSortOrder
+  langs:
+  - csharp
+  - vb
+  name: First
+  nameWithType: IndexNullSortOrder.First
+  fullName: nORM.Configuration.IndexNullSortOrder.First
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: First
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 13
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Sort null values before non-null values.
+  example: []
+  syntax:
+    content: First = 1
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder.Last
+  commentId: F:nORM.Configuration.IndexNullSortOrder.Last
+  id: Last
+  parent: nORM.Configuration.IndexNullSortOrder
+  langs:
+  - csharp
+  - vb
+  name: Last
+  nameWithType: IndexNullSortOrder.Last
+  fullName: nORM.Configuration.IndexNullSortOrder.Last
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Last
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 15
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Sort null values after non-null values.
+  example: []
+  syntax:
+    content: Last = 2
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using nORM.Configuration;
 
 namespace nORM.Migration
 {
@@ -94,7 +95,7 @@ namespace nORM.Migration
             return Esc(table);
         }
 
-        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql) ResolveIndex(
+        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql) ResolveIndex(
             TableSchema table,
             string indexName,
             bool isUnique,
@@ -107,15 +108,17 @@ namespace nORM.Migration
                     return index;
             }
 
-            return (indexName, isUnique, columnNames, descending, Array.Empty<string>(), null);
+            return (indexName, isUnique, columnNames, descending, Array.Empty<IndexNullSortOrder>(), Array.Empty<string>(), false, null);
         }
 
         private static string BuildIndexSql(TableSchema table, string indexName, bool isUnique, string[] columnNames, bool[] descending)
         {
             var index = ResolveIndex(table, indexName, isUnique, columnNames, descending);
             EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+            EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+            EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
             var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-            return $"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}";
+            return $"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}";
         }
 
         private static string BuildImplicitUniqueIndexSql(TableSchema table, ColumnSchema column)
@@ -299,7 +302,7 @@ namespace nORM.Migration
             return indexes.Values.ToArray();
         }
 
-        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexesForUp(TableSchema table, SchemaDiff diff)
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> GetExplicitIndexesForUp(TableSchema table, SchemaDiff diff)
             => ResolveExplicitIndexesForRecreate(
                 table,
                 diff.DroppedIndexes
@@ -309,7 +312,7 @@ namespace nORM.Migration
                     .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
                     .Select(static item => ResolveIndex(item.Table, item.IndexName, item.IsUnique, item.ColumnNames, item.Descending)));
 
-        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexesForDown(TableSchema table, SchemaDiff diff)
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> GetExplicitIndexesForDown(TableSchema table, SchemaDiff diff)
             => ResolveExplicitIndexesForRecreate(
                 table,
                 diff.AddedIndexes
@@ -319,10 +322,10 @@ namespace nORM.Migration
                     .Where(item => string.Equals(item.Table.Name, table.Name, StringComparison.OrdinalIgnoreCase))
                     .Select(static item => ResolveIndex(item.Table, item.IndexName, false, Array.Empty<string>(), Array.Empty<bool>())));
 
-        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> ResolveExplicitIndexesForRecreate(
+        private static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> ResolveExplicitIndexesForRecreate(
             TableSchema table,
             IEnumerable<string> removed,
-            IEnumerable<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> added)
+            IEnumerable<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> added)
         {
             var indexes = SchemaDiffer.GetExplicitIndexes(table).ToDictionary(static index => index.IndexName, StringComparer.OrdinalIgnoreCase);
             foreach (var indexName in removed)
@@ -389,7 +392,9 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
+                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     up.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -508,7 +513,9 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
+                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     down.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -734,7 +741,7 @@ namespace nORM.Migration
             List<string> stmts,
             TableSchema table,
             Dictionary<string, ColumnSchema> overrides,
-            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> explicitIndexes,
+            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> explicitIndexes,
             IReadOnlyList<ExpressionIndexSchema> expressionIndexes)
         {
             var cols = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
@@ -752,7 +759,7 @@ namespace nORM.Migration
         private static void RecreateTable(List<string> stmts, TableSchema table, List<ColumnSchema> cols,
             Dictionary<string, ColumnSchema>? overrides, IReadOnlyList<ForeignKeySchema>? fks = null,
             IReadOnlyList<CheckConstraintSchema>? checks = null,
-            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)>? explicitIndexes = null,
+            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)>? explicitIndexes = null,
             IReadOnlyList<ExpressionIndexSchema>? expressionIndexes = null,
             IReadOnlySet<string>? addedColumnNames = null)
         {
@@ -824,7 +831,9 @@ namespace nORM.Migration
             {
                 var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                 EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                stmts.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatFilter(index.FilterSql)}");
+                EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+                EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
+                stmts.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}");
             }
             foreach (var expressionIndex in expressionIndexes ?? table.ExpressionIndexes)
                 stmts.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -859,7 +868,7 @@ namespace nORM.Migration
             return action;
         }
 
-        private static string FormatIndexColumns(string[] columnNames, bool[] descending)
+        private static string FormatIndexColumns(string[] columnNames, bool[] descending, IndexNullSortOrder[] _)
             => string.Join(", ", columnNames.Select((name, index) =>
                 Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
 
@@ -867,6 +876,18 @@ namespace nORM.Migration
         {
             if (includedColumnNames.Length > 0)
                 throw new NotSupportedException($"SQLite does not support INCLUDE columns for index '{indexName}'. Use key columns only or keep the covering-index tuning in provider-specific migration code.");
+        }
+
+        private static void EnsureNoNullsNotDistinct(bool nullsNotDistinct, string indexName)
+        {
+            if (nullsNotDistinct)
+                throw new NotSupportedException($"SQLite does not support PostgreSQL NULLS NOT DISTINCT semantics for index '{indexName}'. Keep that unique-index behavior in PostgreSQL-specific migration code.");
+        }
+
+        private static void EnsureNoNullSortOrders(IndexNullSortOrder[] nullSortOrders, string indexName)
+        {
+            if (nullSortOrders.Any(static order => order != IndexNullSortOrder.Default))
+                throw new NotSupportedException($"SQLite does not support provider-neutral NULLS FIRST/LAST index ordering for index '{indexName}'. Keep that ordering in provider-specific migration code.");
         }
 
         private static string FormatFilter(string? filterSql)

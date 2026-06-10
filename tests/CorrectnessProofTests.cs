@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -593,6 +593,7 @@ public class CorrectnessProofTests
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task NullConcurrencyToken_UpdateSucceeds_WhenTokenIsNull()
     {
         var (cn, ctx) = CreateNullTokenCtx();
@@ -620,6 +621,7 @@ public class CorrectnessProofTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task NullConcurrencyToken_DeleteSucceeds_WhenTokenIsNull()
     {
         var (cn, ctx) = CreateNullTokenCtx();
@@ -642,6 +644,7 @@ public class CorrectnessProofTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task NullConcurrencyToken_NonNullValue_UpdateSucceeds()
     {
         var (cn, ctx) = CreateNullTokenCtx();
@@ -832,6 +835,7 @@ public class CorrectnessProofTests
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyToken_OriginalSnapshot_UsedInUpdatePredicate()
     {
         var (cn, ctx) = CreateVersionedCtx();
@@ -1049,6 +1053,7 @@ public class CorrectnessProofTests
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task CompiledQuery_ConcurrentInvocations_NoCrossContamination()
     {
         var (cn, ctx) = CreateItemCtx();

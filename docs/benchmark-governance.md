@@ -64,7 +64,8 @@ exists anywhere under the repository root, BenchmarkDotNet's project discovery i
 ambiguous and the run fails before any measurement is taken.
 
 Do not delete the user's worktrees to work around this. Instead, run benchmarks
-through a path that isolates the run in a clean detached checkout:
+through a path that isolates the run from repository-local duplicate benchmark
+projects:
 
 - `eng/run-benchmark-isolated.ps1 -- <benchmark args>` — general-purpose wrapper.
   When duplicate benchmark projects are present it creates a detached
@@ -72,14 +73,41 @@ through a path that isolates the run in a clean detached checkout:
   `.claude/worktrees`), runs `dotnet run` there, copies the raw reports back into
   `benchmarks/BenchmarkDotNet.Artifacts`, and removes the temporary worktree.
 - `eng/run-provider-benchmark-slice.ps1` — provider-matrix slices; applies the
-  same isolation and additionally merges per-slice CSV evidence and can run the
-  threshold checker.
+  isolation by copying the current workspace to the system temp directory while
+  excluding `.git`, `.claude`, build outputs, package outputs, and benchmark
+  artifacts. It then merges per-slice CSV evidence and can run the threshold
+  checker.
 - `eng/v1-release-gate.ps1` (`rc`/`full` modes) — applies the same isolation for
-  its benchmark step automatically.
+  its benchmark step automatically when duplicate benchmark projects are present.
 
 Only run the benchmark project directly with `dotnet run` from `benchmarks/` when
 you have confirmed there are no duplicate `nORM.Benchmarks.csproj` files under the
 repository root (for example in a clean clone with no agent worktrees).
+
+## Scheduling And Time Bounds
+
+Benchmark-enabled `rc` runs are release evidence, not the normal edit-test loop.
+Use `-SkipBenchmark` for daytime correctness validation and collect full provider
+matrix evidence in a quiet scheduled window, normally overnight.
+
+Benchmark steps are time-bounded. `eng/v1-release-gate.ps1` defaults the direct
+benchmark step to 45 minutes; override it with `-BenchmarkStepTimeoutMinutes` or
+`NORM_BENCHMARK_STEP_TIMEOUT_MINUTES` only for a deliberately longer release
+evidence run. Provider-matrix slices are also time-bounded:
+`eng/run-provider-benchmark-slice.ps1` defaults `-SliceTimeoutMinutes` to 90
+minutes per provider/filter slice and fails with the provider name, filter, log
+path, and log tail when a slice exceeds that budget. `eng/v1-release-gate.ps1`
+forwards `-ProviderMatrixSliceTimeoutMinutes` to the slice runner; the same
+value can be set with `NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES`.
+Correctness test steps in `eng/v1-release-gate.ps1` are time-bounded as well.
+They default to 45 minutes per `dotnet test` invocation; override them with
+`-TestStepTimeoutMinutes` or `NORM_TEST_STEP_TIMEOUT_MINUTES` only when a release
+candidate intentionally needs a longer correctness step. Timeouts kill the test
+process tree and report stdout/stderr log paths plus recent log tails.
+
+Official public release evidence must still come from the intended release
+commit. A benchmark-enabled run from a dirty working tree is local validation
+only until those changes are committed and the release evidence is regenerated.
 
 ## BenchmarkDotNet Configuration
 
@@ -105,7 +133,9 @@ from `BenchmarkDotNet.Artifacts/results`. It writes
 `BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.md` and `.json` with
 the release commit, SDK/OS, raw report paths, driver package versions, redacted
 provider configuration, and fastest method per provider. Release automation runs
-this script after benchmark steps in `full` and `rc` modes.
+this script after benchmark steps in `full` and `rc` modes. The `full` gate's
+fast benchmark is recorded with evidence mode `smoke`; only `rc`
+provider-matrix evidence is release-grade performance evidence.
 
 ## Executable Thresholds
 
@@ -140,5 +170,7 @@ tenant/temporal performance only when the raw BenchmarkDotNet report for this
 suite is attached to the release artifacts.
 
 `FastNormBenchmarks` is a smoke suite only. The release evidence generator
-rejects `FastNormBenchmarks` reports in `rc` and `full` modes so fast local
-checks cannot accidentally become public benchmark evidence.
+rejects `FastNormBenchmarks` reports in `rc` and `full` evidence modes so fast
+local checks cannot accidentally become public benchmark evidence. The `full`
+release gate therefore records its fast benchmark output with evidence mode
+`smoke`.

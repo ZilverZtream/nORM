@@ -15,8 +15,15 @@ public class MigrationExpressionIndexTests
         table.ExpressionIndexes.Add(new ExpressionIndexSchema
         {
             Name = "IX_ExpressionIndexedCustomer_LowerEmail",
-            ExpressionSql = provider == "postgres" ? "lower(\"Email\")" : "lower(Email)",
-            FilterSql = provider == "postgres" ? "\"Email\" IS NOT NULL" : "Email IS NOT NULL"
+            ExpressionSql = provider switch
+            {
+                "postgres" => "lower(\"Email\")",
+                "mysql" => "(LOWER(`Email`))",
+                _ => "lower(Email)"
+            },
+            FilterSql = provider == "mysql"
+                ? null
+                : provider == "postgres" ? "\"Email\" IS NOT NULL" : "Email IS NOT NULL"
         });
         var diff = new SchemaDiff();
         diff.AddedTables.Add(table);
@@ -24,8 +31,11 @@ public class MigrationExpressionIndexTests
         var sql = string.Join(" ", generator.GenerateSql(diff).Up);
 
         Assert.Contains("IX_ExpressionIndexedCustomer_LowerEmail", sql);
-        Assert.Contains("lower", sql);
-        Assert.Contains("WHERE", sql);
+        Assert.Contains("lower", sql, StringComparison.OrdinalIgnoreCase);
+        if (provider == "mysql")
+            Assert.DoesNotContain("WHERE", sql);
+        else
+            Assert.Contains("WHERE", sql);
     }
 
     [Theory]
@@ -44,6 +54,23 @@ public class MigrationExpressionIndexTests
         var ex = Assert.Throws<NotSupportedException>(() => generator.GenerateSql(diff));
         Assert.Contains("expression index", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(provider, ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MySqlGenerator_WithFilteredExpressionIndex_Throws()
+    {
+        var table = Table("ExpressionIndexedCustomer");
+        table.ExpressionIndexes.Add(new ExpressionIndexSchema
+        {
+            Name = "IX_ExpressionIndexedCustomer_LowerEmail",
+            ExpressionSql = "(LOWER(`Email`))",
+            FilterSql = "`Email` IS NOT NULL"
+        });
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => new MySqlMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("filtered indexes", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -74,13 +101,13 @@ public class MigrationExpressionIndexTests
     public static TheoryData<IMigrationSqlGenerator, string> SupportedGenerators() => new()
     {
         { new SqliteMigrationSqlGenerator(), "sqlite" },
-        { new PostgresMigrationSqlGenerator(), "postgres" }
+        { new PostgresMigrationSqlGenerator(), "postgres" },
+        { new MySqlMigrationSqlGenerator(), "mysql" }
     };
 
     public static TheoryData<IMigrationSqlGenerator, string> UnsupportedGenerators() => new()
     {
-        { new SqlServerMigrationSqlGenerator(), "SQL Server" },
-        { new MySqlMigrationSqlGenerator(), "MySQL" }
+        { new SqlServerMigrationSqlGenerator(), "SQL Server" }
     };
 
     private static TableSchema Table(string name) => new()

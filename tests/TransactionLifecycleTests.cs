@@ -21,6 +21,7 @@ namespace nORM.Tests;
 //This prevents connection-level resource leaks (lock memory, log space) under load.
 //</summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.TransactionStress)]
 public class TransactionLifecycleTests
 {
     [Table("TxLifecycleItem")]

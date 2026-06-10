@@ -5,7 +5,9 @@ items:
   id: TableSchema
   parent: nORM.Migration
   children:
+  - nORM.Migration.TableSchema.CheckConstraints
   - nORM.Migration.TableSchema.Columns
+  - nORM.Migration.TableSchema.ExpressionIndexes
   - nORM.Migration.TableSchema.ForeignKeys
   - nORM.Migration.TableSchema.Name
   langs:
@@ -22,7 +24,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 30
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -64,7 +66,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 33
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -95,7 +97,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 35
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -126,7 +128,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 37
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -139,6 +141,68 @@ items:
       type: System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
     content.vb: Public Property ForeignKeys As List(Of ForeignKeySchema)
   overload: nORM.Migration.TableSchema.ForeignKeys*
+- uid: nORM.Migration.TableSchema.CheckConstraints
+  commentId: P:nORM.Migration.TableSchema.CheckConstraints
+  id: CheckConstraints
+  parent: nORM.Migration.TableSchema
+  langs:
+  - csharp
+  - vb
+  name: CheckConstraints
+  nameWithType: TableSchema.CheckConstraints
+  fullName: nORM.Migration.TableSchema.CheckConstraints
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CheckConstraints
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 40
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: CHECK constraints defined on this table.
+  example: []
+  syntax:
+    content: public List<CheckConstraintSchema> CheckConstraints { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Migration.CheckConstraintSchema}
+    content.vb: Public Property CheckConstraints As List(Of CheckConstraintSchema)
+  overload: nORM.Migration.TableSchema.CheckConstraints*
+- uid: nORM.Migration.TableSchema.ExpressionIndexes
+  commentId: P:nORM.Migration.TableSchema.ExpressionIndexes
+  id: ExpressionIndexes
+  parent: nORM.Migration.TableSchema
+  langs:
+  - csharp
+  - vb
+  name: ExpressionIndexes
+  nameWithType: TableSchema.ExpressionIndexes
+  fullName: nORM.Migration.TableSchema.ExpressionIndexes
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExpressionIndexes
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 42
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Provider-specific expression indexes defined on this table.
+  example: []
+  syntax:
+    content: public List<ExpressionIndexSchema> ExpressionIndexes { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{nORM.Migration.ExpressionIndexSchema}
+    content.vb: Public Property ExpressionIndexes As List(Of ExpressionIndexSchema)
+  overload: nORM.Migration.TableSchema.ExpressionIndexes*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1262,4 +1326,82 @@ references:
   - uid: nORM.Migration.ForeignKeySchema
     name: ForeignKeySchema
     href: nORM.Migration.ForeignKeySchema.html
+  - name: )
+- uid: nORM.Migration.TableSchema.CheckConstraints*
+  commentId: Overload:nORM.Migration.TableSchema.CheckConstraints
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_CheckConstraints
+  name: CheckConstraints
+  nameWithType: TableSchema.CheckConstraints
+  fullName: nORM.Migration.TableSchema.CheckConstraints
+- uid: System.Collections.Generic.List{nORM.Migration.CheckConstraintSchema}
+  commentId: T:System.Collections.Generic.List{nORM.Migration.CheckConstraintSchema}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<CheckConstraintSchema>
+  nameWithType: List<CheckConstraintSchema>
+  fullName: System.Collections.Generic.List<nORM.Migration.CheckConstraintSchema>
+  nameWithType.vb: List(Of CheckConstraintSchema)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Migration.CheckConstraintSchema)
+  name.vb: List(Of CheckConstraintSchema)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Migration.CheckConstraintSchema
+    name: CheckConstraintSchema
+    href: nORM.Migration.CheckConstraintSchema.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Migration.CheckConstraintSchema
+    name: CheckConstraintSchema
+    href: nORM.Migration.CheckConstraintSchema.html
+  - name: )
+- uid: nORM.Migration.TableSchema.ExpressionIndexes*
+  commentId: Overload:nORM.Migration.TableSchema.ExpressionIndexes
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_ExpressionIndexes
+  name: ExpressionIndexes
+  nameWithType: TableSchema.ExpressionIndexes
+  fullName: nORM.Migration.TableSchema.ExpressionIndexes
+- uid: System.Collections.Generic.List{nORM.Migration.ExpressionIndexSchema}
+  commentId: T:System.Collections.Generic.List{nORM.Migration.ExpressionIndexSchema}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<ExpressionIndexSchema>
+  nameWithType: List<ExpressionIndexSchema>
+  fullName: System.Collections.Generic.List<nORM.Migration.ExpressionIndexSchema>
+  nameWithType.vb: List(Of ExpressionIndexSchema)
+  fullName.vb: System.Collections.Generic.List(Of nORM.Migration.ExpressionIndexSchema)
+  name.vb: List(Of ExpressionIndexSchema)
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - uid: nORM.Migration.ExpressionIndexSchema
+    name: ExpressionIndexSchema
+    href: nORM.Migration.ExpressionIndexSchema.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Migration.ExpressionIndexSchema
+    name: ExpressionIndexSchema
+    href: nORM.Migration.ExpressionIndexSchema.html
   - name: )

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -87,6 +88,36 @@ public class SqlServerMigrationSqlGeneratorTests
         var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s == "CREATE INDEX [IX_Users_Name] ON [Users] ([Name]) INCLUDE ([Email]) WHERE [Name] IS NOT NULL");
+    }
+
+    [Fact]
+    public void CreateTable_WithPostgresNullsNotDistinctIndex_Throws()
+    {
+        var name = new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = true };
+        name.Indexes.Add(new ColumnIndexSchema { Name = "IX_Users_Name", IsUnique = true, NullsNotDistinct = true });
+        var table = BuildTable("Users",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+            name);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("NULLS NOT DISTINCT", ex.Message);
+    }
+
+    [Fact]
+    public void CreateTable_WithExplicitNullSortOrder_Throws()
+    {
+        var name = new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, IsNullable = true };
+        name.Indexes.Add(new ColumnIndexSchema { Name = "IX_Users_Name", NullSortOrder = IndexNullSortOrder.First });
+        var table = BuildTable("Users",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+            name);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => new SqlServerMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("NULLS FIRST/LAST", ex.Message);
     }
 
     [Fact]

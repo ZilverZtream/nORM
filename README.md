@@ -264,11 +264,13 @@ await DatabaseScaffolder.ScaffoldAsync(connection, provider, outputDir, "MyApp.E
 
 Scaffolding is a bounded v1 bootstrap tool: table/column reverse engineering,
 schema-preserving table mapping, identifier cleanup, table filtering,
-deterministic repeated output, preflighted overwrite protection, nullable-safe output, provider
+deterministic repeated output, CLI preflighted overwrite protection that
+refuses output conflicts by default, project-aware nullable output, provider
 metadata-backed identity columns, computed/generated column metadata, SQL
 Server rowversion/timestamp metadata, safe SQL default metadata via generated
-`HasDefaultValueSql(...)` configuration, single-column FK
-navigation generation with supported delete/update referential actions, role-based
+`HasDefaultValueSql(...)` configuration, single-column/composite FK
+navigation generation with supported delete/update referential actions,
+one-to-one reference navigations for exact unique dependent FKs, role-based
 self-referencing FK and self-join names, pure many-to-many join mapping including
 schema-qualified and composite-key junction tables, and
 single-column/composite index metadata including descending key order, SQL
@@ -276,6 +278,9 @@ Server/PostgreSQL/SQLite filtered index predicates, and SQL Server/PostgreSQL
 included-column index metadata are supported, including columns that
 participate in multiple indexes. Table CHECK constraints are emitted into
 fluent model configuration with `HasCheckConstraint` and migration snapshots.
+Generated contexts expose both `DbConnection` and connection-string
+constructors that require an explicit `DatabaseProvider`, apply generated model
+configuration, and never embed the scaffold connection string.
 Computed/generated column expressions are emitted with
 `HasComputedColumnSql` and marked as database-generated for runtime writes.
 Column collations are emitted with `HasCollation` so DB-first string
@@ -302,57 +307,187 @@ into the model.
 SQLite rowid integer primary keys are generated as non-null `long` properties,
 SQLite `UUID` columns scaffold as `Guid`, and SQLite declared `JSON`/`XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
-`json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as
+`citext`/`json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as
 safe scalar CLR storage while native JSON/XML operator semantics stay provider-bound,
 and PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
 UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR arrays
-while remaining provider-specific diagnostics,
+while remaining provider-specific schema for provider-mobility review,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.
 
 Unsupported composite foreign keys that do not target generated primary keys or
-exact unique indexes, payload join tables, complex/provider-specific
-defaults that fail the migration default allowlist, provider column types,
-unparsed provider-specific identity strategies,
+exact ordered unfiltered unique indexes, payload join tables,
+complex/provider-specific defaults that fail the migration default allowlist,
+provider column types,
+unparsed provider-specific identity strategies that make the generated entity read-only,
 unrecognized FK referential actions, triggers, SQL Server provider-native
-temporal tables, SQLite virtual tables and shadow tables, skipped views,
-routines, sequences, synonyms, materialized views, and events are reported in
+temporal tables, SQLite virtual tables and shadow tables,
+routines, sequences, synonyms, and events are reported in
 `nORM.ScaffoldWarnings.md` and
 `nORM.ScaffoldWarnings.json` instead of being silently converted into invalid
 model code. The JSON report includes stable diagnostic codes, categories,
 section counts, and suggested actions so CI can route scaffold follow-up without
 parsing prose.
-Tables without primary keys and all opt-in query artifacts are emitted as
+Tables without primary keys and generated query artifacts are emitted as
 `[ReadOnlyEntity]` types: they can be queried, but nORM rejects generated
 insert/update/delete and tracked `SaveChanges` writes before SQL generation.
+Tables with provider-owned triggers are also emitted as `[ReadOnlyEntity]`
+until trigger side effects are hand-modeled.
+SQL Server provider-native temporal base and history tables are also emitted as
+`[ReadOnlyEntity]` because native period/history behavior is provider-owned
+until explicitly modeled.
+Tables with unsafe provider-specific columns such as SQL Server/SQLite spatial
+types, PostgreSQL `inet`, or MySQL spatial columns, plus unsafe MySQL `set(...)` declarations, are
+also generated as `[ReadOnlyEntity]` so provider-owned type handling cannot be
+written accidentally; safe scalar promotions and MySQL unsigned numeric widths
+remain ordinary generated properties, including unsigned decimal/numeric
+precision and optional-scale metadata.
+SQL Server alias types over scaffoldable scalar/binary bases remain diagnostics
+for provider-mobility review, but generated writes stay enabled because nORM
+binds the safe base CLR type and the database enforces the alias type. SQL
+Server text/binary facets such as non-Unicode `varchar`, fixed-length `char`,
+and fixed-length `binary` are emitted into generated fluent configuration so
+schema snapshots and migrations can round-trip the provider shape.
+PostgreSQL domains over safe scalar/array/enum base types remain diagnostics for
+provider-mobility review, but generated writes stay enabled because nORM binds
+the safe base CLR type, preserves bounded string/numeric facets where provider
+metadata exposes them, and the database enforces the domain constraint.
+Safe SQL defaults, including vetted PostgreSQL typed-cast defaults, are emitted
+as `HasDefaultValueSql(...)`; only unmodeled complex/provider-specific defaults
+make the generated entity read-only.
 Foreign keys from keyless dependent tables are reported as relationship
 diagnostics instead of generating navigations that cannot be safely included or
 tracked.
-Opt-in query artifacts can include views, materialized views, SQLite virtual
-tables, and SQL Server synonyms whose local base object resolves as a table or
-view; non-query, remote, or unresolved synonyms remain provider-owned
-diagnostics.
+Foreign keys with unknown provider-specific referential actions also suppress
+generated navigations/fluent relationships instead of treating those actions as
+`NO ACTION`.
+Ordinary views and PostgreSQL materialized views scaffold as read-only query
+artifacts by default. Opt-in query artifacts can include SQLite virtual tables
+and SQL Server synonyms whose local base object resolves as a table or view;
+non-query, remote, or unresolved synonyms remain provider-owned diagnostics.
 Use `--fail-on-warnings` or `ScaffoldOptions.FailOnWarnings` to make lossy
 scaffolds fail in CI after the warning report is written.
 Use `--dry-run` or `ScaffoldOptions.DryRun` to validate scaffold output without
 creating, deleting, or overwriting files. The CLI dry run also prints warning
 summaries while leaving the requested output path untouched.
 Clean later scaffold runs remove stale warning reports when overwrite is
-allowed, or fail clearly when overwrite protection would leave stale reports in
-place.
+explicitly allowed, or fail clearly when overwrite protection would leave stale
+reports in place.
+Repeated scaffolds can keep reviewed custom code in partial entity/context
+classes, with generated contexts calling `OnModelCreatingPartial(ModelBuilder)`
+after caller-supplied model configuration. Table filters (`--tables`/`--table`)
+and schema filters (`--schemas`/`--schema`) can be combined; EF-style
+multi-value `--table First Second` and `--schema Accounting Sales` tokens are
+accepted, and table filters can use `schema.table` or `schema.view`.
+Blank CLI table/schema filters are rejected so an empty option cannot broaden
+the run to every table.
+Schema filters select all discovered user tables and supported query
+artifacts in matching schemas. Generated `IQueryable<T>` context properties use collection-style
+names by default; `--no-pluralize` or `ScaffoldOptions.PluralizeQueryProperties`
+can leave query property names singular without changing entity class names or
+database object names. `--use-database-names` or
+`ScaffoldOptions.UseDatabaseNames` preserves legal database table, view,
+sequence, routine, column, and routine result-column names as generated CLR
+names while still escaping invalid C# identifiers; synthetic navigation members
+remain C#-style names derived from FK roles.
+The CLI accepts EF's `--no-onconfiguring` switch as a no-op because nORM never
+emits generated `OnConfiguring` connection-string code.
+It also accepts EF-style aliases including `--output-dir`/`-o`, `-n`, `-c`,
+`-t`, `--data-annotations`/`-d`, and `--force`/`-f`; the data-annotations
+switch is a no-op because nORM already emits supported annotation metadata.
+CLI scaffolding refuses existing output conflicts by default; `--force` opts
+into overwriting generated files and `--no-overwrite` is accepted as an explicit
+guard.
+EF-style positional arguments are accepted as
+`norm scaffold <connection> <provider> ...`; explicit `--connection` and
+`--provider` options take precedence when both forms are supplied. A single
+positional value after `--connection` is treated as the provider.
+`norm dbcontext scaffold <connection> <provider> ...` is also accepted as an
+EF-style alias for the same bounded nORM scaffold command, and `norm --help`
+advertises `dbcontext` as an EF-style alias group.
+The provider argument accepts EF Core package names and normalizes them to nORM
+providers, including `Microsoft.EntityFrameworkCore.SqlServer`,
+`Microsoft.EntityFrameworkCore.Sqlite`, `Npgsql.EntityFrameworkCore.PostgreSQL`,
+`Pomelo.EntityFrameworkCore.MySql`, and `MySql.EntityFrameworkCore`.
+Named connection references such as `Name=ConnectionStrings:AppDb`,
+`name=ConnectionStrings:AppDb`, or shorthand `Name=AppDb` resolve from
+environment variables first (for example `ConnectionStrings__AppDb`), then
+startup-project and target-project user secrets declared through `UserSecretsId`, then `appsettings.json` / `appsettings.{Environment}.json` under the startup
+project, target project, or current directory without executing startup code.
+`--project`/`-p` targets a `.csproj` or single-project directory; relative
+output paths resolve under that project, and the namespace defaults to its
+`RootNamespace`, `AssemblyName`, or sanitized project file name plus sanitized
+output directory segments when `--namespace` is omitted. If `--project` is
+omitted and the command working directory contains exactly one `.csproj`, nORM
+uses that project for the same defaults, including nullable-reference output.
+`Nullable` values `enable` and `annotations` emit `#nullable enable`; `disable`,
+`warnings`, or an omitted property emit `#nullable disable`. The nearest
+`Directory.Build.props` is read before project overrides for `RootNamespace`,
+`AssemblyName`, `UserSecretsId`, and `Nullable`. When
+`--context-dir` is supplied, relative paths resolve under the target project
+directory, or under the command working directory when `--project` is omitted. Without
+`--context-namespace`, a qualified `--context`, or an explicit `--namespace`,
+the context namespace defaults to the project's root namespace plus sanitized
+context directory segments. `--context` also accepts namespace-qualified names
+such as `MyApp.Data.AppDbContext`; nORM generates class `AppDbContext` in
+namespace `MyApp.Data`, unless `--context-namespace` supplies an explicit
+context namespace. `--namespace`, `--context-namespace`, and qualified
+`--context` namespace portions are validated as C# namespaces before generation.
+Explicit `--context` class-name segments are validated as C# type identifiers
+rather than silently corrected. Blank explicit CLI string values such as
+`--namespace " "`, `--context " "`, and `--output " "` are rejected instead of
+being treated as omitted options.
+When `--context` is omitted, the CLI derives the context
+class name from the database name, SQLite file name, or final `Name=...`
+configuration-key segment and appends `Context`, falling back to `AppDbContext`
+when no stable name is available. EF common switches
+`--startup-project`/`-s`, `--framework`, `--configuration`, `--runtime`, and
+`--no-build` are accepted for command-line compatibility, but nORM scaffolding
+connects directly to the database and does not build or load a startup app for
+schema discovery. Legacy EF-style `--msbuildprojectextensionspath` is also
+accepted as a no-op because nORM scaffold does not invoke MSBuild.
+EF-style application arguments after `--` are accepted for command
+compatibility. `-- --environment Production` is used only to include
+`appsettings.Production.json` in named-connection lookup, with startup-project
+environment files searched before target-project environment files when
+`--startup-project` is supplied; other application arguments are ignored
+because nORM does not execute startup code. When no
+pass-through environment is supplied, `ASPNETCORE_ENVIRONMENT` and then
+`DOTNET_ENVIRONMENT` select the matching `appsettings.{Environment}.json` file.
+Unmatched scaffold tokens before `--` still fail fast.
+EF-style `.config/dotnet-ef.json` defaults are read for `project`,
+`startupProject`, `context`, `framework`, `configuration`, `runtime`, `verbose`,
+`noColor`, and `prefixOutput`; relative project paths are resolved relative to
+the parent of `.config`, and explicit CLI options override config values.
+`--json` emits a machine-readable scaffold result summary for successful runs
+and scaffold failures; `--verbose`/`-v`,
+`--no-color`, and `--prefix-output` are accepted for EF command-line
+compatibility because nORM scaffold output is already plain and explicit.
+Unfiltered ordinary views and PostgreSQL materialized views are scaffolded by
+default as read-oriented generated types; explicit `--table`/`--schema` filters
+also include matching supported query artifacts. SQLite virtual tables and
+SQL Server local table/view synonyms remain opt-in through explicit filters or
+`--emit-query-artifacts`/`--emit-view-entities`.
+`--context-dir` can place the generated context outside the entity output
+directory using EF-style project-relative paths; the CLI rejects absolute
+context paths. API callers can use
+`ScaffoldOptions.ContextDirectory` for output-relative context placement or
+`ScaffoldOptions.ContextOutputDirectory` for an absolute context directory.
+`--context-namespace`/`ScaffoldOptions.ContextNamespace` can separate the context
+namespace while generated context code imports the entity namespace.
 Opt-in scaffold switches can emit provider-bound routine wrappers
 (`--emit-routine-stubs`), provider-bound sequence wrappers
-(`--emit-sequence-stubs`), and read-oriented view entities
-(`--emit-query-artifacts` / `--emit-view-entities`, also used for SQLite virtual-table query artifacts);
+(`--emit-sequence-stubs`), and optional provider query artifacts
+(`--emit-query-artifacts` / `--emit-view-entities`, used for SQLite virtual-table and SQL Server synonym query artifacts);
 both remain explicitly bounded and are not provider mobility proof by
 themselves. Routine wrappers preserve discovered input CLR types, output
 `DbType` values, INOUT direction, and string/binary output sizes where
 providers expose them; PostgreSQL set-returning functions scaffold as
 table-valued `SELECT * FROM function(...)` wrappers. Payload bridge tables scaffold as explicit join
 entities with payload columns and FK navigations.
-Owned-type inference, inheritance inference, view write semantics, and provider-specific
-schema semantics remain explicit post-processing. See [Scaffolding
-Contract](docs/scaffolding.md).
+Owned-type inference, inheritance inference, view write semantics, and
+provider-specific schema semantics remain explicit modeling work after
+scaffolding. See [Scaffolding Contract](docs/scaffolding.md).
 
 ### Modern SQL Features
 
@@ -556,7 +691,15 @@ entirely. For the full provider contract, cancellation behavior, and custom migr
 `norm migrations add` uses `INormDesignTimeDbContextFactory<TContext>` when one
 is present, so fluent mapping is included in generated migration snapshots. Use
 `--attribute-only` only when you intentionally want to ignore fluent model
-configuration. See [Design-Time Migrations](docs/design-time-migrations.md).
+configuration. The command can resolve project outputs with `--project` or
+`--startup-project` plus `--configuration`, `--runtime`, and
+`--target-framework`/`--framework`; `--environment` is passed to design-time
+factories and exposed through the standard environment variables while the
+snapshot is built. Explicit `--deps` and `--runtimeconfig` files are validated
+and managed/native runtime assets listed in `--deps` are used for design-time
+dependency probing, including nested deps-file-directory, runtimeconfig
+`additionalProbingPaths`, and NuGet package cache assets. See
+[Design-Time Migrations](docs/design-time-migrations.md).
 
 `norm database drop` is guarded: destructive execution requires `--yes`, and
 `--dry-run` previews the files or tables that would be removed. The tool refuses

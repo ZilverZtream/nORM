@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
@@ -986,6 +986,7 @@ public class SqlServerProviderTests
 // ── DbConcurrencyException ────────────────────────────────────────────────────
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class DbConcurrencyExceptionTests
 {
     [Fact]
@@ -1105,6 +1106,9 @@ public class DatabaseScaffolderHelperTests
 
     private static object? Invoke(string methodName, object?[] args)
     {
+        if (methodName == "GetTypeName" && args.Length == 2)
+            args = args.Concat(new object?[] { true }).ToArray();
+
         var method = typeof(DatabaseScaffolder)
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .First(m => m.Name == methodName && m.GetParameters().Length == args.Length);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data.Common;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// SqliteMigrationRunnerTests assembly-scan tests.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class FaultInjectedMigrationReplayTests
 {
     // ── Dynamic assembly builder ──────────────────────────────────────────────

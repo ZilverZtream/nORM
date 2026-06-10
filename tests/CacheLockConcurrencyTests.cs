@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
@@ -20,6 +20,8 @@ namespace nORM.Tests;
 /// called semaphore.Dispose() after TryRemove, causing ObjectDisposedException on the waiting thread.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.CacheMemory)]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class CacheLockConcurrencyTests
 {
     // ── helpers ──────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -33,6 +33,8 @@ namespace nORM.Tests;
 /// </list>
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.CacheMemory)]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrentLruCacheStressTests
 {
     private const int Threads      = 16;

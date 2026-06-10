@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -417,6 +417,7 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Readme_links_to_optimistic_concurrency_contract()
     {
         var root = FindRepositoryRoot();

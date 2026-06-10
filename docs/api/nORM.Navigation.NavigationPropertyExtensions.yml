@@ -24,7 +24,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationPropertyExtensions
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 25
+    startLine: 26
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -86,7 +86,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableLazyLoading
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 51
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -133,7 +133,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CleanupNavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 67
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -170,7 +170,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 88
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -214,7 +214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 107
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -258,7 +258,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 126
+    startLine: 127
   assemblies:
   - nORM
   namespace: nORM.Navigation

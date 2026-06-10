@@ -83,6 +83,21 @@ public class LinqGroupByHavingCompositeKeyTests : IAsyncLifetime
         Assert.Equal("EU",   rows[1].Region); Assert.Equal("Game", rows[1].Type); Assert.Equal(5.0,  rows[1].Total);
     }
 
+    [Fact]
+    public async Task Composite_key_having_before_flattened_key_projection_translates_key_members()
+    {
+        var rows = (await _ctx.Query<GhcSale>()
+            .GroupBy(s => new { s.Region, s.Type })
+            .Where(g => g.Count() >= 2)
+            .Select(g => new { g.Key.Region, g.Key.Type, Count = g.Count() })
+            .ToListAsync())
+            .OrderBy(r => r.Region).ThenBy(r => r.Type)
+            .ToArray();
+
+        var row = Assert.Single(rows);
+        Assert.Equal(("EU", "Book", 2), (row.Region, row.Type, row.Count));
+    }
+
     [Table("GhcSale")]
     public sealed class GhcSale
     {

@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
@@ -239,6 +239,7 @@ public class FastPathCacheCollisionTests
     /// for the same CLR type must never corrupt each other's results.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentContexts_DifferentProviders_NoCachePoisoning()
     {
         // Each task uses its own connection to avoid cross-task disposal races.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -31,6 +31,7 @@ namespace nORM.Tests;
 ///   TI-4  Concurrent SaveChanges for different tenants do not corrupt row counts.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class TenantIsolationStressTests
 {
     [Table("TiRow")]

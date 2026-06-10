@@ -37,7 +37,7 @@ public sealed class PublicApiSnapshotTests
     [Fact]
     public void Public_api_has_no_public_fields_outside_enums()
     {
-        var fields = typeof(DbContext).Assembly.GetExportedTypes()
+        var fields = GetVisibleTypes(typeof(DbContext).Assembly)
             .Where(static type => !type.IsEnum)
             .SelectMany(static type => type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
                 .Select(field => $"{type.FullName}.{field.Name}"))
@@ -50,7 +50,7 @@ public sealed class PublicApiSnapshotTests
     private static IEnumerable<string> GetPublicApiLines(Assembly assembly)
     {
         var lines = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var type in assembly.GetExportedTypes().OrderBy(static t => t.FullName, StringComparer.Ordinal))
+        foreach (var type in GetVisibleTypes(assembly).OrderBy(static t => t.FullName, StringComparer.Ordinal))
         {
             lines.Add("T:" + FormatType(type));
 
@@ -91,6 +91,19 @@ public sealed class PublicApiSnapshotTests
         return lines;
     }
 
+    private static IEnumerable<Type> GetVisibleTypes(Assembly assembly)
+        => assembly.GetTypes().Where(IsPublicApiType);
+
+    private static bool IsPublicApiType(Type type)
+    {
+        if (type.IsPublic)
+            return true;
+
+        return type.IsNestedPublic
+            && type.DeclaringType is not null
+            && IsPublicApiType(type.DeclaringType);
+    }
+
     private static string FormatMethod(MethodInfo method)
     {
         var generic = method.IsGenericMethodDefinition ? "``" + method.GetGenericArguments().Length : string.Empty;
@@ -115,12 +128,35 @@ public sealed class PublicApiSnapshotTests
         if (!type.IsGenericType)
             return (type.FullName ?? type.Name).Replace('+', '.');
 
-        var definition = type.GetGenericTypeDefinition();
-        var name = (definition.FullName ?? definition.Name).Replace('+', '.');
-        var tick = name.IndexOf('`', StringComparison.Ordinal);
-        if (tick >= 0)
-            name = name[..tick];
+        var genericArguments = type.GetGenericArguments();
+        var argumentIndex = 0;
+        return FormatGenericType(type.GetGenericTypeDefinition(), genericArguments, ref argumentIndex);
+    }
 
-        return name + "{" + string.Join(",", type.GetGenericArguments().Select(FormatType)) + "}";
+    private static string FormatGenericType(Type definition, Type[] genericArguments, ref int argumentIndex)
+    {
+        var name = definition.IsNested
+            ? FormatGenericType(definition.DeclaringType!, genericArguments, ref argumentIndex) + "." + StripGenericArity(definition.Name)
+            : StripGenericArity(definition.FullName ?? definition.Name);
+
+        var declaringArgumentCount = definition.IsNested
+            ? definition.DeclaringType!.GetGenericArguments().Length
+            : 0;
+        var ownArgumentCount = definition.GetGenericArguments().Length - declaringArgumentCount;
+        if (ownArgumentCount <= 0)
+            return name;
+
+        var ownArguments = genericArguments
+            .Skip(argumentIndex)
+            .Take(ownArgumentCount)
+            .Select(FormatType);
+        argumentIndex += ownArgumentCount;
+        return name + "{" + string.Join(",", ownArguments) + "}";
+    }
+
+    private static string StripGenericArity(string name)
+    {
+        var tick = name.IndexOf('`', StringComparison.Ordinal);
+        return tick >= 0 ? name[..tick] : name;
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -39,6 +39,7 @@ namespace nORM.Tests;
 ///          (CommitAsync uses None, so a post-write cancel does not abort the commit).
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class FaultInjectedCancellationRaceTests
 {
     // ── Entity used for Save/Commit tests ─────────────────────────────────────

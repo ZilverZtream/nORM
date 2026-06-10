@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -184,6 +184,7 @@ public class ProviderSecurityMatrixTests
     [InlineData("mysql",     "table`with`backticks")]
     [InlineData("postgres",  "table\"with\"double")]
     [InlineData("sqlserver", "table[with]brackets")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void ProviderEscape_AdversarialInput_IsWrappedSafely(string kind, string name)
     {
         var p = MakeProvider(kind);

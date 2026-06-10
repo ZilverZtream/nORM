@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowPropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 480
+    startLine: 934
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -65,7 +65,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 497
+    startLine: 951
   assemblies:
   - nORM
   namespace: nORM.Configuration

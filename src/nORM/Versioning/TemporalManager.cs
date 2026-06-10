@@ -30,6 +30,7 @@ namespace nORM.Versioning
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(conn);
             ct.ThrowIfCancellationRequested();
+            ThrowIfTemporalBootstrapTargetsProtectedDatabase(context.RawProvider, conn);
 
             await CreateTagsTableIfNotExistsAsync(context, conn, ct).ConfigureAwait(false);
 
@@ -63,6 +64,46 @@ namespace nORM.Versioning
                 }
             }
         }
+
+        private static void ThrowIfTemporalBootstrapTargetsProtectedDatabase(DatabaseProvider provider, DbConnection conn)
+        {
+            string? databaseName;
+            try
+            {
+                databaseName = conn.Database;
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(databaseName))
+                return;
+
+            var trimmed = databaseName.Trim();
+            if (!IsProtectedDatabaseName(provider, trimmed))
+                return;
+
+            throw new NormConfigurationException(
+                $"Temporal versioning cannot bootstrap temporal storage tables or triggers in provider-owned database '{trimmed}'. Use an application database/schema such as 'normtest' for temporal storage.");
+        }
+
+        private static bool IsProtectedDatabaseName(DatabaseProvider provider, string databaseName)
+            => provider switch
+            {
+                SqlServerProvider => databaseName.Equals("master", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("model", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+                PostgresProvider => databaseName.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("template0", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("template1", StringComparison.OrdinalIgnoreCase),
+                MySqlProvider => databaseName.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("sys", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+                    || databaseName.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
 
         private static async Task CreateTagsTableIfNotExistsAsync(DbContext context, DbConnection conn, CancellationToken ct)
         {

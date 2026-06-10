@@ -194,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateLikeEscapeChar
     path: src/nORM/Core/NormValidator.cs
-    startLine: 980
+    startLine: 1041
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -236,7 +236,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateConnectionString
     path: src/nORM/Core/NormValidator.cs
-    startLine: 1003
+    startLine: 1064
   assemblies:
   - nORM
   namespace: nORM.Core

@@ -26,6 +26,8 @@ namespace nORM.Tests;
 /// Shape tests verify ON CONFLICT DO NOTHING is absent from generated SQL.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class PostgresBulkDuplicateTests
 {
     [Table("PgBdiRow")]

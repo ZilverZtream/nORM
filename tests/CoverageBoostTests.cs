@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -2439,6 +2439,7 @@ public class CoverageBoostTests : TestBase
     // ═══════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void DbConcurrencyException_MessageOnly_HasCorrectMessage()
     {
         var ex = new DbConcurrencyException("Test concurrency conflict");
@@ -2446,6 +2447,7 @@ public class CoverageBoostTests : TestBase
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void DbConcurrencyException_WithInnerException_PreservesInner()
     {
         var inner = new Exception("inner");
@@ -4302,7 +4304,7 @@ public class DatabaseScaffolderCoverageTests
     {
         var m = _scaffolderType.GetMethod("GetTypeName",
             BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object[] { type, allowNull })!;
+        return (string)m.Invoke(null, new object[] { type, allowNull, true })!;
     }
 
     [Theory]
@@ -4481,7 +4483,10 @@ public class DatabaseScaffolderCoverageTests
     private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
     {
         var m = _scaffolderType.GetMethod("ScaffoldContext",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(string), typeof(string), typeof(IEnumerable<string>) },
+            modifiers: null)!;
         return (string)m.Invoke(null, new object[] { namespaceName, contextName, entities })!;
     }
 
@@ -4489,7 +4494,7 @@ public class DatabaseScaffolderCoverageTests
     public void ScaffoldContext_GeneratesClassWithQueryProperties()
     {
         var code = ScaffoldContext("MyApp", "MyDbContext", new[] { "Product", "Order" });
-        Assert.Contains("public class MyDbContext : DbContext", code);
+        Assert.Contains("public partial class MyDbContext : DbContext", code);
         Assert.Contains("using System.Linq;", code);
         Assert.Contains("IQueryable<Product>", code);
         Assert.Contains("IQueryable<Order>", code);
@@ -4500,7 +4505,7 @@ public class DatabaseScaffolderCoverageTests
     public void ScaffoldContext_EmptyEntities_GeneratesClassWithNoProperties()
     {
         var code = ScaffoldContext("Test", "Ctx", Array.Empty<string>());
-        Assert.Contains("public class Ctx : DbContext", code);
+        Assert.Contains("public partial class Ctx : DbContext", code);
         Assert.DoesNotContain("IQueryable<", code);
     }
 
@@ -6155,14 +6160,14 @@ public class DatabaseScaffolderIntegrationTests
             var entityFile = Path.Combine(outputDir, "Customers.cs");
             Assert.True(File.Exists(entityFile));
             var code = await File.ReadAllTextAsync(entityFile);
-            Assert.Contains("public class Customers", code);
+            Assert.Contains("public partial class Customers", code);
             Assert.Contains("namespace TestNs", code);
             Assert.Contains("[Table(\"Customers\")]", code);
 
             var ctxFile = Path.Combine(outputDir, "AppDbContext.cs");
             Assert.True(File.Exists(ctxFile));
             var ctxCode = await File.ReadAllTextAsync(ctxFile);
-            Assert.Contains("public class AppDbContext : DbContext", ctxCode);
+            Assert.Contains("public partial class AppDbContext : DbContext", ctxCode);
         }
         finally
         {
@@ -6254,7 +6259,7 @@ public class DatabaseScaffolderIntegrationTests
         // Line 222: else branch — reference type with allowNull=true
         var m = _scaffolderType.GetMethod("GetTypeName",
             BindingFlags.NonPublic | BindingFlags.Static)!;
-        var result = (string)m.Invoke(null, new object[] { typeof(Uri), true })!;
+        var result = (string)m.Invoke(null, new object[] { typeof(Uri), true, true })!;
         Assert.Equal("System.Uri?", result);
     }
 

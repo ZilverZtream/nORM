@@ -6,19 +6,31 @@ items:
   parent: nORM.Mapping
   children:
   - nORM.Mapping.JoinTableMapping.EscLeftFkColumn
+  - nORM.Mapping.JoinTableMapping.EscLeftFkColumns
   - nORM.Mapping.JoinTableMapping.EscRightFkColumn
+  - nORM.Mapping.JoinTableMapping.EscRightFkColumns
   - nORM.Mapping.JoinTableMapping.EscTableName
   - nORM.Mapping.JoinTableMapping.LeftCollectionGetter
   - nORM.Mapping.JoinTableMapping.LeftCollectionSetter
   - nORM.Mapping.JoinTableMapping.LeftFkColumn
+  - nORM.Mapping.JoinTableMapping.LeftFkColumns
+  - nORM.Mapping.JoinTableMapping.LeftKeyColumns
   - nORM.Mapping.JoinTableMapping.LeftNavPropertyName
+  - nORM.Mapping.JoinTableMapping.LeftOnDelete
+  - nORM.Mapping.JoinTableMapping.LeftOnUpdate
   - nORM.Mapping.JoinTableMapping.LeftPkGetter
+  - nORM.Mapping.JoinTableMapping.LeftPkGetters
   - nORM.Mapping.JoinTableMapping.LeftType
   - nORM.Mapping.JoinTableMapping.RightCollectionGetter
   - nORM.Mapping.JoinTableMapping.RightCollectionSetter
   - nORM.Mapping.JoinTableMapping.RightFkColumn
+  - nORM.Mapping.JoinTableMapping.RightFkColumns
+  - nORM.Mapping.JoinTableMapping.RightKeyColumns
   - nORM.Mapping.JoinTableMapping.RightNavPropertyName
+  - nORM.Mapping.JoinTableMapping.RightOnDelete
+  - nORM.Mapping.JoinTableMapping.RightOnUpdate
   - nORM.Mapping.JoinTableMapping.RightPkGetter
+  - nORM.Mapping.JoinTableMapping.RightPkGetters
   - nORM.Mapping.JoinTableMapping.RightType
   - nORM.Mapping.JoinTableMapping.SchemaName
   - nORM.Mapping.JoinTableMapping.TableName
@@ -36,7 +48,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: JoinTableMapping
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 14
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -77,7 +89,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 17
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -108,7 +120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 20
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -139,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTableName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 23
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -170,7 +182,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscLeftFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 26
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -201,7 +213,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscRightFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 29
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -214,6 +226,68 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property EscRightFkColumn As String
   overload: nORM.Mapping.JoinTableMapping.EscRightFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.EscLeftFkColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.EscLeftFkColumns
+  id: EscLeftFkColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: EscLeftFkColumns
+  nameWithType: JoinTableMapping.EscLeftFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.EscLeftFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EscLeftFkColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 34
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Escaped columns in the join table that hold the FK to the left (owner) entity's key.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> EscLeftFkColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public ReadOnly Property EscLeftFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Mapping.JoinTableMapping.EscLeftFkColumns*
+- uid: nORM.Mapping.JoinTableMapping.EscRightFkColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.EscRightFkColumns
+  id: EscRightFkColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: EscRightFkColumns
+  nameWithType: JoinTableMapping.EscRightFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.EscRightFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EscRightFkColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 37
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Escaped columns in the join table that hold the FK to the right (related) entity's key.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> EscRightFkColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public ReadOnly Property EscRightFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Mapping.JoinTableMapping.EscRightFkColumns*
 - uid: nORM.Mapping.JoinTableMapping.LeftFkColumn
   commentId: P:nORM.Mapping.JoinTableMapping.LeftFkColumn
   id: LeftFkColumn
@@ -232,7 +306,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 32
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -263,7 +337,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightFkColumn
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 35
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -276,6 +350,68 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property RightFkColumn As String
   overload: nORM.Mapping.JoinTableMapping.RightFkColumn*
+- uid: nORM.Mapping.JoinTableMapping.LeftFkColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftFkColumns
+  id: LeftFkColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftFkColumns
+  nameWithType: JoinTableMapping.LeftFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.LeftFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftFkColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain left FK column names.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> LeftFkColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public ReadOnly Property LeftFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Mapping.JoinTableMapping.LeftFkColumns*
+- uid: nORM.Mapping.JoinTableMapping.RightFkColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.RightFkColumns
+  id: RightFkColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightFkColumns
+  nameWithType: JoinTableMapping.RightFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.RightFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightFkColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 49
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Plain right FK column names.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> RightFkColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public ReadOnly Property RightFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Mapping.JoinTableMapping.RightFkColumns*
 - uid: nORM.Mapping.JoinTableMapping.LeftType
   commentId: P:nORM.Mapping.JoinTableMapping.LeftType
   id: LeftType
@@ -294,7 +430,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftType
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 38
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -325,7 +461,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightType
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 41
+    startLine: 55
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -356,7 +492,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftNavPropertyName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 44
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -387,7 +523,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightNavPropertyName
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 47
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -418,7 +554,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftPkGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 50
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -449,7 +585,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightPkGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 53
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -462,6 +598,254 @@ items:
       type: System.Func{System.Object,System.Object}
     content.vb: Public ReadOnly Property RightPkGetter As Func(Of Object, Object)
   overload: nORM.Mapping.JoinTableMapping.RightPkGetter*
+- uid: nORM.Mapping.JoinTableMapping.LeftPkGetters
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftPkGetters
+  id: LeftPkGetters
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftPkGetters
+  nameWithType: JoinTableMapping.LeftPkGetters
+  fullName: nORM.Mapping.JoinTableMapping.LeftPkGetters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftPkGetters
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the ordered left key values from a left entity instance.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Func<object, object?>> LeftPkGetters { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Func{System.Object,System.Object}}
+    content.vb: Public ReadOnly Property LeftPkGetters As IReadOnlyList(Of Func(Of Object, Object))
+  overload: nORM.Mapping.JoinTableMapping.LeftPkGetters*
+- uid: nORM.Mapping.JoinTableMapping.RightPkGetters
+  commentId: P:nORM.Mapping.JoinTableMapping.RightPkGetters
+  id: RightPkGetters
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightPkGetters
+  nameWithType: JoinTableMapping.RightPkGetters
+  fullName: nORM.Mapping.JoinTableMapping.RightPkGetters
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightPkGetters
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 73
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets the ordered right key values from a right entity instance.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Func<object, object?>> RightPkGetters { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Func{System.Object,System.Object}}
+    content.vb: Public ReadOnly Property RightPkGetters As IReadOnlyList(Of Func(Of Object, Object))
+  overload: nORM.Mapping.JoinTableMapping.RightPkGetters*
+- uid: nORM.Mapping.JoinTableMapping.LeftKeyColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftKeyColumns
+  id: LeftKeyColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftKeyColumns
+  nameWithType: JoinTableMapping.LeftKeyColumns
+  fullName: nORM.Mapping.JoinTableMapping.LeftKeyColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftKeyColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 76
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Ordered key columns on the left entity referenced by the join table.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Column> LeftKeyColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    content.vb: Public ReadOnly Property LeftKeyColumns As IReadOnlyList(Of Column)
+  overload: nORM.Mapping.JoinTableMapping.LeftKeyColumns*
+- uid: nORM.Mapping.JoinTableMapping.RightKeyColumns
+  commentId: P:nORM.Mapping.JoinTableMapping.RightKeyColumns
+  id: RightKeyColumns
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightKeyColumns
+  nameWithType: JoinTableMapping.RightKeyColumns
+  fullName: nORM.Mapping.JoinTableMapping.RightKeyColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightKeyColumns
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 79
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Ordered key columns on the right entity referenced by the join table.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Column> RightKeyColumns { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    content.vb: Public ReadOnly Property RightKeyColumns As IReadOnlyList(Of Column)
+  overload: nORM.Mapping.JoinTableMapping.RightKeyColumns*
+- uid: nORM.Mapping.JoinTableMapping.LeftOnDelete
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftOnDelete
+  id: LeftOnDelete
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftOnDelete
+  nameWithType: JoinTableMapping.LeftOnDelete
+  fullName: nORM.Mapping.JoinTableMapping.LeftOnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftOnDelete
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 82
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database delete action for the FK from the join table to the left entity.
+  example: []
+  syntax:
+    content: public ReferentialAction LeftOnDelete { get; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public ReadOnly Property LeftOnDelete As ReferentialAction
+  overload: nORM.Mapping.JoinTableMapping.LeftOnDelete*
+- uid: nORM.Mapping.JoinTableMapping.LeftOnUpdate
+  commentId: P:nORM.Mapping.JoinTableMapping.LeftOnUpdate
+  id: LeftOnUpdate
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: LeftOnUpdate
+  nameWithType: JoinTableMapping.LeftOnUpdate
+  fullName: nORM.Mapping.JoinTableMapping.LeftOnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftOnUpdate
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 85
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database update action for the FK from the join table to the left entity.
+  example: []
+  syntax:
+    content: public ReferentialAction LeftOnUpdate { get; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public ReadOnly Property LeftOnUpdate As ReferentialAction
+  overload: nORM.Mapping.JoinTableMapping.LeftOnUpdate*
+- uid: nORM.Mapping.JoinTableMapping.RightOnDelete
+  commentId: P:nORM.Mapping.JoinTableMapping.RightOnDelete
+  id: RightOnDelete
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightOnDelete
+  nameWithType: JoinTableMapping.RightOnDelete
+  fullName: nORM.Mapping.JoinTableMapping.RightOnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightOnDelete
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 88
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database delete action for the FK from the join table to the right entity.
+  example: []
+  syntax:
+    content: public ReferentialAction RightOnDelete { get; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public ReadOnly Property RightOnDelete As ReferentialAction
+  overload: nORM.Mapping.JoinTableMapping.RightOnDelete*
+- uid: nORM.Mapping.JoinTableMapping.RightOnUpdate
+  commentId: P:nORM.Mapping.JoinTableMapping.RightOnUpdate
+  id: RightOnUpdate
+  parent: nORM.Mapping.JoinTableMapping
+  langs:
+  - csharp
+  - vb
+  name: RightOnUpdate
+  nameWithType: JoinTableMapping.RightOnUpdate
+  fullName: nORM.Mapping.JoinTableMapping.RightOnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/JoinTableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightOnUpdate
+    path: src/nORM/Mapping/JoinTableMapping.cs
+    startLine: 91
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database update action for the FK from the join table to the right entity.
+  example: []
+  syntax:
+    content: public ReferentialAction RightOnUpdate { get; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public ReadOnly Property RightOnUpdate As ReferentialAction
+  overload: nORM.Mapping.JoinTableMapping.RightOnUpdate*
 - uid: nORM.Mapping.JoinTableMapping.LeftCollectionGetter
   commentId: P:nORM.Mapping.JoinTableMapping.LeftCollectionGetter
   id: LeftCollectionGetter
@@ -480,7 +864,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftCollectionGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 56
+    startLine: 94
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -511,7 +895,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftCollectionSetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 59
+    startLine: 97
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -542,7 +926,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightCollectionGetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 62
+    startLine: 100
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -573,7 +957,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightCollectionSetter
     path: src/nORM/Mapping/JoinTableMapping.cs
-    startLine: 65
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1567,6 +1951,118 @@ references:
   name: EscRightFkColumn
   nameWithType: JoinTableMapping.EscRightFkColumn
   fullName: nORM.Mapping.JoinTableMapping.EscRightFkColumn
+- uid: nORM.Mapping.JoinTableMapping.EscLeftFkColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.EscLeftFkColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscLeftFkColumns
+  name: EscLeftFkColumns
+  nameWithType: JoinTableMapping.EscLeftFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.EscLeftFkColumns
+- uid: System.Collections.Generic.IReadOnlyList{System.String}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<string>
+  nameWithType: IReadOnlyList<string>
+  fullName: System.Collections.Generic.IReadOnlyList<string>
+  nameWithType.vb: IReadOnlyList(Of String)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of String)
+  name.vb: IReadOnlyList(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Mapping.JoinTableMapping.EscRightFkColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.EscRightFkColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_EscRightFkColumns
+  name: EscRightFkColumns
+  nameWithType: JoinTableMapping.EscRightFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.EscRightFkColumns
 - uid: nORM.Mapping.JoinTableMapping.LeftFkColumn*
   commentId: Overload:nORM.Mapping.JoinTableMapping.LeftFkColumn
   href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftFkColumn
@@ -1579,6 +2075,18 @@ references:
   name: RightFkColumn
   nameWithType: JoinTableMapping.RightFkColumn
   fullName: nORM.Mapping.JoinTableMapping.RightFkColumn
+- uid: nORM.Mapping.JoinTableMapping.LeftFkColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftFkColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftFkColumns
+  name: LeftFkColumns
+  nameWithType: JoinTableMapping.LeftFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.LeftFkColumns
+- uid: nORM.Mapping.JoinTableMapping.RightFkColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightFkColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightFkColumns
+  name: RightFkColumns
+  nameWithType: JoinTableMapping.RightFkColumns
+  fullName: nORM.Mapping.JoinTableMapping.RightFkColumns
 - uid: nORM.Mapping.JoinTableMapping.LeftType*
   commentId: Overload:nORM.Mapping.JoinTableMapping.LeftType
   href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftType
@@ -1704,6 +2212,177 @@ references:
   name: RightPkGetter
   nameWithType: JoinTableMapping.RightPkGetter
   fullName: nORM.Mapping.JoinTableMapping.RightPkGetter
+- uid: nORM.Mapping.JoinTableMapping.LeftPkGetters*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftPkGetters
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftPkGetters
+  name: LeftPkGetters
+  nameWithType: JoinTableMapping.LeftPkGetters
+  fullName: nORM.Mapping.JoinTableMapping.LeftPkGetters
+- uid: System.Collections.Generic.IReadOnlyList{System.Func{System.Object,System.Object}}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.Func{System.Object,System.Object}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<Func<object, object>>
+  nameWithType: IReadOnlyList<Func<object, object>>
+  fullName: System.Collections.Generic.IReadOnlyList<System.Func<object, object>>
+  nameWithType.vb: IReadOnlyList(Of Func(Of Object, Object))
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of System.Func(Of Object, Object))
+  name.vb: IReadOnlyList(Of Func(Of Object, Object))
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.RightPkGetters*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightPkGetters
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightPkGetters
+  name: RightPkGetters
+  nameWithType: JoinTableMapping.RightPkGetters
+  fullName: nORM.Mapping.JoinTableMapping.RightPkGetters
+- uid: nORM.Mapping.JoinTableMapping.LeftKeyColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftKeyColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftKeyColumns
+  name: LeftKeyColumns
+  nameWithType: JoinTableMapping.LeftKeyColumns
+  fullName: nORM.Mapping.JoinTableMapping.LeftKeyColumns
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<Column>
+  nameWithType: IReadOnlyList<Column>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Mapping.Column>
+  nameWithType.vb: IReadOnlyList(Of Column)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Mapping.Column)
+  name.vb: IReadOnlyList(Of Column)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Mapping.Column
+    name: Column
+    href: nORM.Mapping.Column.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.Column
+    name: Column
+    href: nORM.Mapping.Column.html
+  - name: )
+- uid: nORM.Mapping.JoinTableMapping.RightKeyColumns*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightKeyColumns
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightKeyColumns
+  name: RightKeyColumns
+  nameWithType: JoinTableMapping.RightKeyColumns
+  fullName: nORM.Mapping.JoinTableMapping.RightKeyColumns
+- uid: nORM.Mapping.JoinTableMapping.LeftOnDelete*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftOnDelete
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftOnDelete
+  name: LeftOnDelete
+  nameWithType: JoinTableMapping.LeftOnDelete
+  fullName: nORM.Mapping.JoinTableMapping.LeftOnDelete
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Mapping.JoinTableMapping.LeftOnUpdate*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.LeftOnUpdate
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftOnUpdate
+  name: LeftOnUpdate
+  nameWithType: JoinTableMapping.LeftOnUpdate
+  fullName: nORM.Mapping.JoinTableMapping.LeftOnUpdate
+- uid: nORM.Mapping.JoinTableMapping.RightOnDelete*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightOnDelete
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightOnDelete
+  name: RightOnDelete
+  nameWithType: JoinTableMapping.RightOnDelete
+  fullName: nORM.Mapping.JoinTableMapping.RightOnDelete
+- uid: nORM.Mapping.JoinTableMapping.RightOnUpdate*
+  commentId: Overload:nORM.Mapping.JoinTableMapping.RightOnUpdate
+  href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_RightOnUpdate
+  name: RightOnUpdate
+  nameWithType: JoinTableMapping.RightOnUpdate
+  fullName: nORM.Mapping.JoinTableMapping.RightOnUpdate
 - uid: nORM.Mapping.JoinTableMapping.LeftCollectionGetter*
   commentId: Overload:nORM.Mapping.JoinTableMapping.LeftCollectionGetter
   href: nORM.Mapping.JoinTableMapping.html#nORM_Mapping_JoinTableMapping_LeftCollectionGetter

@@ -5,10 +5,22 @@ items:
   id: OutputParameter
   parent: nORM.Core
   children:
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType)
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte)
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte,System.Data.ParameterDirection)
   - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection)
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection,System.Object)
+  - nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Nullable{System.Byte},System.Nullable{System.Byte},System.Data.ParameterDirection,System.Object)
   - nORM.Core.OutputParameter.DbType
+  - nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@)
+  - nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@,System.Data.ParameterDirection@,System.Object@)
+  - nORM.Core.OutputParameter.Direction
   - nORM.Core.OutputParameter.Name
+  - nORM.Core.OutputParameter.Precision
+  - nORM.Core.OutputParameter.Scale
   - nORM.Core.OutputParameter.Size
+  - nORM.Core.OutputParameter.Value
   langs:
   - csharp
   - vb
@@ -23,11 +35,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OutputParameter
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 13
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Represents an output parameter for stored procedure execution.
+  summary: Represents an output, input/output, or return-value parameter for stored procedure execution.
   example: []
   syntax:
     content: 'public sealed record OutputParameter : IEquatable<OutputParameter>'
@@ -48,16 +60,16 @@ items:
   - nORM.Core.OutputParameter.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.OutputParameter,{TProperty}}})
   - nORM.Core.OutputParameter.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.OutputParameter,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Core.OutputParameter.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.OutputParameter,{TProperty}}},System.Threading.CancellationToken)
-- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
-  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
-  id: '#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})'
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Nullable{System.Byte},System.Nullable{System.Byte},System.Data.ParameterDirection,System.Object)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Nullable{System.Byte},System.Nullable{System.Byte},System.Data.ParameterDirection,System.Object)
+  id: '#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Nullable{System.Byte},System.Nullable{System.Byte},System.Data.ParameterDirection,System.Object)'
   parent: nORM.Core.OutputParameter
   langs:
   - csharp
   - vb
-  name: OutputParameter(string, DbType, int?)
-  nameWithType: OutputParameter.OutputParameter(string, DbType, int?)
-  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, int?)
+  name: OutputParameter(string, DbType, int?, byte?, byte?, ParameterDirection, object?)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, int?, byte?, byte?, ParameterDirection, object?)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, int?, byte?, byte?, System.Data.ParameterDirection, object?)
   type: Constructor
   source:
     remote:
@@ -66,29 +78,41 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 13
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Represents an output parameter for stored procedure execution.
+  summary: Represents an output, input/output, or return-value parameter for stored procedure execution.
   example: []
   syntax:
-    content: public OutputParameter(string Name, DbType DbType, int? Size = null)
+    content: public OutputParameter(string Name, DbType DbType, int? Size, byte? Precision, byte? Scale, ParameterDirection Direction, object? Value)
     parameters:
     - id: Name
       type: System.String
       description: Name of the parameter without provider-specific prefix.
     - id: DbType
       type: System.Data.DbType
-      description: Database type of the output parameter.
+      description: Database type of the parameter.
     - id: Size
       type: System.Nullable{System.Int32}
       description: Optional size for variable-length parameters.
-    content.vb: Public Sub New(Name As String, DbType As DbType, Size As Integer? = Nothing)
+    - id: Precision
+      type: System.Nullable{System.Byte}
+      description: Optional decimal precision for providers that require explicit output precision.
+    - id: Scale
+      type: System.Nullable{System.Byte}
+      description: Optional decimal scale for providers that require explicit output scale.
+    - id: Direction
+      type: System.Data.ParameterDirection
+      description: Parameter direction. Only Output, InputOutput, and ReturnValue are valid.
+    - id: Value
+      type: System.Object
+      description: Optional initial value for input/output parameters.
+    content.vb: Public Sub New(Name As String, DbType As DbType, Size As Integer?, Precision As Byte?, Scale As Byte?, Direction As ParameterDirection, Value As Object)
   overload: nORM.Core.OutputParameter.#ctor*
-  nameWithType.vb: OutputParameter.New(String, DbType, Integer?)
-  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Integer?)
-  name.vb: New(String, DbType, Integer?)
+  nameWithType.vb: OutputParameter.New(String, DbType, Integer?, Byte?, Byte?, ParameterDirection, Object)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Integer?, Byte?, Byte?, System.Data.ParameterDirection, Object)
+  name.vb: New(String, DbType, Integer?, Byte?, Byte?, ParameterDirection, Object)
 - uid: nORM.Core.OutputParameter.Name
   commentId: P:nORM.Core.OutputParameter.Name
   id: Name
@@ -107,7 +131,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 13
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -138,11 +162,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbType
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 13
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Database type of the output parameter.
+  summary: Database type of the parameter.
   example: []
   syntax:
     content: public DbType DbType { get; init; }
@@ -169,7 +193,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Size
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 13
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -182,6 +206,471 @@ items:
       type: System.Nullable{System.Int32}
     content.vb: Public Property Size As Integer?
   overload: nORM.Core.OutputParameter.Size*
+- uid: nORM.Core.OutputParameter.Precision
+  commentId: P:nORM.Core.OutputParameter.Precision
+  id: Precision
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Precision
+  nameWithType: OutputParameter.Precision
+  fullName: nORM.Core.OutputParameter.Precision
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Precision
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 21
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Optional decimal precision for providers that require explicit output precision.
+  example: []
+  syntax:
+    content: public byte? Precision { get; init; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Byte}
+    content.vb: Public Property Precision As Byte?
+  overload: nORM.Core.OutputParameter.Precision*
+- uid: nORM.Core.OutputParameter.Scale
+  commentId: P:nORM.Core.OutputParameter.Scale
+  id: Scale
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Scale
+  nameWithType: OutputParameter.Scale
+  fullName: nORM.Core.OutputParameter.Scale
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Scale
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 22
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Optional decimal scale for providers that require explicit output scale.
+  example: []
+  syntax:
+    content: public byte? Scale { get; init; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Byte}
+    content.vb: Public Property Scale As Byte?
+  overload: nORM.Core.OutputParameter.Scale*
+- uid: nORM.Core.OutputParameter.Direction
+  commentId: P:nORM.Core.OutputParameter.Direction
+  id: Direction
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Direction
+  nameWithType: OutputParameter.Direction
+  fullName: nORM.Core.OutputParameter.Direction
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Direction
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Parameter direction. Only Output, InputOutput, and ReturnValue are valid.
+  example: []
+  syntax:
+    content: public ParameterDirection Direction { get; init; }
+    parameters: []
+    return:
+      type: System.Data.ParameterDirection
+    content.vb: Public Property Direction As ParameterDirection
+  overload: nORM.Core.OutputParameter.Direction*
+- uid: nORM.Core.OutputParameter.Value
+  commentId: P:nORM.Core.OutputParameter.Value
+  id: Value
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Value
+  nameWithType: OutputParameter.Value
+  fullName: nORM.Core.OutputParameter.Value
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Value
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 24
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Optional initial value for input/output parameters.
+  example: []
+  syntax:
+    content: public object? Value { get; init; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: Public Property Value As Object
+  overload: nORM.Core.OutputParameter.Value*
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType)
+  id: '#ctor(System.String,System.Data.DbType)'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType)
+  nameWithType: OutputParameter.OutputParameter(string, DbType)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 31
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates an output parameter with no explicit size.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    content.vb: Public Sub New(name As String, dbType As DbType)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType)
+  name.vb: New(String, DbType)
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})
+  id: '#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32})'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType, int?)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, int?)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, int?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 42
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates an output parameter with the default <xref href="System.Data.ParameterDirection.Output" data-throw-if-not-resolved="false"></xref> direction.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType, int? size = null)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    - id: size
+      type: System.Nullable{System.Int32}
+      description: Optional size for variable-length parameters.
+    content.vb: Public Sub New(name As String, dbType As DbType, size As Integer? = Nothing)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType, Integer?)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Integer?)
+  name.vb: New(String, DbType, Integer?)
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte)
+  id: '#ctor(System.String,System.Data.DbType,System.Byte,System.Byte)'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType, byte, byte)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, byte, byte)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, byte, byte)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 54
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates a decimal output parameter with explicit precision and scale.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType, byte precision, byte scale)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    - id: precision
+      type: System.Byte
+      description: Decimal precision.
+    - id: scale
+      type: System.Byte
+      description: Decimal scale.
+    content.vb: Public Sub New(name As String, dbType As DbType, precision As Byte, scale As Byte)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType, Byte, Byte)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Byte, Byte)
+  name.vb: New(String, DbType, Byte, Byte)
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte,System.Data.ParameterDirection)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Byte,System.Byte,System.Data.ParameterDirection)
+  id: '#ctor(System.String,System.Data.DbType,System.Byte,System.Byte,System.Data.ParameterDirection)'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType, byte, byte, ParameterDirection)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, byte, byte, ParameterDirection)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, byte, byte, System.Data.ParameterDirection)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 67
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates a decimal output, input/output, or return-value parameter definition.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType, byte precision, byte scale, ParameterDirection direction)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    - id: precision
+      type: System.Byte
+      description: Decimal precision.
+    - id: scale
+      type: System.Byte
+      description: Decimal scale.
+    - id: direction
+      type: System.Data.ParameterDirection
+      description: Parameter direction.
+    content.vb: Public Sub New(name As String, dbType As DbType, precision As Byte, scale As Byte, direction As ParameterDirection)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType, Byte, Byte, ParameterDirection)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Byte, Byte, System.Data.ParameterDirection)
+  name.vb: New(String, DbType, Byte, Byte, ParameterDirection)
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection)
+  id: '#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection)'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType, int?, ParameterDirection)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, int?, ParameterDirection)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, int?, System.Data.ParameterDirection)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 79
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates an output, input/output, or return-value parameter definition.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType, int? size, ParameterDirection direction)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    - id: size
+      type: System.Nullable{System.Int32}
+      description: Optional size for variable-length parameters.
+    - id: direction
+      type: System.Data.ParameterDirection
+      description: Parameter direction.
+    content.vb: Public Sub New(name As String, dbType As DbType, size As Integer?, direction As ParameterDirection)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType, Integer?, ParameterDirection)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Integer?, System.Data.ParameterDirection)
+  name.vb: New(String, DbType, Integer?, ParameterDirection)
+- uid: nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection,System.Object)
+  commentId: M:nORM.Core.OutputParameter.#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection,System.Object)
+  id: '#ctor(System.String,System.Data.DbType,System.Nullable{System.Int32},System.Data.ParameterDirection,System.Object)'
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: OutputParameter(string, DbType, int?, ParameterDirection, object?)
+  nameWithType: OutputParameter.OutputParameter(string, DbType, int?, ParameterDirection, object?)
+  fullName: nORM.Core.OutputParameter.OutputParameter(string, System.Data.DbType, int?, System.Data.ParameterDirection, object?)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 92
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Creates an output, input/output, or return-value parameter definition.
+  example: []
+  syntax:
+    content: public OutputParameter(string name, DbType dbType, int? size, ParameterDirection direction, object? value)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the parameter without provider-specific prefix.
+    - id: dbType
+      type: System.Data.DbType
+      description: Database type of the parameter.
+    - id: size
+      type: System.Nullable{System.Int32}
+      description: Optional size for variable-length parameters.
+    - id: direction
+      type: System.Data.ParameterDirection
+      description: Parameter direction.
+    - id: value
+      type: System.Object
+      description: Optional initial value for input/output parameters.
+    content.vb: Public Sub New(name As String, dbType As DbType, size As Integer?, direction As ParameterDirection, value As Object)
+  overload: nORM.Core.OutputParameter.#ctor*
+  nameWithType.vb: OutputParameter.New(String, DbType, Integer?, ParameterDirection, Object)
+  fullName.vb: nORM.Core.OutputParameter.New(String, System.Data.DbType, Integer?, System.Data.ParameterDirection, Object)
+  name.vb: New(String, DbType, Integer?, ParameterDirection, Object)
+- uid: nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@)
+  commentId: M:nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@)
+  id: Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@)
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Deconstruct(out string, out DbType, out int?)
+  nameWithType: OutputParameter.Deconstruct(out string, out DbType, out int?)
+  fullName: nORM.Core.OutputParameter.Deconstruct(out string, out System.Data.DbType, out int?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Deconstruct
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 100
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deconstructs the v1 output-parameter fields.
+  example: []
+  syntax:
+    content: public void Deconstruct(out string name, out DbType dbType, out int? size)
+    parameters:
+    - id: name
+      type: System.String
+    - id: dbType
+      type: System.Data.DbType
+    - id: size
+      type: System.Nullable{System.Int32}
+    content.vb: Public Sub Deconstruct(name As String, dbType As DbType, size As Integer?)
+  overload: nORM.Core.OutputParameter.Deconstruct*
+  nameWithType.vb: OutputParameter.Deconstruct(String, DbType, Integer?)
+  fullName.vb: nORM.Core.OutputParameter.Deconstruct(String, System.Data.DbType, Integer?)
+  name.vb: Deconstruct(String, DbType, Integer?)
+- uid: nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@,System.Data.ParameterDirection@,System.Object@)
+  commentId: M:nORM.Core.OutputParameter.Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@,System.Data.ParameterDirection@,System.Object@)
+  id: Deconstruct(System.String@,System.Data.DbType@,System.Nullable{System.Int32}@,System.Data.ParameterDirection@,System.Object@)
+  parent: nORM.Core.OutputParameter
+  langs:
+  - csharp
+  - vb
+  name: Deconstruct(out string, out DbType, out int?, out ParameterDirection, out object?)
+  nameWithType: OutputParameter.Deconstruct(out string, out DbType, out int?, out ParameterDirection, out object?)
+  fullName: nORM.Core.OutputParameter.Deconstruct(out string, out System.Data.DbType, out int?, out System.Data.ParameterDirection, out object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/StoredProcedureResult.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Deconstruct
+    path: src/nORM/Core/StoredProcedureResult.cs
+    startLine: 110
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Deconstructs the v1 output-parameter fields.
+  example: []
+  syntax:
+    content: public void Deconstruct(out string name, out DbType dbType, out int? size, out ParameterDirection direction, out object? value)
+    parameters:
+    - id: name
+      type: System.String
+    - id: dbType
+      type: System.Data.DbType
+    - id: size
+      type: System.Nullable{System.Int32}
+    - id: direction
+      type: System.Data.ParameterDirection
+    - id: value
+      type: System.Object
+    content.vb: Public Sub Deconstruct(name As String, dbType As DbType, size As Integer?, direction As ParameterDirection, value As Object)
+  overload: nORM.Core.OutputParameter.Deconstruct*
+  nameWithType.vb: OutputParameter.Deconstruct(String, DbType, Integer?, ParameterDirection, Object)
+  fullName.vb: nORM.Core.OutputParameter.Deconstruct(String, System.Data.DbType, Integer?, System.Data.ParameterDirection, Object)
+  name.vb: Deconstruct(String, DbType, Integer?, ParameterDirection, Object)
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -1185,7 +1674,7 @@ references:
     href: nORM.Navigation.html
 - uid: nORM.Core.OutputParameter.#ctor*
   commentId: Overload:nORM.Core.OutputParameter.#ctor
-  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter__ctor_System_String_System_Data_DbType_System_Nullable_System_Int32__
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter__ctor_System_String_System_Data_DbType_System_Nullable_System_Int32__System_Nullable_System_Byte__System_Nullable_System_Byte__System_Data_ParameterDirection_System_Object_
   name: OutputParameter
   nameWithType: OutputParameter.OutputParameter
   fullName: nORM.Core.OutputParameter.OutputParameter
@@ -1234,6 +1723,37 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.int32
   - name: '?'
+- uid: System.Nullable{System.Byte}
+  commentId: T:System.Nullable{System.Byte}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.byte
+  name: byte?
+  nameWithType: byte?
+  fullName: byte?
+  nameWithType.vb: Byte?
+  fullName.vb: Byte?
+  name.vb: Byte?
+  spec.csharp:
+  - uid: System.Byte
+    name: byte
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.byte
+  - name: '?'
+  spec.vb:
+  - uid: System.Byte
+    name: Byte
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.byte
+  - name: '?'
+- uid: System.Data.ParameterDirection
+  commentId: T:System.Data.ParameterDirection
+  parent: System.Data
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.parameterdirection
+  name: ParameterDirection
+  nameWithType: ParameterDirection
+  fullName: System.Data.ParameterDirection
 - uid: System.Data
   commentId: N:System.Data
   isExternal: true
@@ -1307,3 +1827,51 @@ references:
   name: Size
   nameWithType: OutputParameter.Size
   fullName: nORM.Core.OutputParameter.Size
+- uid: nORM.Core.OutputParameter.Precision*
+  commentId: Overload:nORM.Core.OutputParameter.Precision
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter_Precision
+  name: Precision
+  nameWithType: OutputParameter.Precision
+  fullName: nORM.Core.OutputParameter.Precision
+- uid: nORM.Core.OutputParameter.Scale*
+  commentId: Overload:nORM.Core.OutputParameter.Scale
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter_Scale
+  name: Scale
+  nameWithType: OutputParameter.Scale
+  fullName: nORM.Core.OutputParameter.Scale
+- uid: nORM.Core.OutputParameter.Direction*
+  commentId: Overload:nORM.Core.OutputParameter.Direction
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter_Direction
+  name: Direction
+  nameWithType: OutputParameter.Direction
+  fullName: nORM.Core.OutputParameter.Direction
+- uid: nORM.Core.OutputParameter.Value*
+  commentId: Overload:nORM.Core.OutputParameter.Value
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter_Value
+  name: Value
+  nameWithType: OutputParameter.Value
+  fullName: nORM.Core.OutputParameter.Value
+- uid: System.Data.ParameterDirection.Output
+  commentId: F:System.Data.ParameterDirection.Output
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.parameterdirection#system-data-parameterdirection-output
+  name: Output
+  nameWithType: ParameterDirection.Output
+  fullName: System.Data.ParameterDirection.Output
+- uid: System.Byte
+  commentId: T:System.Byte
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.byte
+  name: byte
+  nameWithType: byte
+  fullName: byte
+  nameWithType.vb: Byte
+  fullName.vb: Byte
+  name.vb: Byte
+- uid: nORM.Core.OutputParameter.Deconstruct*
+  commentId: Overload:nORM.Core.OutputParameter.Deconstruct
+  href: nORM.Core.OutputParameter.html#nORM_Core_OutputParameter_Deconstruct_System_String__System_Data_DbType__System_Nullable_System_Int32___
+  name: Deconstruct
+  nameWithType: OutputParameter.Deconstruct
+  fullName: nORM.Core.OutputParameter.Deconstruct

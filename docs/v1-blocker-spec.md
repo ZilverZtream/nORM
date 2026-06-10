@@ -1,6 +1,6 @@
 # nORM v1.0 Blocker Developer Spec
 
-Date: 2026-05-23
+Date: 2026-06-10
 
 This spec is a fresh v1.0 readiness audit of the current working tree. It is
 deliberately strict: nORM can be fast and promising without being ready for a
@@ -14,28 +14,45 @@ Local commands and findings used for this revision:
 
 - `dotnet build nORM.sln -c Release --nologo`
   - Passed with 0 warnings and 0 errors.
-  - Produced `nORM.1.0.0-rc.1` and `dotnet-norm.1.0.0-rc.1` packages.
+  - Produced `nORM.1.0.0-rc.3` and `dotnet-norm.1.0.0-rc.3` packages.
 - `.\eng\v1-release-gate.ps1 -Mode quick -SkipBenchmark`
-  - First attempt timed out and left `testhost.exe` holding
-    `tests/bin/Release/net8.0/nORM.dll`.
-  - After killing the orphaned test host, the quick gate passed in about
-    98 seconds.
-  - AOT scan observed 91 IL diagnostics, all accepted by
-    `eng/aot-baseline.txt`.
+  - Passed after refreshing five stale `DatabaseScaffolder.cs` AOT baseline
+    line entries.
+  - AOT scan observed 298 IL diagnostics, all accepted by
+    `eng/aot-baseline.txt` (`new=0`, `cleaned=0`).
+  - Public API snapshot passed 2/2.
+  - Package consumer smoke tests passed 6/6.
+  - CLI smoke tests passed 70/70.
 - `dotnet test tests\nORM.Tests.csproj -c Release --no-build --logger "console;verbosity=minimal"`
-  - Failed: 19.
-  - Passed: 7,651.
+  - Passed: 11,450.
+  - Failed: 0.
   - Skipped: 0.
-  - 18 failures are `LiveProviderShapeParityTests` treating unconfigured
-    SQL Server, PostgreSQL, and MySQL providers as failures.
-  - 1 failure is `PackageConsumerIntegrationTests` failing to pack because the
-    existing `.nupkg` was locked by another process.
+- `.\eng\v1-release-gate.ps1 -Mode live -MinLiveProviders 3 -SkipBenchmark`
+  - Passed with SQL Server, PostgreSQL, MySQL, and SQLite configured.
+  - AOT scan observed 298 IL diagnostics, all accepted by
+    `eng/aot-baseline.txt` (`new=0`, `cleaned=0`).
+  - Public API snapshot passed 2/2.
+  - Package consumer smoke tests passed 6/6.
+  - CLI smoke tests passed 70/70.
+  - Live provider gate passed 1,925/1,925.
+  - Wrote `artifacts/v1-rc/rc-artifacts.json` and
+    `artifacts/v1-rc/rc-artifacts.md` in `live` mode with
+    `BenchmarkSkipped=true` and `WorkingTreeClean=false`.
 - Test categorization scan:
-  - 399 test files.
-  - 19 files contain `[Trait(...)]`.
-  - 380 files have no explicit category trait.
+  - 969 test source files after removing four stale merge-placeholder files.
+  - 962 files contain `[Trait(...)]` or `[Xunit.Trait(...)]`.
+  - The remaining 7 files are shared helper or xUnit collection-definition
+    infrastructure with no `[Fact]` or `[Theory]` methods.
+  - `TestCategoryHygieneTests` enforces that every public test class declaring
+    `[Fact]` or `[Theory]` has an allowed v1 category.
+  - `v1-release-gate.ps1` package-consumer smoke tests now use
+    `Category=PackageConsumer`.
+  - The live provider gate now starts from `Category=LiveProvider` and appends
+    `Category=ProviderParity`; discovered test coverage is
+    1,929 tests versus 1,925 in the previous name-only filter, with no previous
+    tests dropped.
 - Public API snapshot:
-  - `tests/PublicApi.Shipped.txt` has 1,009 lines.
+  - `tests/PublicApi.Shipped.txt` has 1,648 lines.
   - Public surface includes `nORM.Internal.ConcurrentLruCache<T, TValue>` and
     `nORM.Internal.ParameterOptimizer`.
   - Public additions include `RenameColumnAttribute`,
@@ -43,16 +60,20 @@ Local commands and findings used for this revision:
     provider constructors accepting `IDbParameterFactory`, and
     `CompiledMaterializerStore.AddPermanent<T>`.
 - Live provider evidence:
-  - No SQL Server, PostgreSQL, or MySQL connection strings were configured in
-    this audit.
-  - Quick mode does not prove real provider semantics.
+  - SQL Server, PostgreSQL, MySQL, and SQLite were configured for the live v1
+    gate.
+  - The `live` artifact manifest records all four providers as configured.
+  - This is local dirty-working-tree correctness evidence, not final release
+    evidence from a clean tag.
 - Benchmark evidence:
   - No fresh BenchmarkDotNet provider matrix was run in this audit.
+  - The current `live` artifact manifest was produced with `-SkipBenchmark`,
+    so it must not be used to support public performance claims.
 - Documentation evidence:
-  - `docs/linq-support-coverage.md` maps LINQ rows to files, but not to
-    provider/path/result evidence.
-  - `docs/scaffolding.md` says scaffolding is a stable v1 feature, then says
-    `dotnet-norm scaffold` is preview.
+  - `docs/scaffolding.md`, `README.md`, and `src/dotnet-norm/README.md` now
+    present scaffolding as a bounded stable v1 tooling surface.
+  - `ScaffoldingContractDocTests` pins the scaffold contract, CLI option
+    inventory, README wording, and release-gate coverage.
 
 ## v1.0 Release Bar
 
@@ -92,9 +113,9 @@ Acceptance gate:
 
 ### 2. Make the Quick Gate Reliable and Bounded
 
-Problem: Quick mode passed only after killing an orphaned `testhost.exe` left
-by a timed-out run. It also takes about 98 seconds, which is acceptable only if
-it is consistently bounded and self-cleaning.
+Problem: Quick mode now passes, but v1 still needs proof that it is
+consistently bounded and self-cleaning across repeated runs instead of passing
+only after manual cleanup.
 
 Work:
 
@@ -108,18 +129,35 @@ Acceptance gate:
 - Repeated `.\eng\v1-release-gate.ps1 -Mode quick -SkipBenchmark` runs pass
   back-to-back without manual process cleanup.
 
+Current status:
+
+- Closed for the current working tree. Quick mode cleans package outputs and
+  orphaned test hosts before running.
+- `eng/v1-release-gate.ps1` has `-TestStepTimeoutMinutes` /
+  `NORM_TEST_STEP_TIMEOUT_MINUTES`, defaults to 45 minutes per `dotnet test`
+  invocation, kills timed-out test process trees, and reports stdout/stderr log
+  paths plus recent log tails.
+- A controlled `-TestStepTimeoutMinutes 1` quick-gate run proved successful
+  test-step exit-code handling on public API/package smoke tests and timed out
+  `CLI smoke tests` with no repo-scoped `dotnet` processes left behind.
+- A native back-to-back quick run passed without manual cleanup:
+  `quick-repeat-native-20260610-025156-run1.log` passed at
+  `2026-06-10T02:53:48+02:00`, `quick-repeat-native-20260610-025156-run2.log`
+  passed at `2026-06-10T02:55:26+02:00`, and
+  `quick-repeat-native-20260610-025156.exitcode` recorded `0`.
+
 ### 3. Fix the Full Local Test Contract
 
-Problem: The full local test command fails when live providers are not
-configured, because `LiveProviderShapeParityTests` throws `SkipException` as a
-test failure instead of being excluded or skipped by xUnit.
+Problem: The full local test command must stay usable on machines without SQL
+Server, PostgreSQL, or MySQL. Live-provider tests need a consistent no-provider
+policy, and live/RC gates still need to fail before tests when the configured
+provider minimum is not met.
 
 Work:
 
-- Decide whether unconfigured live tests are skipped, trait-filtered out, or
-  hard failures only in live/RC gates.
-- Replace ad hoc `SkipException` failure behavior with a consistent test
-  policy.
+- Keep local non-live runs trait-filtered with `Category!=LiveProvider`.
+- Keep unconfigured live-provider test bodies on the shared `Skip.If`
+  early-return policy instead of runtime skip exceptions.
 - Keep RC mode strict: missing required live providers must fail before tests
   run.
 
@@ -128,6 +166,24 @@ Acceptance gate:
 - Local full non-live tests pass without SQL Server, PostgreSQL, or MySQL.
 - `live` and `rc` modes fail early when their configured live-provider minimum
   is not met.
+
+Current status:
+
+- This blocker is closed for the current working tree.
+- `dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter
+  "Category!=LiveProvider"` passed 10,107/10,107 with
+  `NORM_TEST_SQLSERVER`, `NORM_TEST_POSTGRES`, `NORM_TEST_MYSQL`, their `_CS`
+  aliases, `NORM_REQUIRE_LIVE_PARITY`, and `NORM_MIN_LIVE_PROVIDERS` cleared.
+- Focused no-provider live-shape/hygiene coverage passed 27/27 after moving the
+  shared `Skip.If` helper to `tests/LiveProviderSkip.cs`.
+- `v1-release-gate.ps1 -Mode live -MinLiveProviders 3 -SkipBenchmark` and
+  `v1-release-gate.ps1 -Mode rc -SkipBenchmark` both failed before tests with
+  `v1 gate requires 3 live provider(s), but only 0 are configured`.
+- `TestCategoryHygieneTests` now rejects runtime `SkipException` usage in
+  `src/` and `tests/` so the no-provider contract cannot regress silently.
+- The full local test suite also previously passed 11,450/11,450 with the
+  configured live providers available, and the live gate previously passed with
+  SQL Server, PostgreSQL, MySQL, and SQLite coverage.
 
 ### 4. Require Real Live Provider Release Evidence
 
@@ -148,6 +204,14 @@ Acceptance gate:
 - RC evidence includes real-server pass results for every supported provider
   and every provider-specific contract.
 
+Current status:
+
+- Local `live` mode now has real SQL Server, PostgreSQL, MySQL, and SQLite
+  correctness evidence: 1,925/1,925 live provider tests passed with
+  `-MinLiveProviders 3`.
+- This is not final RC evidence because the working tree is dirty and
+  benchmarks were skipped.
+
 ### 5. Validate Provider Capability Floors
 
 Problem: Provider minimum versions are now documented and exposed at runtime,
@@ -166,6 +230,31 @@ Acceptance gate:
 
 - Every documented provider floor is proven by live tests or explicitly raised.
 
+Current status:
+
+- This blocker is closed for the current working tree.
+- `ProviderCapabilityContractTests` already keeps
+  `docs/provider-capabilities.md` minimum-version rows in sync with
+  `ProviderCapabilities.MinimumServerVersion`.
+- `docs/provider-capabilities.md` now includes an explicit floor-feature
+  evidence table for SQL Server 2016, PostgreSQL 12, MySQL 8.0, and SQLite
+  3.25, covering JSON, window functions, generated-value retrieval,
+  rename-column DDL, savepoints, idempotent insert/ignore semantics,
+  temporal/versioning, native bulk, and native tenant session support where
+  applicable.
+- `eng/rc-artifact-manifest.ps1` records the same declared floor-feature ledger
+  in `rc-artifacts.json`/`rc-artifacts.md` without pretending to capture actual
+  server versions.
+- `dotnet-norm portability certify` live target probing now exercises
+  representative floor-gated features instead of only checking JSON:
+  JSON translation, `ROW_NUMBER` window translation, generated-value retrieval,
+  rename-column DDL, savepoints, and idempotent insert/ignore semantics.
+- `artifacts/v1-rc/provider-target-capabilities.json` and
+  `artifacts/v1-rc/provider-target-capabilities.html` passed on `2026-06-10`
+  with actual target versions SQLite `3.41.2`, SQL Server `16.0.1000`,
+  PostgreSQL `17.5`, and MySQL `8.0.46`, all at or above the documented
+  provider floors. The report has no `provider-target-capability` errors.
+
 ### 6. Freeze the Public API Surface
 
 Problem: The public API is large and includes types that look internal,
@@ -177,13 +266,32 @@ Work:
 - Classify every public type as stable user API, stable provider API, stable
   tooling API, or explicitly out of v1.
 - Move or rename `nORM.Internal.*` public types, or intentionally document and
-  support them under a non-internal namespace.
+  support them as a compatibility exception with a future relocation path.
 - Add support-tier documentation and tests for every exported namespace.
 
 Acceptance gate:
 
 - Every entry in `tests/PublicApi.Shipped.txt` has an intentional support tier
   and matching docs.
+
+Current status:
+
+- `docs/namespace-policy.md` defines the approved public namespaces and closes
+  `nORM.Internal` to new public additions.
+- `NamespacePolicyContractTests` enforces both the approved namespace list and
+  the grandfathered internal type list.
+- `docs/public-api-policy.md` now classifies
+  `nORM.Internal.ConcurrentLruCache<TKey, TValue>` and
+  `nORM.Internal.ParameterOptimizer` as v1.0 compatibility surface in a
+  deprecated namespace, with v1.x relocation targets documented in
+  `docs/namespace-policy.md`.
+- `PublicApiClassificationTests` now derives its support-tier map from
+  `docs/namespace-policy.md`, verifies every non-comment entry in
+  `tests/PublicApi.Shipped.txt` maps to a documented namespace tier, and fails on
+  missing or stale policy rows. The current shipped baseline has 1,648 lines.
+- This blocker is closed for the current working tree. The final release branch
+  still reruns the public API gate, but the current contract contradiction is
+  enforced mechanically instead of depending on a stale in-test registry.
 
 ### 7. Review Recent Public API Additions
 
@@ -201,6 +309,16 @@ Work:
 Acceptance gate:
 
 - Public API snapshot changes are approved with docs and tests before v1.
+
+Current status:
+
+- `docs/public-api-policy.md` lists the recent v1 additions with test and
+  documentation evidence.
+- The `nORM.Internal` compatibility entries are now included in that table and
+  pinned by `NamespacePolicyContractTests` plus `InternalPublicApiTests`.
+- This blocker remains open for final release review of naming, XML docs,
+  mutability, nullability, and exception contracts across the full public API
+  baseline.
 
 ### 8. Regenerate and Verify API Documentation
 
@@ -254,20 +372,42 @@ Acceptance gate:
 
 ### 11. Make Test Categories Real
 
-Problem: 380 of 399 test files have no explicit category trait, while release
-scripts rely on a mixture of name filters and a small number of traits.
+Problem: Test-class categorization is now enforced and the v1 gate uses
+category-first package, live, provider-parity, and RC-loop filters. This closes
+the previous name-pattern routing risk for the release gate.
 
 Work:
 
-- Categorize every test class as Fast, LiveProvider, PackageConsumer, Stress,
-  BenchmarkContract, Security, or another documented category.
-- Convert release-gate filters to category-first filters.
-- Add a hygiene test that fails on uncategorized test classes.
+- Keep every test class categorized as Fast, LiveProvider, PackageConsumer,
+  Stress, ProviderParity, or another documented release-gate category.
+- Keep release-gate filters category-first.
+- Keep hygiene tests failing on uncategorized or undocumented test categories.
 
 Acceptance gate:
 
 - Quick, full, live, stress, and RC gates run predictable, documented test
   sets.
+
+Current status:
+
+- `TestCategoryHygieneTests` enforces explicit categories on every public test
+  class that declares xUnit `[Fact]` or `[Theory]` methods.
+- Four stale merge-placeholder `.cs` files were removed; the remaining
+  category-less files are helper/collection infrastructure.
+- Package-consumer smoke tests now run by `Category=PackageConsumer`.
+- The live provider gate now starts with `Category=LiveProvider` and keeps
+  supplemental provider-parity evidence under `Category=ProviderParity`. The
+  category filter preserves the previous 1,925 discovered tests and adds four
+  categorized `TenantTemporalProviderSwapTests`.
+- RC-loop navigation, transaction, compiled-query, provider/source-generation
+  parity, bulk/provider parity, migration parity, cache-memory, and
+  concurrency/adversarial filters now use documented categories. Discovery
+  comparison matched the previous name-based filters exactly: 26 navigation
+  tests, 55 transaction tests, 26 compiled-query tests, 97 provider/source-gen
+  parity tests, 424 bulk/provider parity tests, 219 migration tests, 16
+  cache-memory tests, and 768 concurrency/adversarial tests.
+- This blocker is closed for the current working tree. It still needs the
+  normal clean-branch release evidence required by blocker 1 before v1 tagging.
 
 ### 12. Turn the LINQ Matrix Into Executable Evidence
 
@@ -427,7 +567,7 @@ Acceptance gate:
 
 ### 21. Shrink the AOT and Trimming Baseline
 
-Problem: The gate currently accepts 91 IL diagnostics. That is useful as a
+Problem: The gate currently accepts 298 IL diagnostics. That is useful as a
 regression fence, but it is not v1-ready AOT/trimming support.
 
 Work:
@@ -644,10 +784,36 @@ Acceptance gate:
 
 - `dotnet-norm migrations add` works against realistic application layouts.
 
+Current status:
+
+- This blocker is closed for the current working tree. `migrations add` now resolves `--project` /
+  `--startup-project` outputs with `--configuration`, `--runtime`, and
+  `--target-framework`/`--framework` passed through MSBuild evaluation instead
+  of defaulting silently to Debug/no-RID output.
+- Explicit `--deps` and `--runtimeconfig` paths now fail fast when missing;
+  explicit `.deps.json` managed and native runtime assets are dependency
+  candidates instead of ignored command-line values, including nested
+  deps-file-directory assets, runtimeconfig `additionalProbingPaths`, and
+  matching assets under the configured/global NuGet package cache.
+- `--environment` is passed to `INormDesignTimeDbContextFactory<TContext>` and
+  temporarily exposed through `ASPNETCORE_ENVIRONMENT` and
+  `DOTNET_ENVIRONMENT` while the snapshot is built.
+- Focused CLI integration coverage now proves `--framework` on a multi-targeted
+  project and `--startup-project` winning over an unbuilt target project for the
+  design-time host.
+- Design-time factory constructor and `CreateDbContext` failures are normalized
+  with the failing factory type, keep the underlying failure reason, and redact
+  connection-string secrets in CLI stderr.
+- The broader CLI design-time/integration gate passed 91/91:
+  `dotnet test tests/nORM.Tests.csproj -c Release --filter
+  "FullyQualifiedName~CliDesignTimeTests|FullyQualifiedName~CliIntegrationTests"`.
+
 ### 34. Resolve the Scaffolding Contract Contradiction
 
-Problem: `docs/scaffolding.md` calls scaffolding stable v1, but later says the
-`dotnet-norm scaffold` command is preview.
+Problem: This blocker existed because `docs/scaffolding.md` called scaffolding
+stable v1 while later saying the `dotnet-norm scaffold` command was preview.
+The current docs now resolve that contradiction as a bounded stable v1 tooling
+surface.
 
 Work:
 
@@ -662,6 +828,10 @@ Acceptance gate:
 - Runtime API, CLI help, README, generated API docs, and tests all state one
   coherent scaffolding contract.
 
+Current status:
+
+- This blocker is closed for the current working tree.
+
 Resolution note:
 
 - Current v1 scaffolding is a bounded stable tooling surface, not preview.
@@ -670,20 +840,28 @@ Resolution note:
   Server/PostgreSQL/SQLite attached databases, MySQL catalog-portable metadata,
   nullable-safe generated code, provider metadata-backed identity columns,
   computed/generated and rowversion metadata, deterministic generated output,
-  SQLite rowid key normalization, static/dynamic required metadata parity,
-  single-column FK navigations only when the FK targets the generated principal primary key,
-  cascade/non-cascade delete preservation, pure many-to-many join mappings
-  including schema-qualified and self-referencing role-named join tables, index
+  explicit SQL Server/PostgreSQL primary-key constraint names without
+  system/default-name noise, provider-native table/column comments,
+  SQL Server/PostgreSQL/MySQL routine
+  comments, SQL Server/PostgreSQL sequence comments, SQL Server local-synonym
+  comments, and SQL Server/PostgreSQL view/materialized-view query-artifact
+  comments as generated XML documentation, SQLite rowid key normalization,
+  static/dynamic required metadata parity,
+  single-column and composite FK navigations when the FK targets the generated
+  principal primary key or an exact ordered unfiltered unique index, one-to-one
+  reference navigations for exact unique dependent FKs, cascade/non-cascade
+  delete preservation, pure many-to-many join mappings including
+  schema-qualified and self-referencing role-named join tables, index
   metadata, warning reports, and `--fail-on-warnings`.
 - Warning reports are structured evidence, not prose dumps: JSON rows include
   stable diagnostic codes, severity, category, suggested actions, section
   counts, and code/category summaries; stale warning reports are removed or
   rejected deterministically when a later scaffold has no diagnostics.
 - Unsupported or non-entity database shapes are reported instead of silently
-  modeled: composite FKs, payload join tables, alternate-key/keyless-principal
-  relationships, provider defaults/computed expressions/check constraints/
+  modeled: non-scaffoldable composite FKs, payload join tables,
+  alternate-key/keyless-principal relationships, provider defaults/computed expressions/check constraints/
   collations/provider column types/precision, non-default identity settings,
-  non-default FK referential actions, triggers, SQL Server provider-native
+  unrecognized/provider-specific FK referential action tokens, triggers, SQL Server provider-native
   temporal tables, keyless tables, SQLite virtual tables and shadow tables,
   views, routines, sequences, synonyms, materialized views, and events.
 - Evidence lives in `ScaffoldingAndNavigationCoverageTests`,

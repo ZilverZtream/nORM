@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -30,6 +30,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class MigrationStressTests
 {
     // ── Dynamic assembly builder ──────────────────────────────────────────────

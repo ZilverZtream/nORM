@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -287,6 +287,7 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task MaterializerFactory_StaticCaches_ConcurrentReads_NoCorruption()
     {
         const int concurrency = 8;
@@ -435,6 +436,7 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentSaveChanges_DifferentContexts_NoInterference()
     {
         const int contextCount = 6;
@@ -558,6 +560,7 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task StaticMaterializerCache_ConcurrentContexts_CorrectResultsPerContext()
     {
         const int threads = 10;
@@ -768,6 +771,7 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task StaticTypeCache_ConcurrentAccess_NoRaceCondition()
     {
         const int concurrency = 12;
@@ -920,6 +924,7 @@ public class SharedStateSafetyTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentMaterializerReads_NoPhantomRowsAcrossContexts()
     {
         const int parallelCount = 8;

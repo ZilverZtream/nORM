@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -39,6 +39,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class DivergentModelCacheStressTests : IDisposable
 {
     // ── Entity types ────────────────────────────────────────────────────────

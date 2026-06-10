@@ -449,6 +449,108 @@ public class SchemaSignatureTests
         Assert.Equal(typeof(Guid?), optionalExternalId.PropertyType);
         Assert.Empty(externalId.GetCustomAttributes(typeof(MaxLengthAttribute), inherit: false));
         Assert.Empty(optionalExternalId.GetCustomAttributes(typeof(MaxLengthAttribute), inherit: false));
+        Assert.Null(type.GetCustomAttributes(typeof(ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithUnsafeProviderSpecificDeclaredType_MarksTypeReadOnly()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicProviderOwned (
+                Id INTEGER PRIMARY KEY,
+                Shape GEOMETRY NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE DynamicProviderOwned (
+                Id INTEGER PRIMARY KEY,
+                Shape TEXT NULL
+            )
+            """;
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var type = gen.GenerateEntityType(cn, "DynamicProviderOwned");
+        var unsafeSignature = gen.ComputeSchemaSignature(cn, "DynamicProviderOwned");
+        var safeSignature = gen.ComputeSchemaSignature(cn2, "DynamicProviderOwned");
+
+        Assert.NotNull(type.GetCustomAttributes(typeof(ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+        Assert.NotEqual(safeSignature, unsafeSignature);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithProviderOwnedTrigger_MarksTypeReadOnly()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicTriggered (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TRIGGER TR_DynamicTriggered_Audit
+            AFTER INSERT ON DynamicTriggered
+            BEGIN
+                SELECT 1;
+            END;
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE DynamicTriggered (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            """;
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var type = gen.GenerateEntityType(cn, "DynamicTriggered");
+        var triggeredSignature = gen.ComputeSchemaSignature(cn, "DynamicTriggered");
+        var plainSignature = gen.ComputeSchemaSignature(cn2, "DynamicTriggered");
+
+        Assert.NotNull(type.GetCustomAttributes(typeof(ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+        Assert.NotEqual(plainSignature, triggeredSignature);
+    }
+
+    [Fact]
+    public void GenerateEntityType_WithUnmodeledDefault_MarksTypeReadOnly()
+    {
+        using var cn = OpenMemory();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DynamicDefaultOwned (
+                Id INTEGER PRIMARY KEY,
+                Status TEXT NOT NULL DEFAULT (lower('NEW'))
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        using var cn2 = OpenMemory();
+        using var cmd2 = cn2.CreateCommand();
+        cmd2.CommandText = """
+            CREATE TABLE DynamicDefaultOwned (
+                Id INTEGER PRIMARY KEY,
+                Status TEXT NOT NULL
+            );
+            """;
+        cmd2.ExecuteNonQuery();
+
+        var gen = Gen();
+        var type = gen.GenerateEntityType(cn, "DynamicDefaultOwned");
+        var defaultSignature = gen.ComputeSchemaSignature(cn, "DynamicDefaultOwned");
+        var plainSignature = gen.ComputeSchemaSignature(cn2, "DynamicDefaultOwned");
+
+        Assert.NotNull(type.GetCustomAttributes(typeof(ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+        Assert.NotEqual(plainSignature, defaultSignature);
     }
 
     [Fact]

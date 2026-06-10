@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
@@ -54,6 +55,29 @@ public class TemporalLifecycleHardeningTests
         await ctx.EnsureConnectionAsync();
         Assert.False(TableExists(cn, "__NormTemporalTags"));
         Assert.False(TableExists(cn, "TlhProduct_History"));
+    }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("information_schema")]
+    public async Task Temporal_bootstrap_rejects_provider_owned_database(string databaseName)
+    {
+        using var inner = OpenDb();
+        using var cn = new DatabaseNameConnection(inner, databaseName);
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<TlhProduct>()
+        };
+        options.EnableTemporalVersioning();
+        using var ctx = new DbContext(cn, new MySqlProvider(new SqliteParameterFactory()), options);
+
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(
+            () => ctx.EnsureConnectionAsync());
+
+        Assert.Contains("Temporal versioning", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(databaseName, ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(TableExists(inner, "__NormTemporalTags"));
+        Assert.False(TableExists(inner, "TlhProduct_History"));
     }
 
     [Fact]
@@ -501,6 +525,31 @@ public class TemporalLifecycleHardeningTests
     private sealed class FixedTenantProvider(int tenantId) : ITenantProvider
     {
         public object GetCurrentTenantId() => tenantId;
+    }
+
+    private sealed class DatabaseNameConnection(DbConnection inner, string databaseName) : DbConnection
+    {
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string ConnectionString
+        {
+            get => inner.ConnectionString;
+            set => inner.ConnectionString = value!;
+        }
+
+        public override string Database => databaseName;
+        public override string DataSource => inner.DataSource;
+        public override string ServerVersion => inner.ServerVersion;
+        public override ConnectionState State => inner.State;
+
+        public override void ChangeDatabase(string databaseName) => inner.ChangeDatabase(databaseName);
+        public override void Close() => inner.Close();
+        public override void Open() => inner.Open();
+
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+            => inner.BeginTransaction(isolationLevel);
+
+        protected override DbCommand CreateDbCommand()
+            => inner.CreateCommand();
     }
 
     private static bool TableExists(SqliteConnection cn, string table)

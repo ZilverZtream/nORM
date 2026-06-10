@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -30,6 +30,7 @@ namespace nORM.Tests;
 ///   - Context isolation: independent DbContext instances do not share mutable state.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialConcurrencyTests
 {
     // ── Shared entity types ────────────────────────────────────────────────────

@@ -39,7 +39,7 @@ namespace nORM.Security
                 var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
 
                 // Enforce security requirements for SQL Server
-                if (provider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase))
+                if (IsSqlServerProvider(provider))
                 {
                     EnforceSqlServerSecurity(builder);
                 }
@@ -84,6 +84,14 @@ namespace nORM.Security
             };
         }
 
+        private static bool IsSqlServerProvider(string provider)
+        {
+            var normalized = provider.Trim();
+            return normalized.Equals("sqlserver", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("mssql", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("Microsoft.EntityFrameworkCore.SqlServer", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void EnforceSqlServerSecurity(DbConnectionStringBuilder builder)
         {
             // Enforce encryption
@@ -93,11 +101,14 @@ namespace nORM.Security
                 builder["Encrypt"] = "True";
             }
 
-            // Enforce certificate validation in production
+            // Preserve explicit certificate-trust choices; ASPNETCORE_ENVIRONMENT
+            // is also used by scaffold appsettings lookup and must not rewrite
+            // the selected connection string.
             if (!string.Equals(
                     Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
                     "Development",
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase) &&
+                !builder.ContainsKey("TrustServerCertificate"))
             {
                 builder["TrustServerCertificate"] = "False";
             }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -118,6 +118,7 @@ public class SecurityBoundaryTests
     [InlineData("a; DELETE FROM b")]
     [InlineData("\"col\"\"injection\"")]
     [InlineData("`col`injection`")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void IsSafeIdentifier_ReturnsFalse_ForAdversarialInput(string identifier)
     {
         Assert.False(DbContext.IsSafeIdentifier(identifier),

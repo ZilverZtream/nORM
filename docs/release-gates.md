@@ -36,8 +36,28 @@ set NORM_TEST_MYSQL=Server=127.0.0.1;Port=3306;Database=normtest;User ID=root;Pa
 ```
 
 `*_CS` aliases are also supported by the test infrastructure, for example `NORM_TEST_POSTGRES_CS`.
+Use application-owned databases for these connection strings. Provider-owned
+catalogs such as `master`, `postgres`, and `mysql` are intentionally rejected or
+skipped by destructive/trigger-based temporal checks.
 
 The gate sets `NORM_REQUIRE_LIVE_PARITY=any` when at least one live provider is configured and defaults `NORM_MIN_LIVE_PROVIDERS` to the number of configured providers. Set either variable before running the script when a stricter local policy is needed.
+
+The v1 release gate routes package-consumer tests through
+`Category=PackageConsumer` and starts live-provider selection from
+`Category=LiveProvider`. It appends `Category=ProviderParity` for provider SQL,
+behavior, migration, bulk, and binding parity suites that remain valid quick/full
+coverage but are also required in live/RC release evidence.
+For ordinary no-provider local runs, use `Category!=LiveProvider`; test bodies
+that encounter an unconfigured server early-return through the shared live
+provider skip helper, while live/RC gate modes fail before tests if
+`-MinLiveProviders` is not satisfied.
+The RC loop also routes the navigation, transaction, compiled-query,
+provider/source-generator parity, bulk/provider parity, migration parity,
+cache-memory, and concurrency/adversarial buckets through dedicated category filters:
+`Category=NavigationStress`, `Category=TransactionStress`,
+`Category=CompiledQueryStress`, `Category=ProviderSourceGenParity`,
+`Category=BulkProviderParity`, `Category=MigrationParity`, and
+`Category=CacheMemory`, and `Category=AdversarialConcurrency`.
 
 For a release candidate, run `full` with every supported live provider configured. For everyday regression work, run `quick` or `live` with the providers available on the machine.
 
@@ -51,9 +71,20 @@ dotnet build nORM.sln -c Release --nologo
 dotnet test tests/nORM.Tests.csproj -c Release --no-build --filter "Scaffolding|SchemaSignatureTests|DynamicTypeQueryTests|RelationshipConfigurationTests|UpdateNoMutableColumnsTests|PublicApiSnapshotTests|PublicApiClassificationTests|Scaffold_fail_on_warnings_returns_nonzero_after_writing_report|Scaffold_with_warnings_returns_zero_and_prints_warning_paths|Scaffold_sqlite_output_builds_as_consumer_project|Scaffold_emit_query_artifacts_generates_read_only_view_and_builds|Scaffold_help_describes_bounded_contract_and_warning_reports|Scaffold_no_overwrite_with_stale_warning_report_does_not_print_stale_summary|Scaffold_clean_run_removes_stale_warning_reports_without_printing_summary|LiveProviderScaffoldCliParityTests"
 ```
 
-Live provider scaffolding parity is included in `eng\live-provider-gate.cmd live`
-and the RC gate through `LiveProviderScaffoldingParityTests` and
-`LiveProviderScaffoldCliParityTests`.
+The broad `Scaffolding` filter intentionally includes
+`LiveProviderScaffoldingParityTests`, so this focused gate exercises static live
+scaffold parity for every configured provider without running provider mobility
+or benchmark work. `LiveProviderScaffoldCliParityTests` is listed explicitly so
+CLI scaffold parity is included as well, including provider-native
+table/column comment preservation as generated XML docs across the all-four
+provider command path, SQL Server/PostgreSQL/MySQL routine comments,
+SQL Server/PostgreSQL sequence comments, and SQL Server/PostgreSQL
+view/materialized-view query-artifact comments plus SQL Server local-synonym
+comments in the same all-four view/provider-artifact gates. The CLI scaffold
+gate also verifies explicit SQL Server/PostgreSQL primary-key constraint-name
+preservation while MySQL's fixed `PRIMARY` metadata and SQLite's PRAGMA-only
+key shape remain unnamed generated `HasKey(...)` configuration. The same live scaffold parity tests are also included in
+`eng\live-provider-gate.cmd live` and the RC gate.
 Run CLI scaffold consumer-build tests after `dotnet build` so they reference
 the already-built `nORM.dll` rather than rebuilding the source project inside a
 generated consumer project.
@@ -125,9 +156,12 @@ MySQL target decisions. Add target connection options such as
 prove actual server versions instead of descriptor-only capability floors. A
 descriptor-only report must leave `ActualServerVersion` empty; it must not reuse
 the minimum supported version as fake live evidence.
-Live target certification also executes a minimal provider JSON expression on
-each supplied target so the report proves required JSON functionality is present,
-not only that the server version looks high enough.
+Live target certification also executes representative floor-feature probes on
+each supplied target: JSON translation, `ROW_NUMBER` window translation,
+generated-value retrieval, rename-column DDL, savepoints, and idempotent
+insert/ignore semantics. A `provider-target-capability` finding means a target
+failed one of those probes and cannot be used as floor evidence, even if the
+server version is high enough.
 The provider target section must include both coarse capabilities and concrete
 translation-strategy rows: paging, identifier escaping, parameter binding,
 boolean predicates, null semantics, LIKE escaping, string concatenation,
@@ -170,6 +204,18 @@ fix rows in addition to per-provider checks. Provider FAIL results, and SKIP
 results under strict certification, contribute error-level report evidence.
 SQLite sample verification runs against an isolated in-memory database so
 parallel certification probes cannot collide on a shared local file.
+Current provider-floor target evidence is
+`artifacts/v1-rc/provider-target-capabilities.json` /
+`artifacts/v1-rc/provider-target-capabilities.html` from `2026-06-10`; it
+passed with actual target versions SQLite `3.41.2`, SQL Server `16.0.1000`,
+PostgreSQL `17.5`, and MySQL `8.0.46`.
+The RC artifact manifest records the declared provider floor-feature ledger
+from `docs/provider-capabilities.md`, including JSON, window functions,
+generated-value retrieval, rename-column DDL, savepoints, idempotent
+insert/ignore semantics, temporal/versioning, native bulk, and native tenant
+session capabilities. That manifest is not actual version proof; the provider
+mobility target report must contain actual server-version decisions for every
+live provider before claiming floor evidence.
 
 ## v1.0 Release Candidate Gate
 
@@ -186,11 +232,33 @@ gate evaluates the merged result set.
 .\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20
 ```
 
+During normal daytime development, run the same correctness gate without
+BenchmarkDotNet:
+
+```powershell
+.\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20 -SkipBenchmark
+```
+
+The benchmark-enabled `rc` command is release evidence and should be scheduled
+for a quiet window, typically overnight. The direct benchmark step defaults to a
+45-minute timeout; override it with `-BenchmarkStepTimeoutMinutes` or
+`NORM_BENCHMARK_STEP_TIMEOUT_MINUTES` when collecting a deliberately longer
+release run. Provider-matrix slices default to a 90-minute timeout per
+provider/filter slice; override them with `-ProviderMatrixSliceTimeoutMinutes`
+or `NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES`. Timed-out benchmark steps fail
+the gate with log paths and recent log tails instead of waiting indefinitely.
+Every `dotnet test` step is also time-bounded. The default is 45 minutes per
+test step; override it with `-TestStepTimeoutMinutes` or
+`NORM_TEST_STEP_TIMEOUT_MINUTES`. Timed-out test steps terminate the process tree
+and report stdout/stderr log paths plus recent log tails.
+`full` mode records its fast benchmark as smoke evidence; public performance
+claims still require the `rc` provider matrix.
+
 Modes:
 
 - `quick`: restore, build, public API snapshot, and package validation.
 - `live`: quick gate plus live provider tests.
-- `full`: live gate plus full test suite and benchmark.
+- `full`: live gate plus full test suite and the fast benchmark smoke check.
 - `rc`: full gate plus the repeated v1.0 stress/parity loops and provider
   matrix benchmarks.
 

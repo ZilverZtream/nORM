@@ -36,6 +36,8 @@ namespace nORM.Tests;
 // =============================================================================
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class BulkProviderParityTests
 {
     // -- Entities ---------------------------------------------------------------

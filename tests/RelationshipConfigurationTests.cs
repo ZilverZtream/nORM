@@ -19,6 +19,7 @@ public class RelationshipConfigurationTests
     {
         public int Key { get; set; }
         public ICollection<Post> Posts { get; set; } = new List<Post>();
+        public BlogProfile? Profile { get; set; }
     }
 
     private class Post
@@ -27,6 +28,30 @@ public class RelationshipConfigurationTests
         public int Id { get; set; }
         public int ParentKey { get; set; }
         public Blog? Parent { get; set; }
+    }
+
+    private class BlogProfile
+    {
+        [Key]
+        public int Id { get; set; }
+        public int BlogKey { get; set; }
+        public Blog? Blog { get; set; }
+    }
+
+    private class TenantAccount
+    {
+        public int TenantId { get; set; }
+        public int AccountNo { get; set; }
+        public TenantAccountProfile? Profile { get; set; }
+    }
+
+    private class TenantAccountProfile
+    {
+        [Key]
+        public int Id { get; set; }
+        public int TenantId { get; set; }
+        public int AccountNo { get; set; }
+        public TenantAccount? Account { get; set; }
     }
 
     private class TenantOrder
@@ -111,6 +136,63 @@ public class RelationshipConfigurationTests
         Assert.Equal(typeof(Post), rel.DependentType);
         Assert.Equal("Key", rel.PrincipalKey.PropName);
         Assert.Equal("ParentKey", rel.ForeignKey.PropName);
+    }
+
+    [Fact]
+    public void Fluent_one_to_one_relationship_configuration_is_used()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Blog>()
+                    .HasKey(b => b.Key)
+                    .HasOne(b => b.Profile)
+                    .WithOne(p => p.Blog)
+                    .HasForeignKey(p => p.BlogKey, b => b.Key, cascadeDelete: false);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var blogMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(Blog) })!;
+
+        Assert.True(blogMap.Relations.ContainsKey(nameof(Blog.Profile)));
+        var rel = blogMap.Relations[nameof(Blog.Profile)];
+        Assert.Equal(typeof(BlogProfile), rel.DependentType);
+        Assert.Equal("Key", rel.PrincipalKey.PropName);
+        Assert.Equal("BlogKey", rel.ForeignKey.PropName);
+        Assert.False(rel.CascadeDelete);
+    }
+
+    [Fact]
+    public void Fluent_composite_one_to_one_relationship_configuration_preserves_ordered_key_pairs()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<TenantAccount>().HasKey(a => new { a.TenantId, a.AccountNo });
+                mb.Entity<TenantAccountProfile>().HasKey(p => p.Id);
+                mb.Entity<TenantAccount>()
+                    .HasOne(a => a.Profile)
+                    .WithOne(p => p.Account)
+                    .HasForeignKey(p => new { p.TenantId, p.AccountNo }, a => new { a.TenantId, a.AccountNo }, cascadeDelete: false);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var accountMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(TenantAccount) })!;
+
+        var rel = accountMap.Relations[nameof(TenantAccount.Profile)];
+        Assert.True(rel.IsComposite);
+        Assert.False(rel.CascadeDelete);
+        Assert.Equal(typeof(TenantAccountProfile), rel.DependentType);
+        Assert.Equal(new[] { "TenantId", "AccountNo" }, rel.PrincipalKeys.Select(c => c.PropName).ToArray());
+        Assert.Equal(new[] { "TenantId", "AccountNo" }, rel.ForeignKeys.Select(c => c.PropName).ToArray());
     }
 
     [Fact]
@@ -268,6 +350,39 @@ public class RelationshipConfigurationTests
         Assert.Equal("AuthorBook", join.TableName);
         Assert.Equal("aux", join.SchemaName);
         Assert.Equal("\"aux\".\"AuthorBook\"", join.EscTableName);
+    }
+
+    [Fact]
+    public void Fluent_many_to_many_configuration_preserves_referential_actions()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Author>()
+                    .HasMany<Book>(a => a.Books)
+                    .WithMany(b => b.Authors)
+                    .UsingTable(
+                        "AuthorBook",
+                        new[] { "AuthorId" },
+                        new[] { "BookId" },
+                        ReferentialAction.Cascade,
+                        ReferentialAction.Cascade,
+                        ReferentialAction.Restrict,
+                        ReferentialAction.NoAction);
+            }
+        };
+
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+        var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var authorMap = (TableMapping)getMapping.Invoke(ctx, new object[] { typeof(Author) })!;
+
+        var join = Assert.Single(authorMap.ManyToManyJoins);
+        Assert.Equal(ReferentialAction.Cascade, join.LeftOnDelete);
+        Assert.Equal(ReferentialAction.Cascade, join.LeftOnUpdate);
+        Assert.Equal(ReferentialAction.Restrict, join.RightOnDelete);
+        Assert.Equal(ReferentialAction.NoAction, join.RightOnUpdate);
     }
 
     [Fact]

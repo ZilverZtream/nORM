@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -85,6 +85,7 @@ public class ExpressionCacheTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task HighConcurrency_UniqueShapes_CacheRemainsWithinBounds()
     {
         const int tasks = 30;
@@ -112,6 +113,7 @@ public class ExpressionCacheTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentSameExpression_AllReturnCorrectDelegate()
     {
         const int concurrency = 40;

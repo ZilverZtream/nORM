@@ -7,7 +7,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Configuration;
@@ -29,8 +28,6 @@ namespace nORM.Scaffolding
     {
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
-        private static readonly IReadOnlySet<string> EmptyStringSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private const int MaxScaffoldedMySqlSetValueCount = 8;
 
         /// <summary>
         /// Generates entity classes and a DbContext based on the current database schema.
@@ -75,6 +72,8 @@ namespace nORM.Scaffolding
                     $"Scaffold namespace '{namespaceName}' is not a valid C# namespace. " +
                     "Use a dot-separated namespace such as 'MyApp.Data'.");
             options ??= new ScaffoldOptions();
+            var contextNamespace = NormalizeContextNamespace(namespaceName, options.ContextNamespace);
+            var contextOutputDirectory = ResolveContextOutputDirectory(outputDirectory, options.ContextDirectory, options.ContextOutputDirectory);
             var safeContextName = EscapeCSharpIdentifier(ToPascalCase(contextName));
 
             var connectionWasOpen = connection.State == ConnectionState.Open;
@@ -84,35 +83,49 @@ namespace nORM.Scaffolding
             try
             {
                 if (!options.DryRun)
+                {
                     Directory.CreateDirectory(outputDirectory);
+                    Directory.CreateDirectory(contextOutputDirectory);
+                }
+                var filterCatalog = GetScaffoldFilterCatalog(connection, provider);
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-                var emitQueryArtifacts = options.EmitViewEntities || options.EmitQueryArtifacts;
-                var emittedViewObjects = emitQueryArtifacts
-                    ? discoveredSkippedObjects.Where(IsQueryArtifactObject).ToArray()
-                    : Array.Empty<ScaffoldSkippedObject>();
-                var queryArtifactTableKeys = emittedViewObjects
+                var candidateQueryArtifacts = discoveredSkippedObjects
+                    .Where(obj => ShouldEmitQueryArtifactObject(obj, options, provider, filterCatalog))
+                    .ToArray();
+                var discoveredTablesAndViews = discoveredTables
+                    .Concat(candidateQueryArtifacts.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
+                    .ToArray();
+                var tables = FilterTables(discoveredTablesAndViews, discoveredSkippedObjects, options, provider, filterCatalog);
+                var selectedTableKeys = tables
+                    .Select(table => TableKey(table.Schema, table.Name))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var emittedQueryArtifacts = candidateQueryArtifacts
+                    .Where(obj => selectedTableKeys.Contains(TableKey(obj.Schema, obj.Name)))
+                    .ToArray();
+                var queryArtifactTableKeys = emittedQueryArtifacts
                     .Select(obj => TableKey(obj.Schema, obj.Name))
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var discoveredTablesAndViews = discoveredTables
-                    .Concat(emittedViewObjects.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
-                    .ToArray();
-                var tables = FilterTables(discoveredTablesAndViews, discoveredSkippedObjects, options);
                 EnsureNoTableKeyCollisions(tables);
                 var skippedObjects = FilterSkippedObjects(
-                    discoveredSkippedObjects.Where(obj => !emittedViewObjects.Contains(obj)).ToArray(),
+                    discoveredSkippedObjects.Where(obj => !emittedQueryArtifacts.Contains(obj)).ToArray(),
                     options,
-                    emittedViewObjects);
+                    provider,
+                    filterCatalog,
+                    emittedQueryArtifacts);
                 var entityNames = new List<string>();
-                var entityByTable = BuildEntityNameMap(tables);
+                var entityByTable = BuildEntityNameMap(tables, options.UseDatabaseNames);
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
-                var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables, entityByTable).ConfigureAwait(false);
+                var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables, entityByTable, options.UseDatabaseNames).ConfigureAwait(false);
                 var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable, entityByTable);
                 var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
+                var primaryKeyConstraintNamesByTable = await GetPrimaryKeyConstraintNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var nonNullableColumnsByTable = await GetNonNullableColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var sqliteDeclaredTypesByTable = provider is SqliteProvider
                     ? await GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false)
                     : new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+                var stringBinaryFacetsByTable = await GetStringBinaryFacetsAsync(connection, provider, tables).ConfigureAwait(false);
+                var commentsByTable = await GetScaffoldCommentsAsync(connection, provider, tables).ConfigureAwait(false);
                 var identityColumnsByTable = await GetIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
                 var scaffoldedTableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var indexes = FilterIndexesToScaffoldedTables(
@@ -122,70 +135,23 @@ namespace nORM.Scaffolding
                     await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false),
                     scaffoldedTableKeys);
                 var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
-                var generatedModelFeatureDiagnostics = new List<ScaffoldUnsupportedFeature>();
                 unsupportedFeatures.AddRange(await GetPostgresEnumColumnFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
                 RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
                 RemoveSupportedPartialIndexDiagnostics(unsupportedFeatures, indexes);
                 AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable, columnPropertiesByTable);
                 AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
-                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
+                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
                 AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
-                var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(unsupportedFeatures, "ProviderSpecificColumnType");
-                var enumCheckConstraintConfigurations = BuildEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                RemoveSupportedProviderSpecificColumnTypeDiagnostics(unsupportedFeatures, columnPropertiesByTable, generatedModelFeatureDiagnostics);
-                var defaultValuesByTable = BuildScaffoldDefaultValueMap(unsupportedFeatures, columnPropertiesByTable);
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
-                    && defaultValuesByTable.TryGetValue(feature.TableKey, out var defaults)
-                    && defaults.ContainsKey(feature.Name));
-                var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, unsupportedFeatures)
-                    .Concat(enumCheckConstraintConfigurations)
-                    .ToArray();
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
-                    && checkConstraints.Any(check =>
-                        string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(check.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
-                    && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    && properties.TryGetValue(feature.Name, out var propertyName)
-                    && enumCheckConstraintConfigurations.Any(check =>
-                        string.Equals(check.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && check.Name.EndsWith("_" + propertyName + "_Enum", StringComparison.Ordinal)));
-                var expressionIndexConfigurations = BuildExpressionIndexConfigurations(entityByTable, unsupportedFeatures);
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
-                    && expressionIndexConfigurations.Any(index =>
-                        string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "PartialIndex", StringComparison.OrdinalIgnoreCase)
-                    && expressionIndexConfigurations.Any(index =>
-                        !string.IsNullOrWhiteSpace(index.FilterSql)
-                        && string.Equals(index.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(index.Name, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                var collationConfigurations = BuildCollationConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "Collation", StringComparison.OrdinalIgnoreCase)
-                    && collationConfigurations.Any(collation =>
-                        string.Equals(collation.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(collation.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                var computedColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "Computed", "RowVersion");
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "Computed", StringComparison.OrdinalIgnoreCase)
-                    && computedColumnConfigurations.Any(computed =>
-                        string.Equals(computed.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(computed.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                var decimalPrecisionByTable = BuildDecimalPrecisionMap(unsupportedFeatures);
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, static feature =>
-                    string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
-                    && TryParseDecimalPrecision(feature.Detail, out _, out _));
-                var rowVersionColumnsByTable = BuildFeatureNameMap(unsupportedFeatures, "RowVersion");
-                var providerNativeTemporalHistoryTableKeys = BuildProviderNativeTemporalHistoryTableKeys(unsupportedFeatures);
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, computedColumnsByTable, indexes, nonNullableColumnsByTable, memberNamesByTable);
+                var featureConfigurations = BuildFeatureConfigurations(
+                    unsupportedFeatures,
+                    entityByTable,
+                    columnPropertiesByTable,
+                    stringBinaryFacetsByTable);
+                var providerSpecificColumnTypesByTable = featureConfigurations.ProviderSpecificColumnTypesByTable;
+                var computedColumnsByTable = featureConfigurations.ComputedColumnsByTable;
+                var rowVersionColumnsByTable = featureConfigurations.RowVersionColumnsByTable;
+                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, computedColumnsByTable, indexes, nonNullableColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, memberNamesByTable);
                 var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var relationships = BuildRelationships(
                     foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
@@ -195,31 +161,31 @@ namespace nORM.Scaffolding
                     indexes,
                     nonNullableColumnsByTable,
                     memberNamesByTable);
-                var compositePrimaryKeys = BuildCompositePrimaryKeys(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, manyToManyJoinTableKeys);
-                var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, defaultValuesByTable);
-                var identityOptionConfigurations = BuildIdentityOptionConfigurations(entityByTable, columnPropertiesByTable, unsupportedFeatures);
-                RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                    string.Equals(feature.Kind, "IdentityStrategy", StringComparison.OrdinalIgnoreCase)
-                    && identityOptionConfigurations.Any(identity =>
-                        string.Equals(identity.TableKey, feature.TableKey, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(identity.ColumnName, feature.Name, StringComparison.OrdinalIgnoreCase)));
-                RestoreGeneratedManyToManyUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, manyToManyJoinTableKeys);
+                var compositePrimaryKeys = BuildPrimaryKeyConfigurations(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, primaryKeyConstraintNamesByTable, manyToManyJoinTableKeys);
+                var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, featureConfigurations.DefaultValuesByTable);
+                RestoreGeneratedManyToManyUnsupportedFeatures(unsupportedFeatures, featureConfigurations.GeneratedModelFeatureDiagnostics, manyToManyJoinTableKeys);
                 defaultValueConfigurations = defaultValueConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
-                checkConstraints = checkConstraints
+                var checkConstraints = featureConfigurations.CheckConstraints
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
-                computedColumnConfigurations = computedColumnConfigurations
+                var computedColumnConfigurations = featureConfigurations.ComputedColumnConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
-                expressionIndexConfigurations = expressionIndexConfigurations
+                var expressionIndexConfigurations = featureConfigurations.ExpressionIndexConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
-                collationConfigurations = collationConfigurations
+                var collationConfigurations = featureConfigurations.CollationConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
-                identityOptionConfigurations = identityOptionConfigurations
+                var identityOptionConfigurations = featureConfigurations.IdentityOptionConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                var precisionConfigurations = featureConfigurations.PrecisionConfigurations
+                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
+                    .ToArray();
+                var columnFacetConfigurations = featureConfigurations.ColumnFacetConfigurations
                     .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
                     .ToArray();
                 var generatedFiles = new List<(string Path, string Content)>();
@@ -244,14 +210,22 @@ namespace nORM.Scaffolding
                     computedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
                     rowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
                     identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
-                    decimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
+                    nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns);
+                    featureConfigurations.DecimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
+                    stringBinaryFacetsByTable.TryGetValue(tableKey, out var columnFacets);
+                    commentsByTable.TryGetValue(tableKey, out var comments);
                     sqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
                     providerSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
-                    var isReadOnlyEntity = queryArtifactTableKeys.Contains(tableKey)
-                        || providerNativeTemporalHistoryTableKeys.Contains(tableKey)
-                        || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
-                        || primaryKeyColumns.Count == 0;
-                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, isReadOnlyEntity, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
+                    var isReadOnlyEntity = ShouldMarkScaffoldedEntityReadOnly(
+                        tableKey,
+                        queryArtifactTableKeys,
+                        featureConfigurations.ProviderNativeTemporalTableKeys,
+                        featureConfigurations.ProviderOwnedTriggerTableKeys,
+                        featureConfigurations.ProviderSpecificIdentityStrategyTableKeys,
+                        featureConfigurations.ProviderSpecificDefaultTableKeys,
+                        providerSpecificColumnTypes,
+                        primaryKeyColumnsByTable);
+                    var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, columnFacets, comments, isReadOnlyEntity, options.UseNullableReferenceTypes, nonNullableColumns, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
                     generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
                 }
 
@@ -261,36 +235,13 @@ namespace nORM.Scaffolding
                 var sequenceStubs = options.EmitSequenceStubs
                     ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase)).ToArray()
                     : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(namespaceName, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations);
-                generatedFiles.Add((Path.Combine(outputDirectory, safeContextName + ".cs"), ctxCode));
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, manyToManyJoinTableKeys);
-                if (!string.IsNullOrWhiteSpace(diagnostics))
-                {
-                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"), diagnostics));
-                    generatedFiles.Add((Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json"), ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, manyToManyJoinTableKeys)));
-                }
-                else
-                {
-                    if (!options.DryRun)
-                        EnsureNoStaleScaffoldWarningReports(outputDirectory, options);
-                }
-
-                if (!options.DryRun)
-                {
-                    EnsureNoOutputFileConflicts(generatedFiles.Select(file => file.Path), options);
-                    foreach (var (path, content) in generatedFiles)
-                        await WriteGeneratedFileAsync(path, content).ConfigureAwait(false);
-                }
-
-                if (!string.IsNullOrWhiteSpace(diagnostics))
-                {
-                    if (options.FailOnWarnings)
-                        throw new NormConfigurationException(
-                            "Scaffolding produced warnings for schema features that cannot be emitted as runnable nORM model code. " +
-                            (options.DryRun
-                                ? "Rerun without ScaffoldOptions.DryRun to write nORM.ScaffoldWarnings.md, or disable ScaffoldOptions.FailOnWarnings."
-                                : "Review nORM.ScaffoldWarnings.md or disable ScaffoldOptions.FailOnWarnings."));
-                }
+                var ctxCode = ScaffoldContextWithRelationships(contextNamespace, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations, precisionConfigurations, columnFacetConfigurations, options.PluralizeQueryProperties, options.UseNullableReferenceTypes, namespaceName, options.UseDatabaseNames);
+                generatedFiles.Add((Path.Combine(contextOutputDirectory, safeContextName + ".cs"), ctxCode));
+                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, manyToManyJoinTableKeys);
+                var diagnosticsJson = string.IsNullOrWhiteSpace(diagnostics)
+                    ? null
+                    : ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, manyToManyJoinTableKeys);
+                await EmitScaffoldOutputAsync(outputDirectory, generatedFiles, diagnostics, diagnosticsJson, options).ConfigureAwait(false);
             }
             finally
             {
@@ -300,29 +251,20 @@ namespace nORM.Scaffolding
             }
         }
 
-        /// <summary>
-        /// Generates C# source code for a single entity type based on the provided database schema information.
-        /// </summary>
-        /// <param name="connection">Active database connection.</param>
-        /// <param name="provider">Database provider in use.</param>
-        /// <param name="schemaName">Optional schema name.</param>
-        /// <param name="tableName">Table name in the database.</param>
-        /// <param name="entityName">Name of the entity class to produce.</param>
-        /// <param name="namespaceName">Namespace for the generated entity.</param>
-        /// <param name="columnPropertyNames">Optional map from database column names to generated C# property names.</param>
-        /// <param name="indexes">Index metadata for this entity's table.</param>
-        /// <param name="references">Reference navigations from this entity to principal entities.</param>
-        /// <param name="collections">Collection navigations from this entity to dependent entities.</param>
-        /// <param name="manyToManyCollections">Many-to-many collection navigations from this entity through pure join tables.</param>
-        /// <param name="computedColumns">Column names known to be database-computed/generated.</param>
-        /// <param name="rowVersionColumns">Column names known to be database-managed rowversion/timestamp tokens.</param>
-        /// <param name="identityColumns">Column names known to be database-generated identity/auto-increment values.</param>
-        /// <param name="decimalPrecisions">Decimal precision/scale metadata keyed by database column name.</param>
-        /// <param name="isReadOnlyEntity">Whether the generated type should reject nORM write operations.</param>
-        /// <param name="sqliteDeclaredTypes">SQLite declared column type names keyed by database column name.</param>
-        /// <param name="providerSpecificColumnTypes">Provider-specific column type details keyed by database column name.</param>
-        /// <returns>A string containing the generated C# code.</returns>
-        private static async Task<string> ScaffoldEntityAsync(
+        private static async Task EmitScaffoldOutputAsync(
+            string outputDirectory,
+            List<(string Path, string Content)> generatedFiles,
+            string diagnostics,
+            string? diagnosticsJson,
+            ScaffoldOptions options)
+            => await ScaffoldOutputManager.EmitAsync(
+                outputDirectory,
+                generatedFiles,
+                diagnostics,
+                diagnosticsJson,
+                options).ConfigureAwait(false);
+
+        private static Task<string> ScaffoldEntityAsync(
             DbConnection connection,
             DatabaseProvider provider,
             string? schemaName,
@@ -338,149 +280,84 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? rowVersionColumns = null,
             IReadOnlySet<string>? identityColumns = null,
             IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null,
+            IReadOnlyDictionary<string, ScaffoldColumnFacet>? columnFacets = null,
+            ScaffoldComments? comments = null,
             bool isReadOnlyEntity = false,
+            bool useNullableReferenceTypes = true,
+            IReadOnlySet<string>? nonNullableColumns = null,
             IReadOnlyDictionary<string, string>? sqliteDeclaredTypes = null,
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes = null)
-        {
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                sb.AppendLine("// <auto-generated/>");
-                sb.AppendLine("#nullable enable");
-                sb.AppendLine("using System;");
-                sb.AppendLine("using System.Collections.Generic;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations;");
-                sb.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
-                if ((indexes?.Count > 0) || isReadOnlyEntity)
-                    sb.AppendLine("using nORM.Configuration;");
-                sb.AppendLine();
-                sb.AppendLine($"namespace {namespaceName};");
-                sb.AppendLine();
-                // Class-level [Table] with schema (if available); escape quotes to prevent code injection
-                var safeTableName = EscapeStringLiteral(tableName);
-                var tableAttr = schemaName is not null
-                    ? $"[Table(\"{safeTableName}\", Schema = \"{EscapeStringLiteral(schemaName)}\")]"
-                    : $"[Table(\"{safeTableName}\")]";
-                sb.AppendLine(tableAttr);
-                if (isReadOnlyEntity)
-                    sb.AppendLine("[ReadOnlyEntity]");
-                sb.AppendLine($"public class {EscapeCSharpIdentifier(entityName)}");
-                sb.AppendLine("{");
+            => ScaffoldEntitySourceBuilder.BuildAsync(new ScaffoldEntitySourceInfo(
+                connection,
+                provider,
+                schemaName,
+                tableName,
+                entityName,
+                namespaceName,
+                columnPropertyNames,
+                ConvertEntityIndexInfos(indexes),
+                ConvertEntityReferenceInfos(references),
+                ConvertEntityCollectionInfos(collections),
+                ConvertEntityManyToManyNavigationInfos(manyToManyCollections),
+                computedColumns,
+                rowVersionColumns,
+                identityColumns,
+                ConvertEntityDecimalPrecisionInfos(decimalPrecisions),
+                columnFacets,
+                comments,
+                isReadOnlyEntity,
+                useNullableReferenceTypes,
+                nonNullableColumns,
+                sqliteDeclaredTypes,
+                providerSpecificColumnTypes));
 
-                // Read schema using a zero-row query (fast) with key info
-                var postgresTextCastColumns = await GetPostgresUserDefinedColumnNamesAsync(connection, provider, schemaName, tableName).ConfigureAwait(false);
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = BuildSchemaProbeSql(provider, schemaName, tableName, columnPropertyNames, providerSpecificColumnTypes, postgresTextCastColumns);
-                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
-                var schema = reader.GetSchemaTable()!;
-                foreach (DataRow row in schema.Rows)
-                {
-                    var colName = row["ColumnName"]!.ToString()!;
-                    var propName = columnPropertyNames is not null && columnPropertyNames.TryGetValue(colName, out var mappedProperty)
-                        ? mappedProperty
-                        : EscapeCSharpIdentifier(ToPascalCase(colName));
-                    var allowNull = row["AllowDBNull"] is bool b && b;
+        private static ScaffoldEntityIndexSourceInfo[] ConvertEntityIndexInfos(IReadOnlyList<ScaffoldIndex>? indexes)
+            => (indexes ?? Array.Empty<ScaffoldIndex>())
+                .Select(index => new ScaffoldEntityIndexSourceInfo(
+                    index.ColumnName,
+                    index.IndexName,
+                    index.IsUnique,
+                    index.ColumnCount,
+                    index.Ordinal,
+                    index.IsDescending,
+                    index.IsIncluded,
+                    index.NullSortOrder,
+                    index.NullsNotDistinct,
+                    index.FilterSql))
+                .ToArray();
 
-                    var isKey = row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                    var isAuto = (row.Table.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
-                        || identityColumns?.Contains(colName) == true;
-                    var isComputed = computedColumns?.Contains(colName) == true;
-                    var isRowVersion = rowVersionColumns?.Contains(colName) == true;
-                    var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
-                    string? declaredType = null;
-                    sqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
-                    string? providerSpecificType = null;
-                    providerSpecificColumnTypes?.TryGetValue(colName, out providerSpecificType);
-                    var rawClrType = row["DataType"] is Type type ? type : typeof(object);
-                    var clrType = NormalizeScaffoldClrType(provider, rawClrType, effectiveAllowNull, isKey, isAuto, declaredType, providerSpecificType);
+        private static ScaffoldEntityReferenceInfo[] ConvertEntityReferenceInfos(IReadOnlyList<ScaffoldRelationship>? references)
+            => (references ?? Array.Empty<ScaffoldRelationship>())
+                .Select(reference => new ScaffoldEntityReferenceInfo(
+                    reference.PrincipalEntityName,
+                    reference.ReferenceNavigationName,
+                    reference.ForeignKeyPropertyName,
+                    reference.IsComposite,
+                    reference.IsRequired))
+                .ToArray();
 
-                    // Decide C# type name with correct nullability for value OR reference types
-                    var typeName = GetTypeName(clrType, effectiveAllowNull);
+        private static ScaffoldEntityCollectionInfo[] ConvertEntityCollectionInfos(IReadOnlyList<ScaffoldRelationship>? collections)
+            => (collections ?? Array.Empty<ScaffoldRelationship>())
+                .Select(collection => new ScaffoldEntityCollectionInfo(
+                    collection.DependentEntityName,
+                    collection.CollectionNavigationName,
+                    collection.ForeignKeyPropertyName,
+                    collection.IsUniqueDependentKey))
+                .ToArray();
 
-                    var maxLength = GetScaffoldMaxLength(clrType, row);
+        private static ScaffoldEntityManyToManyNavigationInfo[] ConvertEntityManyToManyNavigationInfos(IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections)
+            => (manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
+                .Select(collection => new ScaffoldEntityManyToManyNavigationInfo(
+                    collection.TargetEntityName,
+                    collection.CollectionNavigationName))
+                .ToArray();
 
-                    sb.AppendLine("    /// <summary>");
-                    sb.AppendLine($"    /// Maps to column {EscapeXmlDocumentation(colName)}");
-                    sb.AppendLine("    /// </summary>");
-                    if (isKey)
-                        sb.AppendLine("    [Key]");
-                    if (isRowVersion)
-                        sb.AppendLine("    [Timestamp]");
-                    if (isAuto)
-                        sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-                    else if (isComputed)
-                        sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
-                    if (maxLength.HasValue)
-                        sb.AppendLine($"    [MaxLength({maxLength.Value})]");
-                    if (!clrType.IsValueType && !effectiveAllowNull)
-                        sb.AppendLine("    [Required]");
-                    foreach (var index in (indexes ?? Array.Empty<ScaffoldIndex>())
-                        .Where(i => string.Equals(i.ColumnName, colName, StringComparison.Ordinal))
-                        .OrderBy(i => i.IndexName, StringComparer.Ordinal)
-                        .ThenBy(i => i.Ordinal))
-                    {
-                        if (index.IndexName.Length == 0)
-                            continue;
-                        var safeIndexName = EscapeStringLiteral(index.IndexName);
-                        var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
-                        var orderSuffix = index.ColumnCount > 1 && !index.IsIncluded ? $", Order = {index.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty;
-                        var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
-                        var includedSuffix = index.IsIncluded ? ", IsIncluded = true" : string.Empty;
-                        var filterSuffix = string.IsNullOrWhiteSpace(index.FilterSql) ? string.Empty : $", FilterSql = \"{EscapeStringLiteral(index.FilterSql)}\"";
-                        sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix}{filterSuffix})]");
-                    }
-                    if (clrType == typeof(decimal)
-                        && decimalPrecisions is not null
-                        && decimalPrecisions.TryGetValue(colName, out var decimalPrecision))
-                    {
-                        sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\", TypeName = \"decimal({decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})\")]");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"    [Column(\"{EscapeStringLiteral(colName)}\")]");
-                    }
-                    var initializer = clrType == typeof(byte[]) && !effectiveAllowNull
-                        ? " = Array.Empty<byte>();"
-                        : !clrType.IsValueType && !effectiveAllowNull ? " = default!;" : string.Empty;
-                    sb.AppendLine($"    public {typeName} {propName} {{ get; set; }}{initializer}");
-                    sb.AppendLine();
-                }
-
-                foreach (var reference in (references ?? Array.Empty<ScaffoldRelationship>())
-                    .OrderBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
-                    .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
-                {
-                    if (!reference.IsComposite)
-                        sb.AppendLine($"    [ForeignKey(nameof({EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
-                    sb.AppendLine($"    public {EscapeCSharpIdentifier(reference.PrincipalEntityName)}? {EscapeCSharpIdentifier(reference.ReferenceNavigationName)} {{ get; set; }}");
-                    sb.AppendLine();
-                }
-
-                foreach (var collection in (collections ?? Array.Empty<ScaffoldRelationship>())
-                    .OrderBy(r => r.CollectionNavigationName, StringComparer.Ordinal)
-                    .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
-                {
-                    sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.DependentEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
-                    sb.AppendLine();
-                }
-
-                foreach (var collection in (manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
-                    .OrderBy(n => n.CollectionNavigationName, StringComparer.Ordinal)
-                    .ThenBy(n => n.TargetEntityName, StringComparer.Ordinal))
-                {
-                    sb.AppendLine($"    public List<{EscapeCSharpIdentifier(collection.TargetEntityName)}> {EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
-                    sb.AppendLine();
-                }
-
-                sb.AppendLine("}");
-                return sb.ToString();
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
-        }
+        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>? ConvertEntityDecimalPrecisionInfos(
+            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions)
+            => decimalPrecisions?.ToDictionary(
+                pair => pair.Key,
+                pair => new ScaffoldDecimalPrecisionInfo(pair.Value.Precision, pair.Value.Scale),
+                StringComparer.OrdinalIgnoreCase);
 
         private static string BuildSchemaProbeSql(
             DatabaseProvider provider,
@@ -489,665 +366,96 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string>? columnPropertyNames,
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
             IReadOnlySet<string>? postgresTextCastColumns = null)
-        {
-            var qualified = EscapeQualified(provider, schemaName, tableName);
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
-                || ((providerSpecificColumnTypes is null
-                     || providerSpecificColumnTypes.Count == 0
-                     || !providerSpecificColumnTypes.Values.Any(RequiresPostgresSchemaProbeCast))
-                    && (postgresTextCastColumns is null || postgresTextCastColumns.Count == 0))
-                || columnPropertyNames is null
-                || columnPropertyNames.Count == 0)
-            {
-                return $"SELECT * FROM {qualified} WHERE 1=0";
-            }
+            => ScaffoldEntitySourceBuilder.BuildSchemaProbeSql(
+                provider,
+                schemaName,
+                tableName,
+                columnPropertyNames,
+                providerSpecificColumnTypes,
+                postgresTextCastColumns);
 
-            var columns = columnPropertyNames.Keys.Select(column =>
-            {
-                var escaped = provider.Escape(column);
-                return providerSpecificColumnTypes is not null
-                       && providerSpecificColumnTypes.TryGetValue(column, out var detail)
-                       && TryGetPostgresSchemaProbeCastType(detail, out var castType)
-                    ? $"{escaped}::{castType} AS {escaped}"
-                    : postgresTextCastColumns is not null && postgresTextCastColumns.Contains(column)
-                        ? $"{escaped}::text AS {escaped}"
-                    : escaped;
-            });
-
-            return $"SELECT {string.Join(", ", columns)} FROM {qualified} WHERE 1=0";
-        }
-
-        private static async Task<IReadOnlySet<string>> GetPostgresUserDefinedColumnNamesAsync(
+        private static Task<IReadOnlySet<string>> GetPostgresUserDefinedColumnNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             string? schemaName,
             string tableName)
-        {
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-                return EmptyStringSet;
-
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = @tableName
-                  AND (@schemaName IS NULL OR table_schema = @schemaName)
-                  AND domain_name IS NULL
-                  AND data_type = 'USER-DEFINED'
-                """;
-            AddParameter(cmd, "@tableName", tableName);
-            AddParameter(cmd, "@schemaName", string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName);
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var columnName = Convert.ToString(reader["column_name"]);
-                if (!string.IsNullOrWhiteSpace(columnName))
-                    result.Add(columnName);
-            }
-
-            return result.Count == 0 ? EmptyStringSet : result;
-        }
-
-        private static void AddParameter(DbCommand command, string name, object? value)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.Value = value ?? DBNull.Value;
-            command.Parameters.Add(parameter);
-        }
+            => ScaffoldEntitySourceBuilder.GetPostgresUserDefinedColumnNamesAsync(connection, provider, schemaName, tableName);
 
         private static bool RequiresPostgresSchemaProbeCast(string detail)
-            => TryGetPostgresSchemaProbeCastType(detail, out _);
+            => ScaffoldProviderSpecificTypeClassifier.RequiresPostgresSchemaProbeCast(detail);
 
         private static bool TryGetPostgresSchemaProbeCastType(string detail, out string castType)
-        {
-            if (detail.Contains("DOMAIN", StringComparison.OrdinalIgnoreCase))
-            {
-                castType = GetPostgresDomainProbeCastType(detail);
-                return true;
-            }
-
-            if (TryParsePostgresEnumValues(detail, out _))
-            {
-                castType = "text";
-                return true;
-            }
-
-            if (detail.StartsWith("USER-DEFINED", StringComparison.OrdinalIgnoreCase))
-            {
-                castType = "text";
-                return true;
-            }
-
-            castType = string.Empty;
-            return false;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryGetPostgresSchemaProbeCastType(detail, out castType);
 
         private static string GetPostgresDomainProbeCastType(string detail)
-        {
-            const string fallback = "text";
-            var arrowIndex = detail.IndexOf("->", StringComparison.Ordinal);
-            if (arrowIndex < 0)
-                return fallback;
+            => ScaffoldProviderSpecificTypeClassifier.GetPostgresDomainProbeCastType(detail);
 
-            var typeText = detail[(arrowIndex + 2)..].Trim();
-            if (typeText.EndsWith(")", StringComparison.Ordinal))
-                typeText = typeText[..^1].Trim();
-
-            var udtSuffixIndex = typeText.LastIndexOf(" (", StringComparison.Ordinal);
-            if (udtSuffixIndex >= 0
-                && typeText.EndsWith(")", StringComparison.Ordinal)
-                && !typeText.StartsWith("ARRAY", StringComparison.OrdinalIgnoreCase)
-                && !typeText.StartsWith("USER-DEFINED", StringComparison.OrdinalIgnoreCase))
-            {
-                typeText = typeText[..udtSuffixIndex].Trim();
-            }
-
-            return NormalizePostgresDomainProbeCastType(typeText);
-        }
+        private static bool TryGetPostgresDomainBaseTypeText(string? detail, out string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.TryGetPostgresDomainBaseTypeText(detail, out typeText);
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
-        {
-            var normalized = typeText.Trim().ToLowerInvariant();
-            if (TryMapPostgresArrayProbeCastType(normalized, out var arrayCastType))
-                return arrayCastType;
+            => ScaffoldProviderSpecificTypeClassifier.NormalizePostgresDomainProbeCastType(typeText);
 
-            return typeText.Trim().ToLowerInvariant() switch
-            {
-                "integer" or "int" or "int4" => "integer",
-                "bigint" or "int8" => "bigint",
-                "smallint" or "int2" => "smallint",
-                "boolean" or "bool" => "boolean",
-                "uuid" => "uuid",
-                "date" => "date",
-                "text" => "text",
-                "citext" => "citext",
-                "json" => "json",
-                "jsonb" => "jsonb",
-                "xml" => "xml",
-                "character varying" or "varchar" => "character varying",
-                "character" or "char" => "character",
-                "numeric" or "decimal" => "numeric",
-                "real" or "float4" => "real",
-                "double precision" or "float8" => "double precision",
-                "bytea" => "bytea",
-                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
-                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
-                "time without time zone" or "time" => "time without time zone",
-                "time with time zone" or "timetz" => "time with time zone",
-                "interval" => "interval",
-                _ => "text"
-            };
-        }
+        private static bool TryNormalizeSafePostgresDomainProbeCastType(string typeText, out string castType)
+            => ScaffoldProviderSpecificTypeClassifier.TryNormalizeSafePostgresDomainProbeCastType(typeText, out castType);
+
+        private static bool TryNormalizePostgresParameterizedProbeCastType(string normalized, out string castType)
+            => ScaffoldProviderSpecificTypeClassifier.TryNormalizePostgresParameterizedProbeCastType(normalized, out castType);
+
+        private static bool TryParsePostgresTypeArguments(string normalized, string typeName, out string[] args)
+            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresTypeArguments(normalized, typeName, out args);
 
         private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
-        {
-            castType = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out castType);
 
-            var open = normalized.IndexOf('(');
-            if (open < 0)
-                return false;
+        private static string? GetScaffoldFilterCatalog(DbConnection connection, DatabaseProvider provider)
+            => IsMySqlProvider(provider) ? NullIfWhiteSpace(connection.Database) : null;
 
-            var close = normalized.IndexOf(')', open + 1);
-            var element = (close > open
-                    ? normalized.Substring(open + 1, close - open - 1)
-                    : normalized[(open + 1)..])
-                .Trim()
-                .TrimStart('_');
-
-            castType = element switch
-            {
-                "int2" or "smallint" => "smallint[]",
-                "int4" or "integer" => "integer[]",
-                "int8" or "bigint" => "bigint[]",
-                "float4" or "real" => "real[]",
-                "float8" or "double precision" => "double precision[]",
-                "numeric" or "decimal" => "numeric[]",
-                "bool" or "boolean" => "boolean[]",
-                "uuid" => "uuid[]",
-                "text" => "text[]",
-                "varchar" or "character varying" => "character varying[]",
-                "bpchar" or "char" or "character" => "character[]",
-                "citext" => "citext[]",
-                "bytea" => "bytea[]",
-                "date" => "date[]",
-                "time" or "time without time zone" => "time without time zone[]",
-                "timetz" or "time with time zone" => "time with time zone[]",
-                "interval" => "interval[]",
-                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
-                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
-                _ => string.Empty
-            };
-
-            return castType.Length > 0;
-        }
+        private static bool IsMySqlProvider(DatabaseProvider provider)
+            => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)
-        {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
-            {
-                var tables = new List<ScaffoldTable>();
-                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
-                {
-                    tables.AddRange(await QueryTablesAsync(
-                        connection,
-                        $"""
-                        SELECT {SqliteSchemaResult(schema)} AS TABLE_SCHEMA, m.name AS TABLE_NAME
-                        FROM {provider.Escape(schema)}.sqlite_master m
-                        WHERE m.type = 'table'
-                          AND m.name NOT LIKE 'sqlite_%'
-                          AND UPPER(COALESCE(m.sql, '')) NOT LIKE 'CREATE VIRTUAL TABLE%'
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM {provider.Escape(schema)}.sqlite_master vt
-                              WHERE vt.type = 'table'
-                                AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
-                                AND m.name IN (
-                                    vt.name || '_data',
-                                    vt.name || '_idx',
-                                    vt.name || '_content',
-                                    vt.name || '_docsize',
-                                    vt.name || '_config',
-                                    vt.name || '_segments',
-                                    vt.name || '_segdir',
-                                    vt.name || '_stat',
-                                    vt.name || '_node',
-                                    vt.name || '_parent',
-                                    vt.name || '_rowid'
-                                )
-                          )
-                        ORDER BY m.name
-                        """).ConfigureAwait(false));
-                }
-
-                return tables;
-            }
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryTablesAsync(
-                    connection,
-                    "SELECT s.name AS TABLE_SCHEMA, t.name AS TABLE_NAME FROM sys.tables t INNER JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.is_ms_shipped = 0 ORDER BY s.name, t.name").ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryTablesAsync(
-                    connection,
-                    "SELECT table_schema AS TABLE_SCHEMA, table_name AS TABLE_NAME FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name").ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryTablesAsync(
-                    connection,
-                    "SELECT NULL AS TABLE_SCHEMA, table_name AS TABLE_NAME FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema = DATABASE() ORDER BY table_name").ConfigureAwait(false);
-            }
-
-            return await GetSchemaTablesAsync(connection).ConfigureAwait(false);
-        }
+            => (await ScaffoldTableDiscovery.GetTablesAsync(connection, provider).ConfigureAwait(false))
+                .Select(ToScaffoldTable)
+                .ToArray();
 
         private static async Task<IReadOnlyList<ScaffoldSkippedObject>> GetSkippedObjectsAsync(DbConnection connection, DatabaseProvider provider)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
+            var discoveredObjects = await ScaffoldSkippedObjectDiscovery.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
+            if (discoveredObjects.Count == 0)
+                return Array.Empty<ScaffoldSkippedObject>();
+
+            var objects = new ScaffoldSkippedObject[discoveredObjects.Count];
+            for (var i = 0; i < discoveredObjects.Count; i++)
             {
-                var objects = new List<ScaffoldSkippedObject>();
-                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
-                {
-                    objects.AddRange(await QuerySkippedObjectsAsync(
-                        connection,
-                        $"""
-                        SELECT {SqliteSchemaResult(schema)} AS ObjectSchema, name AS ObjectName, 'View' AS Kind, 'SQLite view' AS Detail
-                        FROM {provider.Escape(schema)}.sqlite_master
-                        WHERE type = 'view'
-                        UNION ALL
-                        SELECT {SqliteSchemaResult(schema)}, name, 'VirtualTable', 'SQLite virtual table'
-                        FROM {provider.Escape(schema)}.sqlite_master
-                        WHERE type = 'table' AND UPPER(sql) LIKE 'CREATE VIRTUAL TABLE%'
-                        UNION ALL
-                        SELECT {SqliteSchemaResult(schema)}, m.name, 'VirtualTableShadow', 'SQLite virtual table shadow table'
-                        FROM {provider.Escape(schema)}.sqlite_master m
-                        WHERE m.type = 'table'
-                          AND m.name NOT LIKE 'sqlite_%'
-                          AND UPPER(COALESCE(m.sql, '')) NOT LIKE 'CREATE VIRTUAL TABLE%'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM {provider.Escape(schema)}.sqlite_master vt
-                              WHERE vt.type = 'table'
-                                AND UPPER(COALESCE(vt.sql, '')) LIKE 'CREATE VIRTUAL TABLE%'
-                                AND m.name IN (
-                                    vt.name || '_data',
-                                    vt.name || '_idx',
-                                    vt.name || '_content',
-                                    vt.name || '_docsize',
-                                    vt.name || '_config',
-                                    vt.name || '_segments',
-                                    vt.name || '_segdir',
-                                    vt.name || '_stat',
-                                    vt.name || '_node',
-                                    vt.name || '_parent',
-                                    vt.name || '_rowid'
-                                )
-                          )
-                        ORDER BY ObjectName
-                        """).ConfigureAwait(false));
-                }
-
-                return objects;
-            }
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QuerySkippedObjectsAsync(connection, """
-                    SELECT SCHEMA_NAME(v.schema_id) AS ObjectSchema, v.name AS ObjectName, 'View' AS Kind, 'SQL Server view' AS Detail
-                    FROM sys.views v
-                    WHERE v.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(p.schema_id), p.name, 'Routine',
-                           CONCAT('SQL Server stored procedure; parameters=',
-                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = p.object_id),
-                                  '; outputParameters=',
-                                  (SELECT COUNT(*) + 1 FROM sys.parameters pa WHERE pa.object_id = p.object_id AND pa.is_output = 1),
-                                  '; parameterModes=',
-                                  COALESCE(NULLIF((
-                                      SELECT STRING_AGG(CONCAT(
-                                          pa.name, ':', CASE WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END, ':',
-                                          CASE
-                                              WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
-                                              ELSE COALESCE(base_ty.name, ty.name)
-                                          END,
-                                          CASE
-                                              WHEN ty.is_table_type = 1 THEN ''
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
-                                              ELSE ''
-                                          END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
-                                      FROM sys.parameters pa
-                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
-                                      LEFT JOIN sys.types base_ty
-                                        ON ty.is_user_defined = 1
-                                       AND ty.is_table_type = 0
-                                       AND base_ty.user_type_id = ty.system_type_id
-                                       AND base_ty.is_user_defined = 0
-                                      WHERE pa.object_id = p.object_id
-                                  ), '') + ',', '') + 'return:RETURN:int',
-                                  '; resultColumns=',
-                                  COALESCE(NULLIF((
-                                      SELECT STRING_AGG(CONCAT(
-                                          COALESCE(rs.name, ''),
-                                          ':',
-                                          COALESCE(rs.system_type_name, ''),
-                                          ':',
-                                          CONVERT(varchar(1), COALESCE(rs.is_nullable, 0))), '|') WITHIN GROUP (ORDER BY rs.column_ordinal)
-                                      FROM sys.dm_exec_describe_first_result_set_for_object(p.object_id, NULL) rs
-                                      WHERE rs.error_number IS NULL
-                                        AND rs.is_hidden = 0
-                                  ), ''), ''))
-                    FROM sys.procedures p
-                    WHERE p.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(o.schema_id), o.name, 'Routine',
-                           CONCAT('SQL Server ',
-                                  CASE
-                                      WHEN o.type IN ('IF', 'TF') THEN 'table-valued function'
-                                      ELSE 'scalar function'
-                                  END,
-                                  '; parameters=',
-                                  (SELECT COUNT(*) FROM sys.parameters pa WHERE pa.object_id = o.object_id AND pa.parameter_id > 0),
-                                  '; outputParameters=',
-                                  CASE WHEN o.type = 'FN' THEN 1 ELSE 0 END,
-                                  '; callShape=',
-                                  CASE
-                                      WHEN o.type IN ('IF', 'TF') THEN 'table-valued-function'
-                                      ELSE 'scalar-function'
-                                  END,
-                                  '; parameterModes=',
-                                  COALESCE((
-                                      SELECT STRING_AGG(CONCAT(
-                                          pa.name, ':',
-                                          CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
-                                          ':',
-                                          CASE
-                                              WHEN ty.is_table_type = 1 THEN CONCAT('table type (', SCHEMA_NAME(ty.schema_id), '.', ty.name, ')')
-                                              ELSE COALESCE(base_ty.name, ty.name)
-                                          END,
-                                          CASE
-                                              WHEN ty.is_table_type = 1 THEN ''
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length) END, ')')
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
-                                              WHEN COALESCE(base_ty.name, ty.name) IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
-                                              ELSE ''
-                                          END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
-                                      FROM sys.parameters pa
-                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
-                                      LEFT JOIN sys.types base_ty
-                                        ON ty.is_user_defined = 1
-                                       AND ty.is_table_type = 0
-                                       AND base_ty.user_type_id = ty.system_type_id
-                                       AND base_ty.is_user_defined = 0
-                                      WHERE pa.object_id = o.object_id
-                                  ), ''),
-                                  '; dataType=',
-                                  COALESCE((
-                                      SELECT TOP (1) ty.name
-                                      FROM sys.parameters pa
-                                      INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
-                                      WHERE pa.object_id = o.object_id
-                                        AND pa.parameter_id = 0
-                                  ), CASE WHEN o.type IN ('IF', 'TF') THEN 'TABLE' ELSE '' END),
-                                  '; resultColumns=',
-                                  COALESCE(NULLIF((
-                                      SELECT STRING_AGG(CONCAT(
-                                          COALESCE(rs.name, ''),
-                                          ':',
-                                          COALESCE(rs.system_type_name, ''),
-                                          ':',
-                                          CONVERT(varchar(1), COALESCE(rs.is_nullable, 0))), '|') WITHIN GROUP (ORDER BY rs.column_ordinal)
-                                      FROM sys.dm_exec_describe_first_result_set_for_object(o.object_id, NULL) rs
-                                      WHERE rs.error_number IS NULL
-                                        AND rs.is_hidden = 0
-                                  ), ''), NULLIF((
-                                      SELECT STRING_AGG(CONCAT(
-                                          c.name,
-                                          ':',
-                                          ty.name,
-                                          CASE
-                                              WHEN ty.name IN ('varchar', 'char', 'varbinary', 'binary') THEN CONCAT('(', CASE WHEN c.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), c.max_length) END, ')')
-                                              WHEN ty.name IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN c.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), c.max_length / 2) END, ')')
-                                              WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', c.precision, ',', c.scale, ')')
-                                              ELSE ''
-                                          END,
-                                          ':',
-                                          CONVERT(varchar(1), c.is_nullable)), '|') WITHIN GROUP (ORDER BY c.column_id)
-                                      FROM sys.columns c
-                                      INNER JOIN sys.types ty ON c.user_type_id = ty.user_type_id
-                                      WHERE c.object_id = o.object_id
-                                        AND c.is_hidden = 0
-                                        AND o.type IN ('IF', 'TF')
-                                  ), ''), ''))
-                    FROM sys.objects o
-                    WHERE o.is_ms_shipped = 0
-                      AND o.type IN ('FN', 'IF', 'TF')
-                    UNION ALL
-                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Sequence',
-                           CONCAT('SQL Server sequence; dataType=', ty.name,
-                                  CASE
-                                      WHEN ty.name IN ('decimal', 'numeric') THEN CONCAT('(', s.precision, ',', s.scale, ')')
-                                      ELSE ''
-                                  END)
-                    FROM sys.sequences s
-                    INNER JOIN sys.types ty ON ty.user_type_id = s.user_type_id
-                    UNION ALL
-                    SELECT SCHEMA_NAME(s.schema_id), s.name, 'Synonym',
-                           CONCAT('SQL Server synonym; baseObject=', s.base_object_name,
-                                  '; baseType=', COALESCE(CONVERT(nvarchar(20), OBJECTPROPERTYEX(OBJECT_ID(s.base_object_name), 'BaseType')), ''))
-                    FROM sys.synonyms s
-                    ORDER BY ObjectSchema, ObjectName
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QuerySkippedObjectsAsync(connection, """
-                    SELECT table_schema AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'PostgreSQL view' AS Detail
-                    FROM information_schema.views
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT sequence_schema, sequence_name, 'Sequence', 'PostgreSQL sequence; dataType=' || data_type
-                    FROM information_schema.sequences seq
-                    WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM pg_class sequence_class
-                          INNER JOIN pg_namespace sequence_schema_ns ON sequence_schema_ns.oid = sequence_class.relnamespace
-                          INNER JOIN pg_depend dependency ON dependency.objid = sequence_class.oid
-                          WHERE sequence_class.relkind = 'S'
-                            AND sequence_schema_ns.nspname = seq.sequence_schema
-                            AND sequence_class.relname = seq.sequence_name
-                            AND dependency.deptype IN ('a', 'i')
-                      )
-                    UNION ALL
-                    SELECT schemaname, matviewname, 'MaterializedView', 'PostgreSQL materialized view'
-                    FROM pg_matviews
-                    WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT r.routine_schema, r.routine_name, 'Routine',
-                           'PostgreSQL ' || LOWER(r.routine_type) || '; parameters=' ||
-                           COALESCE((
-                               SELECT COUNT(*)
-                               FROM information_schema.parameters p
-                               WHERE p.specific_schema = r.specific_schema
-                                 AND p.specific_name = r.specific_name
-                                 AND p.parameter_mode IS NOT NULL
-                           ), 0)::text ||
-                           '; outputParameters=' ||
-                           COALESCE((
-                               SELECT COUNT(*)
-                               FROM information_schema.parameters p
-                               WHERE p.specific_schema = r.specific_schema
-                                 AND p.specific_name = r.specific_name
-                                 AND p.parameter_mode IN ('OUT', 'INOUT')
-                           ), 0)::text ||
-                           '; parameterModes=' ||
-                           COALESCE((
-                               SELECT string_agg(
-                                   COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' ||
-                                   CASE
-                                       WHEN p.data_type IN ('ARRAY', 'USER-DEFINED')
-                                            AND p.udt_name IS NOT NULL
-                                            AND p.udt_name <> ''
-                                       THEN p.data_type || ' (' || p.udt_name || ')'
-                                       ELSE COALESCE(p.data_type, '')
-                                   END ||
-                                   CASE
-                                       WHEN p.character_maximum_length IS NOT NULL THEN '(' || p.character_maximum_length::text || ')'
-                                       WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN '(' || p.numeric_precision::text || ',' || p.numeric_scale::text || ')'
-                                       ELSE ''
-                                   END,
-                                   ',' ORDER BY p.ordinal_position)
-                               FROM information_schema.parameters p
-                               WHERE p.specific_schema = r.specific_schema
-                                 AND p.specific_name = r.specific_name
-                                 AND p.parameter_mode IS NOT NULL
-                           ), '') ||
-                           '; callShape=' ||
-                           CASE
-                               WHEN UPPER(r.routine_type) = 'FUNCTION' AND EXISTS (
-                                   SELECT 1
-                                   FROM pg_proc routine_proc
-                                   INNER JOIN pg_namespace routine_ns ON routine_ns.oid = routine_proc.pronamespace
-                                   WHERE routine_ns.nspname = r.specific_schema
-                                     AND routine_proc.proname = r.routine_name
-                                     AND routine_proc.proretset
-                               ) THEN 'table-valued-function'
-                               WHEN UPPER(r.routine_type) = 'FUNCTION' AND LOWER(COALESCE(r.data_type, '')) IN ('record', 'table') THEN 'table-valued-function'
-                               WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
-                               ELSE ''
-                           END ||
-                           '; dataType=' || COALESCE(r.data_type, '')
-                    FROM information_schema.routines r
-                    WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
-                    ORDER BY ObjectSchema, ObjectName
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QuerySkippedObjectsAsync(connection, """
-                    SELECT NULL AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'MySQL view' AS Detail
-                    FROM information_schema.views
-                    WHERE table_schema = DATABASE()
-                    UNION ALL
-                    SELECT NULL, r.routine_name, 'Routine',
-                           CONCAT('MySQL ', r.routine_type, '; parameters=',
-                                  (SELECT COUNT(*)
-                                   FROM information_schema.parameters p
-                                   WHERE p.specific_schema = r.routine_schema
-                                     AND p.specific_name = r.specific_name
-                                     AND p.parameter_mode IS NOT NULL),
-                                  '; outputParameters=',
-                                  (SELECT COUNT(*)
-                                   FROM information_schema.parameters p
-                                   WHERE p.specific_schema = r.routine_schema
-                                     AND p.specific_name = r.specific_name
-                                     AND p.parameter_mode IN ('OUT', 'INOUT')),
-                                  '; parameterModes=',
-                                  COALESCE((SELECT GROUP_CONCAT(CONCAT(
-                                                COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':',
-                                                CASE
-                                                    WHEN LOWER(COALESCE(p.dtd_identifier, '')) LIKE '%unsigned%' THEN COALESCE(p.dtd_identifier, p.data_type, '')
-                                                    ELSE COALESCE(p.data_type, '')
-                                                END,
-                                                CASE
-                                                    WHEN LOWER(COALESCE(p.dtd_identifier, '')) LIKE '%unsigned%' THEN ''
-                                                    WHEN p.character_maximum_length IS NOT NULL THEN CONCAT('(', p.character_maximum_length, ')')
-                                                    WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN CONCAT('(', p.numeric_precision, ',', p.numeric_scale, ')')
-                                                    ELSE ''
-                                                END) ORDER BY p.ordinal_position SEPARATOR ',')
-                                            FROM information_schema.parameters p
-                                            WHERE p.specific_schema = r.routine_schema
-                                              AND p.specific_name = r.specific_name
-                                              AND p.parameter_mode IS NOT NULL), ''),
-                                  '; callShape=',
-                                  CASE
-                                      WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
-                                      ELSE ''
-                                  END,
-                                  '; dataType=', COALESCE(r.data_type, ''))
-                    FROM information_schema.routines r
-                    WHERE r.routine_schema = DATABASE()
-                    UNION ALL
-                    SELECT NULL, event_name, 'Event',
-                           CONCAT('MySQL event; eventType=', COALESCE(event_type, ''),
-                                  '; status=', COALESCE(status, ''),
-                                  '; intervalValue=', COALESCE(interval_value, ''),
-                                  '; intervalField=', COALESCE(interval_field, ''),
-                                  '; executeAt=', COALESCE(DATE_FORMAT(execute_at, '%Y-%m-%d %H:%i:%s'), ''),
-                                  '; starts=', COALESCE(DATE_FORMAT(starts, '%Y-%m-%d %H:%i:%s'), ''),
-                                  '; ends=', COALESCE(DATE_FORMAT(ends, '%Y-%m-%d %H:%i:%s'), ''))
-                    FROM information_schema.events
-                    WHERE event_schema = DATABASE()
-                    ORDER BY ObjectSchema, ObjectName
-                    """).ConfigureAwait(false);
-            }
-
-            return Array.Empty<ScaffoldSkippedObject>();
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldSkippedObject>> QuerySkippedObjectsAsync(DbConnection connection, string sql)
-        {
-            var objects = new List<ScaffoldSkippedObject>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var objectName = Convert.ToString(reader["ObjectName"]);
-                if (string.IsNullOrWhiteSpace(objectName))
-                    continue;
-
-                objects.Add(new ScaffoldSkippedObject(
-                    NullIfWhiteSpace(Convert.ToString(reader["ObjectSchema"])),
-                    objectName,
-                    Convert.ToString(reader["Kind"]) ?? string.Empty,
-                    Convert.ToString(reader["Detail"]) ?? string.Empty));
+                var obj = discoveredObjects[i];
+                objects[i] = new ScaffoldSkippedObject(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
             }
 
             return objects;
         }
 
-        private static async Task<IReadOnlyList<string>> GetSqliteSchemasAsync(DbConnection connection)
+        private static IReadOnlyList<ScaffoldSkippedObjectInfo> ConvertSkippedObjectInfos(
+            IReadOnlyList<ScaffoldSkippedObject> objects)
         {
-            var schemas = new List<string>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = "PRAGMA database_list";
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
+            var converted = new ScaffoldSkippedObjectInfo[objects.Count];
+            for (var i = 0; i < objects.Count; i++)
             {
-                var schema = Convert.ToString(reader["name"]);
-                if (string.IsNullOrWhiteSpace(schema)
-                    || string.Equals(schema, "temp", StringComparison.OrdinalIgnoreCase))
+                var obj = objects[i];
+                converted[i] = new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment)
                 {
-                    continue;
-                }
-
-                schemas.Add(schema);
+                    Metadata = BuildSkippedObjectMetadata(obj)
+                };
             }
 
-            return schemas.Count == 0 ? new[] { "main" } : schemas;
+            return converted;
         }
 
-        private static string SqliteSchemaResult(string schema)
-            => string.Equals(schema, "main", StringComparison.OrdinalIgnoreCase)
-                ? "NULL"
-                : "'" + schema.Replace("'", "''") + "'";
+        private static Task<IReadOnlyList<string>> GetSqliteSchemasAsync(DbConnection connection)
+            => ScaffoldSkippedObjectDiscovery.GetSqliteSchemasAsync(connection);
 
+        private static string SqliteSchemaResult(string schema)
+            => ScaffoldSkippedObjectDiscovery.SqliteSchemaResult(schema);
         private static string SqlitePragma(DatabaseProvider provider, string? schema, string pragmaName, string argument)
         {
             var prefix = string.IsNullOrWhiteSpace(schema)
@@ -1182,432 +490,134 @@ namespace nORM.Scaffolding
             return result;
         }
 
+        private static Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>>> GetStringBinaryFacetsAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+            => ScaffoldColumnDiscovery.GetStringBinaryFacetsAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
+
+        private static Task<IReadOnlyDictionary<string, ScaffoldComments>> GetScaffoldCommentsAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+            => ScaffoldCommentDiscovery.GetScaffoldCommentsAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
+
+        private static ScaffoldTableInfo[] ToScaffoldTableInfos(IEnumerable<ScaffoldTable> tables)
+            => tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+
+        private static ScaffoldTable ToScaffoldTable(ScaffoldTableInfo table)
+            => new(table.Name, table.Schema);
+
+        private static ScaffoldSkippedObjectInfo[] ToSkippedObjectInfos(IEnumerable<ScaffoldSkippedObject> objects)
+            => objects.Select(ToSkippedObjectInfo).ToArray();
+
+        private static ScaffoldSkippedObjectInfo ToSkippedObjectInfo(ScaffoldSkippedObject obj)
+            => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
+
+        private static ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
+            => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
+
         private static IReadOnlyList<ScaffoldTable> FilterTables(
             IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
-            ScaffoldOptions options)
-        {
-            var requested = GetRequestedTableFilters(options);
-            if (requested.Length == 0)
-                return tables;
-
-            var ambiguousRequests = requested
-                .Select(request => new
-                {
-                    Request = request,
-                    Matches = tables
-                        .Where(table => MatchesTableFilter(table, request))
-                        .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
-                        .Select(group => DisplayTableMatch(group.First()))
-                        .OrderBy(value => value, StringComparer.Ordinal)
-                        .ToArray()
-                })
-                .Where(match => match.Matches.Length > 1)
+            ScaffoldOptions options,
+            DatabaseProvider provider,
+            string? filterCatalog)
+            => ScaffoldTableFilter.FilterTables(
+                    ToScaffoldTableInfos(tables),
+                    ToSkippedObjectInfos(skippedObjects),
+                    options,
+                    provider,
+                    filterCatalog)
+                .Select(ToScaffoldTable)
                 .ToArray();
-
-            if (ambiguousRequests.Length > 0)
-            {
-                throw new NormConfigurationException(
-                    "Scaffolding table filter is ambiguous because it matches multiple discovered tables: " +
-                    string.Join("; ", ambiguousRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
-                    ". Use schema-qualified table filters when the ambiguity is across schemas; literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter.");
-            }
-
-            var selected = tables
-                .Where(table => requested.Any(request => MatchesTableFilter(table, request)))
-                .Select(table => ApplyRequestedTableCasing(table, requested))
-                .ToArray();
-
-            var missing = requested
-                .Where(request => !tables.Any(table => MatchesTableFilter(table, request)))
-                .ToArray();
-
-            if (missing.Length > 0)
-            {
-                var skippedMatches = skippedObjects
-                    .Where(obj => missing.Any(request => MatchesSkippedObjectFilter(obj, request)))
-                    .Select(obj => $"{obj.Kind} {TableKey(obj.Schema, obj.Name)}")
-                    .OrderBy(value => value, StringComparer.Ordinal)
-                    .ToArray();
-
-                if (skippedMatches.Length > 0)
-                {
-                    throw new NormConfigurationException(
-                        "Scaffolding table filter matched database object(s) that v1 scaffolding does not emit as entity classes: " +
-                        string.Join(", ", skippedMatches) +
-                        ". Scaffold base tables or create a provider-neutral entity manually.");
-                }
-
-                throw new NormConfigurationException(
-                    "Scaffolding table filter did not match discovered table(s): " +
-                    string.Join(", ", missing));
-            }
-
-            return selected;
-        }
-
-        private static ScaffoldTable ApplyRequestedTableCasing(ScaffoldTable table, IReadOnlyList<string> requested)
-        {
-            var request = requested.FirstOrDefault(filter => MatchesTableFilter(table, filter));
-            if (string.IsNullOrWhiteSpace(request))
-                return table;
-
-            var requestedSchema = GetSchemaNameOrNull(request);
-            if (!string.IsNullOrWhiteSpace(requestedSchema)
-                && string.Equals(requestedSchema, table.Schema, StringComparison.OrdinalIgnoreCase))
-            {
-                return new ScaffoldTable(GetUnqualifiedName(request), requestedSchema);
-            }
-
-            if (requestedSchema is null && string.Equals(request, table.Name, StringComparison.OrdinalIgnoreCase))
-                return new ScaffoldTable(request, table.Schema);
-
-            return table;
-        }
-
-        private static bool MatchesTableFilter(ScaffoldTable table, string requested)
-            => string.Equals(table.Name, requested, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(TableKey(table.Schema, table.Name), requested, StringComparison.OrdinalIgnoreCase);
-
-        private static string DisplayTableMatch(ScaffoldTable table)
-            => string.IsNullOrWhiteSpace(table.Schema)
-                ? "<default>." + table.Name
-                : TableKey(table.Schema, table.Name);
 
         private static void EnsureNoTableKeyCollisions(IReadOnlyList<ScaffoldTable> tables)
-        {
-            var collisions = tables
-                .GroupBy(table => TableKey(table.Schema, table.Name), StringComparer.OrdinalIgnoreCase)
-                .Select(group => new
-                {
-                    DisplayKey = group.Key,
-                    Matches = group
-                        .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
-                        .Select(inner => DisplayTableMatch(inner.First()))
-                        .OrderBy(value => value, StringComparer.Ordinal)
-                        .ToArray()
-                })
-                .Where(group => group.Matches.Length > 1)
-                .ToArray();
-
-            if (collisions.Length == 0)
-                return;
-
-            throw new NormConfigurationException(
-                "Scaffolding discovered tables whose display names collide with schema-qualified names: " +
-                string.Join("; ", collisions.Select(c => $"{c.DisplayKey} matched {string.Join(", ", c.Matches)}")) +
-                ". Rename one table or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names.");
-        }
+            => ScaffoldTableFilter.EnsureNoTableKeyCollisions(ToScaffoldTableInfos(tables));
 
         private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(
             IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
             ScaffoldOptions options,
+            DatabaseProvider provider,
+            string? filterCatalog,
             IReadOnlyList<ScaffoldSkippedObject>? emittedQueryArtifacts = null)
-        {
-            var requested = GetRequestedTableFilters(options);
-            if (requested.Length == 0)
-                return skippedObjects;
-
-            var emittedVirtualTables = (emittedQueryArtifacts ?? Array.Empty<ScaffoldSkippedObject>())
-                .Where(obj => string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase))
+            => ScaffoldTableFilter.FilterSkippedObjects(
+                    ToSkippedObjectInfos(skippedObjects),
+                    options,
+                    provider,
+                    filterCatalog,
+                    emittedQueryArtifacts is null ? null : ToSkippedObjectInfos(emittedQueryArtifacts))
+                .Select(ToScaffoldSkippedObject)
                 .ToArray();
-
-            return skippedObjects
-                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(obj, request))
-                              || IsShadowOfEmittedVirtualTable(obj, emittedVirtualTables))
-                .ToArray();
-        }
-
-        private static bool IsShadowOfEmittedVirtualTable(
-            ScaffoldSkippedObject obj,
-            IReadOnlyList<ScaffoldSkippedObject> emittedVirtualTables)
-            => string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase)
-               && emittedVirtualTables.Any(vt =>
-                   string.Equals(vt.Schema ?? string.Empty, obj.Schema ?? string.Empty, StringComparison.OrdinalIgnoreCase)
-                   && obj.Name.StartsWith(vt.Name + "_", StringComparison.OrdinalIgnoreCase));
-
-        private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObject obj, string requested)
-            => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
 
         private static bool IsQueryArtifactObject(ScaffoldSkippedObject obj)
-            => string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase)
-               || (string.Equals(obj.Kind, "Synonym", StringComparison.OrdinalIgnoreCase) && IsTableLikeSqlServerSynonym(obj.Detail));
+            => ScaffoldTableFilter.IsQueryArtifactObject(ToSkippedObjectInfo(obj));
+
+        private static bool ShouldEmitQueryArtifactObject(ScaffoldSkippedObject obj, ScaffoldOptions options, DatabaseProvider provider, string? filterCatalog)
+            => ScaffoldTableFilter.ShouldEmitQueryArtifactObject(ToSkippedObjectInfo(obj), options, provider, filterCatalog);
 
         private static bool IsTableLikeSqlServerSynonym(string detail)
-        {
-            if (!detail.StartsWith("SQL Server synonym", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            var baseType = ParseSemicolonValue(detail, "baseType");
-            return string.Equals(baseType, "U", StringComparison.OrdinalIgnoreCase)
-                   || string.Equals(baseType, "V", StringComparison.OrdinalIgnoreCase);
-        }
+            => ScaffoldSkippedObjectMetadataBuilder.IsTableLikeSqlServerSynonym(detail);
 
         private static string[] GetRequestedTableFilters(ScaffoldOptions options)
-        {
-            if (options.Tables is null)
-                return Array.Empty<string>();
+            => ScaffoldTableFilter.GetRequestedTableFilters(options);
 
-            return options.Tables
-                .Where(table => !string.IsNullOrWhiteSpace(table))
-                .Select(table => table.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
+        private static string[] GetRequestedSchemaFilters(ScaffoldOptions options)
+            => ScaffoldTableFilter.GetRequestedSchemaFilters(options);
+
+        private static string NormalizeContextNamespace(string entityNamespaceName, string? contextNamespaceName)
+            => ScaffoldOutputManager.NormalizeContextNamespace(entityNamespaceName, contextNamespaceName);
+
+        private static string ResolveContextOutputDirectory(string outputDirectory, string? contextDirectory, string? contextOutputDirectory)
+            => ScaffoldOutputManager.ResolveContextOutputDirectory(outputDirectory, contextDirectory, contextOutputDirectory);
 
         private static void EnsureNoOutputFileConflicts(IEnumerable<string> paths, ScaffoldOptions options)
-        {
-            if (options.OverwriteFiles)
-                return;
-
-            foreach (var path in paths)
-            {
-                if (File.Exists(path))
-                {
-                    throw new NormConfigurationException(
-                        $"Scaffolding output file already exists: '{path}'. Enable overwrite or choose an empty output directory.");
-                }
-            }
-        }
+            => ScaffoldOutputManager.EnsureNoOutputFileConflicts(paths, options);
 
         private static void EnsureNoStaleScaffoldWarningReports(string outputDirectory, ScaffoldOptions options)
-        {
-            var warningPaths = new[]
-            {
-                Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.md"),
-                Path.Combine(outputDirectory, "nORM.ScaffoldWarnings.json")
-            };
-            var existingWarnings = warningPaths.Where(File.Exists).ToArray();
-            if (existingWarnings.Length == 0)
-                return;
-
-            if (!options.OverwriteFiles)
-            {
-                throw new NormConfigurationException(
-                    "Scaffolding produced no warnings, but stale scaffold warning report files already exist: " +
-                    string.Join(", ", existingWarnings.Select(path => $"'{path}'")) +
-                    ". Enable overwrite or remove the stale report files before running with overwrite protection.");
-            }
-
-            foreach (var path in existingWarnings)
-                File.Delete(path);
-        }
+            => ScaffoldOutputManager.EnsureNoStaleScaffoldWarningReports(outputDirectory, options);
 
         private static async Task WriteGeneratedFileAsync(string path, string content)
-        {
-            await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-        }
+            => await ScaffoldOutputManager.WriteGeneratedFileAsync(path, content).ConfigureAwait(false);
 
         private static async Task<IReadOnlyList<ScaffoldIndex>> GetIndexesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
+            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            var indexes = await ScaffoldIndexDiscovery.GetIndexesAsync(connection, provider, tableInfos).ConfigureAwait(false);
+            return ConvertIndexes(indexes);
+        }
+
+        private static IReadOnlyList<ScaffoldIndex> ConvertIndexes(IReadOnlyList<ScaffoldIndexInfo> indexes)
+        {
+            var converted = new ScaffoldIndex[indexes.Count];
+            for (var i = 0; i < indexes.Count; i++)
             {
-                var indexes = new List<ScaffoldIndex>();
-                foreach (var table in tables)
-                {
-                    await using var listCommand = connection.CreateCommand();
-                    listCommand.CommandText = SqlitePragma(provider, table.Schema, "index_list", table.Name);
-                    await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                    var tableIndexes = new List<(string Name, bool IsUnique, string Origin, bool IsPartial)>();
-                    while (await listReader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var name = Convert.ToString(listReader["name"]);
-                        if (string.IsNullOrWhiteSpace(name))
-                            continue;
-
-                        tableIndexes.Add((
-                            name,
-                            Convert.ToInt32(listReader["unique"], System.Globalization.CultureInfo.InvariantCulture) != 0,
-                            Convert.ToString(listReader["origin"]) ?? string.Empty,
-                            ReaderHasColumn(listReader, "partial")
-                                && Convert.ToInt32(listReader["partial"], System.Globalization.CultureInfo.InvariantCulture) != 0));
-                    }
-
-                    foreach (var (name, isUnique, origin, isPartial) in tableIndexes)
-                    {
-                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
-                            continue;
-                        var filterSql = isPartial
-                            ? await GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name).ConfigureAwait(false)
-                            : null;
-
-                        await using var infoCommand = connection.CreateCommand();
-                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", name);
-                        await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                        var columns = new List<(int Ordinal, string Name, bool IsDescending)>();
-                        var hasUnsupportedKeyPart = false;
-                        while (await infoReader.ReadAsync().ConfigureAwait(false))
-                        {
-                            if (ReaderHasColumn(infoReader, "key")
-                                && Convert.ToInt32(infoReader["key"], System.Globalization.CultureInfo.InvariantCulture) == 0)
-                            {
-                                continue;
-                            }
-
-                            if (ReaderHasColumn(infoReader, "cid")
-                                && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
-                            {
-                                hasUnsupportedKeyPart = true;
-                                continue;
-                            }
-
-                            var columnName = Convert.ToString(infoReader["name"]);
-                            if (!string.IsNullOrWhiteSpace(columnName))
-                            {
-                                columns.Add((
-                                    Convert.ToInt32(infoReader["seqno"], System.Globalization.CultureInfo.InvariantCulture),
-                                    columnName,
-                                    ReaderHasColumn(infoReader, "desc")
-                                        && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0));
-                            }
-                        }
-
-                        if (hasUnsupportedKeyPart)
-                            continue;
-
-                        foreach (var column in columns.OrderBy(static c => c.Ordinal))
-                            indexes.Add(new ScaffoldIndex(TableKey(table.Schema, table.Name), column.Name, name, isUnique, columns.Count, column.Ordinal, column.IsDescending, false, filterSql));
-                    }
-                }
-
-                return indexes;
+                var index = indexes[i];
+                converted[i] = new ScaffoldIndex(
+                    index.TableKey,
+                    index.ColumnName,
+                    index.IndexName,
+                    index.IsUnique,
+                    index.ColumnCount,
+                    index.Ordinal,
+                    index.IsDescending,
+                    index.IsIncluded,
+                    index.NullSortOrder,
+                    index.NullsNotDistinct,
+                    index.FilterSql,
+                    index.IsSyntheticName);
             }
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryIndexesAsync(connection, """
-                    SELECT
-                        SCHEMA_NAME(t.schema_id) AS TableSchema,
-                        t.name AS TableName,
-                        c.name AS ColumnName,
-                        i.name AS IndexName,
-                        i.is_unique AS IsUnique,
-                        SUM(CASE WHEN ic.is_included_column = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY i.object_id, i.index_id) AS ColumnCount,
-                        CASE WHEN ic.is_included_column = 1 THEN 2147483647 ELSE ic.key_ordinal - 1 END AS Ordinal,
-                        ic.is_descending_key AS IsDescending,
-                        ic.is_included_column AS IsIncluded,
-                        i.filter_definition AS FilterSql
-                    FROM sys.indexes i
-                    INNER JOIN sys.tables t ON t.object_id = i.object_id
-                    INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-                    INNER JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = ic.column_id
-                    WHERE t.is_ms_shipped = 0
-                      AND i.is_primary_key = 0
-                      AND i.is_hypothetical = 0
-                      AND i.type IN (1, 2)
-                      AND i.name IS NOT NULL
-                    ORDER BY SCHEMA_NAME(t.schema_id), t.name, i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryIndexesAsync(connection, """
-                    SELECT
-                        ns.nspname AS TableSchema,
-                        tbl.relname AS TableName,
-                        att.attname AS ColumnName,
-                        idx.relname AS IndexName,
-                        ix.indisunique AS IsUnique,
-                        ix.indnkeyatts AS ColumnCount,
-                        CASE WHEN key.ord > ix.indnkeyatts THEN 2147483647 ELSE key.ord - 1 END AS Ordinal,
-                        CASE WHEN key.ord <= ix.indnkeyatts AND (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending,
-                        CASE WHEN key.ord > ix.indnkeyatts THEN 1 ELSE 0 END AS IsIncluded,
-                        CASE WHEN ix.indpred IS NULL THEN NULL ELSE pg_get_expr(ix.indpred, ix.indrelid) END AS FilterSql
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    INNER JOIN pg_am am ON am.oid = idx.relam
-                    INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
-                    INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
-                    WHERE ix.indisprimary = false
-                      AND ix.indexprs IS NULL
-                      AND am.amname = 'btree'
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                      AND COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) = false
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
-                          INNER JOIN pg_attribute option_att
-                              ON option_att.attrelid = tbl.oid
-                             AND option_att.attnum = option_key.attnum
-                          INNER JOIN pg_opclass option_opclass
-                              ON option_opclass.oid = ix.indclass[option_key.ord - 1]
-                          WHERE option_key.ord <= ix.indnkeyatts
-                            AND (
-                                option_opclass.opcdefault = false
-                                OR (
-                                    ix.indcollation[option_key.ord - 1] <> 0
-                                    AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
-                                )
-                                OR (
-                                    ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
-                                    OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
-                                )
-                            )
-                      )
-                    ORDER BY ns.nspname, tbl.relname, idx.relname, key.ord
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                var indexes = await QueryIndexesAsync(connection, """
-                    SELECT
-                        NULL AS TableSchema,
-                        s.table_name AS TableName,
-                        s.column_name AS ColumnName,
-                        s.index_name AS IndexName,
-                        CASE WHEN s.non_unique = 0 THEN 1 ELSE 0 END AS IsUnique,
-                        COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount,
-                        s.seq_in_index - 1 AS Ordinal,
-                        CASE WHEN UPPER(COALESCE(s.collation, 'A')) = 'D' THEN 1 ELSE 0 END AS IsDescending
-                    FROM information_schema.statistics s
-                    INNER JOIN information_schema.columns c
-                        ON c.table_schema = s.table_schema
-                       AND c.table_name = s.table_name
-                       AND c.column_name = s.column_name
-                    WHERE s.table_schema = DATABASE()
-                      AND s.index_name <> 'PRIMARY'
-                      AND UPPER(COALESCE(NULLIF(s.index_type, ''), 'BTREE')) = 'BTREE'
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM information_schema.statistics bad
-                          INNER JOIN information_schema.columns bad_col
-                              ON bad_col.table_schema = bad.table_schema
-                             AND bad_col.table_name = bad.table_name
-                             AND bad_col.column_name = bad.column_name
-                          WHERE bad.table_schema = s.table_schema
-                            AND bad.table_name = s.table_name
-                            AND bad.index_name = s.index_name
-                            AND bad.sub_part IS NOT NULL
-                            AND (
-                                bad_col.character_maximum_length IS NULL
-                                OR bad.sub_part < bad_col.character_maximum_length
-                            )
-                      )
-                    ORDER BY s.table_schema, s.table_name, s.index_name, s.seq_in_index
-                    """).ConfigureAwait(false);
-                var expressionIndexKeys = (await GetMySqlExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false))
-                    .Select(static feature => feature.TableKey + "\u001f" + feature.Name)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (expressionIndexKeys.Count == 0)
-                    return indexes;
-
-                return indexes
-                    .Where(index => !expressionIndexKeys.Contains(index.TableKey + "\u001f" + index.IndexName))
-                    .ToArray();
-            }
-
-            return Array.Empty<ScaffoldIndex>();
+            return converted;
         }
 
         private static IReadOnlyList<ScaffoldIndex> FilterIndexesToScaffoldedTables(
@@ -1617,250 +627,37 @@ namespace nORM.Scaffolding
                 .Where(index => scaffoldedTableKeys.Contains(index.TableKey))
                 .ToArray();
 
-        private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
-        {
-            var sql = await GetSqliteIndexSqlAsync(connection, provider, schemaName, indexName).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(sql))
-                return null;
-
-            var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
-            return where < 0 ? null : sql[(where + 7)..].Trim();
-        }
-
-        private static async Task<string?> GetSqliteIndexSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
-        {
-            await using var cmd = connection.CreateCommand();
-            var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
-            cmd.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'index' AND name = @name";
-            var p = cmd.CreateParameter();
-            p.ParameterName = "@name";
-            p.Value = indexName;
-            cmd.Parameters.Add(p);
-            return Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldIndex>> QueryIndexesAsync(DbConnection connection, string sql)
-        {
-            var indexes = new List<ScaffoldIndex>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableName = Convert.ToString(reader["TableName"]);
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                var indexName = Convert.ToString(reader["IndexName"]);
-                if (string.IsNullOrWhiteSpace(tableName)
-                    || string.IsNullOrWhiteSpace(columnName)
-                    || string.IsNullOrWhiteSpace(indexName))
-                {
-                    continue;
-                }
-
-                var columnCount = Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture);
-                indexes.Add(new ScaffoldIndex(
-                    TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), tableName),
-                    columnName,
-                    indexName,
-                    Convert.ToBoolean(reader["IsUnique"], System.Globalization.CultureInfo.InvariantCulture),
-                    columnCount,
-                    Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture),
-                    ReaderHasColumn(reader, "IsDescending")
-                        && Convert.ToBoolean(reader["IsDescending"], System.Globalization.CultureInfo.InvariantCulture),
-                    ReaderHasColumn(reader, "IsIncluded")
-                        && Convert.ToBoolean(reader["IsIncluded"], System.Globalization.CultureInfo.InvariantCulture),
-                    ReaderHasColumn(reader, "FilterSql") ? NullIfWhiteSpace(Convert.ToString(reader["FilterSql"])) : null));
-            }
-
-            return indexes;
-        }
-
         private static async Task<IReadOnlyList<ScaffoldForeignKey>> GetForeignKeysAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
-            {
-                var foreignKeys = new List<ScaffoldForeignKey>();
-                foreach (var table in tables)
-                {
-                    await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = SqlitePragma(provider, table.Schema, "foreign_key_list", table.Name);
-                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-
-                    var rows = new List<(long Id, long Seq, string PrincipalTable, string DependentColumn, string PrincipalColumn, string OnUpdate, string OnDelete)>();
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        rows.Add((
-                            Convert.ToInt64(reader["id"]),
-                            Convert.ToInt64(reader["seq"]),
-                            Convert.ToString(reader["table"]) ?? string.Empty,
-                            Convert.ToString(reader["from"]) ?? string.Empty,
-                            Convert.ToString(reader["to"]) ?? string.Empty,
-                            Convert.ToString(reader["on_update"]) ?? string.Empty,
-                            Convert.ToString(reader["on_delete"]) ?? string.Empty));
-                    }
-
-                    foreach (var group in rows.GroupBy(r => r.Id))
-                    {
-                        var groupRows = group.OrderBy(r => r.Seq).ToArray();
-                        foreach (var row in groupRows)
-                        {
-                            if (string.IsNullOrWhiteSpace(row.PrincipalTable)
-                                || string.IsNullOrWhiteSpace(row.DependentColumn)
-                                || string.IsNullOrWhiteSpace(row.PrincipalColumn))
-                            {
-                                continue;
-                            }
-
-                            foreignKeys.Add(new ScaffoldForeignKey(
-                                DependentSchema: table.Schema,
-                                DependentTable: table.Name,
-                                DependentColumn: row.DependentColumn,
-                                PrincipalSchema: table.Schema,
-                                PrincipalTable: row.PrincipalTable,
-                                PrincipalColumn: row.PrincipalColumn,
-                                ConstraintName: "sqlite_fk_" + row.Id,
-                                ColumnCount: groupRows.Length,
-                                OnDelete: NormalizeReferentialAction(row.OnDelete),
-                                OnUpdate: NormalizeReferentialAction(row.OnUpdate),
-                                IsSyntheticConstraintName: true));
-                        }
-                    }
-                }
-
-                return foreignKeys;
-            }
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryForeignKeysAsync(connection, """
-                    SELECT
-                        SCHEMA_NAME(dep.schema_id) AS DependentSchema,
-                        dep.name AS DependentTable,
-                        dep_col.name AS DependentColumn,
-                        SCHEMA_NAME(principal.schema_id) AS PrincipalSchema,
-                        principal.name AS PrincipalTable,
-                        principal_col.name AS PrincipalColumn,
-                        fk.name AS ConstraintName,
-                        COUNT(*) OVER (PARTITION BY fk.object_id) AS ColumnCount,
-                        fk.delete_referential_action_desc AS OnDelete,
-                        fk.update_referential_action_desc AS OnUpdate
-                    FROM sys.foreign_keys fk
-                    INNER JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
-                    INNER JOIN sys.tables dep ON dep.object_id = fk.parent_object_id
-                    INNER JOIN sys.columns dep_col ON dep_col.object_id = dep.object_id AND dep_col.column_id = fkc.parent_column_id
-                    INNER JOIN sys.tables principal ON principal.object_id = fk.referenced_object_id
-                    INNER JOIN sys.columns principal_col ON principal_col.object_id = principal.object_id AND principal_col.column_id = fkc.referenced_column_id
-                    WHERE dep.is_ms_shipped = 0 AND principal.is_ms_shipped = 0
-                    ORDER BY SCHEMA_NAME(dep.schema_id), dep.name, fk.name, fkc.constraint_column_id
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryForeignKeysAsync(connection, """
-                    SELECT
-                        dep_ns.nspname AS DependentSchema,
-                        dep.relname AS DependentTable,
-                        dep_att.attname AS DependentColumn,
-                        principal_ns.nspname AS PrincipalSchema,
-                        principal.relname AS PrincipalTable,
-                        principal_att.attname AS PrincipalColumn,
-                        con.conname AS ConstraintName,
-                        array_length(con.conkey, 1) AS ColumnCount,
-                        CASE con.confdeltype
-                            WHEN 'c' THEN 'CASCADE'
-                            WHEN 'n' THEN 'SET NULL'
-                            WHEN 'd' THEN 'SET DEFAULT'
-                            WHEN 'r' THEN 'RESTRICT'
-                            ELSE 'NO ACTION'
-                        END AS OnDelete,
-                        CASE con.confupdtype
-                            WHEN 'c' THEN 'CASCADE'
-                            WHEN 'n' THEN 'SET NULL'
-                            WHEN 'd' THEN 'SET DEFAULT'
-                            WHEN 'r' THEN 'RESTRICT'
-                            ELSE 'NO ACTION'
-                        END AS OnUpdate
-                    FROM pg_constraint con
-                    INNER JOIN pg_class dep ON dep.oid = con.conrelid
-                    INNER JOIN pg_namespace dep_ns ON dep_ns.oid = dep.relnamespace
-                    INNER JOIN pg_class principal ON principal.oid = con.confrelid
-                    INNER JOIN pg_namespace principal_ns ON principal_ns.oid = principal.relnamespace
-                    INNER JOIN unnest(con.conkey, con.confkey) WITH ORDINALITY AS key_pair(dep_attnum, principal_attnum, ord) ON true
-                    INNER JOIN pg_attribute dep_att ON dep_att.attrelid = dep.oid AND dep_att.attnum = key_pair.dep_attnum
-                    INNER JOIN pg_attribute principal_att ON principal_att.attrelid = principal.oid AND principal_att.attnum = key_pair.principal_attnum
-                    WHERE con.contype = 'f'
-                      AND dep_ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    ORDER BY dep_ns.nspname, dep.relname, con.conname, key_pair.ord
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryForeignKeysAsync(connection, """
-                    SELECT
-                        NULL AS DependentSchema,
-                        kcu.table_name AS DependentTable,
-                        kcu.column_name AS DependentColumn,
-                        NULL AS PrincipalSchema,
-                        kcu.referenced_table_name AS PrincipalTable,
-                        kcu.referenced_column_name AS PrincipalColumn,
-                        kcu.constraint_name AS ConstraintName,
-                        COUNT(*) OVER (PARTITION BY kcu.constraint_schema, kcu.table_name, kcu.constraint_name) AS ColumnCount,
-                        rc.delete_rule AS OnDelete,
-                        rc.update_rule AS OnUpdate
-                    FROM information_schema.key_column_usage kcu
-                    INNER JOIN information_schema.referential_constraints rc
-                        ON rc.constraint_schema = kcu.constraint_schema
-                       AND rc.constraint_name = kcu.constraint_name
-                       AND rc.table_name = kcu.table_name
-                    WHERE kcu.table_schema = DATABASE()
-                      AND kcu.referenced_table_name IS NOT NULL
-                    ORDER BY kcu.table_schema, kcu.table_name, kcu.constraint_name, kcu.ordinal_position
-                    """).ConfigureAwait(false);
-            }
-
-            return Array.Empty<ScaffoldForeignKey>();
+            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            var foreignKeys = await ScaffoldForeignKeyDiscovery.GetForeignKeysAsync(connection, provider, tableInfos).ConfigureAwait(false);
+            return ConvertForeignKeys(foreignKeys);
         }
 
-        private static async Task<IReadOnlyList<ScaffoldForeignKey>> QueryForeignKeysAsync(DbConnection connection, string sql)
+        private static IReadOnlyList<ScaffoldForeignKey> ConvertForeignKeys(IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys)
         {
-            var foreignKeys = new List<ScaffoldForeignKey>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
+            var converted = new ScaffoldForeignKey[foreignKeys.Count];
+            for (var i = 0; i < foreignKeys.Count; i++)
             {
-                var dependentTable = Convert.ToString(reader["DependentTable"]);
-                var dependentColumn = Convert.ToString(reader["DependentColumn"]);
-                var principalTable = Convert.ToString(reader["PrincipalTable"]);
-                var principalColumn = Convert.ToString(reader["PrincipalColumn"]);
-                if (string.IsNullOrWhiteSpace(dependentTable)
-                    || string.IsNullOrWhiteSpace(dependentColumn)
-                    || string.IsNullOrWhiteSpace(principalTable)
-                    || string.IsNullOrWhiteSpace(principalColumn))
-                {
-                    continue;
-                }
-
-                foreignKeys.Add(new ScaffoldForeignKey(
-                    NullIfWhiteSpace(Convert.ToString(reader["DependentSchema"])),
-                    dependentTable,
-                    dependentColumn,
-                    NullIfWhiteSpace(Convert.ToString(reader["PrincipalSchema"])),
-                    principalTable,
-                    principalColumn,
-                    Convert.ToString(reader["ConstraintName"]) ?? string.Empty,
-                    Convert.ToInt32(reader["ColumnCount"], System.Globalization.CultureInfo.InvariantCulture),
-                    ReaderHasColumn(reader, "OnDelete") ? NormalizeReferentialAction(Convert.ToString(reader["OnDelete"])) : "NO ACTION",
-                    ReaderHasColumn(reader, "OnUpdate") ? NormalizeReferentialAction(Convert.ToString(reader["OnUpdate"])) : "NO ACTION"));
+                var foreignKey = foreignKeys[i];
+                converted[i] = new ScaffoldForeignKey(
+                    foreignKey.DependentSchema,
+                    foreignKey.DependentTable,
+                    foreignKey.DependentColumn,
+                    foreignKey.PrincipalSchema,
+                    foreignKey.PrincipalTable,
+                    foreignKey.PrincipalColumn,
+                    foreignKey.ConstraintName,
+                    foreignKey.ColumnCount,
+                    foreignKey.OnDelete,
+                    foreignKey.OnUpdate,
+                    foreignKey.IsSyntheticConstraintName);
             }
 
-            return foreignKeys;
+            return converted;
         }
 
         private static IReadOnlyList<ScaffoldForeignKey> FilterForeignKeysToScaffoldedTables(
@@ -1910,712 +707,82 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTable> tables)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var features = new List<ScaffoldUnsupportedFeature>();
             var providerName = provider.GetType().Name;
 
             if (provider is SqliteProvider)
-            {
-                var sqliteCreateSqlByTable = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-                foreach (var table in tables)
-                {
-                    var tableKey = TableKey(table.Schema, table.Name);
-                    var createSql = await GetSqliteCreateTableSqlAsync(connection, provider, table).ConfigureAwait(false);
-                    sqliteCreateSqlByTable[tableKey] = createSql;
-                    var generatedColumns = ExtractSqliteGeneratedColumns(createSql);
-                    await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
-                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var name = Convert.ToString(reader["name"]) ?? string.Empty;
-                        var declaredType = Convert.ToString(reader["type"]);
-                        var defaultValue = Convert.ToString(reader["dflt_value"]);
-                        var hidden = Convert.ToInt32(reader["hidden"], System.Globalization.CultureInfo.InvariantCulture);
-                        if (!string.IsNullOrWhiteSpace(defaultValue))
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Default", name, defaultValue));
-                        if (hidden is 2 or 3)
-                        {
-                            var detail = generatedColumns.TryGetValue(name, out var generated)
-                                ? generated.Sql + (generated.Stored ? " STORED" : " VIRTUAL")
-                                : "SQLite generated column";
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "Computed", name, detail));
-                        }
-                        if (IsSqliteProviderSpecificDeclaredType(declaredType))
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ProviderSpecificColumnType", name, declaredType!));
-                    }
-                }
-
-                foreach (var table in tables)
-                {
-                    sqliteCreateSqlByTable.TryGetValue(TableKey(table.Schema, table.Name), out var createSql);
-                    foreach (var check in ExtractSqliteCheckConstraints(table.Name, createSql))
-                    {
-                        features.Add(new ScaffoldUnsupportedFeature(
-                            TableKey(table.Schema, table.Name),
-                            "CheckConstraint",
-                            check.Name,
-                            check.Sql));
-                    }
-
-                    foreach (var (columnName, collation) in ExtractSqliteColumnCollations(createSql))
-                    {
-                        features.Add(new ScaffoldUnsupportedFeature(
-                            TableKey(table.Schema, table.Name),
-                            "Collation",
-                            columnName,
-                            collation));
-                    }
-                }
-
-                foreach (var schema in await GetSqliteSchemasAsync(connection).ConfigureAwait(false))
-                {
-                    await using var triggerCmd = connection.CreateCommand();
-                    triggerCmd.CommandText = $"SELECT {SqliteSchemaResult(schema)} AS TableSchema, tbl_name AS TableName, name AS TriggerName, sql AS TriggerSql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'trigger'";
-                    await using var triggerReader = await triggerCmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    while (await triggerReader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var tableName = Convert.ToString(triggerReader["TableName"]);
-                        var triggerName = Convert.ToString(triggerReader["TriggerName"]);
-                        var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(triggerReader["TableSchema"])), tableName ?? string.Empty);
-                        if (!string.IsNullOrWhiteSpace(tableName) && tableKeys.Contains(tableKey))
-                        {
-                            var triggerSql = NullIfWhiteSpace(Convert.ToString(triggerReader["TriggerSql"]));
-                            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-                            {
-                                ["provider"] = "SQLite",
-                                ["providerObjectKind"] = "Trigger",
-                                ["table"] = tableKey,
-                                ["triggerName"] = triggerName ?? string.Empty,
-                                ["providerOwnedDdl"] = true,
-                                ["generatedModelConfigurationSupported"] = false,
-                                ["definitionAvailable"] = triggerSql is not null
-                            };
-                            if (triggerSql is not null)
-                                metadata["triggerSql"] = triggerSql;
-                            var feature = new ScaffoldUnsupportedFeature(tableKey, "Trigger", triggerName ?? string.Empty, "SQLite trigger")
-                            {
-                                Metadata = metadata
-                            };
-                            features.Add(feature);
-                        }
-                    }
-                }
-
-                foreach (var table in tables)
-                {
-                    await using var listCommand = connection.CreateCommand();
-                    listCommand.CommandText = SqlitePragma(provider, table.Schema, "index_list", table.Name);
-                    await using var listReader = await listCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                    var indexRows = new List<(string Name, bool IsPartial, string Origin)>();
-                    while (await listReader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var indexName = Convert.ToString(listReader["name"]);
-                        if (string.IsNullOrWhiteSpace(indexName))
-                            continue;
-
-                        indexRows.Add((
-                            indexName,
-                            ReaderHasColumn(listReader, "partial")
-                                && Convert.ToInt32(listReader["partial"], System.Globalization.CultureInfo.InvariantCulture) != 0,
-                            Convert.ToString(listReader["origin"]) ?? string.Empty));
-                    }
-
-                    foreach (var (indexName, isPartial, origin) in indexRows)
-                    {
-                        if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        string? indexSql = null;
-                        if (isPartial)
-                        {
-                            indexSql = await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
-                            features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "PartialIndex", indexName, indexSql ?? "SQLite partial index"));
-                        }
-
-                        await using var infoCommand = connection.CreateCommand();
-                        infoCommand.CommandText = SqlitePragma(provider, table.Schema, "index_xinfo", indexName);
-                        await using var infoReader = await infoCommand.ExecuteReaderAsync().ConfigureAwait(false);
-                        var reportedDescending = false;
-                        while (await infoReader.ReadAsync().ConfigureAwait(false))
-                        {
-                            if (ReaderHasColumn(infoReader, "key")
-                                && Convert.ToInt32(infoReader["key"], System.Globalization.CultureInfo.InvariantCulture) == 0)
-                            {
-                                continue;
-                            }
-
-                            if (ReaderHasColumn(infoReader, "cid")
-                                && Convert.ToInt32(infoReader["cid"], System.Globalization.CultureInfo.InvariantCulture) < 0)
-                            {
-                                indexSql ??= await GetSqliteIndexSqlAsync(connection, provider, table.Schema, indexName).ConfigureAwait(false);
-                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "ExpressionIndex", indexName, indexSql ?? "SQLite expression index"));
-                                if (!reportedDescending
-                                    && ReaderHasColumn(infoReader, "desc")
-                                    && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0)
-                                {
-                                    features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "DescendingIndex", indexName, indexSql ?? "SQLite descending expression index key"));
-                                    reportedDescending = true;
-                                }
-
-                                break;
-                            }
-
-                            if (!reportedDescending
-                                && ReaderHasColumn(infoReader, "desc")
-                                && Convert.ToInt32(infoReader["desc"], System.Globalization.CultureInfo.InvariantCulture) != 0)
-                            {
-                                features.Add(new ScaffoldUnsupportedFeature(TableKey(table.Schema, table.Name), "DescendingIndex", indexName, "SQLite descending index key"));
-                                reportedDescending = true;
-                            }
-                        }
-                    }
-                }
-
-                return features;
-            }
+                return await GetSqliteUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
 
             if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
-                    SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ObjectName, 'Default' AS Kind, dc.definition AS Detail
-                    FROM sys.default_constraints dc
-                    INNER JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
-                    INNER JOIN sys.tables t ON t.object_id = dc.parent_object_id
-                    WHERE t.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Computed',
-                        CONCAT(cc.definition, CASE WHEN cc.is_persisted = 1 THEN ' PERSISTED' ELSE '' END)
-                    FROM sys.computed_columns cc
-                    INNER JOIN sys.columns c ON c.object_id = cc.object_id AND c.column_id = cc.column_id
-                    INNER JOIN sys.tables t ON t.object_id = cc.object_id
-                    WHERE t.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, cc.name, 'CheckConstraint', cc.definition
-                    FROM sys.check_constraints cc
-                    INNER JOIN sys.tables t ON t.object_id = cc.parent_object_id
-                    WHERE t.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'Collation', c.collation_name
-                    FROM sys.columns c
-                    INNER JOIN sys.tables t ON t.object_id = c.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND c.collation_name IS NOT NULL
-                      AND c.collation_name <> CONVERT(sysname, DATABASEPROPERTYEX(DB_NAME(), 'Collation'))
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'ProviderSpecificColumnType',
-                        CASE
-                            WHEN ty.is_user_defined = 1
-                            THEN CONCAT(
-                                'user-defined type (',
-                                SCHEMA_NAME(ty.schema_id),
-                                '.',
-                                ty.name,
-                                CASE WHEN base_ty.name IS NULL THEN '' ELSE CONCAT(' -> ', base_ty.name) END,
-                                ')')
-                            ELSE ty.name
-                        END
-                    FROM sys.columns c
-                    INNER JOIN sys.tables t ON t.object_id = c.object_id
-                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-                    LEFT JOIN sys.types base_ty
-                      ON ty.is_user_defined = 1
-                     AND base_ty.user_type_id = ty.system_type_id
-                     AND base_ty.is_user_defined = 0
-                    WHERE t.is_ms_shipped = 0
-                      AND (ty.is_user_defined = 1 OR ty.name IN ('geography', 'geometry', 'hierarchyid', 'sql_variant', 'xml'))
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'PrecisionScale',
-                        ty.name + '(' + CONVERT(varchar(10), c.precision) + ',' + CONVERT(varchar(10), c.scale) + ')'
-                    FROM sys.columns c
-                    INNER JOIN sys.tables t ON t.object_id = c.object_id
-                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-                    WHERE t.is_ms_shipped = 0
-                      AND ty.name IN ('decimal', 'numeric')
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'RowVersion', ty.name
-                    FROM sys.columns c
-                    INNER JOIN sys.tables t ON t.object_id = c.object_id
-                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-                    WHERE t.is_ms_shipped = 0
-                      AND ty.name IN ('timestamp', 'rowversion')
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, c.name, 'IdentityStrategy',
-                        'IDENTITY(' + CONVERT(varchar(40), ic.seed_value) + ',' + CONVERT(varchar(40), ic.increment_value) + ')'
-                    FROM sys.identity_columns ic
-                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND (CONVERT(decimal(38,0), ic.seed_value) <> 1 OR CONVERT(decimal(38,0), ic.increment_value) <> 1)
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, tr.name, 'Trigger',
-                        CONCAT(
-                            'SQL Server trigger; timing=',
-                            CASE WHEN tr.is_instead_of_trigger = 1 THEN 'INSTEAD OF' ELSE 'AFTER' END,
-                            '; isDisabled=',
-                            CASE WHEN tr.is_disabled = 1 THEN 'true' ELSE 'false' END,
-                            '; isInsteadOf=',
-                            CASE WHEN tr.is_instead_of_trigger = 1 THEN 'true' ELSE 'false' END)
-                    FROM sys.triggers tr
-                    INNER JOIN sys.tables t ON t.object_id = tr.parent_id
-                    WHERE t.is_ms_shipped = 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, t.name, 'TemporalTable',
-                        CONCAT(
-                            CASE t.temporal_type WHEN 1 THEN 'SQL Server temporal history table' ELSE 'SQL Server system-versioned temporal table' END,
-                            '; temporalType=',
-                            CASE t.temporal_type WHEN 1 THEN 'history' ELSE 'system-versioned' END,
-                            CASE
-                                WHEN t.history_table_id IS NOT NULL AND t.history_table_id <> 0 AND h.object_id IS NOT NULL
-                                THEN CONCAT('; historyTable=', SCHEMA_NAME(h.schema_id), '.', h.name)
-                                ELSE ''
-                            END)
-                    FROM sys.tables t
-                    LEFT JOIN sys.tables h ON h.object_id = t.history_table_id
-                    WHERE t.is_ms_shipped = 0 AND t.temporal_type <> 0
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'PartialIndex', 'SQL Server filtered index'
-                    FROM sys.indexes i
-                    INNER JOIN sys.tables t ON t.object_id = i.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND i.is_primary_key = 0
-                      AND i.has_filter = 1
-                      AND i.name IS NOT NULL
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'IncludedColumnIndex', 'SQL Server index with included columns'
-                    FROM sys.indexes i
-                    INNER JOIN sys.tables t ON t.object_id = i.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND i.is_primary_key = 0
-                      AND i.name IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1
-                          FROM sys.index_columns included
-                          WHERE included.object_id = i.object_id
-                            AND included.index_id = i.index_id
-                            AND included.is_included_column = 1
-                      )
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'DescendingIndex', 'SQL Server descending index key'
-                    FROM sys.indexes i
-                    INNER JOIN sys.tables t ON t.object_id = i.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND i.is_primary_key = 0
-                      AND i.name IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1
-                          FROM sys.index_columns ic
-                          WHERE ic.object_id = i.object_id
-                            AND ic.index_id = i.index_id
-                            AND ic.key_ordinal > 0
-                            AND ic.is_descending_key = 1
-                      )
-                    UNION ALL
-                    SELECT SCHEMA_NAME(t.schema_id), t.name, i.name, 'ProviderSpecificIndex',
-                        CONCAT(
-                            'SQL Server provider-specific index; indexType=',
-                            CONVERT(nvarchar(128), i.type_desc) COLLATE DATABASE_DEFAULT)
-                    FROM sys.indexes i
-                    INNER JOIN sys.tables t ON t.object_id = i.object_id
-                    WHERE t.is_ms_shipped = 0
-                      AND i.is_primary_key = 0
-                      AND i.is_hypothetical = 0
-                      AND i.name IS NOT NULL
-                      AND i.type NOT IN (1, 2)
-                    """).ConfigureAwait(false);
-                return features;
-            }
+                return await GetSqlServerUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
 
             if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default::text AS Detail
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND column_default IS NOT NULL
-                      AND is_identity <> 'YES'
-                      AND column_default NOT LIKE 'nextval(%'
-                    UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Computed', (generation_expression || ' STORED')::text
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND is_generated <> 'NEVER'
-                    UNION ALL
-                    SELECT event_object_schema, event_object_table, trigger_name, 'Trigger',
-                        ('PostgreSQL trigger; timing=' || action_timing || '; event=' || event_manipulation || '; orientation=' || action_orientation)::text
-                    FROM information_schema.triggers
-                    WHERE event_object_schema NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, con.conname, 'CheckConstraint', pg_get_constraintdef(con.oid)::text
-                    FROM pg_constraint con
-                    INNER JOIN pg_class tbl ON tbl.oid = con.conrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    WHERE con.contype = 'c'
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT table_schema, table_name, column_name, 'Collation', collation_name::text
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND collation_name IS NOT NULL
-                    UNION ALL
-                    SELECT table_schema, table_name, column_name, 'ProviderSpecificColumnType',
-                        (CASE
-                            WHEN domain_name IS NOT NULL AND domain_name <> ''
-                            THEN 'DOMAIN (' ||
-                                 CASE WHEN domain_schema IS NOT NULL AND domain_schema <> '' THEN domain_schema || '.' ELSE '' END ||
-                                 domain_name || ' -> ' ||
-                                 CASE WHEN udt_name IS NULL OR udt_name = '' THEN data_type ELSE data_type || ' (' || udt_name || ')' END ||
-                                 ')'
-                            WHEN data_type = 'USER-DEFINED'
-                                 AND EXISTS (
-                                     SELECT 1
-                                     FROM pg_type enum_type
-                                     INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
-                                     WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
-                                       AND enum_type.typname = udt_name
-                                       AND enum_type.typtype = 'e'
-                                 )
-                            THEN 'ENUM (' ||
-                                 CASE WHEN udt_schema IS NOT NULL AND udt_schema <> '' THEN udt_schema || '.' ELSE '' END ||
-                                 udt_name || ': ' ||
-                                 COALESCE((
-                                     SELECT string_agg(quote_literal(enum_value.enumlabel), ',' ORDER BY enum_value.enumsortorder)
-                                     FROM pg_type enum_type
-                                     INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
-                                     INNER JOIN pg_enum enum_value ON enum_value.enumtypid = enum_type.oid
-                                     WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
-                                       AND enum_type.typname = udt_name
-                                       AND enum_type.typtype = 'e'
-                                 ), '') ||
-                                 ')'
-                            WHEN udt_name IS NULL OR udt_name = '' THEN data_type
-                            ELSE data_type || ' (' || udt_name || ')'
-                        END)::text
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND (
-                          domain_name IS NOT NULL
-                          OR
-                          data_type IN ('ARRAY', 'USER-DEFINED', 'json', 'jsonb', 'xml')
-                          OR udt_name IN ('json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8', 'tsvector', 'tsquery')
-                      )
-                    UNION ALL
-                    SELECT table_schema, table_name, column_name, 'PrecisionScale',
-                        ('numeric(' || numeric_precision || ',' || numeric_scale || ')')::text
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND data_type = 'numeric'
-                      AND numeric_precision IS NOT NULL
-                      AND numeric_scale IS NOT NULL
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'PartialIndex', 'PostgreSQL partial index'::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    WHERE ix.indisprimary = false
-                      AND ix.indpred IS NOT NULL
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'ExpressionIndex', pg_get_indexdef(ix.indexrelid)::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    WHERE ix.indisprimary = false
-                      AND ix.indexprs IS NOT NULL
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'IncludedColumnIndex', pg_get_indexdef(ix.indexrelid)::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    WHERE ix.indisprimary = false
-                      AND ix.indnatts <> ix.indnkeyatts
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'DescendingIndex', pg_get_indexdef(ix.indexrelid)::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    WHERE ix.indisprimary = false
-                      AND EXISTS (
-                          SELECT 1
-                          FROM unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord)
-                          WHERE key.ord <= ix.indnkeyatts
-                            AND (ix.indoption[key.ord - 1] & 1) = 1
-                      )
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'ProviderSpecificIndex',
-                        ('PostgreSQL provider-specific index; accessMethod=' || am.amname ||
-                         '; indexSql=' || pg_get_indexdef(ix.indexrelid))::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    INNER JOIN pg_am am ON am.oid = idx.relam
-                    WHERE ix.indisprimary = false
-                      AND am.amname <> 'btree'
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    UNION ALL
-                    SELECT ns.nspname, tbl.relname, idx.relname, 'ProviderSpecificIndex',
-                        ('PostgreSQL btree index with provider-specific key options' ||
-                         '; accessMethod=btree' ||
-                         '; hasNullsNotDistinct=' ||
-                         CASE WHEN COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) THEN 'true' ELSE 'false' END ||
-                         '; hasNonDefaultOperatorClass=' ||
-                         CASE WHEN EXISTS (
-                             SELECT 1
-                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
-                             INNER JOIN pg_opclass option_opclass
-                                 ON option_opclass.oid = ix.indclass[option_key.ord - 1]
-                             WHERE option_key.ord <= ix.indnkeyatts
-                               AND option_opclass.opcdefault = false
-                         ) THEN 'true' ELSE 'false' END ||
-                         '; hasIndexCollation=' ||
-                         CASE WHEN EXISTS (
-                             SELECT 1
-                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
-                             INNER JOIN pg_attribute option_att
-                                 ON option_att.attrelid = tbl.oid
-                                AND option_att.attnum = option_key.attnum
-                             WHERE option_key.ord <= ix.indnkeyatts
-                               AND ix.indcollation[option_key.ord - 1] <> 0
-                               AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
-                         ) THEN 'true' ELSE 'false' END ||
-                         '; hasNonDefaultNullOrdering=' ||
-                         CASE WHEN EXISTS (
-                             SELECT 1
-                             FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
-                             WHERE option_key.ord <= ix.indnkeyatts
-                               AND (
-                                   ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
-                                   OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
-                               )
-                         ) THEN 'true' ELSE 'false' END ||
-                         '; indexSql=' || pg_get_indexdef(ix.indexrelid))::text
-                    FROM pg_index ix
-                    INNER JOIN pg_class idx ON idx.oid = ix.indexrelid
-                    INNER JOIN pg_class tbl ON tbl.oid = ix.indrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-                    INNER JOIN pg_am am ON am.oid = idx.relam
-                    WHERE ix.indisprimary = false
-                      AND am.amname = 'btree'
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                      AND (
-                          COALESCE((to_jsonb(ix)->>'indnullsnotdistinct')::boolean, false) = true
-                          OR EXISTS (
-                              SELECT 1
-                              FROM unnest(ix.indkey) WITH ORDINALITY AS option_key(attnum, ord)
-                              LEFT JOIN pg_attribute option_att
-                                  ON option_att.attrelid = tbl.oid
-                                 AND option_att.attnum = option_key.attnum
-                              INNER JOIN pg_opclass option_opclass
-                                  ON option_opclass.oid = ix.indclass[option_key.ord - 1]
-                              WHERE option_key.ord <= ix.indnkeyatts
-                                AND (
-                                    option_opclass.opcdefault = false
-                                    OR (
-                                        option_att.attnum IS NOT NULL
-                                        AND ix.indcollation[option_key.ord - 1] <> 0
-                                        AND ix.indcollation[option_key.ord - 1] <> option_att.attcollation
-                                    )
-                                    OR (
-                                        ((ix.indoption[option_key.ord - 1] & 1) = 0 AND (ix.indoption[option_key.ord - 1] & 2) = 2)
-                                        OR ((ix.indoption[option_key.ord - 1] & 1) = 1 AND (ix.indoption[option_key.ord - 1] & 2) = 0)
-                                    )
-                                )
-                          )
-                      )
-                    """).ConfigureAwait(false);
-                return features;
-            }
+                return await GetPostgresUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
 
             if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                await AddUnsupportedFeaturesAsync(connection, features, tableKeys, """
-                    SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default AS Detail
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE() AND column_default IS NOT NULL
-                    UNION ALL
-                    SELECT NULL, table_name, column_name, 'Computed',
-                        CONCAT(
-                            generation_expression,
-                            CASE
-                                WHEN LOWER(COALESCE(extra, '')) LIKE '%stored generated%' THEN ' STORED'
-                                WHEN LOWER(COALESCE(extra, '')) LIKE '%virtual generated%' THEN ' VIRTUAL'
-                                ELSE ''
-                            END)
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE() AND generation_expression IS NOT NULL AND generation_expression <> ''
-                    UNION ALL
-                    SELECT NULL, event_object_table, trigger_name, 'Trigger',
-                        CONCAT('MySQL trigger; timing=', action_timing, '; event=', event_manipulation, '; orientation=', action_orientation)
-                    FROM information_schema.triggers
-                    WHERE trigger_schema = DATABASE()
-                    UNION ALL
-                    SELECT NULL, tc.table_name, tc.constraint_name, 'CheckConstraint', cc.check_clause
-                    FROM information_schema.table_constraints tc
-                    INNER JOIN information_schema.check_constraints cc
-                        ON cc.constraint_schema = tc.constraint_schema
-                       AND cc.constraint_name = tc.constraint_name
-                    WHERE tc.table_schema = DATABASE() AND tc.constraint_type = 'CHECK'
-                    UNION ALL
-                    SELECT NULL, c.table_name, c.column_name, 'Collation', c.collation_name
-                    FROM information_schema.columns c
-                    INNER JOIN information_schema.schemata s ON s.schema_name = c.table_schema
-                    WHERE c.table_schema = DATABASE()
-                      AND c.collation_name IS NOT NULL
-                      AND c.collation_name <> s.default_collation_name
-                    UNION ALL
-                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType',
-                        CASE
-                            WHEN data_type IN ('enum', 'set')
-                                 AND column_type IS NOT NULL
-                                 AND column_type <> ''
-                            THEN column_type
-                            ELSE data_type
-                        END
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND data_type IN (
-                          'json',
-                          'geometry',
-                          'point',
-                          'linestring',
-                          'polygon',
-                          'multipoint',
-                          'multilinestring',
-                          'multipolygon',
-                          'geometrycollection',
-                          'enum',
-                          'set',
-                          'year'
-                      )
-                    UNION ALL
-                    SELECT NULL, table_name, column_name, 'ProviderSpecificColumnType', column_type
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND LOWER(COALESCE(column_type, '')) LIKE '%unsigned%'
-                      AND data_type IN ('tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint')
-                    UNION ALL
-                    SELECT NULL, table_name, column_name, 'PrecisionScale',
-                        CONCAT(data_type, '(', numeric_precision, ',', numeric_scale, ')')
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND data_type IN ('decimal', 'numeric')
-                      AND numeric_precision IS NOT NULL
-                      AND numeric_scale IS NOT NULL
-                    UNION ALL
-                    SELECT DISTINCT NULL, table_name, index_name, 'DescendingIndex', 'MySQL descending index key'
-                    FROM information_schema.statistics
-                    WHERE table_schema = DATABASE()
-                      AND index_name <> 'PRIMARY'
-                      AND collation = 'D'
-                    UNION ALL
-                    SELECT NULL, s.table_name, s.index_name, 'PrefixIndex',
-                        CONCAT(
-                            'MySQL prefix index; prefixColumns=',
-                            GROUP_CONCAT(
-                                CONCAT(
-                                    s.column_name,
-                                    ':',
-                                    s.sub_part,
-                                    '/',
-                                    COALESCE(CAST(c.character_maximum_length AS CHAR), '')
-                                )
-                                ORDER BY s.seq_in_index
-                                SEPARATOR ','
-                            )
-                        )
-                    FROM information_schema.statistics s
-                    INNER JOIN information_schema.columns c
-                        ON c.table_schema = s.table_schema
-                       AND c.table_name = s.table_name
-                       AND c.column_name = s.column_name
-                    WHERE s.table_schema = DATABASE()
-                      AND s.index_name <> 'PRIMARY'
-                      AND s.sub_part IS NOT NULL
-                      AND (
-                          c.character_maximum_length IS NULL
-                          OR s.sub_part < c.character_maximum_length
-                      )
-                    GROUP BY s.table_name, s.index_name
-                    UNION ALL
-                    SELECT DISTINCT NULL, table_name, index_name, 'ProviderSpecificIndex',
-                        CONCAT('MySQL provider-specific index; indexType=', index_type)
-                    FROM information_schema.statistics
-                    WHERE table_schema = DATABASE()
-                      AND index_name <> 'PRIMARY'
-                      AND UPPER(COALESCE(NULLIF(index_type, ''), 'BTREE')) <> 'BTREE'
-                    """).ConfigureAwait(false);
-                features.AddRange(await GetMySqlExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
-            }
+                return await GetMySqlUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
 
-            return features;
+            return Array.Empty<ScaffoldUnsupportedFeature>();
         }
 
-        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetMySqlExpressionIndexFeaturesAsync(
+        private static IReadOnlyList<ScaffoldUnsupportedFeature> ConvertUnsupportedFeatures(
+            IReadOnlyList<ScaffoldUnsupportedFeatureInfo> features)
+        {
+            var converted = new ScaffoldUnsupportedFeature[features.Count];
+            for (var i = 0; i < features.Count; i++)
+            {
+                var feature = features[i];
+                converted[i] = new ScaffoldUnsupportedFeature(
+                    feature.TableKey,
+                    feature.Kind,
+                    feature.Name,
+                    feature.Detail)
+                {
+                    Metadata = feature.Metadata
+                };
+            }
+
+            return converted;
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqliteUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<ScaffoldTable> tables)
+            IReadOnlyList<ScaffoldTable> tables,
+            HashSet<string> tableKeys)
         {
-            var features = new List<ScaffoldUnsupportedFeature>();
-            foreach (var table in tables)
-            {
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SHOW INDEX FROM {provider.Escape(table.Name)}";
-                await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                if (!ReaderHasColumn(reader, "Expression"))
-                    continue;
-
-                var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    var expression = NullIfWhiteSpace(Convert.ToString(reader["Expression"]));
-                    if (expression is null)
-                        continue;
-
-                    var indexName = Convert.ToString(reader["Key_name"]);
-                    if (string.IsNullOrWhiteSpace(indexName)
-                        || string.Equals(indexName, "PRIMARY", StringComparison.OrdinalIgnoreCase)
-                        || !reported.Add(indexName))
-                    {
-                        continue;
-                    }
-
-                    features.Add(new ScaffoldUnsupportedFeature(
-                        TableKey(table.Schema, table.Name),
-                        "ExpressionIndex",
-                        indexName,
-                        "MySQL expression index; expression=" + expression));
-                }
-            }
-
-            return features;
+            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            var features = await ScaffoldSqliteUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, tableInfos, tableKeys).ConfigureAwait(false);
+            return ConvertUnsupportedFeatures(features);
         }
 
-        private static async Task AddUnsupportedFeaturesAsync(
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqlServerUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
-            List<ScaffoldUnsupportedFeature> features,
-            HashSet<string> tableKeys,
-            string sql)
+            HashSet<string> tableKeys)
         {
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
-                if (!tableKeys.Contains(tableKey))
-                    continue;
-                features.Add(new ScaffoldUnsupportedFeature(
-                    tableKey,
-                    Convert.ToString(reader["Kind"]) ?? string.Empty,
-                    Convert.ToString(reader["ObjectName"]) ?? string.Empty,
-                    Convert.ToString(reader["Detail"]) ?? string.Empty));
-            }
+            var features = await ScaffoldSqlServerUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
+            return ConvertUnsupportedFeatures(features);
         }
+
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresUnsupportedSchemaFeaturesAsync(
+            DbConnection connection,
+            HashSet<string> tableKeys)
+        {
+            var features = await ScaffoldPostgresUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
+            return ConvertUnsupportedFeatures(features);
+        }
+
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetMySqlUnsupportedSchemaFeaturesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables,
+            HashSet<string> tableKeys)
+        {
+            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            var features = await ScaffoldMySqlUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, tableInfos, tableKeys).ConfigureAwait(false);
+            return ConvertUnsupportedFeatures(features);
+        }
+
+
 
         private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresEnumColumnFeaturesAsync(
             DbConnection connection,
@@ -2626,42 +793,8 @@ namespace nORM.Scaffolding
                 return Array.Empty<ScaffoldUnsupportedFeature>();
 
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var features = new List<ScaffoldUnsupportedFeature>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT c.table_schema AS TableSchema,
-                       c.table_name AS TableName,
-                       c.column_name AS ColumnName,
-                       'ENUM (' ||
-                       CASE WHEN c.udt_schema IS NOT NULL AND c.udt_schema <> '' THEN c.udt_schema || '.' ELSE '' END ||
-                       c.udt_name || ': ' ||
-                       string_agg(quote_literal(e.enumlabel), ',' ORDER BY e.enumsortorder) ||
-                       ')' AS Detail
-                FROM information_schema.columns c
-                INNER JOIN pg_namespace ns ON ns.nspname = COALESCE(c.udt_schema, c.table_schema)
-                INNER JOIN pg_type t ON t.typnamespace = ns.oid AND t.typname = c.udt_name AND t.typtype = 'e'
-                INNER JOIN pg_enum e ON e.enumtypid = t.oid
-                WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
-                  AND c.data_type = 'USER-DEFINED'
-                GROUP BY c.table_schema, c.table_name, c.column_name, c.udt_schema, c.udt_name
-                """;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableKey = TableKey(
-                    NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])),
-                    Convert.ToString(reader["TableName"]) ?? string.Empty);
-                if (!tableKeys.Contains(tableKey))
-                    continue;
-
-                features.Add(new ScaffoldUnsupportedFeature(
-                    tableKey,
-                    "ProviderSpecificColumnType",
-                    Convert.ToString(reader["ColumnName"]) ?? string.Empty,
-                    Convert.ToString(reader["Detail"]) ?? string.Empty));
-            }
-
-            return features;
+            var features = await ScaffoldPostgresUnsupportedFeatureDiscovery.GetEnumColumnFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
+            return ConvertUnsupportedFeatures(features);
         }
 
         private static void AddMissingPrimaryKeyDiagnostics(
@@ -2783,425 +916,193 @@ namespace nORM.Scaffolding
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-        {
-            foreach (var group in foreignKeys
-                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
-            {
-                if (ReferencesScaffoldablePrincipalKey(group, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                    continue;
-
-                var fk = group.First();
-                var rows = group.ToArray();
-                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
-                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
-                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-                features.Add(new ScaffoldUnsupportedFeature(
-                    dependentKey,
-                    "RelationshipPrincipalKey",
-                    fk.ConstraintName,
-                    $"FK references {principalKey}.({string.Join(", ", principalColumns)}), which is neither the generated principal primary key nor an exact ordered unfiltered non-null unique index.")
-                {
-                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["dependentTable"] = dependentKey,
-                        ["dependentColumns"] = dependentColumns,
-                        ["principalTable"] = principalKey,
-                        ["principalColumns"] = principalColumns,
-                        ["columnCount"] = rows.Length
-                    }
-                });
-            }
-        }
+            IReadOnlyList<ScaffoldIndex> indexes)
+            => features.AddRange(ConvertUnsupportedFeatures(
+                ScaffoldRelationshipDiagnosticBuilder.BuildPrincipalKeyDiagnostics(
+                    ConvertForeignKeyInfos(foreignKeys),
+                    primaryKeyColumnsByTable,
+                    ConvertIndexInfos(indexes))));
 
         private static void AddRelationshipDependentKeyDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
-        {
-            foreach (var group in foreignKeys
-                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
-            {
-                var fk = group.First();
-                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
-                if (primaryKeyColumnsByTable.TryGetValue(dependentKey, out var primaryKeyColumns)
-                    && primaryKeyColumns.Count > 0)
-                {
-                    continue;
-                }
-
-                var rows = group.ToArray();
-                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
-                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-                features.Add(new ScaffoldUnsupportedFeature(
-                    dependentKey,
-                    "RelationshipDependentKey",
-                    fk.ConstraintName,
-                    $"FK dependent table {dependentKey} has no primary key; generated navigations are suppressed because nORM cannot track or include the dependent side safely.")
-                {
-                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["dependentTable"] = dependentKey,
-                        ["dependentColumns"] = dependentColumns,
-                        ["principalTable"] = principalKey,
-                        ["principalColumns"] = principalColumns,
-                        ["columnCount"] = rows.Length
-                    }
-                });
-            }
-        }
+            => features.AddRange(ConvertUnsupportedFeatures(
+                ScaffoldRelationshipDiagnosticBuilder.BuildDependentKeyDiagnostics(
+                    ConvertForeignKeyInfos(foreignKeys),
+                    primaryKeyColumnsByTable)));
 
         private static IReadOnlyList<(string Name, string Sql)> ExtractSqliteCheckConstraints(string tableName, string? createTableSql)
-        {
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return Array.Empty<(string Name, string Sql)>();
-
-            var result = new List<(string Name, string Sql)>();
-            var regex = new System.Text.RegularExpressions.Regex(
-                @"(?:(?:CONSTRAINT)\s+(?:""(?<name>[^""]+)""|\[(?<name>[^\]]+)\]|`(?<name>[^`]+)`|(?<name>[A-Za-z_][A-Za-z0-9_]*))\s+)?CHECK\s*\(",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-            var ordinal = 0;
-            foreach (System.Text.RegularExpressions.Match match in regex.Matches(createTableSql))
-            {
-                var openIndex = createTableSql.IndexOf('(', match.Index + match.Length - 1);
-                if (openIndex < 0)
-                    continue;
-
-                var closeIndex = FindMatchingParenthesis(createTableSql, openIndex);
-                if (closeIndex <= openIndex)
-                    continue;
-
-                var name = match.Groups["name"].Success
-                    ? match.Groups["name"].Value
-                    : $"CK_{ToPascalCase(tableName)}_{++ordinal}";
-                var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
-                if (!string.IsNullOrWhiteSpace(sql))
-                    result.Add((name, sql));
-            }
-
-            return result;
-        }
+            => ScaffoldSqliteDdlParser.ExtractCheckConstraints(tableName, createTableSql);
 
         private static IReadOnlyDictionary<string, (string Sql, bool Stored)> ExtractSqliteGeneratedColumns(string? createTableSql)
-        {
-            var result = new Dictionary<string, (string Sql, bool Stored)>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return result;
+            => ScaffoldSqliteDdlParser.ExtractGeneratedColumns(createTableSql);
 
-            var bodyOpen = createTableSql.IndexOf('(');
-            if (bodyOpen < 0)
-                return result;
-
-            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
-            if (bodyClose <= bodyOpen)
-                return result;
-
-            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
-            {
-                var trimmed = part.Trim();
-                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
-                    continue;
-
-                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
-                    continue;
-
-                var generatedIndex = CultureInfo.InvariantCulture.CompareInfo.IndexOf(
-                    trimmed,
-                    "GENERATED",
-                    CompareOptions.IgnoreCase);
-                if (generatedIndex < 0)
-                    continue;
-
-                var openIndex = trimmed.IndexOf('(', generatedIndex);
-                if (openIndex < 0)
-                    continue;
-
-                var closeIndex = FindMatchingParenthesis(trimmed, openIndex);
-                if (closeIndex <= openIndex)
-                    continue;
-
-                var suffix = trimmed.Substring(closeIndex + 1);
-                var stored = suffix.Contains("STORED", StringComparison.OrdinalIgnoreCase);
-                var sql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
-                if (!string.IsNullOrWhiteSpace(sql))
-                    result[columnName] = (sql, stored);
-            }
-
-            return result;
-        }
-
-        private static async Task<string?> GetSqliteCreateTableSqlAsync(DbConnection connection, DatabaseProvider provider, ScaffoldTable table)
-        {
-            await using var command = connection.CreateCommand();
-            var schema = string.IsNullOrWhiteSpace(table.Schema) ? "main" : table.Schema!;
-            command.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
-            var tableNameParameter = command.CreateParameter();
-            tableNameParameter.ParameterName = "@tableName";
-            tableNameParameter.Value = table.Name;
-            command.Parameters.Add(tableNameParameter);
-            return Convert.ToString(await command.ExecuteScalarAsync().ConfigureAwait(false));
-        }
 
         private static int FindMatchingParenthesis(string sql, int openIndex)
-        {
-            var depth = 0;
-            char? quote = null;
-            for (var i = openIndex; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                        continue;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                {
-                    depth++;
-                }
-                else if (ch == ')')
-                {
-                    depth--;
-                    if (depth == 0)
-                        return i;
-                }
-            }
-
-            return -1;
-        }
+            => ScaffoldSqliteDdlParser.FindMatchingParenthesis(sql, openIndex);
 
         private static IReadOnlyDictionary<string, string> ExtractSqliteColumnCollations(string? createTableSql)
-        {
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return result;
-
-            var open = createTableSql.IndexOf('(');
-            if (open < 0)
-                return result;
-            var close = FindMatchingParenthesis(createTableSql, open);
-            if (close <= open)
-                return result;
-
-            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(open + 1, close - open - 1)))
-            {
-                var trimmed = part.Trim();
-                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
-                    continue;
-
-                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
-                    continue;
-
-                var match = System.Text.RegularExpressions.Regex.Match(
-                    trimmed,
-                    @"\bCOLLATE\s+(?<name>""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_-]*)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-                if (!match.Success)
-                    continue;
-
-                result[columnName] = UnquoteSqlIdentifier(match.Groups["name"].Value);
-            }
-
-            return result;
-        }
-
-        private static bool StartsWithTableConstraint(string value)
-            => value.StartsWith("CONSTRAINT ", StringComparison.OrdinalIgnoreCase)
-               || value.StartsWith("PRIMARY ", StringComparison.OrdinalIgnoreCase)
-               || value.StartsWith("FOREIGN ", StringComparison.OrdinalIgnoreCase)
-               || value.StartsWith("UNIQUE ", StringComparison.OrdinalIgnoreCase)
-               || value.StartsWith("CHECK ", StringComparison.OrdinalIgnoreCase);
-
-        private static bool TryReadLeadingSqlIdentifier(string value, out string identifier, out int nextIndex)
-        {
-            identifier = string.Empty;
-            nextIndex = 0;
-            if (string.IsNullOrWhiteSpace(value))
-                return false;
-
-            var i = 0;
-            while (i < value.Length && char.IsWhiteSpace(value[i]))
-                i++;
-            if (i >= value.Length)
-                return false;
-
-            var ch = value[i];
-            if (ch is '"' or '`' or '[')
-            {
-                var close = ch == '[' ? ']' : ch;
-                var start = ++i;
-                var sb = new System.Text.StringBuilder();
-                while (i < value.Length)
-                {
-                    if (value[i] == close)
-                    {
-                        if (i + 1 < value.Length && value[i + 1] == close)
-                        {
-                            sb.Append(close);
-                            i += 2;
-                            continue;
-                        }
-
-                        identifier = sb.ToString();
-                        nextIndex = i + 1;
-                        return identifier.Length > 0;
-                    }
-
-                    sb.Append(value[i++]);
-                }
-
-                nextIndex = start;
-                return false;
-            }
-
-            var begin = i;
-            while (i < value.Length && (char.IsLetterOrDigit(value[i]) || value[i] == '_' || value[i] == '$'))
-                i++;
-            if (i == begin)
-                return false;
-
-            identifier = value.Substring(begin, i - begin);
-            nextIndex = i;
-            return true;
-        }
-
-        private static string UnquoteSqlIdentifier(string value)
-        {
-            var trimmed = value.Trim();
-            if (trimmed.Length >= 2)
-            {
-                var first = trimmed[0];
-                var last = trimmed[^1];
-                if ((first == '"' && last == '"') || (first == '`' && last == '`'))
-                    return trimmed.Substring(1, trimmed.Length - 2).Replace(new string(first, 2), first.ToString(), StringComparison.Ordinal);
-                if (first == '[' && last == ']')
-                    return trimmed.Substring(1, trimmed.Length - 2).Replace("]]", "]", StringComparison.Ordinal);
-            }
-
-            return trimmed;
-        }
+            => ScaffoldSqliteDdlParser.ExtractColumnCollations(createTableSql);
 
         private static IReadOnlyList<string> SplitTopLevelCommaSeparated(string sql)
-        {
-            var result = new List<string>();
-            var start = 0;
-            var depth = 0;
-            char? quote = null;
-            for (var i = 0; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                        continue;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                    depth++;
-                else if (ch == ')')
-                    depth--;
-                else if (ch == ',' && depth == 0)
-                {
-                    result.Add(sql.Substring(start, i - start));
-                    start = i + 1;
-                }
-            }
-            result.Add(sql[start..]);
-            return result;
-        }
+            => ScaffoldSqliteDdlParser.SplitTopLevelCommaSeparated(sql);
 
         private static bool IsSqliteProviderSpecificDeclaredType(string? declaredType)
-        {
-            if (string.IsNullOrWhiteSpace(declaredType))
-                return false;
+            => ScaffoldSqliteDdlParser.IsProviderSpecificDeclaredType(declaredType);
 
-            var normalized = declaredType.Trim().ToUpperInvariant();
-            if (IsSqliteScaffoldableScalarDeclaredType(normalized))
-                return false;
+        private static bool IsUnsafeSqliteProviderSpecificDeclaredType(string normalizedDeclaredType)
+            => ScaffoldSqliteDdlParser.IsUnsafeProviderSpecificDeclaredType(normalizedDeclaredType);
 
-            return normalized.Contains("GEOMETRY", StringComparison.Ordinal)
-                   || normalized.Contains("GEOGRAPHY", StringComparison.Ordinal)
-                   || normalized.Contains("HIERARCHYID", StringComparison.Ordinal)
-                   || normalized.Contains("SQL_VARIANT", StringComparison.Ordinal)
-                   || normalized.Contains("INET", StringComparison.Ordinal)
-                   || normalized.Contains("CIDR", StringComparison.Ordinal)
-                   || normalized.Contains("MACADDR", StringComparison.Ordinal)
-                   || normalized.StartsWith("ENUM", StringComparison.Ordinal)
-                   || normalized.StartsWith("SET", StringComparison.Ordinal)
-                   || normalized.EndsWith("[]", StringComparison.Ordinal);
-        }
+        private static bool ContainsSqliteDeclaredTypeToken(string normalizedDeclaredType, string token)
+            => ScaffoldSqliteDdlParser.ContainsDeclaredTypeToken(normalizedDeclaredType, token);
 
-        private static bool IsSqliteScaffoldableScalarDeclaredType(string normalizedDeclaredType)
-            => normalizedDeclaredType.Contains("JSON", StringComparison.Ordinal)
-               || normalizedDeclaredType.Contains("XML", StringComparison.Ordinal)
-               || normalizedDeclaredType.Contains("UUID", StringComparison.Ordinal);
-
-        private static void RemoveSupportedProviderSpecificColumnTypeDiagnostics(
+        private static ScaffoldFeatureConfigurations BuildFeatureConfigurations(
             List<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            ICollection<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable)
         {
-            RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedModelFeatureDiagnostics, feature =>
-                string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
-                && IsScaffoldableProviderSpecificColumnType(feature.Detail)
-                && columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                && properties.ContainsKey(feature.Name));
-        }
-
-        private static void RemoveGeneratedUnsupportedFeatures(
-            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
-            ICollection<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
-            Predicate<ScaffoldUnsupportedFeature> predicate)
-        {
+            var featureInputs = ConvertFeatureInputs(unsupportedFeatures);
+            var configurations = ScaffoldFeatureConfigurationBuilder.BuildFeatureConfigurations(
+                featureInputs,
+                entityByTable,
+                columnPropertiesByTable,
+                stringBinaryFacetsByTable);
+            var generatedFeatureIndexes = configurations.GeneratedFeatureIndexes.ToArray();
+            var generatedFeatureIndexSet = generatedFeatureIndexes.ToHashSet();
+            var generatedModelFeatureDiagnostics = generatedFeatureIndexes
+                .Select(index => unsupportedFeatures[index])
+                .ToArray();
             for (var i = unsupportedFeatures.Count - 1; i >= 0; i--)
             {
-                var feature = unsupportedFeatures[i];
-                if (!predicate(feature))
-                    continue;
-
-                generatedModelFeatureDiagnostics.Add(feature);
-                unsupportedFeatures.RemoveAt(i);
+                if (generatedFeatureIndexSet.Contains(i))
+                    unsupportedFeatures.RemoveAt(i);
             }
+
+            return ConvertFeatureConfigurations(configurations, generatedModelFeatureDiagnostics);
         }
+
+        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IReadOnlyList<ScaffoldUnsupportedFeature> features)
+        {
+            var converted = new ScaffoldFeatureInput[features.Count];
+            for (var i = 0; i < features.Count; i++)
+            {
+                converted[i] = new ScaffoldFeatureInput(i, ConvertUnsupportedFeatureInputInfo(features[i]));
+            }
+
+            return converted;
+        }
+
+        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IEnumerable<ScaffoldUnsupportedFeature> features)
+        {
+            var featureList = features as IReadOnlyList<ScaffoldUnsupportedFeature> ?? features.ToArray();
+            return ConvertFeatureInputs(featureList);
+        }
+
+        private static ScaffoldUnsupportedFeatureInfo ConvertUnsupportedFeatureInputInfo(ScaffoldUnsupportedFeature feature)
+            => new(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
+            {
+                Metadata = feature.Metadata
+            };
+
+        private static ScaffoldFeatureInput ConvertFeatureInput(ScaffoldUnsupportedFeature feature)
+            => new(0, ConvertUnsupportedFeatureInputInfo(feature));
+
+        private static ScaffoldFeatureConfigurations ConvertFeatureConfigurations(
+            ScaffoldFeatureConfigurationsInfo configurations,
+            IReadOnlyList<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
+            => new(
+                generatedModelFeatureDiagnostics,
+                configurations.ProviderSpecificColumnTypesByTable,
+                configurations.DefaultValuesByTable,
+                configurations.ProviderSpecificDefaultTableKeys,
+                ConvertCheckConstraintConfigurations(configurations.CheckConstraints),
+                ConvertExpressionIndexConfigurations(configurations.ExpressionIndexConfigurations),
+                ConvertCollationConfigurations(configurations.CollationConfigurations),
+                ConvertComputedColumnConfigurations(configurations.ComputedColumnConfigurations),
+                configurations.ComputedColumnsByTable,
+                ConvertDecimalPrecisionMap(configurations.DecimalPrecisionByTable),
+                ConvertPrecisionConfigurations(configurations.PrecisionConfigurations),
+                ConvertColumnFacetConfigurations(configurations.ColumnFacetConfigurations),
+                configurations.RowVersionColumnsByTable,
+                configurations.ProviderNativeTemporalTableKeys,
+                configurations.ProviderOwnedTriggerTableKeys,
+                ConvertIdentityOptionConfigurations(configurations.IdentityOptionConfigurations),
+                configurations.ProviderSpecificIdentityStrategyTableKeys,
+                configurations.ProviderOwnedWriteBlockedTableKeys);
+
+        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> ConvertCheckConstraintConfigurations(
+            IReadOnlyList<ScaffoldCheckConstraintConfigurationInfo> checks)
+            => checks
+                .Select(static check => new ScaffoldCheckConstraintConfiguration(check.TableKey, check.EntityName, check.Name, check.Sql))
+                .ToArray();
+
+        private static ScaffoldCheckConstraintConfigurationInfo ConvertCheckConstraintConfiguration(
+            ScaffoldCheckConstraintConfiguration check)
+            => new(check.TableKey, check.EntityName, check.Name, check.Sql);
+
+        private static IReadOnlyList<ScaffoldDefaultValueConfiguration> ConvertDefaultValueConfigurations(
+            IReadOnlyList<ScaffoldDefaultValueConfigurationInfo> defaultValues)
+            => defaultValues
+                .Select(static value => new ScaffoldDefaultValueConfiguration(value.TableKey, value.EntityName, value.ColumnName, value.PropertyName, value.DefaultValueSql))
+                .ToArray();
+
+        private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> ConvertExpressionIndexConfigurations(
+            IReadOnlyList<ScaffoldExpressionIndexConfigurationInfo> expressionIndexes)
+            => expressionIndexes
+                .Select(static index => new ScaffoldExpressionIndexConfiguration(index.TableKey, index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
+                .ToArray();
+
+        private static IReadOnlyList<ScaffoldCollationConfiguration> ConvertCollationConfigurations(
+            IReadOnlyList<ScaffoldCollationConfigurationInfo> collations)
+            => collations
+                .Select(static collation => new ScaffoldCollationConfiguration(collation.TableKey, collation.EntityName, collation.ColumnName, collation.PropertyName, collation.Collation))
+                .ToArray();
+
+        private static IReadOnlyList<ScaffoldComputedColumnConfiguration> ConvertComputedColumnConfigurations(
+            IReadOnlyList<ScaffoldComputedColumnConfigurationInfo> computedColumns)
+            => computedColumns
+                .Select(static computed => new ScaffoldComputedColumnConfiguration(computed.TableKey, computed.EntityName, computed.ColumnName, computed.PropertyName, computed.Sql, computed.Stored))
+                .ToArray();
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> ConvertDecimalPrecisionMap(
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>> decimalPrecisionByTable)
+            => decimalPrecisionByTable.ToDictionary(
+                table => table.Key,
+                table => (IReadOnlyDictionary<string, ScaffoldDecimalPrecision>)table.Value.ToDictionary(
+                    column => column.Key,
+                    column => new ScaffoldDecimalPrecision(column.Value.Precision, column.Value.Scale),
+                    StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>> ConvertDecimalPrecisionInfoMap(
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> decimalPrecisionByTable)
+            => decimalPrecisionByTable.ToDictionary(
+                table => table.Key,
+                table => (IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>)table.Value.ToDictionary(
+                    column => column.Key,
+                    column => new ScaffoldDecimalPrecisionInfo(column.Value.Precision, column.Value.Scale),
+                    StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+
+        private static IReadOnlyList<ScaffoldPrecisionConfiguration> ConvertPrecisionConfigurations(
+            IReadOnlyList<ScaffoldPrecisionConfigurationInfo> precisionConfigurations)
+            => precisionConfigurations
+                .Select(static precision => new ScaffoldPrecisionConfiguration(precision.TableKey, precision.EntityName, precision.ColumnName, precision.PropertyName, precision.Precision, precision.Scale))
+                .ToArray();
+
+        private static IReadOnlyList<ScaffoldColumnFacetConfiguration> ConvertColumnFacetConfigurations(
+            IReadOnlyList<ScaffoldColumnFacetConfigurationInfo> columnFacetConfigurations)
+            => columnFacetConfigurations
+                .Select(static facet => new ScaffoldColumnFacetConfiguration(facet.TableKey, facet.EntityName, facet.ColumnName, facet.PropertyName, facet.MaxLength, facet.IsUnicode, facet.IsFixedLength))
+                .ToArray();
+
+        private static IReadOnlyList<ScaffoldIdentityOptionConfiguration> ConvertIdentityOptionConfigurations(
+            IReadOnlyList<ScaffoldIdentityOptionConfigurationInfo> identityOptions)
+            => identityOptions
+                .Select(static identity => new ScaffoldIdentityOptionConfiguration(identity.TableKey, identity.EntityName, identity.ColumnName, identity.PropertyName, identity.Seed, identity.Increment))
+                .ToArray();
 
         private static void RestoreGeneratedManyToManyUnsupportedFeatures(
             List<ScaffoldUnsupportedFeature> unsupportedFeatures,
@@ -3225,22 +1126,49 @@ namespace nORM.Scaffolding
             => !string.Equals(kind, "Computed", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsScaffoldableProviderSpecificColumnType(string? detail)
-        {
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
+            => ScaffoldProviderSpecificTypeClassifier.IsScaffoldableProviderSpecificColumnType(detail);
 
-            var normalized = detail.Trim().ToLowerInvariant();
-            return normalized == "xml"
-                   || normalized == "json"
-                   || normalized == "jsonb"
-                   || normalized == "uuid"
-                   || normalized == "user-defined (uuid)"
-                   || (normalized.StartsWith("array", StringComparison.Ordinal) && TryMapPostgresArrayType(detail, out _))
-                   || TryParseMySqlEnumValues(detail, out _)
-                   || TryParseBoundedMySqlSetValues(detail, out _)
-                   || TryParsePostgresEnumValues(detail, out _)
-                   || normalized == "year";
-        }
+        private static bool IsSafePostgresUserDefinedScalarColumnType(string normalized)
+            => ScaffoldProviderSpecificTypeClassifier.IsSafePostgresUserDefinedScalarColumnType(normalized);
+
+        private static bool HasWriteBlockingProviderSpecificColumnTypes(IReadOnlyDictionary<string, string>? providerSpecificColumnTypes)
+            => ScaffoldProviderSpecificTypeClassifier.HasWriteBlockingProviderSpecificColumnTypes(providerSpecificColumnTypes);
+
+        private static bool ShouldMarkScaffoldedEntityReadOnly(
+            string tableKey,
+            IReadOnlySet<string> queryArtifactTableKeys,
+            IReadOnlySet<string> providerNativeTemporalTableKeys,
+            IReadOnlySet<string> providerOwnedTriggerTableKeys,
+            IReadOnlySet<string> providerSpecificIdentityStrategyTableKeys,
+            IReadOnlySet<string> providerSpecificDefaultTableKeys,
+            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
+            => queryArtifactTableKeys.Contains(tableKey)
+               || providerNativeTemporalTableKeys.Contains(tableKey)
+               || providerOwnedTriggerTableKeys.Contains(tableKey)
+               || providerSpecificIdentityStrategyTableKeys.Contains(tableKey)
+               || providerSpecificDefaultTableKeys.Contains(tableKey)
+               || HasWriteBlockingProviderSpecificColumnTypes(providerSpecificColumnTypes)
+               || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
+               || primaryKeyColumns.Count == 0;
+
+        private static bool IsWriteBlockingProviderSpecificColumnType(string? detail)
+            => ScaffoldProviderSpecificTypeClassifier.IsWriteBlockingProviderSpecificColumnType(detail);
+
+        private static bool IsSafeMySqlUnsignedDecimalType(string? detail)
+            => ScaffoldProviderSpecificTypeClassifier.IsSafeMySqlUnsignedDecimalType(detail);
+
+        private static bool IsSafeSqlServerAliasColumnType(string? detail)
+            => ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasColumnType(detail);
+
+        private static bool TryGetSqlServerAliasBaseTypeText(string? detail, out string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.TryGetSqlServerAliasBaseTypeText(detail, out typeText);
+
+        private static bool IsSafeSqlServerAliasBaseType(string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasBaseType(typeText);
+
+        private static bool IsSafePostgresDomainColumnType(string? detail)
+            => ScaffoldProviderSpecificTypeClassifier.IsSafePostgresDomainColumnType(detail);
 
         private static string ScaffoldDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -3252,16 +1180,14 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
-            var compositeForeignKeys = foreignKeys
-                .Where(fk => fk.ColumnCount > 1)
-                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
-                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
-                .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
-                .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
-                .ToArray();
+            var compositeForeignKeys = BuildCompositeForeignKeyDiagnostics(
+                foreignKeys,
+                primaryKeyColumnsByTable,
+                indexes,
+                nonNullableColumnsByTable);
             var possibleJoinTables = BuildPossibleJoinTableDiagnostics(
                 foreignKeys,
                 primaryKeyColumnsByTable,
@@ -3270,6 +1196,7 @@ namespace nORM.Scaffolding
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
                 indexes,
+                providerOwnedWriteBlockedTableKeys,
                 emittedManyToManyJoinTableKeys);
 
             if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0 && skippedObjects.Count == 0)
@@ -3278,79 +1205,12 @@ namespace nORM.Scaffolding
             var sb = _stringBuilderPool.Get();
             try
             {
-                sb.AppendLine("# nORM Scaffold Warnings");
-                sb.AppendLine();
-                sb.AppendLine("The scaffolder detected database features that were not converted into runnable nORM model code.");
-                sb.AppendLine("Review these items before using the generated model for migrations or navigation queries.");
-
-                if (compositeForeignKeys.Length > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("## Composite Foreign Keys");
-                    sb.AppendLine();
-                    sb.AppendLine("These composite foreign keys do not target the generated principal primary key or an exact ordered unfiltered non-null unique index, so v1 scaffolding keeps them diagnostic.");
-                    sb.AppendLine("The generated entity classes keep the scalar columns, and no relationship navigation is emitted for these constraints.");
-                    sb.AppendLine();
-                    sb.AppendLine("| Code | Severity | Category | Constraint | Dependent | Columns | Principal | Principal Columns | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
-                    foreach (var group in compositeForeignKeys)
-                    {
-                        var rows = group.ToArray();
-                        var first = rows[0];
-                        var dependent = TableKey(first.DependentSchema, first.DependentTable);
-                        var principal = TableKey(first.PrincipalSchema, first.PrincipalTable);
-                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForCompositeForeignKey()} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForCompositeForeignKey()} | {EscapeMarkdown(first.ConstraintName)} | {EscapeMarkdown(dependent)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.DependentColumn)))} | {EscapeMarkdown(principal)} | {EscapeMarkdown(string.Join(", ", rows.Select(r => r.PrincipalColumn)))} | {EscapeMarkdown(SuggestedActionForCompositeForeignKey())} |");
-                    }
-                }
-
-                if (possibleJoinTables.Length > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("## Possible Many-To-Many Join Tables");
-                    sb.AppendLine();
-                    sb.AppendLine("These tables look like join-table candidates but were scaffolded as normal entities because at least one safe `UsingTable` requirement was not met.");
-                    sb.AppendLine();
-                    sb.AppendLine("| Code | Severity | Category | Table | Principal Tables | Constraints | Reason Codes | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
-                    foreach (var table in possibleJoinTables)
-                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForPossibleJoinTable()} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForPossibleJoinTable()} | {EscapeMarkdown(table.TableKey)} | {EscapeMarkdown(string.Join(", ", table.PrincipalTables))} | {EscapeMarkdown(string.Join(", ", table.ConstraintNames))} | {EscapeMarkdown(string.Join(", ", table.Reasons))} | {EscapeMarkdown(SuggestedActionForPossibleJoinTable())} |");
-                }
-
-                if (unsupportedFeatures.Count > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("## Provider-Owned Schema Features");
-                    sb.AppendLine();
-                    sb.AppendLine("Defaults, ordinary table CHECK constraints, and computed/generated column expressions are emitted as migration metadata when possible. Collations, scaffoldable JSON/XML/UUID scalar storage, and parsed SQL Server identity seed/increment settings are emitted when a generated property can safely own them. Remaining provider-specific column types, rowversion/timestamp columns, unparsed identity strategies, non-default FK referential actions, relationships that do not target the generated principal primary key or an exact ordered unfiltered non-null unique index, triggers, provider-native temporal tables, and tables without primary keys are discovered for review, but are not emitted as complete provider-neutral nORM model code.");
-                    sb.AppendLine();
-                    sb.AppendLine("| Code | Severity | Category | Kind | Table | Object | Detail | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
-                    foreach (var feature in unsupportedFeatures
-                        .OrderBy(f => f.TableKey, StringComparer.Ordinal)
-                        .ThenBy(f => f.Kind, StringComparer.Ordinal)
-                        .ThenBy(f => f.Name, StringComparer.Ordinal))
-                    {
-                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForUnsupportedFeature(feature.Kind)} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForUnsupportedFeature(feature.Kind)} | {EscapeMarkdown(feature.Kind)} | {EscapeMarkdown(feature.TableKey)} | {EscapeMarkdown(feature.Name)} | {EscapeMarkdown(feature.Detail)} | {EscapeMarkdown(SuggestedActionForUnsupportedFeature(feature.Kind))} |");
-                    }
-                }
-
-                if (skippedObjects.Count > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("## Skipped Database Objects");
-                    sb.AppendLine();
-                    sb.AppendLine("Views/materialized views can be emitted as opt-in query artifacts, routines can be emitted as opt-in provider-bound stubs, and sequences/synonyms/events remain provider-owned review items.");
-                    sb.AppendLine();
-                    sb.AppendLine("| Code | Severity | Category | Kind | Name | Detail | Suggested Action |");
-                    sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
-                    foreach (var obj in skippedObjects
-                        .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
-                        .ThenBy(o => o.Kind, StringComparer.Ordinal))
-                    {
-                        sb.AppendLine($"| {ScaffoldDiagnosticCodeForSkippedObject(obj.Kind)} | {ScaffoldDiagnosticSeverity()} | {ScaffoldDiagnosticCategoryForSkippedObject(obj.Kind)} | {EscapeMarkdown(obj.Kind)} | {EscapeMarkdown(TableKey(obj.Schema, obj.Name))} | {EscapeMarkdown(obj.Detail)} | {EscapeMarkdown(SuggestedActionForSkippedObject(obj.Kind))} |");
-                    }
-                }
-
+                ScaffoldDiagnosticsWriter.AppendMarkdown(
+                    sb,
+                    compositeForeignKeys,
+                    possibleJoinTables,
+                    ConvertUnsupportedFeatureInfos(unsupportedFeatures),
+                    ConvertSkippedObjectInfos(skippedObjects));
                 return sb.ToString();
             }
             finally
@@ -3360,29 +1220,18 @@ namespace nORM.Scaffolding
             }
         }
 
-        private static string EscapeMarkdown(string value)
-            => value
-                .Replace("\\", "\\\\")
-                .Replace("|", "\\|")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n");
+        private static ScaffoldCompositeForeignKeyDiagnosticInfo[] BuildCompositeForeignKeyDiagnostics(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
+            => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
+                ConvertForeignKeyInfos(foreignKeys),
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes),
+                nonNullableColumnsByTable);
 
-        private static string EscapeStringLiteral(string value)
-            => value
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n");
-
-        private static string EscapeXmlDocumentation(string value)
-            => value
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n");
-
-        private static ScaffoldPossibleJoinTableDiagnostic[] BuildPossibleJoinTableDiagnostics(
+        private static ScaffoldPossibleJoinTableDiagnosticInfo[] BuildPossibleJoinTableDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
@@ -3390,25 +1239,18 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
-        {
-            return foreignKeys
-                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase)
-                .Select(g =>
-                {
-                    var rows = g.ToArray();
-                    var tableKey = g.Key;
-                    var principalTables = rows.Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-                    var constraintNames = rows.Select(fk => fk.ConstraintName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-                    var reasons = BuildPossibleJoinTableReasons(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable, identityColumnsByTable, indexes);
-                    var metadata = BuildPossibleJoinTableMetadata(tableKey, rows, primaryKeyColumnsByTable, columnPropertiesByTable, nonNullableColumnsByTable, databaseGeneratedColumnsByTable, identityColumnsByTable, indexes);
-                    return new ScaffoldPossibleJoinTableDiagnostic(tableKey, principalTables, constraintNames, reasons, metadata);
-                })
-                .Where(g => g.ConstraintNames.Length >= 2 && g.PrincipalTables.Length is 1 or 2)
-                .Where(g => emittedManyToManyJoinTableKeys is null || !emittedManyToManyJoinTableKeys.Contains(g.TableKey))
-                .OrderBy(g => g.TableKey, StringComparer.Ordinal)
-                .ToArray();
-        }
+            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
+                ConvertForeignKeyInfos(foreignKeys),
+                primaryKeyColumnsByTable,
+                columnPropertiesByTable,
+                nonNullableColumnsByTable,
+                databaseGeneratedColumnsByTable,
+                identityColumnsByTable,
+                ConvertIndexInfos(indexes),
+                providerOwnedWriteBlockedTableKeys,
+                emittedManyToManyJoinTableKeys);
 
         private static IReadOnlyDictionary<string, object?> BuildPossibleJoinTableMetadata(
             string tableKey,
@@ -3418,113 +1260,29 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var foreignKeyColumns = foreignKeys
-                .Select(static fk => fk.DependentColumn)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static column => column, StringComparer.Ordinal)
-                .ToArray();
-            var foreignKeyColumnSet = foreignKeyColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var primaryKeyColumns = primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKey)
-                ? primaryKey.ToArray()
-                : Array.Empty<string>();
-            var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(tableKey, out var generatedColumns)
-                ? generatedColumns.OrderBy(static column => column, StringComparer.Ordinal).ToArray()
-                : Array.Empty<string>();
-            var databaseGeneratedColumnSet = databaseGeneratedColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var identityColumns = identityColumnsByTable.TryGetValue(tableKey, out var identity)
-                ? identity.OrderBy(static column => column, StringComparer.Ordinal).ToArray()
-                : Array.Empty<string>();
-            var identityColumnSet = identityColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var payloadColumns = columnPropertiesByTable.TryGetValue(tableKey, out var columns)
-                ? columns.Keys
-                    .Where(column => !foreignKeyColumnSet.Contains(column)
-                                     && !databaseGeneratedColumnSet.Contains(column)
-                                     && !identityColumnSet.Contains(column))
-                    .OrderBy(static column => column, StringComparer.Ordinal)
-                    .ToArray()
-                : Array.Empty<string>();
-            var nullableForeignKeyColumns = nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
-                ? foreignKeyColumns
-                    .Where(column => !nonNullableColumns.Contains(column))
-                    .OrderBy(static column => column, StringComparer.Ordinal)
-                    .ToArray()
-                : Array.Empty<string>();
-            var hasExactBridgePrimaryKey = primaryKeyColumns.Length == foreignKeyColumns.Length
-                && primaryKeyColumns.All(foreignKeyColumnSet.Contains);
-            var primaryKeyExtraColumns = primaryKeyColumns
-                .Where(column => !foreignKeyColumnSet.Contains(column))
-                .ToArray();
-            var hasGeneratedSurrogatePrimaryKey = primaryKeyColumns.Length == 1
-                && primaryKeyExtraColumns.Length == 1
-                && (databaseGeneratedColumnSet.Contains(primaryKeyExtraColumns[0])
-                    || identityColumnSet.Contains(primaryKeyExtraColumns[0]));
-            var foreignKeyConstraintMetadata = foreignKeys
-                .GroupBy(static fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static group => group.Key, StringComparer.Ordinal)
-                .Select(group =>
-                {
-                    var rows = group.ToArray();
-                    var first = rows[0];
-                    return new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["constraint"] = first.ConstraintName,
-                        ["principalTable"] = TableKey(first.PrincipalSchema, first.PrincipalTable),
-                        ["dependentColumns"] = rows.Select(static row => row.DependentColumn).ToArray(),
-                        ["principalColumns"] = rows.Select(static row => row.PrincipalColumn).ToArray()
-                    };
-                })
-                .ToArray();
-
-            return new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["foreignKeyConstraintCount"] = foreignKeyConstraintMetadata.Length,
-                ["foreignKeyColumns"] = foreignKeyColumns,
-                ["primaryKeyColumns"] = primaryKeyColumns,
-                ["payloadColumns"] = payloadColumns,
-                ["databaseGeneratedColumns"] = databaseGeneratedColumns,
-                ["identityColumns"] = identityColumns,
-                ["nullableForeignKeyColumns"] = nullableForeignKeyColumns,
-                ["hasExactBridgePrimaryKey"] = hasExactBridgePrimaryKey,
-                ["hasGeneratedSurrogatePrimaryKey"] = hasGeneratedSurrogatePrimaryKey,
-                ["hasExactForeignKeyUniqueIndex"] = HasExactUniqueIndex(indexes, tableKey, foreignKeyColumnSet, nonNullableColumnsByTable),
-                ["foreignKeys"] = foreignKeyConstraintMetadata
-            };
-        }
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
+            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableMetadata(
+                tableKey,
+                ConvertForeignKeyInfos(foreignKeys),
+                primaryKeyColumnsByTable,
+                columnPropertiesByTable,
+                nonNullableColumnsByTable,
+                databaseGeneratedColumnsByTable,
+                identityColumnsByTable,
+                ConvertIndexInfos(indexes),
+                providerOwnedWriteBlockedTableKeys);
 
         private static IReadOnlyDictionary<string, object?> BuildCompositeForeignKeyMetadata(
             IReadOnlyList<ScaffoldForeignKey> rows,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-        {
-            if (rows.Count == 0)
-                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
-
-            var first = rows[0];
-            var dependentTable = TableKey(first.DependentSchema, first.DependentTable);
-            var principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable);
-            var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
-            var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["relationshipSuppressed"] = true,
-                ["reason"] = "principal-key-not-scaffoldable",
-                ["columnCount"] = rows.Count,
-                ["dependentTable"] = dependentTable,
-                ["principalTable"] = principalTable,
-                ["dependentColumns"] = dependentColumns,
-                ["principalColumns"] = principalColumns,
-                ["referencesPrimaryKey"] = HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTable, principalColumns),
-                ["referencesScaffoldableUniqueIndex"] = ReferencesUniqueIndex(rows, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable)
-            };
-
-            if (primaryKeyColumnsByTable.TryGetValue(principalTable, out var principalPrimaryKeyColumns))
-                metadata["principalPrimaryKeyColumns"] = principalPrimaryKeyColumns.ToArray();
-
-            return metadata;
-        }
+            => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyMetadata(
+                ConvertForeignKeyInfos(rows),
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes),
+                nonNullableColumnsByTable);
 
         private static string[] BuildPossibleJoinTableReasons(
             string tableKey,
@@ -3534,82 +1292,18 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var reasons = new HashSet<string>(StringComparer.Ordinal);
-            var fkColumns = foreignKeys.Select(fk => fk.DependentColumn).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var constraints = foreignKeys.GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase).ToArray();
-
-            if (constraints.Length != 2)
-                reasons.Add("not-two-foreign-keys");
-            if (constraints.Any(g => g.Count() == 0 || g.Any(fk => fk.ColumnCount != g.Count())))
-                reasons.Add("foreign-key-metadata-incomplete");
-
-            var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(tableKey, out var generatedColumns)
-                ? generatedColumns
-                : EmptyStringSet;
-            var identityColumns = identityColumnsByTable.TryGetValue(tableKey, out var identity)
-                ? identity
-                : EmptyStringSet;
-            if (columnPropertiesByTable.TryGetValue(tableKey, out var columns)
-                && columns.Keys.Any(column => !fkColumns.Contains(column)
-                                             && !databaseGeneratedColumns.Contains(column)
-                                             && !identityColumns.Contains(column)))
-            {
-                reasons.Add("payload-columns");
-            }
-
-            if (!primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
-                || primaryKeyColumns.Count == 0)
-            {
-                reasons.Add("missing-primary-key");
-            }
-            else
-            {
-                var hasExactBridgePrimaryKey = primaryKeyColumns.Count == fkColumns.Count
-                    && primaryKeyColumns.All(column => fkColumns.Contains(column));
-                if (!hasExactBridgePrimaryKey)
-                {
-                    var primaryKeyExtraColumns = primaryKeyColumns
-                        .Where(column => !fkColumns.Contains(column))
-                        .ToArray();
-                    var hasGeneratedSurrogatePrimaryKeyShape = primaryKeyColumns.Count == 1
-                        && primaryKeyExtraColumns.Length == 1
-                        && (databaseGeneratedColumns.Contains(primaryKeyExtraColumns[0])
-                            || identityColumns.Contains(primaryKeyExtraColumns[0]));
-
-                    reasons.Add(hasGeneratedSurrogatePrimaryKeyShape && !HasExactUniqueIndex(indexes, tableKey, fkColumns, nonNullableColumnsByTable)
-                        ? "missing-exact-unique-index"
-                        : "primary-key-not-exact-bridge-columns");
-                }
-            }
-
-            if (nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
-                && fkColumns.Any(column => !nonNullableColumns.Contains(column)))
-            {
-                reasons.Add("nullable-foreign-key");
-            }
-
-            foreach (var fkGroup in constraints)
-            {
-                var fk = fkGroup.First();
-                var principalTableKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                var principalColumns = foreignKeys
-                    .Where(row => string.Equals(row.ConstraintName, fk.ConstraintName, StringComparison.OrdinalIgnoreCase))
-                    .Select(row => row.PrincipalColumn)
-                    .ToArray();
-                if (!HasPrimaryKeyColumns(primaryKeyColumnsByTable, principalTableKey, principalColumns)
-                    && !ReferencesUniqueIndex(fkGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                {
-                    reasons.Add("principal-key-not-scaffoldable");
-                }
-            }
-
-            if (reasons.Count == 0)
-                reasons.Add("review-shape");
-
-            return reasons.OrderBy(reason => reason, StringComparer.Ordinal).ToArray();
-        }
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
+            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableReasons(
+                tableKey,
+                ConvertForeignKeyInfos(foreignKeys),
+                primaryKeyColumnsByTable,
+                columnPropertiesByTable,
+                nonNullableColumnsByTable,
+                databaseGeneratedColumnsByTable,
+                identityColumnsByTable,
+                ConvertIndexInfos(indexes),
+                providerOwnedWriteBlockedTableKeys);
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
         {
@@ -3622,918 +1316,19 @@ namespace nORM.Scaffolding
             return false;
         }
 
-        private static string SuggestedActionForCompositeForeignKey()
-            => "Keep scalar columns and add the composite relationship manually, or simplify the relationship to a single-column surrogate key before relying on generated navigations.";
-
-        private static string SuggestedActionForPossibleJoinTable()
-            => "If this is a safe pure join table, verify all FK columns are NOT NULL, both FKs target generated primary keys or exact ordered unfiltered non-null unique indexes, and the bridge uses either an FK-column primary key or a generated surrogate primary key plus an exact unfiltered non-null unique index over the FK columns; then use the generated UsingTable mapping. Keep payload, duplicate-pair, or domain-behavior bridges as explicit join entities.";
-
-        private static string ScaffoldDiagnosticSeverity()
-            => "Warning";
-
-        private static string ScaffoldDiagnosticCodeForCompositeForeignKey()
-            => "SCF001";
-
-        private static string ScaffoldDiagnosticCategoryForCompositeForeignKey()
-            => "relationship";
-
-        private static string ScaffoldDiagnosticCodeForPossibleJoinTable()
-            => "SCF002";
-
-        private static string ScaffoldDiagnosticCategoryForPossibleJoinTable()
-            => "many-to-many";
-
-        private static string ScaffoldDiagnosticCodeForUnsupportedFeature(string kind)
-            => kind switch
-            {
-                "Default" => "SCF100",
-                "Computed" => "SCF101",
-                "CheckConstraint" => "SCF102",
-                "Collation" => "SCF103",
-                "ProviderSpecificColumnType" => "SCF104",
-                "ReferentialAction" => "SCF106",
-                "RelationshipPrincipalKey" => "SCF107",
-                "RelationshipDependentKey" => "SCF118",
-                "RowVersion" => "SCF108",
-                "IdentityStrategy" => "SCF109",
-                "Trigger" => "SCF110",
-                "PartialIndex" => "SCF111",
-                "ExpressionIndex" => "SCF112",
-                "IncludedColumnIndex" => "SCF113",
-                "DescendingIndex" => "SCF114",
-                "TemporalTable" => "SCF115",
-                "MissingPrimaryKey" => "SCF116",
-                "PrefixIndex" => "SCF117",
-                "ProviderSpecificIndex" => "SCF119",
-                _ => "SCF199"
-            };
-
-        private static string ScaffoldDiagnosticCategoryForUnsupportedFeature(string kind)
-            => kind switch
-            {
-                "ReferentialAction" or "RelationshipPrincipalKey" or "RelationshipDependentKey" => "relationship",
-                "PartialIndex" or "ExpressionIndex" or "IncludedColumnIndex" or "DescendingIndex" or "PrefixIndex" or "ProviderSpecificIndex" => "index",
-                "Trigger" or "TemporalTable" => "database-object",
-                "MissingPrimaryKey" => "table-shape",
-                _ => "schema-feature"
-            };
-
-        private static string ScaffoldDiagnosticCodeForSkippedObject(string kind)
-            => kind switch
-            {
-                "View" => "SCF200",
-                "Routine" => "SCF201",
-                "Sequence" => "SCF202",
-                "Synonym" => "SCF203",
-                "MaterializedView" => "SCF204",
-                "Event" => "SCF205",
-                "VirtualTable" => "SCF206",
-                "VirtualTableShadow" => "SCF207",
-                _ => "SCF299"
-            };
-
-        private static string ScaffoldDiagnosticCategoryForSkippedObject(string kind)
-            => kind switch
-            {
-                "View" or "MaterializedView" => "query-object",
-                "Routine" or "Event" => "routine",
-                "Sequence" => "key-generation",
-                "VirtualTable" or "VirtualTableShadow" => "virtual-table",
-                _ => "database-object"
-            };
-
-        private static string SuggestedActionForUnsupportedFeature(string kind)
-            => kind switch
-            {
-                "Default" => "Move default semantics into application/model configuration or keep provider DDL in migrations and treat the column as database-owned.",
-                "Computed" => "Use explicit HasComputedColumnSql model configuration or keep the provider-specific generated expression in migrations.",
-                "CheckConstraint" => "Use explicit HasCheckConstraint model configuration or keep the provider-specific CHECK predicate in migrations.",
-                "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
-                "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
-                "ReferentialAction" => "Review the provider-specific FK referential action token; common actions are generated, but unrecognized actions need explicit migration/model handling.",
-                "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered non-null unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
-                "RelationshipDependentKey" => "Add a primary key to the dependent table before relying on generated navigations/includes, or keep the keyless type read-only and configure explicit query projections.",
-                "RowVersion" => "Keep provider-managed rowversion/timestamp semantics in migrations; scaffolded code marks the column as [Timestamp] and database-generated but cannot recreate provider DDL.",
-                "IdentityStrategy" => "Parsed SQL Server IDENTITY(seed, increment) metadata is scaffolded into HasIdentityOptions; review any unparsed provider-specific identity strategy manually.",
-                "Trigger" => "Keep the trigger in provider migrations and add integration tests for any side effects nORM cannot infer.",
-                "PartialIndex" => "Keep the filtered/partial index in provider migrations; v1 scaffolding emits only provider-neutral column indexes.",
-                "ExpressionIndex" => "Keep the expression index in provider migrations or replace it with a provider-neutral persisted column plus a normal index.",
-                "IncludedColumnIndex" => "Keep included-column index tuning in provider migrations; v1 scaffolding emits only key-column index metadata.",
-                "DescendingIndex" => "Review this descending index shape; ordinary column-key descending indexes are generated, but this one was not safe to map as provider-neutral index metadata.",
-                "PrefixIndex" => "Keep the MySQL prefix index in provider migrations; prefix uniqueness is not full-column uniqueness and is not used for generated alternate-key relationships.",
-                "ProviderSpecificIndex" => "Keep this provider-specific index implementation in migrations; v1 scaffolding emits portable B-tree/rowstore column-index metadata only.",
-                "TemporalTable" => "Choose provider-native temporal intentionally or migrate to nORM-managed temporal history; do not assume scaffolding round-trips native temporal DDL.",
-                "MissingPrimaryKey" => "Generated code marks this type with [ReadOnlyEntity] so query materialization works but nORM writes are rejected; add a primary key before using generated writes or navigations.",
-                _ => "Review the provider-owned object and add explicit model configuration or migration code for the intended behavior."
-            };
-
-        private static string SuggestedActionForSkippedObject(string kind)
-            => kind switch
-            {
-                "View" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities to generate a read-oriented query artifact, or keep the view behind explicit provider-bound query code.",
-                "Routine" => "Keep routine calls behind explicit raw SQL/stored-procedure code and document the provider-bound contract.",
-                "Sequence" => "Configure generated-key behavior explicitly or keep sequence DDL in provider migrations.",
-                "Synonym" => "Use --emit-query-artifacts for local table/view synonyms, resolve the synonym to a supported base table, or keep non-query/remote synonyms behind provider-bound integration code.",
-                "MaterializedView" => "Use --emit-view-entities/ScaffoldOptions.EmitViewEntities for a read-oriented query artifact and keep refresh behavior provider-bound.",
-                "Event" => "Keep scheduled event behavior in provider operations/migrations; v1 scaffolding emits table models only.",
-                "VirtualTable" => "Use --emit-query-artifacts/ScaffoldOptions.EmitQueryArtifacts for a read-oriented query artifact, or keep the virtual table behind provider-bound query/index code.",
-                "VirtualTableShadow" => "Do not map SQLite virtual-table shadow storage as domain entities; keep it provider-owned with the virtual table.",
-                _ => "Keep this database object in provider migrations or hand-written integration code."
-            };
-
         private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(ScaffoldSkippedObject obj)
-        {
-            if (string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase))
-                return BuildSequenceMetadata(obj);
-
-            if (string.Equals(obj.Kind, "Synonym", StringComparison.OrdinalIgnoreCase))
-                return BuildSynonymMetadata(obj);
-
-            if (string.Equals(obj.Kind, "Event", StringComparison.OrdinalIgnoreCase))
-                return BuildEventMetadata(obj);
-
-            if (string.Equals(obj.Kind, "View", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(obj.Kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(obj.Kind, "VirtualTable", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase))
-            {
-                return BuildQueryObjectMetadata(obj);
-            }
-
-            if (!string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase))
-                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
-
-            var values = ParseRoutineSemicolonValues(obj.Detail, out var header);
-            var provider = ParseRoutineProvider(header);
-            var routineType = ParseRoutineType(header);
-            values.TryGetValue("dataType", out var dataType);
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["provider"] = provider,
-                ["routineType"] = routineType,
-                ["parameterCount"] = ParseNullableInt(values.TryGetValue("parameters", out var parameterCount) ? parameterCount : null),
-                ["outputParameterCount"] = ParseNullableInt(values.TryGetValue("outputParameters", out var outputParameterCount) ? outputParameterCount : null)
-            };
-
-            if (!string.IsNullOrWhiteSpace(dataType))
-                metadata["dataType"] = dataType;
-
-            if (values.TryGetValue("callShape", out var callShape) && !string.IsNullOrWhiteSpace(callShape))
-                metadata["callShape"] = callShape;
-            else
-            {
-                var inferredCallShape = InferRoutineCallShape(provider, routineType, dataType);
-                if (!string.IsNullOrWhiteSpace(inferredCallShape))
-                    metadata["callShape"] = inferredCallShape;
-            }
-
-            if (values.TryGetValue("parameterModes", out var parameterModes))
-                metadata["parameters"] = ParseRoutineParameters(parameterModes);
-
-            if (values.TryGetValue("resultColumns", out var resultColumns))
-                metadata["resultColumns"] = ParseRoutineResultColumns(resultColumns);
-
-            return metadata;
-        }
+            => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(
+                new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment));
 
         private static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(ScaffoldUnsupportedFeature feature)
-        {
-            var metadata = feature.Metadata is null
-                ? new Dictionary<string, object?>(StringComparer.Ordinal)
-                : new Dictionary<string, object?>(feature.Metadata, StringComparer.Ordinal);
-            switch (feature.Kind)
-            {
-                case "MissingPrimaryKey":
-                    metadata["readOnlyEntity"] = true;
-                    metadata["generatedWritesSupported"] = false;
-                    metadata["generatedNavigationSupported"] = false;
-                    if (!metadata.ContainsKey("table"))
-                        metadata["table"] = feature.TableKey;
-                    if (!metadata.ContainsKey("reason"))
-                        metadata["reason"] = "missing-primary-key";
-                    break;
-                case "RelationshipPrincipalKey":
-                    metadata["navigationSuppressed"] = true;
-                    metadata["reason"] = "principal-key-not-scaffoldable";
-                    if (!metadata.ContainsKey("dependentTable"))
-                        metadata["dependentTable"] = feature.TableKey;
-                    if (TryParseRelationshipPrincipalKeyDetail(feature.Detail, out var principalTable, out var principalColumns))
-                    {
-                        if (!metadata.ContainsKey("principalTable"))
-                            metadata["principalTable"] = principalTable;
-                        if (!metadata.ContainsKey("principalColumns"))
-                            metadata["principalColumns"] = principalColumns;
-                    }
-                    break;
-                case "RelationshipDependentKey":
-                    metadata["navigationSuppressed"] = true;
-                    metadata["reason"] = "dependent-table-keyless";
-                    metadata["generatedNavigationSupported"] = false;
-                    if (!metadata.ContainsKey("dependentTable"))
-                        metadata["dependentTable"] = feature.TableKey;
-                    break;
-                case "ReferentialAction":
-                    if (TryParseReferentialActionDetail(feature.Detail, out var onDelete, out var onUpdate))
-                    {
-                        metadata["onDelete"] = onDelete;
-                        metadata["onUpdate"] = onUpdate;
-                    }
-                    break;
-                case "PrecisionScale":
-                    if (TryParseDecimalPrecision(feature.Detail, out var precision, out var scale))
-                    {
-                        metadata["precision"] = precision;
-                        metadata["scale"] = scale;
-                    }
-                    break;
-                case "Computed":
-                    var (sql, stored) = NormalizeScaffoldComputedSql(feature.Detail);
-                    metadata["computedSql"] = sql;
-                    metadata["stored"] = stored;
-                    break;
-                case "RowVersion":
-                    metadata["concurrencyToken"] = true;
-                    metadata["databaseGenerated"] = true;
-                    break;
-                case "IdentityStrategy":
-                    if (TryParseIdentityOptions(feature.Detail, out var seed, out var increment))
-                    {
-                        metadata["seed"] = seed;
-                        metadata["increment"] = increment;
-                    }
-                    break;
-                case "ProviderSpecificColumnType":
-                    metadata["providerType"] = feature.Detail;
-                    break;
-                case "Collation":
-                    metadata["collation"] = feature.Detail;
-                    break;
-                case "Default":
-                    metadata["defaultSql"] = feature.Detail;
-                    break;
-                case "CheckConstraint":
-                    metadata["checkSql"] = NormalizeScaffoldCheckSql(feature.Detail);
-                    break;
-                case "PartialIndex":
-                    metadata["filtered"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "ExpressionIndex":
-                    metadata["expressionBased"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    AddExpressionIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "IncludedColumnIndex":
-                    metadata["includedColumns"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "DescendingIndex":
-                    metadata["descending"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "PrefixIndex":
-                    metadata["prefixIndex"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "ProviderSpecificIndex":
-                    metadata["providerSpecific"] = true;
-                    AddIndexFeatureMetadata(metadata, feature.Detail);
-                    break;
-                case "Trigger":
-                    AddTriggerFeatureMetadata(metadata, feature);
-                    break;
-                case "TemporalTable":
-                    AddTemporalTableFeatureMetadata(metadata, feature);
-                    break;
-            }
-
-            return metadata;
-        }
-
-        private static void AddTriggerFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeature feature)
-        {
-            var values = ParseSemicolonValues(feature.Detail, out var header);
-            var provider = ParseSkippedObjectProvider(header);
-            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
-            metadata["providerObjectKind"] = "Trigger";
-            if (!metadata.ContainsKey("table"))
-                metadata["table"] = feature.TableKey;
-            if (!metadata.ContainsKey("triggerName"))
-                metadata["triggerName"] = feature.Name;
-            metadata["providerOwnedDdl"] = true;
-            metadata["generatedModelConfigurationSupported"] = false;
-            AddMetadataValue(metadata, values, "timing");
-            AddMetadataValue(metadata, values, "event");
-            AddMetadataValue(metadata, values, "orientation");
-            AddMetadataValue(metadata, values, "triggerSql");
-            AddMetadataBooleanValue(metadata, values, "isDisabled");
-            AddMetadataBooleanValue(metadata, values, "isInsteadOf");
-            if (!metadata.ContainsKey("definitionAvailable"))
-                metadata["definitionAvailable"] = metadata.ContainsKey("triggerSql");
-        }
-
-        private static void AddTemporalTableFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeature feature)
-        {
-            var values = ParseSemicolonValues(feature.Detail, out var header);
-            var provider = ParseSkippedObjectProvider(header);
-            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
-            metadata["providerObjectKind"] = "TemporalTable";
-            if (!metadata.ContainsKey("table"))
-                metadata["table"] = feature.TableKey;
-            metadata["providerNativeTemporal"] = true;
-            metadata["generatedTemporalConfigurationSupported"] = false;
-            AddMetadataValue(metadata, values, "temporalType");
-            AddMetadataValue(metadata, values, "historyTable");
-            if (!metadata.ContainsKey("temporalType"))
-            {
-                metadata["temporalType"] = feature.Detail.Contains("history table", StringComparison.OrdinalIgnoreCase)
-                    ? "history"
-                    : "system-versioned";
-            }
-        }
-
-        private static void AddIndexFeatureMetadata(IDictionary<string, object?> metadata, string detail)
-        {
-            if (string.IsNullOrWhiteSpace(detail))
-                return;
-
-            var values = ParseSemicolonValues(detail, out var header);
-            var provider = ParseSkippedObjectProvider(header);
-            if (IsKnownProviderName(provider))
-                metadata["provider"] = provider;
-
-            AddMetadataValue(metadata, values, "indexType");
-            AddMetadataValue(metadata, values, "accessMethod");
-            AddMetadataValue(metadata, values, "filterSql");
-            AddMetadataBooleanValue(metadata, values, "hasNullsNotDistinct");
-            AddMetadataBooleanValue(metadata, values, "hasNonDefaultOperatorClass");
-            AddMetadataBooleanValue(metadata, values, "hasIndexCollation");
-            AddMetadataBooleanValue(metadata, values, "hasNonDefaultNullOrdering");
-
-            if (values.TryGetValue("prefixColumns", out var prefixColumns)
-                && !string.IsNullOrWhiteSpace(prefixColumns))
-            {
-                metadata["prefixColumns"] = ParsePrefixIndexColumns(prefixColumns);
-            }
-
-            var indexSql = values.TryGetValue("indexSql", out var explicitIndexSql)
-                ? NullIfWhiteSpace(explicitIndexSql)
-                : ExtractCreateIndexStatement(detail);
-            if (string.IsNullOrWhiteSpace(indexSql))
-                return;
-
-            metadata["indexSql"] = indexSql;
-            metadata["isUnique"] = IsCreateIndexUnique(indexSql);
-            var keySql = ExtractCreateIndexExpressionSql(indexSql);
-            if (!string.IsNullOrWhiteSpace(keySql))
-                metadata["keySql"] = keySql;
-            var filterSql = ExtractCreateIndexWhereClause(indexSql);
-            if (!string.IsNullOrWhiteSpace(filterSql))
-                metadata["filterSql"] = filterSql;
-        }
-
-        private static void AddMetadataBooleanValue(
-            IDictionary<string, object?> metadata,
-            IReadOnlyDictionary<string, string> values,
-            string key)
-        {
-            if (!values.TryGetValue(key, out var value)
-                || !TryParseMetadataBoolean(value, out var parsed))
-            {
-                return;
-            }
-
-            metadata[key] = parsed;
-        }
+            => ScaffoldUnsupportedFeatureMetadataBuilder.BuildMetadata(
+                new ScaffoldUnsupportedFeatureInfo(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
+                {
+                    Metadata = feature.Metadata
+                });
 
         private static bool TryParseMetadataBoolean(string value, out bool parsed)
-        {
-            var trimmed = value.Trim();
-            if (trimmed.Equals("true", StringComparison.OrdinalIgnoreCase)
-                || trimmed.Equals("1", StringComparison.Ordinal))
-            {
-                parsed = true;
-                return true;
-            }
-
-            if (trimmed.Equals("false", StringComparison.OrdinalIgnoreCase)
-                || trimmed.Equals("0", StringComparison.Ordinal))
-            {
-                parsed = false;
-                return true;
-            }
-
-            parsed = false;
-            return false;
-        }
-
-        private static void AddExpressionIndexFeatureMetadata(IDictionary<string, object?> metadata, string detail)
-        {
-            var values = ParseSemicolonValues(detail, out _);
-            if (values.TryGetValue("expression", out var expression)
-                && !string.IsNullOrWhiteSpace(expression))
-            {
-                metadata["expressionSql"] = expression.Trim();
-            }
-
-            var indexSql = ExtractCreateIndexStatement(detail);
-            var expressionSql = ExtractCreateIndexExpressionSql(indexSql ?? detail);
-            if (!string.IsNullOrWhiteSpace(expressionSql)
-                && !expressionSql.EndsWith("expression index", StringComparison.OrdinalIgnoreCase))
-            {
-                metadata["expressionSql"] = expressionSql;
-            }
-        }
-
-        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParsePrefixIndexColumns(string prefixColumns)
-        {
-            var result = new List<IReadOnlyDictionary<string, object?>>();
-            foreach (var rawPart in SplitTopLevelCommaSeparated(prefixColumns))
-            {
-                var part = rawPart.Trim();
-                if (part.Length == 0)
-                    continue;
-
-                var separator = part.LastIndexOf(':');
-                if (separator <= 0)
-                    continue;
-
-                var lengths = part[(separator + 1)..];
-                var slash = lengths.IndexOf('/');
-                var prefixLengthText = slash >= 0 ? lengths[..slash] : lengths;
-                var declaredLengthText = slash >= 0 ? lengths[(slash + 1)..] : string.Empty;
-                var column = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["name"] = part[..separator].Trim()
-                };
-
-                var prefixLength = ParseNullableInt(prefixLengthText);
-                if (prefixLength.HasValue)
-                    column["prefixLength"] = prefixLength.Value;
-
-                var declaredLength = ParseNullableInt(declaredLengthText);
-                if (declaredLength.HasValue)
-                    column["declaredLength"] = declaredLength.Value;
-
-                result.Add(column);
-            }
-
-            return result;
-        }
-
-        private static string? ExtractCreateIndexStatement(string detail)
-        {
-            var createIndex = FindSqlKeywordOutsideQuotes(detail, "CREATE", 0);
-            if (createIndex < 0)
-                return null;
-
-            var candidate = detail[createIndex..].Trim();
-            var index = 0;
-            return TryConsumeSqlKeyword(candidate, ref index, "CREATE")
-                ? candidate
-                : null;
-        }
-
-        private static bool IsKnownProviderName(string value)
-            => value.Equals("SQL Server", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("SQLite", StringComparison.OrdinalIgnoreCase);
-
-        private static bool TryParseRelationshipPrincipalKeyDetail(
-            string detail,
-            out string principalTable,
-            out string[] principalColumns)
-        {
-            principalTable = string.Empty;
-            principalColumns = Array.Empty<string>();
-            const string prefix = "FK references ";
-            if (!detail.StartsWith(prefix, StringComparison.Ordinal))
-                return false;
-
-            var columnsStart = detail.IndexOf(".(", prefix.Length, StringComparison.Ordinal);
-            if (columnsStart < 0)
-                return false;
-
-            var columnsEnd = detail.IndexOf(')', columnsStart + 2);
-            if (columnsEnd <= columnsStart + 2)
-                return false;
-
-            principalTable = detail.Substring(prefix.Length, columnsStart - prefix.Length);
-            principalColumns = detail
-                .Substring(columnsStart + 2, columnsEnd - columnsStart - 2)
-                .Split(',')
-                .Select(static column => column.Trim())
-                .Where(static column => column.Length > 0)
-                .ToArray();
-            return !string.IsNullOrWhiteSpace(principalTable) && principalColumns.Length > 0;
-        }
-
-        private static bool TryParseReferentialActionDetail(
-            string detail,
-            out string onDelete,
-            out string onUpdate)
-        {
-            onDelete = string.Empty;
-            onUpdate = string.Empty;
-            const string deletePrefix = "ON DELETE ";
-            const string updateMarker = "; ON UPDATE ";
-            if (!detail.StartsWith(deletePrefix, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            var updateIndex = detail.IndexOf(updateMarker, deletePrefix.Length, StringComparison.OrdinalIgnoreCase);
-            if (updateIndex < 0)
-                return false;
-
-            onDelete = detail.Substring(deletePrefix.Length, updateIndex - deletePrefix.Length).Trim();
-            onUpdate = detail[(updateIndex + updateMarker.Length)..].Trim();
-            return onDelete.Length > 0 && onUpdate.Length > 0;
-        }
-
-        private static IReadOnlyDictionary<string, object?> BuildSequenceMetadata(ScaffoldSkippedObject obj)
-        {
-            var provider = ParseSequenceProvider(obj.Detail);
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["provider"] = FormatSequenceProvider(provider),
-                ["stubSupported"] = provider is "sqlserver" or "postgres",
-                ["clrType"] = GetTypeName(MapSequenceValueType(obj.Detail), allowNull: false)
-            };
-
-            var dataType = ParseSemicolonValue(obj.Detail, "dataType");
-            if (!string.IsNullOrWhiteSpace(dataType))
-                metadata["dataType"] = dataType;
-
-            return metadata;
-        }
-
-        private static IReadOnlyDictionary<string, object?> BuildEventMetadata(ScaffoldSkippedObject obj)
-        {
-            if (!obj.Detail.StartsWith("MySQL event", StringComparison.OrdinalIgnoreCase))
-                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
-
-            var values = ParseSemicolonValues(obj.Detail, out _);
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["provider"] = "MySQL"
-            };
-
-            AddMetadataValue(metadata, values, "eventType");
-            AddMetadataValue(metadata, values, "status");
-            AddMetadataValue(metadata, values, "intervalValue");
-            AddMetadataValue(metadata, values, "intervalField");
-            AddMetadataValue(metadata, values, "executeAt");
-            AddMetadataValue(metadata, values, "starts");
-            AddMetadataValue(metadata, values, "ends");
-            return metadata;
-        }
-
-        private static void AddMetadataValue(
-            IDictionary<string, object?> metadata,
-            IReadOnlyDictionary<string, string> values,
-            string key)
-        {
-            if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
-                metadata[key] = value;
-        }
-
-        private static IReadOnlyDictionary<string, object?> BuildQueryObjectMetadata(ScaffoldSkippedObject obj)
-        {
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["provider"] = ParseSkippedObjectProvider(obj.Detail),
-                ["targetKind"] = obj.Kind,
-                ["queryArtifactSupported"] = IsQueryArtifactObject(obj)
-            };
-
-            if (string.Equals(obj.Kind, "VirtualTableShadow", StringComparison.OrdinalIgnoreCase))
-            {
-                var owner = InferSqliteVirtualTableShadowOwner(obj.Name);
-                if (!string.IsNullOrWhiteSpace(owner))
-                    metadata["shadowOf"] = owner;
-            }
-
-            return metadata;
-        }
-
-        private static string ParseSkippedObjectProvider(string detail)
-        {
-            if (detail.StartsWith("SQL Server", StringComparison.OrdinalIgnoreCase)) return "SQL Server";
-            if (detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase)) return "PostgreSQL";
-            if (detail.StartsWith("MySQL", StringComparison.OrdinalIgnoreCase)) return "MySQL";
-            if (detail.StartsWith("SQLite", StringComparison.OrdinalIgnoreCase)) return "SQLite";
-            var space = detail.IndexOf(' ');
-            return space > 0 ? detail[..space] : detail;
-        }
-
-        private static string InferSqliteVirtualTableShadowOwner(string tableName)
-        {
-            var suffixes = new[]
-            {
-                "_content",
-                "_data",
-                "_idx",
-                "_docsize",
-                "_config",
-                "_segments",
-                "_segdir",
-                "_stat",
-                "_node",
-                "_parent",
-                "_rowid"
-            };
-
-            foreach (var suffix in suffixes)
-            {
-                if (tableName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
-                    && tableName.Length > suffix.Length)
-                {
-                    return tableName[..^suffix.Length];
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private static string FormatSequenceProvider(string provider)
-            => provider switch
-            {
-                "sqlserver" => "SQL Server",
-                "postgres" => "PostgreSQL",
-                _ => provider
-            };
-
-        private static IReadOnlyDictionary<string, object?> BuildSynonymMetadata(ScaffoldSkippedObject obj)
-        {
-            if (!obj.Detail.StartsWith("SQL Server synonym", StringComparison.OrdinalIgnoreCase))
-                return new Dictionary<string, object?>(0, StringComparer.Ordinal);
-
-            var baseObject = ParseSemicolonValue(obj.Detail, "baseObject");
-            var baseType = ParseSemicolonValue(obj.Detail, "baseType");
-            var metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["provider"] = "SQL Server",
-                ["queryArtifactSupported"] = IsTableLikeSqlServerSynonym(obj.Detail)
-            };
-
-            if (!string.IsNullOrWhiteSpace(baseObject))
-                metadata["baseObject"] = baseObject;
-            if (!string.IsNullOrWhiteSpace(baseType))
-            {
-                metadata["baseType"] = baseType;
-                metadata["targetKind"] = baseType.ToUpperInvariant() switch
-                {
-                    "U" => "Table",
-                    "V" => "View",
-                    "P" => "Procedure",
-                    "FN" or "IF" or "TF" => "Function",
-                    _ => baseType
-                };
-            }
-
-            return metadata;
-        }
-
-        private static string InferRoutineCallShape(string provider, string routineType, string? dataType)
-        {
-            if (!routineType.Contains("function", StringComparison.OrdinalIgnoreCase))
-                return string.Empty;
-
-            if (provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
-                && (string.Equals(dataType, "record", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(dataType, "table", StringComparison.OrdinalIgnoreCase)))
-            {
-                return "table-valued-function";
-            }
-
-            return "scalar-function";
-        }
-
-        private static string ParseRoutineProvider(string header)
-        {
-            if (header.StartsWith("SQL Server ", StringComparison.OrdinalIgnoreCase)) return "SQL Server";
-            if (header.StartsWith("PostgreSQL ", StringComparison.OrdinalIgnoreCase)) return "PostgreSQL";
-            if (header.StartsWith("MySQL ", StringComparison.OrdinalIgnoreCase)) return "MySQL";
-            var space = header.IndexOf(' ');
-            return space > 0 ? header[..space] : header;
-        }
-
-        private static string ParseRoutineType(string header)
-        {
-            foreach (var provider in new[] { "SQL Server ", "PostgreSQL ", "MySQL " })
-            {
-                if (header.StartsWith(provider, StringComparison.OrdinalIgnoreCase))
-                    return header[provider.Length..];
-            }
-
-            var space = header.IndexOf(' ');
-            return space > 0 ? header[(space + 1)..] : header;
-        }
-
-        private static int? ParseNullableInt(string? value)
-            => int.TryParse(value, out var parsed) ? parsed : null;
-
-        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParseRoutineParameters(string parameterModes)
-        {
-            if (string.IsNullOrWhiteSpace(parameterModes))
-                return Array.Empty<IReadOnlyDictionary<string, object?>>();
-
-            return SplitRoutineParameterModes(parameterModes)
-                .Select(ParseRoutineParameter)
-                .ToArray();
-        }
-
-        private static IReadOnlyDictionary<string, object?> ParseRoutineParameter(string raw)
-        {
-            if (!TryParseRoutineParameterMode(raw, out var name, out var mode, out var dataType))
-            {
-                var parts = raw.Split(':', 3);
-                name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
-                mode = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-                dataType = parts.Length > 2 ? parts[2].Trim() : string.Empty;
-            }
-
-            var parameter = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["name"] = name,
-                ["mode"] = mode
-            };
-            if (!string.IsNullOrWhiteSpace(dataType))
-            {
-                parameter["dataType"] = dataType;
-                parameter["clrType"] = GetRoutineParameterTypeName(dataType);
-                parameter["dbType"] = GetRoutineParameterDbTypeName(dataType);
-            }
-
-            return parameter;
-        }
-
-        private static bool TryParseRoutineParameterMode(
-            string raw,
-            out string name,
-            out string mode,
-            out string dataType)
-        {
-            name = string.Empty;
-            mode = string.Empty;
-            dataType = string.Empty;
-
-            var trimmed = raw.Trim();
-            if (trimmed.Length == 0)
-                return false;
-
-            for (var separator = trimmed.Length - 1; separator >= 0; separator--)
-            {
-                if (trimmed[separator] != ':')
-                    continue;
-
-                var modeStart = separator + 1;
-                var modeEnd = trimmed.IndexOf(':', modeStart);
-                var candidate = modeEnd >= 0
-                    ? trimmed.Substring(modeStart, modeEnd - modeStart).Trim()
-                    : trimmed[modeStart..].Trim();
-                if (!IsRoutineParameterMode(candidate))
-                    continue;
-
-                name = trimmed[..separator].Trim();
-                mode = candidate;
-                dataType = modeEnd >= 0 ? trimmed[(modeEnd + 1)..].Trim() : string.Empty;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsRoutineParameterMode(string mode)
-            => mode.Equals("IN", StringComparison.OrdinalIgnoreCase)
-               || mode.Equals("OUT", StringComparison.OrdinalIgnoreCase)
-               || mode.Equals("INOUT", StringComparison.OrdinalIgnoreCase)
-               || mode.Equals("RETURN", StringComparison.OrdinalIgnoreCase);
-
-        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParseRoutineResultColumns(string resultColumns)
-        {
-            if (string.IsNullOrWhiteSpace(resultColumns))
-                return Array.Empty<IReadOnlyDictionary<string, object?>>();
-
-            return SplitRoutineResultColumns(resultColumns)
-                .Select(ParseRoutineResultColumn)
-                .ToArray();
-        }
-
-        private static IReadOnlyDictionary<string, object?> ParseRoutineResultColumn(string raw)
-        {
-            string name;
-            string dataType;
-            bool? isNullable = null;
-            if (TryParseRoutineResultColumnParts(raw, out name, out dataType, out var nullable))
-            {
-                isNullable = nullable;
-            }
-            else
-            {
-                var parts = raw.Split(':', 3);
-                name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
-                dataType = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-                if (parts.Length > 2 && int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedNullable))
-                    isNullable = parsedNullable != 0;
-            }
-
-            var column = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["name"] = name,
-                ["dataType"] = dataType
-            };
-            if (isNullable.HasValue)
-                column["nullable"] = isNullable.Value;
-            return column;
-        }
-
-        private static bool TryParseRoutineResultColumnParts(
-            string raw,
-            out string name,
-            out string dataType,
-            out bool nullable)
-        {
-            name = string.Empty;
-            dataType = string.Empty;
-            nullable = false;
-
-            var trimmed = raw.Trim();
-            var nullableSeparator = trimmed.LastIndexOf(':');
-            if (nullableSeparator <= 0
-                || !int.TryParse(trimmed[(nullableSeparator + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedNullable))
-            {
-                return false;
-            }
-
-            var typeSeparator = trimmed.LastIndexOf(':', nullableSeparator - 1);
-            if (typeSeparator < 0)
-                return false;
-
-            name = trimmed[..typeSeparator].Trim();
-            dataType = trimmed.Substring(typeSeparator + 1, nullableSeparator - typeSeparator - 1).Trim();
-            nullable = parsedNullable != 0;
-            return true;
-        }
-
-        private static IReadOnlyList<string> SplitRoutineParameterModes(string parameterModes)
-        {
-            var parts = new List<string>();
-            var start = 0;
-            var depth = 0;
-            for (var i = 0; i < parameterModes.Length; i++)
-            {
-                var ch = parameterModes[i];
-                if (ch == '(')
-                {
-                    depth++;
-                }
-                else if (ch == ')' && depth > 0)
-                {
-                    depth--;
-                }
-                else if (ch == ',' && depth == 0)
-                {
-                    var candidate = parameterModes[start..i];
-                    if (TryParseRoutineParameterMode(candidate, out _, out _, out _))
-                    {
-                        AddRoutineDelimitedPart(parts, candidate);
-                        start = i + 1;
-                    }
-                }
-            }
-
-            AddRoutineDelimitedPart(parts, parameterModes[start..]);
-            return parts;
-        }
-
-        private static IReadOnlyList<string> SplitRoutineResultColumns(string resultColumns)
-        {
-            var parts = new List<string>();
-            var start = 0;
-            for (var i = 0; i < resultColumns.Length; i++)
-            {
-                if (resultColumns[i] != '|')
-                    continue;
-
-                var candidate = resultColumns[start..i];
-                if (TryParseRoutineResultColumnParts(candidate, out _, out _, out _))
-                {
-                    AddRoutineDelimitedPart(parts, candidate);
-                    start = i + 1;
-                }
-            }
-
-            AddRoutineDelimitedPart(parts, resultColumns[start..]);
-            return parts;
-        }
-
-        private static void AddRoutineDelimitedPart(List<string> parts, string value)
-        {
-            var trimmed = value.Trim();
-            if (!string.IsNullOrWhiteSpace(trimmed))
-                parts.Add(trimmed);
-        }
+            => ScaffoldUnsupportedFeatureMetadataBuilder.TryParseMetadataBoolean(value, out parsed);
 
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -4545,35 +1340,14 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
         {
-            var compositeForeignKeys = foreignKeys
-                .Where(fk => fk.ColumnCount > 1)
-                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
-                .Where(g => !ReferencesScaffoldablePrincipalKey(g, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                .OrderBy(g => g.First().DependentSchema, StringComparer.Ordinal)
-                .ThenBy(g => g.First().DependentTable, StringComparer.Ordinal)
-                .ThenBy(g => g.First().ConstraintName, StringComparer.Ordinal)
-                .Select(g =>
-                {
-                    var rows = g.ToArray();
-                    var first = rows[0];
-                    return new
-                    {
-                        code = ScaffoldDiagnosticCodeForCompositeForeignKey(),
-                        severity = ScaffoldDiagnosticSeverity(),
-                        category = ScaffoldDiagnosticCategoryForCompositeForeignKey(),
-                        constraint = first.ConstraintName,
-                        dependentTable = TableKey(first.DependentSchema, first.DependentTable),
-                        dependentColumns = rows.Select(r => r.DependentColumn).ToArray(),
-                        principalTable = TableKey(first.PrincipalSchema, first.PrincipalTable),
-                        principalColumns = rows.Select(r => r.PrincipalColumn).ToArray(),
-                        metadata = BuildCompositeForeignKeyMetadata(rows, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable),
-                        suggestedAction = SuggestedActionForCompositeForeignKey()
-                    };
-                })
-                .ToArray();
-
+            var compositeForeignKeys = BuildCompositeForeignKeyDiagnostics(
+                foreignKeys,
+                primaryKeyColumnsByTable,
+                indexes,
+                nonNullableColumnsByTable);
             var possibleJoinTables = BuildPossibleJoinTableDiagnostics(
                 foreignKeys,
                 primaryKeyColumnsByTable,
@@ -4582,99 +1356,13 @@ namespace nORM.Scaffolding
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
                 indexes,
-                emittedManyToManyJoinTableKeys)
-                .Select(g => new
-                {
-                    code = ScaffoldDiagnosticCodeForPossibleJoinTable(),
-                    severity = ScaffoldDiagnosticSeverity(),
-                    category = ScaffoldDiagnosticCategoryForPossibleJoinTable(),
-                    table = g.TableKey,
-                    principalTables = g.PrincipalTables,
-                    constraints = g.ConstraintNames,
-                    reasons = g.Reasons,
-                    metadata = g.Metadata,
-                    suggestedAction = SuggestedActionForPossibleJoinTable()
-                })
-                .ToArray();
-
-            var providerOwnedSchemaFeatures = unsupportedFeatures
-                .OrderBy(f => f.TableKey, StringComparer.Ordinal)
-                .ThenBy(f => f.Kind, StringComparer.Ordinal)
-                .ThenBy(f => f.Name, StringComparer.Ordinal)
-                .Select(f => new
-                {
-                    code = ScaffoldDiagnosticCodeForUnsupportedFeature(f.Kind),
-                    severity = ScaffoldDiagnosticSeverity(),
-                    category = ScaffoldDiagnosticCategoryForUnsupportedFeature(f.Kind),
-                    kind = f.Kind,
-                    table = f.TableKey,
-                    name = f.Name,
-                    detail = f.Detail,
-                    metadata = BuildUnsupportedFeatureMetadata(f),
-                    suggestedAction = SuggestedActionForUnsupportedFeature(f.Kind)
-                })
-                .ToArray();
-
-            var skippedDatabaseObjects = skippedObjects
-                .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
-                .ThenBy(o => o.Kind, StringComparer.Ordinal)
-                .Select(o => new
-                {
-                    code = ScaffoldDiagnosticCodeForSkippedObject(o.Kind),
-                    severity = ScaffoldDiagnosticSeverity(),
-                    category = ScaffoldDiagnosticCategoryForSkippedObject(o.Kind),
-                    kind = o.Kind,
-                    name = TableKey(o.Schema, o.Name),
-                    detail = o.Detail,
-                    metadata = BuildSkippedObjectMetadata(o),
-                    suggestedAction = SuggestedActionForSkippedObject(o.Kind)
-                })
-                .ToArray();
-
-            var diagnosticCodes = compositeForeignKeys
-                .Select(item => item.code)
-                .Concat(possibleJoinTables.Select(item => item.code))
-                .Concat(providerOwnedSchemaFeatures.Select(item => item.code))
-                .Concat(skippedDatabaseObjects.Select(item => item.code))
-                .GroupBy(code => code, StringComparer.Ordinal)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-
-            var diagnosticCategories = compositeForeignKeys
-                .Select(item => item.category)
-                .Concat(possibleJoinTables.Select(item => item.category))
-                .Concat(providerOwnedSchemaFeatures.Select(item => item.category))
-                .Concat(skippedDatabaseObjects.Select(item => item.category))
-                .GroupBy(category => category, StringComparer.Ordinal)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-
-            return JsonSerializer.Serialize(
-                new
-                {
-                    version = 1,
-                    summary = new
-                    {
-                        totalWarnings = compositeForeignKeys.Length
-                            + possibleJoinTables.Length
-                            + providerOwnedSchemaFeatures.Length
-                            + skippedDatabaseObjects.Length,
-                        sectionCounts = new
-                        {
-                            compositeForeignKeys = compositeForeignKeys.Length,
-                            possibleManyToManyJoinTables = possibleJoinTables.Length,
-                            providerOwnedSchemaFeatures = providerOwnedSchemaFeatures.Length,
-                            skippedDatabaseObjects = skippedDatabaseObjects.Length
-                        },
-                        codes = diagnosticCodes,
-                        categories = diagnosticCategories
-                    },
-                    compositeForeignKeys,
-                    possibleManyToManyJoinTables = possibleJoinTables,
-                    providerOwnedSchemaFeatures,
-                    skippedDatabaseObjects
-                },
-                new JsonSerializerOptions { WriteIndented = true });
+                providerOwnedWriteBlockedTableKeys,
+                emittedManyToManyJoinTableKeys);
+            return ScaffoldDiagnosticsWriter.WriteJson(
+                compositeForeignKeys,
+                possibleJoinTables,
+                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
+                ConvertSkippedObjectInfos(skippedObjects));
         }
 
         private static IReadOnlyList<ScaffoldManyToManyJoin> BuildManyToManyJoins(
@@ -4687,127 +1375,152 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
-            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var tablesByKey = tables.ToDictionary(t => TableKey(t.Schema, t.Name), StringComparer.OrdinalIgnoreCase);
-            var joins = new List<ScaffoldManyToManyJoin>();
+            var foreignKeyInfos = ConvertForeignKeyInfos(foreignKeys);
+            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            var indexInfos = ConvertIndexInfos(indexes);
+            var joins = ScaffoldManyToManyJoinDiscovery.BuildManyToManyJoins(
+                foreignKeyInfos,
+                tableInfos,
+                entityByTable,
+                columnPropertiesByTable,
+                primaryKeyColumnsByTable,
+                identityColumnsByTable,
+                databaseGeneratedColumnsByTable,
+                indexInfos,
+                nonNullableColumnsByTable,
+                providerOwnedWriteBlockedTableKeys,
+                memberNamesByTable);
+            return ConvertManyToManyJoins(joins);
+        }
 
-            foreach (var group in foreignKeys
-                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable), StringComparer.OrdinalIgnoreCase))
+        private static IReadOnlyList<ScaffoldForeignKeyInfo> ConvertForeignKeyInfos(IReadOnlyList<ScaffoldForeignKey> foreignKeys)
+        {
+            var converted = new ScaffoldForeignKeyInfo[foreignKeys.Count];
+            for (var i = 0; i < foreignKeys.Count; i++)
             {
-                var joinTableKey = group.Key;
-                if (!tableKeys.Contains(joinTableKey) || !tablesByKey.TryGetValue(joinTableKey, out var joinTable))
-                    continue;
-                var canonicalJoinTableKey = TableKey(joinTable.Schema, joinTable.Name);
-
-                var fkGroups = OrderManyToManyForeignKeyGroups(
-                    joinTable.Name,
-                    group
-                    .GroupBy(fk => fk.ConstraintName, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.ToArray())
-                    .ToArray());
-
-                if (fkGroups.Length != 2 || fkGroups.Any(rows => rows.Length == 0 || rows.Any(row => row.ColumnCount != rows.Length)))
-                    continue;
-
-                if (!columnPropertiesByTable.TryGetValue(joinTableKey, out var joinColumns))
-                    continue;
-
-                var fkColumnNames = fkGroups.SelectMany(rows => rows.Select(fk => fk.DependentColumn)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                if (!primaryKeyColumnsByTable.TryGetValue(joinTableKey, out var joinPrimaryKeyColumns))
-                {
-                    continue;
-                }
-
-                var hasExactBridgePrimaryKey = joinPrimaryKeyColumns.Count == fkColumnNames.Count
-                    && joinPrimaryKeyColumns.All(column => fkColumnNames.Contains(column));
-                var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(joinTableKey, out var generatedColumns)
-                    ? generatedColumns
-                    : EmptyStringSet;
-                var extraColumns = joinColumns.Keys.Where(column => !fkColumnNames.Contains(column)).ToArray();
-                var payloadColumns = extraColumns
-                    .Where(column => !databaseGeneratedColumns.Contains(column))
-                    .ToArray();
-                var hasGeneratedSurrogatePrimaryKey = payloadColumns.Length == 1
-                    && joinPrimaryKeyColumns.Count == 1
-                    && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
-                    && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
-                    && identityColumns.Contains(payloadColumns[0])
-                    && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames, nonNullableColumnsByTable);
-
-                if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
-                    continue;
-
-                if (!hasExactBridgePrimaryKey && !hasGeneratedSurrogatePrimaryKey)
-                    continue;
-
-                if (!nonNullableColumnsByTable.TryGetValue(joinTableKey, out var nonNullableColumns)
-                    || fkColumnNames.Any(column => !nonNullableColumns.Contains(column)))
-                {
-                    continue;
-                }
-
-                var leftGroup = fkGroups[0];
-                var rightGroup = fkGroups[1];
-                var left = leftGroup[0];
-                var right = rightGroup[0];
-                var leftTableKey = TableKey(left.PrincipalSchema, left.PrincipalTable);
-                var rightTableKey = TableKey(right.PrincipalSchema, right.PrincipalTable);
-                if (!entityByTable.TryGetValue(leftTableKey, out var leftEntity)
-                    || !entityByTable.TryGetValue(rightTableKey, out var rightEntity))
-                {
-                    continue;
-                }
-
-                var leftPrincipalColumns = leftGroup.Select(fk => fk.PrincipalColumn).ToArray();
-                var rightPrincipalColumns = rightGroup.Select(fk => fk.PrincipalColumn).ToArray();
-                var leftUsesPrimaryKey = HasPrimaryKeyColumns(primaryKeyColumnsByTable, leftTableKey, leftPrincipalColumns);
-                var rightUsesPrimaryKey = HasPrimaryKeyColumns(primaryKeyColumnsByTable, rightTableKey, rightPrincipalColumns);
-                if ((!leftUsesPrimaryKey && !ReferencesUniqueIndex(leftGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                    || (!rightUsesPrimaryKey && !ReferencesUniqueIndex(rightGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable)))
-                {
-                    continue;
-                }
-
-                var leftPrincipalKeyProperties = leftPrincipalColumns
-                    .Select(column => GetColumnPropertyName(columnPropertiesByTable, leftTableKey, column))
-                    .ToArray();
-                var rightPrincipalKeyProperties = rightPrincipalColumns
-                    .Select(column => GetColumnPropertyName(columnPropertiesByTable, rightTableKey, column))
-                    .ToArray();
-
-                var isSelfJoin = string.Equals(leftTableKey, rightTableKey, StringComparison.OrdinalIgnoreCase);
-                var leftCollectionBase = Pluralize(rightEntity);
-                var rightCollectionBase = Pluralize(leftEntity);
-                if (isSelfJoin)
-                {
-                    leftCollectionBase += "By" + GetColumnPropertyName(columnPropertiesByTable, joinTableKey, left.DependentColumn);
-                    rightCollectionBase += "By" + GetColumnPropertyName(columnPropertiesByTable, joinTableKey, right.DependentColumn);
-                }
-
-                var existingNames = GetOrCreateMemberNames(memberNamesByTable, leftTableKey);
-                var leftCollectionName = MakeUnique(leftCollectionBase, existingNames);
-                var existingInverseNames = GetOrCreateMemberNames(memberNamesByTable, rightTableKey);
-                var rightCollectionName = MakeUnique(rightCollectionBase, existingInverseNames);
-                joins.Add(new ScaffoldManyToManyJoin(
-                    canonicalJoinTableKey,
-                    leftTableKey,
-                    rightTableKey,
-                    joinTable.Name,
-                    joinTable.Schema,
-                    leftEntity,
-                    rightEntity,
-                    leftGroup.Select(fk => fk.DependentColumn).ToArray(),
-                    rightGroup.Select(fk => fk.DependentColumn).ToArray(),
-                    leftPrincipalKeyProperties,
-                    rightPrincipalKeyProperties,
-                    leftUsesPrimaryKey && rightUsesPrimaryKey,
-                    leftCollectionName,
-                    rightCollectionName));
+                var foreignKey = foreignKeys[i];
+                converted[i] = new ScaffoldForeignKeyInfo(
+                    foreignKey.DependentSchema,
+                    foreignKey.DependentTable,
+                    foreignKey.DependentColumn,
+                    foreignKey.PrincipalSchema,
+                    foreignKey.PrincipalTable,
+                    foreignKey.PrincipalColumn,
+                    foreignKey.ConstraintName,
+                    foreignKey.ColumnCount,
+                    foreignKey.OnDelete,
+                    foreignKey.OnUpdate,
+                    foreignKey.IsSyntheticConstraintName);
             }
 
-            return joins;
+            return converted;
+        }
+
+        private static IReadOnlyList<ScaffoldUnsupportedFeatureInfo> ConvertUnsupportedFeatureInfos(
+            IReadOnlyList<ScaffoldUnsupportedFeature> features)
+        {
+            var converted = new ScaffoldUnsupportedFeatureInfo[features.Count];
+            for (var i = 0; i < features.Count; i++)
+            {
+                var feature = features[i];
+                converted[i] = new ScaffoldUnsupportedFeatureInfo(
+                    feature.TableKey,
+                    feature.Kind,
+                    feature.Name,
+                    feature.Detail)
+                {
+                    Metadata = BuildUnsupportedFeatureMetadata(feature)
+                };
+            }
+
+            return converted;
+        }
+
+        private static IReadOnlyList<ScaffoldIndexInfo> ConvertIndexInfos(IReadOnlyList<ScaffoldIndex> indexes)
+        {
+            var converted = new ScaffoldIndexInfo[indexes.Count];
+            for (var i = 0; i < indexes.Count; i++)
+            {
+                var index = indexes[i];
+                converted[i] = new ScaffoldIndexInfo(
+                    index.TableKey,
+                    index.ColumnName,
+                    index.IndexName,
+                    index.IsUnique,
+                    index.ColumnCount,
+                    index.Ordinal,
+                    index.IsDescending,
+                    index.IsIncluded,
+                    index.NullSortOrder,
+                    index.NullsNotDistinct,
+                    index.FilterSql,
+                    index.IsSyntheticName);
+            }
+
+            return converted;
+        }
+
+        private static IReadOnlyList<ScaffoldManyToManyJoin> ConvertManyToManyJoins(IReadOnlyList<ScaffoldManyToManyJoinInfo> joins)
+        {
+            var converted = new ScaffoldManyToManyJoin[joins.Count];
+            for (var i = 0; i < joins.Count; i++)
+            {
+                var join = joins[i];
+                converted[i] = new ScaffoldManyToManyJoin(
+                    join.JoinTableKey,
+                    join.LeftTableKey,
+                    join.RightTableKey,
+                    join.JoinTableName,
+                    join.JoinTableSchema,
+                    join.LeftEntityName,
+                    join.RightEntityName,
+                    join.LeftForeignKeyColumns,
+                    join.RightForeignKeyColumns,
+                    join.LeftPrincipalKeyProperties,
+                    join.RightPrincipalKeyProperties,
+                    join.LeftOnDelete,
+                    join.LeftOnUpdate,
+                    join.RightOnDelete,
+                    join.RightOnUpdate,
+                    join.UsesPrimaryKeys,
+                    join.LeftCollectionNavigationName,
+                    join.RightCollectionNavigationName);
+            }
+
+            return converted;
+        }
+
+        private static IReadOnlyList<ScaffoldRelationship> ConvertRelationships(IReadOnlyList<ScaffoldRelationshipInfo> relationships)
+        {
+            var converted = new ScaffoldRelationship[relationships.Count];
+            for (var i = 0; i < relationships.Count; i++)
+            {
+                var relationship = relationships[i];
+                converted[i] = new ScaffoldRelationship(
+                    relationship.DependentTableKey,
+                    relationship.PrincipalTableKey,
+                    relationship.DependentEntityName,
+                    relationship.PrincipalEntityName,
+                    relationship.ForeignKeyPropertyName,
+                    relationship.PrincipalKeyPropertyName,
+                    relationship.ReferenceNavigationName,
+                    relationship.CollectionNavigationName,
+                    relationship.IsUniqueDependentKey,
+                    relationship.CascadeDelete,
+                    relationship.OnDelete,
+                    relationship.OnUpdate,
+                    relationship.ConstraintName)
+                {
+                    IsRequired = relationship.IsRequired,
+                    ForeignKeyPropertyNames = relationship.ForeignKeyPropertyNames,
+                    PrincipalKeyPropertyNames = relationship.PrincipalKeyPropertyNames
+                };
+            }
+
+            return converted;
         }
 
         private static IReadOnlyList<ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
@@ -4835,72 +1548,37 @@ namespace nORM.Scaffolding
             return navigations;
         }
 
-        private static ScaffoldForeignKey[] OrderManyToManyForeignKeys(string joinTableName, ScaffoldForeignKey[] foreignKeys)
-        {
-            return foreignKeys
-                .OrderBy(fk => PrincipalNamePosition(joinTableName, fk.PrincipalTable))
-                .ThenBy(fk => PrincipalNamePosition(joinTableName, TrimIdSuffix(fk.DependentColumn)))
-                .ThenBy(fk => fk.DependentColumn, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static ScaffoldForeignKey[][] OrderManyToManyForeignKeyGroups(string joinTableName, ScaffoldForeignKey[][] foreignKeyGroups)
-        {
-            return foreignKeyGroups
-                .OrderBy(group => PrincipalNamePosition(joinTableName, group[0].PrincipalTable))
-                .ThenBy(group => PrincipalNamePosition(joinTableName, TrimIdSuffix(group[0].DependentColumn)))
-                .ThenBy(group => group[0].DependentColumn, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static int PrincipalNamePosition(string joinTableName, string principalTable)
-        {
-            var position = joinTableName.IndexOf(principalTable, StringComparison.OrdinalIgnoreCase);
-            return position < 0 ? int.MaxValue : position;
-        }
-
         private static bool HasSinglePrimaryKeyColumn(
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             string tableKey,
             string columnName)
-        {
-            return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
-                   && keyColumns.Count == 1
-                   && keyColumns.Contains(columnName);
-        }
+            => ScaffoldForeignKeyShape.HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, tableKey, columnName);
 
         private static bool HasPrimaryKeyColumns(
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             string tableKey,
             IReadOnlyList<string> columnNames)
-        {
-            return primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
-                   && keyColumns.Count == columnNames.Count
-                   && keyColumns.SequenceEqual(columnNames, StringComparer.OrdinalIgnoreCase);
-        }
+            => ScaffoldForeignKeyShape.HasPrimaryKeyColumns(primaryKeyColumnsByTable, tableKey, columnNames);
+
+        private static bool HasOnlyScaffoldableReferentialActions(IEnumerable<ScaffoldForeignKey> foreignKeys)
+            => ScaffoldForeignKeyShape.HasOnlyScaffoldableReferentialActions(ConvertForeignKeyInfos(foreignKeys.ToArray()));
 
         private static bool HasExactUniqueIndex(
             IReadOnlyList<ScaffoldIndex> indexes,
             string tableKey,
-            IReadOnlySet<string> columnNames,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-        {
-            return indexes
-                .Where(index => IsUnfilteredUniqueKeyIndex(index)
-                                && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
-                .Any(group =>
-                {
-                    var keyColumns = group
-                        .Where(index => !index.IsIncluded)
-                        .OrderBy(index => index.Ordinal)
-                        .Select(index => index.ColumnName)
-                        .ToArray();
-                    return keyColumns.Length == columnNames.Count
-                           && HasNonNullableColumns(nonNullableColumnsByTable, tableKey, keyColumns)
-                           && keyColumns.All(columnNames.Contains);
-                });
-        }
+            IReadOnlySet<string> columnNames)
+            => ScaffoldForeignKeyShape.HasExactUniqueIndex(ConvertIndexInfos(indexes), tableKey, columnNames);
+
+        private static bool AllForeignKeyGroupsAreUniqueDependentKeys(
+            string dependentTableKey,
+            IEnumerable<IReadOnlyList<ScaffoldForeignKey>> foreignKeyGroups,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyList<ScaffoldIndex> indexes)
+            => ScaffoldForeignKeyShape.AllForeignKeyGroupsAreUniqueDependentKeys(
+                dependentTableKey,
+                foreignKeyGroups.Select(ConvertForeignKeyInfos).ToArray(),
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes));
 
         private static bool HasNonNullableColumns(
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
@@ -4912,36 +1590,29 @@ namespace nORM.Scaffolding
         private static bool ReferencesPrimaryKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
-        {
-            var rows = foreignKeyGroup.ToArray();
-            if (rows.Length == 0)
-                return false;
-
-            var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
-            var principalColumns = rows.Select(row => row.PrincipalColumn).ToArray();
-            return primaryKeyColumnsByTable.TryGetValue(principalKey, out var keyColumns)
-                   && keyColumns.Count == rows.Length
-                   && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
-        }
+            => ScaffoldForeignKeyShape.ReferencesPrimaryKey(ConvertForeignKeyInfos(foreignKeyGroup.ToArray()), primaryKeyColumnsByTable);
 
         private static bool ReferencesScaffoldablePrincipalKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-            => ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable)
-               || ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
+            IReadOnlyList<ScaffoldIndex> indexes)
+            => ScaffoldForeignKeyShape.ReferencesScaffoldablePrincipalKey(
+                ConvertForeignKeyInfos(foreignKeyGroup.ToArray()),
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes));
 
-        private static IReadOnlyList<ScaffoldPrimaryKey> BuildCompositePrimaryKeys(
+        private static IReadOnlyList<ScaffoldPrimaryKey> BuildPrimaryKeyConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlyDictionary<string, string> primaryKeyConstraintNamesByTable,
             IReadOnlySet<string> skippedTableKeys)
         {
             var keys = new List<ScaffoldPrimaryKey>();
             foreach (var (tableKey, keyColumns) in primaryKeyColumnsByTable.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
-                if (keyColumns.Count <= 1
+                primaryKeyConstraintNamesByTable.TryGetValue(tableKey, out var constraintName);
+                if ((keyColumns.Count <= 1 && string.IsNullOrWhiteSpace(constraintName))
                     || skippedTableKeys.Contains(tableKey)
                     || !entityByTable.TryGetValue(tableKey, out var entityName)
                     || !columnPropertiesByTable.TryGetValue(tableKey, out var propertyNames))
@@ -4954,7 +1625,7 @@ namespace nORM.Scaffolding
                     .Select(column => propertyNames[column])
                     .ToArray();
                 if (keyProperties.Length == keyColumns.Count)
-                    keys.Add(new ScaffoldPrimaryKey(entityName, keyProperties));
+                    keys.Add(new ScaffoldPrimaryKey(entityName, keyProperties, NullIfWhiteSpace(constraintName)));
             }
 
             return keys;
@@ -4963,48 +1634,20 @@ namespace nORM.Scaffolding
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-            => ReferencesUniqueIndex(foreignKeyGroup.ToArray(), primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable);
+            IReadOnlyList<ScaffoldIndex> indexes)
+            => ReferencesUniqueIndex(foreignKeyGroup.ToArray(), primaryKeyColumnsByTable, indexes);
 
         private static bool ReferencesUniqueIndex(
             IReadOnlyList<ScaffoldForeignKey> rows,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-        {
-            if (rows.Count == 0)
-                return false;
-
-            var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
-            if (!primaryKeyColumnsByTable.TryGetValue(principalKey, out var primaryKeyColumns)
-                || primaryKeyColumns.Count == 0)
-            {
-                return false;
-            }
-
-            var principalColumns = rows.Select(row => row.PrincipalColumn).ToArray();
-            return indexes
-                .Where(index => IsUnfilteredUniqueKeyIndex(index) && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
-                .Any(group =>
-                {
-                    var keyColumns = group
-                        .Where(index => !index.IsIncluded)
-                        .OrderBy(index => index.Ordinal)
-                        .Select(index => index.ColumnName)
-                        .ToArray();
-                    return keyColumns.Length == rows.Count
-                           && group.All(col => col.ColumnCount == rows.Count)
-                           && HasNonNullableColumns(nonNullableColumnsByTable, principalKey, keyColumns)
-                           && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
-                });
-        }
+            IReadOnlyList<ScaffoldIndex> indexes)
+            => ScaffoldForeignKeyShape.ReferencesUniqueIndex(
+                ConvertForeignKeyInfos(rows),
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes));
 
         private static bool IsUnfilteredUniqueKeyIndex(ScaffoldIndex index)
-            => index.IsUnique
-               && !index.IsIncluded
-               && string.IsNullOrWhiteSpace(index.FilterSql);
+            => ScaffoldForeignKeyShape.IsUnfilteredUniqueKeyIndex(ConvertIndexInfos(new[] { index })[0]);
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -5014,93 +1657,16 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
-        {
-            var relationships = new List<ScaffoldRelationship>();
-            var relationshipPairCounts = foreignKeys
-                .GroupBy(fk => $"{TableKey(fk.DependentSchema, fk.DependentTable)}\u001f{TableKey(fk.PrincipalSchema, fk.PrincipalTable)}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .GroupBy(fk => TableKey(fk.DependentSchema, fk.DependentTable) + "\u001f" + TableKey(fk.PrincipalSchema, fk.PrincipalTable), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            => ConvertRelationships(ScaffoldRelationshipDiscovery.BuildRelationships(
+                ConvertForeignKeyInfos(foreignKeys),
+                entityByTable,
+                columnPropertiesByTable,
+                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes),
+                nonNullableColumnsByTable,
+                memberNamesByTable));
 
-            foreach (var foreignKeyGroup in foreignKeys
-                .GroupBy(fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}", StringComparer.OrdinalIgnoreCase))
-            {
-                var rows = foreignKeyGroup.ToArray();
-                var foreignKey = rows[0];
-                var dependentKey = TableKey(foreignKey.DependentSchema, foreignKey.DependentTable);
-                var principalKey = TableKey(foreignKey.PrincipalSchema, foreignKey.PrincipalTable);
-                if (!entityByTable.TryGetValue(dependentKey, out var dependentEntity)
-                    || !entityByTable.TryGetValue(principalKey, out var principalEntity))
-                {
-                    continue;
-                }
-
-                if (!ReferencesScaffoldablePrincipalKey(foreignKeyGroup, primaryKeyColumnsByTable, indexes, nonNullableColumnsByTable))
-                    continue;
-
-                if (!primaryKeyColumnsByTable.TryGetValue(dependentKey, out var dependentPrimaryKeyColumns)
-                    || dependentPrimaryKeyColumns.Count == 0)
-                {
-                    continue;
-                }
-
-                var foreignKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, dependentKey, row.DependentColumn)).ToArray();
-                var principalKeyProperties = rows.Select(row => GetColumnPropertyName(columnPropertiesByTable, principalKey, row.PrincipalColumn)).ToArray();
-                var foreignKeyProperty = foreignKeyProperties[0];
-                var principalKeyProperty = principalKeyProperties[0];
-                var hasMultipleRelationshipsToSamePrincipal = relationshipPairCounts.TryGetValue(
-                    dependentKey + "\u001f" + principalKey,
-                    out var relationshipPairCount)
-                    && relationshipPairCount > 1;
-                var isSelfRelationship = string.Equals(dependentKey, principalKey, StringComparison.OrdinalIgnoreCase);
-
-                var dependentMemberNames = GetOrCreateMemberNames(memberNamesByTable, dependentKey);
-                var referenceBase = principalEntity;
-                if (isSelfRelationship
-                    || hasMultipleRelationshipsToSamePrincipal
-                    || dependentMemberNames.Contains(referenceBase))
-                {
-                    referenceBase = TrimIdSuffix(foreignKeyProperty);
-                    if (string.IsNullOrWhiteSpace(referenceBase))
-                        referenceBase = principalEntity + "Navigation";
-                }
-
-                var referenceName = MakeUnique(referenceBase, dependentMemberNames);
-
-                var principalMemberNames = GetOrCreateMemberNames(memberNamesByTable, principalKey);
-                var collectionBase = Pluralize(dependentEntity);
-                if (isSelfRelationship
-                    || hasMultipleRelationshipsToSamePrincipal
-                    || principalMemberNames.Contains(collectionBase))
-                {
-                    collectionBase = Pluralize(dependentEntity) + "By" + foreignKeyProperty;
-                }
-
-                var collectionName = MakeUnique(collectionBase, principalMemberNames);
-
-                relationships.Add(new ScaffoldRelationship(
-                    dependentKey,
-                    principalKey,
-                    dependentEntity,
-                    principalEntity,
-                    foreignKeyProperty,
-                    principalKeyProperty,
-                    referenceName,
-                    collectionName,
-                    string.Equals(foreignKey.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase),
-                    NormalizeReferentialAction(foreignKey.OnDelete),
-                    NormalizeReferentialAction(foreignKey.OnUpdate),
-                    foreignKey.IsSyntheticConstraintName ? null : NullIfWhiteSpace(foreignKey.ConstraintName))
-                {
-                    ForeignKeyPropertyNames = foreignKeyProperties,
-                    PrincipalKeyPropertyNames = principalKeyProperties
-                });
-            }
-
-            return relationships;
-        }
-
-        private static IReadOnlyDictionary<string, string> BuildEntityNameMap(IReadOnlyList<ScaffoldTable> tables)
+        private static IReadOnlyDictionary<string, string> BuildEntityNameMap(IReadOnlyList<ScaffoldTable> tables, bool useDatabaseNames)
         {
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -5117,56 +1683,28 @@ namespace nORM.Scaffolding
                         ? "Default_" + table.Name
                         : table.Schema + "_" + table.Name
                     : table.Name;
-                var baseName = EscapeCSharpIdentifier(ToPascalCase(sourceName));
+                var baseName = ToScaffoldClrName(sourceName, useDatabaseNames);
                 names[TableKey(table.Schema, table.Name)] = MakeUnique(baseName, existingNames);
             }
 
             return names;
         }
 
-        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetNonNullableColumnNamesAsync(
+        private static Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetNonNullableColumnNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                return await QueryColumnNameMapAsync(connection, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND is_nullable = 'NO'
-                    """).ConfigureAwait(false);
-            }
-
-            var result = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var table in tables)
-            {
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
-                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
-                var schema = reader.GetSchemaTable()!;
-                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (DataRow row in schema.Rows)
-                {
-                    var columnName = row["ColumnName"]!.ToString()!;
-                    var allowNull = row["AllowDBNull"] is bool b && b;
-                    if (!allowNull)
-                        columns.Add(columnName);
-                }
-
-                result[TableKey(table.Schema, table.Name)] = columns;
-            }
-
-            return result;
-        }
+            => ScaffoldColumnDiscovery.GetNonNullableColumnNamesAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetColumnPropertyNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables,
-            IReadOnlyDictionary<string, string> entityByTable)
+            IReadOnlyDictionary<string, string> entityByTable,
+            bool useDatabaseNames)
         {
             if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
             {
@@ -5176,7 +1714,7 @@ namespace nORM.Scaffolding
                     FROM information_schema.columns
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                     """).ConfigureAwait(false);
-                return BuildColumnPropertyNameMap(orderedColumns, entityByTable);
+                return BuildColumnPropertyNameMap(orderedColumns, entityByTable, useDatabaseNames);
             }
 
             var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -5190,15 +1728,10 @@ namespace nORM.Scaffolding
                 var existingNames = CreateReservedMemberNameSet();
                 if (entityByTable.TryGetValue(tableKey, out var entityName))
                     existingNames.Add(entityName);
-                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (DataRow row in schema.Rows)
-                {
-                    var columnName = row["ColumnName"]!.ToString()!;
-                    var baseName = EscapeCSharpIdentifier(ToPascalCase(columnName));
-                    properties[columnName] = MakeUnique(baseName, existingNames);
-                }
-
-                result[tableKey] = properties;
+                result[tableKey] = ScaffoldColumnPropertyNameBuilder.BuildColumnPropertyNames(
+                    schema.Rows.Cast<DataRow>().Select(row => row["ColumnName"]!.ToString()!),
+                    existingNames,
+                    useDatabaseNames);
             }
 
             return result;
@@ -5206,44 +1739,17 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildColumnPropertyNameMap(
             IReadOnlyDictionary<string, IReadOnlyList<string>> orderedColumns,
-            IReadOnlyDictionary<string, string> entityByTable)
-        {
-            var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (tableKey, columns) in orderedColumns)
-            {
-                var existingNames = CreateReservedMemberNameSet();
-                if (entityByTable.TryGetValue(tableKey, out var entityName))
-                    existingNames.Add(entityName);
-                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var columnName in columns)
-                {
-                    var baseName = EscapeCSharpIdentifier(ToPascalCase(columnName));
-                    properties[columnName] = MakeUnique(baseName, existingNames);
-                }
-
-                result[tableKey] = properties;
-            }
-
-            return result;
-        }
+            IReadOnlyDictionary<string, string> entityByTable,
+            bool useDatabaseNames)
+            => ScaffoldColumnPropertyNameBuilder.BuildColumnPropertyNameMap(
+                orderedColumns,
+                entityByTable,
+                useDatabaseNames);
 
         private static Dictionary<string, HashSet<string>> BuildMemberNameMap(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, string> entityByTable)
-        {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (tableKey, columns) in columnPropertiesByTable)
-            {
-                var names = CreateReservedMemberNameSet();
-                if (entityByTable.TryGetValue(tableKey, out var entityName))
-                    names.Add(entityName);
-                foreach (var column in columns.Values)
-                    names.Add(column);
-                result[tableKey] = names;
-            }
-
-            return result;
-        }
+            => ScaffoldColumnPropertyNameBuilder.BuildMemberNameMap(columnPropertiesByTable, entityByTable);
 
         private static HashSet<string> CreateReservedContextMemberNameSet()
         {
@@ -5259,1061 +1765,228 @@ namespace nORM.Scaffolding
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildScaffoldDefaultValueMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
-        {
-            var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    || !properties.ContainsKey(feature.Name)
-                    || !TryNormalizeScaffoldDefaultSql(feature.Detail, out var defaultValueSql))
-                {
-                    continue;
-                }
-
-                if (!result.TryGetValue(feature.TableKey, out var table))
-                {
-                    table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    result[feature.TableKey] = table;
-                }
-
-                table[feature.Name] = defaultValueSql;
-            }
-
-            return result.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyDictionary<string, string>)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
+            => ScaffoldFeatureConfigurationBuilder.BuildScaffoldDefaultValueMap(
+                ConvertFeatureInputs(features),
+                columnPropertiesByTable);
 
         private static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable)
-        {
-            var result = new List<ScaffoldDefaultValueConfiguration>();
-            foreach (var (tableKey, defaults) in defaultValuesByTable)
-            {
-                if (!entityByTable.TryGetValue(tableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(tableKey, out var properties))
-                    continue;
+            => ConvertDefaultValueConfigurations(ScaffoldFeatureConfigurationBuilder.BuildDefaultValueConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                defaultValuesByTable));
 
-                foreach (var (columnName, defaultValueSql) in defaults)
-                {
-                    if (properties.TryGetValue(columnName, out var propertyName))
-                        result.Add(new ScaffoldDefaultValueConfiguration(tableKey, entityName, columnName, propertyName, defaultValueSql));
-                }
-            }
+        private static IReadOnlyList<ScaffoldPrecisionConfiguration> BuildPrecisionConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> decimalPrecisionByTable)
+            => ConvertPrecisionConfigurations(ScaffoldFeatureConfigurationBuilder.BuildPrecisionConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                ConvertDecimalPrecisionInfoMap(decimalPrecisionByTable)));
 
-            return result;
-        }
+        private static IReadOnlyList<ScaffoldColumnFacetConfiguration> BuildColumnFacetConfigurations(
+            IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> columnFacetsByTable)
+            => ConvertColumnFacetConfigurations(ScaffoldFeatureConfigurationBuilder.BuildColumnFacetConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                columnFacetsByTable));
 
         private static IReadOnlyList<ScaffoldIdentityOptionConfiguration> BuildIdentityOptionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new List<ScaffoldIdentityOptionConfiguration>();
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "IdentityStrategy", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || !TryParseIdentityOptions(feature.Detail, out var seed, out var increment)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    || !properties.TryGetValue(feature.Name, out var propertyName))
-                {
-                    continue;
-                }
-
-                result.Add(new ScaffoldIdentityOptionConfiguration(
-                    feature.TableKey,
-                    entityName,
-                    feature.Name,
-                    propertyName,
-                    seed,
-                    increment));
-            }
-
-            return result;
-        }
+            => ConvertIdentityOptionConfigurations(ScaffoldFeatureConfigurationBuilder.BuildIdentityOptionConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                ConvertFeatureInputs(features)));
 
         private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new List<ScaffoldCheckConstraintConfiguration>();
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || string.IsNullOrWhiteSpace(feature.Detail)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName))
-                {
-                    continue;
-                }
+            => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildCheckConstraintConfigurations(
+                entityByTable,
+                ConvertFeatureInputs(features)));
 
-                var sql = NormalizeScaffoldCheckSql(feature.Detail);
-                if (string.IsNullOrWhiteSpace(sql))
-                    continue;
+        private static bool CheckConstraintConfigurationMatchesFeature(
+            ScaffoldCheckConstraintConfiguration check,
+            ScaffoldUnsupportedFeature feature)
+            => ScaffoldFeatureConfigurationBuilder.CheckConstraintConfigurationMatchesFeature(
+                ConvertCheckConstraintConfiguration(check),
+                ConvertUnsupportedFeatureInputInfo(feature));
 
-                result.Add(new ScaffoldCheckConstraintConfiguration(
-                    feature.TableKey,
-                    entityName,
-                    feature.Name,
-                    sql));
-            }
-
-            return result;
-        }
+        private static string BuildGeneratedCheckConstraintName(string entityName, string sql)
+            => ScaffoldFeatureConfigurationBuilder.BuildGeneratedCheckConstraintName(entityName, sql);
 
         private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildEnumCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new List<ScaffoldCheckConstraintConfiguration>();
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "ProviderSpecificColumnType", StringComparison.OrdinalIgnoreCase)
-                    || !TryBuildProviderValueCheckSql(feature.Name, feature.Detail, out var checkKind, out var sql)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || !IsSimpleSqlIdentifier(feature.Name)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    || !properties.TryGetValue(feature.Name, out var propertyName))
-                {
-                    continue;
-                }
-
-                var checkName = "CK_" + entityName + "_" + propertyName + "_" + checkKind;
-                result.Add(new ScaffoldCheckConstraintConfiguration(feature.TableKey, entityName, checkName, sql));
-            }
-
-            return result;
-        }
+            => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildEnumCheckConstraintConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                ConvertFeatureInputs(features)));
 
         private static bool TryBuildProviderValueCheckSql(
             string columnName,
             string? detail,
             out string checkKind,
             out string sql)
-        {
-            checkKind = string.Empty;
-            sql = string.Empty;
-
-            if (TryParseEnumValues(detail, out var enumValues))
-            {
-                checkKind = "Enum";
-                sql = columnName + " IN (" + string.Join(", ", QuoteSqlStringLiterals(enumValues)) + ")";
-                return true;
-            }
-
-            if (TryParseBoundedMySqlSetValues(detail, out var setValues))
-            {
-                checkKind = "Set";
-                sql = columnName + " IN (" + string.Join(", ", QuoteSqlStringLiterals(BuildMySqlSetCombinations(setValues))) + ")";
-                return true;
-            }
-
-            return false;
-        }
+            => ScaffoldFeatureConfigurationBuilder.TryBuildProviderValueCheckSql(columnName, detail, out checkKind, out sql);
 
         private static bool TryParseEnumValues(string? detail, out string[] values)
-            => TryParseMySqlEnumValues(detail, out values)
-               || TryParsePostgresEnumValues(detail, out values);
+            => ScaffoldProviderSpecificTypeClassifier.TryParseEnumValues(detail, out values);
+
+        private static bool TryParsePostgresDomainEnumValues(string? detail, out string[] values)
+            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresDomainEnumValues(detail, out values);
 
         private static bool TryParseMySqlEnumValues(string? detail, out string[] values)
-            => TryParseMySqlQuotedTypeValues(detail, "enum", out values);
+            => ScaffoldProviderSpecificTypeClassifier.TryParseMySqlEnumValues(detail, out values);
 
         private static bool TryParseBoundedMySqlSetValues(string? detail, out string[] values)
-        {
-            if (!TryParseMySqlQuotedTypeValues(detail, "set", out values)
-                || values.Length == 0
-                || values.Length > MaxScaffoldedMySqlSetValueCount
-                || values.Any(static value => value.Length == 0 || value.Contains(','))
-                || values.Distinct(StringComparer.Ordinal).Count() != values.Length)
-            {
-                values = Array.Empty<string>();
-                return false;
-            }
-
-            return true;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryParseBoundedMySqlSetValues(detail, out values);
 
         private static bool TryParseMySqlQuotedTypeValues(string? detail, string typeName, out string[] values)
-        {
-            values = Array.Empty<string>();
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var trimmed = detail.Trim();
-            if (!trimmed.StartsWith(typeName + "(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
-                return false;
-
-            var body = trimmed.Substring(trimmed.IndexOf('(') + 1, trimmed.Length - trimmed.IndexOf('(') - 2);
-            var parsed = new List<string>();
-            var current = new StringBuilder();
-            var inString = false;
-            for (var i = 0; i < body.Length; i++)
-            {
-                var ch = body[i];
-                if (!inString)
-                {
-                    if (char.IsWhiteSpace(ch) || ch == ',')
-                        continue;
-                    if (ch != '\'')
-                        return false;
-
-                    inString = true;
-                    current.Clear();
-                    continue;
-                }
-
-                if (ch == '\\' && i + 1 < body.Length)
-                {
-                    current.Append(body[++i]);
-                    continue;
-                }
-
-                if (ch == '\'')
-                {
-                    if (i + 1 < body.Length && body[i + 1] == '\'')
-                    {
-                        current.Append('\'');
-                        i++;
-                        continue;
-                    }
-
-                    parsed.Add(current.ToString());
-                    inString = false;
-                    continue;
-                }
-
-                current.Append(ch);
-            }
-
-            if (inString || parsed.Count == 0)
-                return false;
-
-            values = parsed.ToArray();
-            return true;
-        }
-
-        private static string[] BuildMySqlSetCombinations(IReadOnlyList<string> values)
-        {
-            var result = new List<string> { string.Empty };
-            var combinationCount = 1 << values.Count;
-            for (var mask = 1; mask < combinationCount; mask++)
-            {
-                var selected = new List<string>(values.Count);
-                for (var i = 0; i < values.Count; i++)
-                {
-                    if ((mask & (1 << i)) != 0)
-                        selected.Add(values[i]);
-                }
-
-                result.Add(string.Join(",", selected));
-            }
-
-            return result.ToArray();
-        }
-
-        private static IEnumerable<string> QuoteSqlStringLiterals(IEnumerable<string> values)
-            => values.Select(static value => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'");
+            => ScaffoldProviderSpecificTypeClassifier.TryParseMySqlQuotedTypeValues(detail, typeName, out values);
 
         private static bool TryParsePostgresEnumValues(string? detail, out string[] values)
-        {
-            values = Array.Empty<string>();
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var trimmed = detail.Trim();
-            if (!trimmed.StartsWith("ENUM (", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")", StringComparison.Ordinal))
-                return false;
-
-            var colon = trimmed.IndexOf(':');
-            if (colon < 0)
-                return false;
-
-            var valueList = trimmed.Substring(colon + 1, trimmed.Length - colon - 2).Trim();
-            return TryParseSqlStringLiteralList(valueList, out values);
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresEnumValues(detail, out values);
 
         private static bool TryParseSqlStringLiteralList(string body, out string[] values)
-        {
-            values = Array.Empty<string>();
-            var parsed = new List<string>();
-            var current = new StringBuilder();
-            var inString = false;
-            for (var i = 0; i < body.Length; i++)
-            {
-                var ch = body[i];
-                if (!inString)
-                {
-                    if (char.IsWhiteSpace(ch) || ch == ',')
-                        continue;
-                    if (ch != '\'')
-                        return false;
-
-                    inString = true;
-                    current.Clear();
-                    continue;
-                }
-
-                if (ch == '\\' && i + 1 < body.Length)
-                {
-                    current.Append(body[++i]);
-                    continue;
-                }
-
-                if (ch == '\'')
-                {
-                    if (i + 1 < body.Length && body[i + 1] == '\'')
-                    {
-                        current.Append('\'');
-                        i++;
-                        continue;
-                    }
-
-                    parsed.Add(current.ToString());
-                    inString = false;
-                    continue;
-                }
-
-                current.Append(ch);
-            }
-
-            if (inString || parsed.Count == 0)
-                return false;
-
-            values = parsed.ToArray();
-            return true;
-        }
-
-        private static bool IsSimpleSqlIdentifier(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value) || !(char.IsLetter(value[0]) || value[0] == '_'))
-                return false;
-
-            for (var i = 1; i < value.Length; i++)
-            {
-                var ch = value[i];
-                if (!char.IsLetterOrDigit(ch) && ch != '_')
-                    return false;
-            }
-
-            return true;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryParseSqlStringLiteralList(body, out values);
 
         private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var featureList = features as IReadOnlyList<ScaffoldUnsupportedFeature> ?? features.ToArray();
-            var unrepresentableExpressionIndexes = featureList
-                .Where(static feature => string.Equals(feature.Kind, "ProviderSpecificIndex", StringComparison.OrdinalIgnoreCase)
-                                         || string.Equals(feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
-                                         || string.Equals(feature.Kind, "DescendingIndex", StringComparison.OrdinalIgnoreCase))
-                .Select(static feature => feature.TableKey + "\u001f" + feature.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var result = new List<ScaffoldExpressionIndexConfiguration>();
-            foreach (var feature in featureList)
-            {
-                if (!string.Equals(feature.Kind, "ExpressionIndex", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || string.IsNullOrWhiteSpace(feature.Detail)
-                    || IsProviderOwnedExpressionIndexDetail(feature.Detail)
-                    || unrepresentableExpressionIndexes.Contains(feature.TableKey + "\u001f" + feature.Name)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName))
-                {
-                    continue;
-                }
-
-                var expressionSql = ExtractCreateIndexExpressionSql(feature.Detail) ?? feature.Detail.Trim();
-                if (expressionSql.EndsWith("expression index", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                result.Add(new ScaffoldExpressionIndexConfiguration(
-                    feature.TableKey,
-                    entityName,
-                    feature.Name,
-                    expressionSql,
-                    IsUnique: IsCreateIndexUnique(feature.Detail),
-                    FilterSql: ExtractCreateIndexWhereClause(feature.Detail)));
-            }
-
-            return result;
-        }
+            => ConvertExpressionIndexConfigurations(ScaffoldFeatureConfigurationBuilder.BuildExpressionIndexConfigurations(
+                entityByTable,
+                ConvertFeatureInputs(features)));
 
         private static bool IsProviderOwnedExpressionIndexDetail(string detail)
-        {
-            if (string.IsNullOrWhiteSpace(detail))
-                return true;
-
-            var values = ParseSemicolonValues(detail, out var header);
-            return values.ContainsKey("expression")
-                   && header.EndsWith("expression index", StringComparison.OrdinalIgnoreCase)
-                   && !header.StartsWith("CREATE", StringComparison.OrdinalIgnoreCase);
-        }
+            => ScaffoldFeatureConfigurationBuilder.IsProviderOwnedExpressionIndexDetail(detail);
 
         private static IReadOnlyList<ScaffoldCollationConfiguration> BuildCollationConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new List<ScaffoldCollationConfiguration>();
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "Collation", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || string.IsNullOrWhiteSpace(feature.Detail)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    || !properties.TryGetValue(feature.Name, out var propertyName))
-                {
-                    continue;
-                }
-
-                result.Add(new ScaffoldCollationConfiguration(
-                    feature.TableKey,
-                    entityName,
-                    feature.Name,
-                    propertyName,
-                    feature.Detail.Trim()));
-            }
-
-            return result;
-        }
+            => ConvertCollationConfigurations(ScaffoldFeatureConfigurationBuilder.BuildCollationConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                ConvertFeatureInputs(features)));
 
         private static string? ExtractCreateIndexWhereClause(string sql)
-        {
-            if (string.IsNullOrWhiteSpace(sql))
-                return null;
-
-            var onIndex = sql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
-            if (onIndex < 0)
-                return null;
-
-            var openIndex = FindCreateIndexKeyListOpen(sql, onIndex);
-            if (openIndex < 0)
-                return null;
-
-            var closeIndex = FindMatchingParenthesis(sql, openIndex);
-            if (closeIndex <= openIndex)
-                return null;
-
-            var where = FindSqlKeywordOutsideQuotes(sql, "WHERE", closeIndex + 1);
-            return where < 0 ? null : sql[(where + 5)..].Trim();
-        }
+            => ScaffoldSqlMetadataParser.ExtractCreateIndexWhereClause(sql);
 
         private static bool IsCreateIndexUnique(string? createIndexSql)
-        {
-            if (string.IsNullOrWhiteSpace(createIndexSql))
-                return false;
-
-            var index = 0;
-            return TryConsumeSqlKeyword(createIndexSql, ref index, "CREATE")
-                   && TryConsumeSqlKeyword(createIndexSql, ref index, "UNIQUE");
-        }
+            => ScaffoldSqlMetadataParser.IsCreateIndexUnique(createIndexSql);
 
         private static bool TryConsumeSqlKeyword(string sql, ref int index, string keyword)
-        {
-            while (index < sql.Length && char.IsWhiteSpace(sql[index]))
-                index++;
-
-            if (index + keyword.Length > sql.Length
-                || !sql.AsSpan(index, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var end = index + keyword.Length;
-            if (end < sql.Length && IsSqlIdentifierChar(sql[end]))
-                return false;
-
-            index = end;
-            return true;
-        }
-
-        private static bool IsSqlIdentifierChar(char value)
-            => char.IsLetterOrDigit(value) || value == '_' || value == '$';
+            => ScaffoldSqlMetadataParser.TryConsumeSqlKeyword(sql, ref index, keyword);
 
         private static string? ExtractCreateIndexExpressionSql(string? createIndexSql)
-        {
-            if (string.IsNullOrWhiteSpace(createIndexSql))
-                return null;
-
-            var onIndex = createIndexSql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
-            if (onIndex < 0)
-                return null;
-
-            var openIndex = FindCreateIndexKeyListOpen(createIndexSql, onIndex);
-            if (openIndex < 0)
-                return null;
-
-            var closeIndex = FindMatchingParenthesis(createIndexSql, openIndex);
-            if (closeIndex <= openIndex)
-                return null;
-
-            return createIndexSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
-        }
+            => ScaffoldSqlMetadataParser.ExtractCreateIndexExpressionSql(createIndexSql);
 
         private static int FindCreateIndexKeyListOpen(string sql, int startIndex)
-        {
-            char? quote = null;
-            for (var i = startIndex; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                    return i;
-            }
-
-            return -1;
-        }
+            => ScaffoldSqlMetadataParser.FindCreateIndexKeyListOpen(sql, startIndex);
 
         private static int FindSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
-        {
-            char? quote = null;
-            for (var i = startIndex; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (i + keyword.Length <= sql.Length
-                    && sql.AsSpan(i, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase)
-                    && (i == 0 || !IsSqlIdentifierChar(sql[i - 1]))
-                    && (i + keyword.Length == sql.Length || !IsSqlIdentifierChar(sql[i + keyword.Length])))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
+            => ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, keyword, startIndex);
 
         private static IReadOnlyList<ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new List<ScaffoldComputedColumnConfiguration>();
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "Computed", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || string.IsNullOrWhiteSpace(feature.Detail)
-                    || !entityByTable.TryGetValue(feature.TableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
-                    || !properties.TryGetValue(feature.Name, out var propertyName))
-                {
-                    continue;
-                }
-
-                var (sql, stored) = NormalizeScaffoldComputedSql(feature.Detail);
-                if (string.IsNullOrWhiteSpace(sql))
-                    continue;
-
-                result.Add(new ScaffoldComputedColumnConfiguration(
-                    feature.TableKey,
-                    entityName,
-                    feature.Name,
-                    propertyName,
-                    sql,
-                    stored));
-            }
-
-            return result;
-        }
+            => ConvertComputedColumnConfigurations(ScaffoldFeatureConfigurationBuilder.BuildComputedColumnConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                ConvertFeatureInputs(features)));
 
         private static (string Sql, bool Stored) NormalizeScaffoldComputedSql(string raw)
-        {
-            var candidate = raw.Trim();
-            if (candidate.EndsWith("generated column", StringComparison.OrdinalIgnoreCase))
-                return (string.Empty, false);
-            var stored = false;
-
-            if (candidate.StartsWith("GENERATED", StringComparison.OrdinalIgnoreCase))
-            {
-                var open = candidate.IndexOf('(');
-                var close = open >= 0 ? FindMatchingParenthesis(candidate, open) : -1;
-                if (open >= 0 && close > open)
-                {
-                    var suffix = candidate[(close + 1)..];
-                    stored = FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
-                             || FindSqlKeywordOutsideQuotes(suffix, "PERSISTED", 0) >= 0;
-                    candidate = candidate.Substring(open + 1, close - open - 1).Trim();
-                }
-            }
-
-            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
-                candidate = candidate[1..^1].Trim();
-
-            if (TryTrimTrailingComputedStorageToken(candidate, "VIRTUAL", out var virtualTrimmed))
-            {
-                candidate = virtualTrimmed;
-            }
-            else if (TryTrimTrailingComputedStorageToken(candidate, "STORED", out var storedTrimmed))
-            {
-                candidate = storedTrimmed;
-                stored = true;
-            }
-            else if (TryTrimTrailingComputedStorageToken(candidate, "PERSISTED", out var persistedTrimmed))
-            {
-                candidate = persistedTrimmed;
-                stored = true;
-            }
-
-            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
-                candidate = candidate[1..^1].Trim();
-
-            return (candidate, stored);
-        }
+            => ScaffoldSqlMetadataParser.NormalizeScaffoldComputedSql(raw);
 
         private static bool TryTrimTrailingComputedStorageToken(string sql, string token, out string trimmedSql)
-        {
-            trimmedSql = sql;
-            var trimmed = sql.TrimEnd();
-            if (!trimmed.EndsWith(token, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            var tokenStart = trimmed.Length - token.Length;
-            if (tokenStart <= 0 || !char.IsWhiteSpace(trimmed[tokenStart - 1]))
-                return false;
-
-            trimmedSql = trimmed[..tokenStart].TrimEnd();
-            return true;
-        }
+            => ScaffoldSqlMetadataParser.TryTrimTrailingComputedStorageToken(sql, token, out trimmedSql);
 
         private static string NormalizeScaffoldCheckSql(string raw)
-        {
-            var candidate = raw.Trim();
-            var keywordIndex = 0;
-            if (TryConsumeSqlKeyword(candidate, ref keywordIndex, "CHECK"))
-            {
-                var open = candidate.IndexOf('(', keywordIndex);
-                var close = open >= 0 ? FindMatchingParenthesis(candidate, open) : -1;
-                if (open >= 0 && close > open)
-                    candidate = candidate.Substring(open + 1, close - open - 1).Trim();
-            }
-
-            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
-                candidate = candidate[1..^1].Trim();
-
-            return candidate;
-        }
+            => ScaffoldSqlMetadataParser.NormalizeScaffoldCheckSql(raw);
 
         private static bool TryNormalizeScaffoldDefaultSql(string? raw, out string defaultValueSql)
-        {
-            defaultValueSql = string.Empty;
-            if (string.IsNullOrWhiteSpace(raw))
-                return false;
-
-            var candidate = raw.Trim();
-            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
-                candidate = candidate[1..^1].Trim();
-
-            try
-            {
-                var validated = DefaultValueValidator.Validate(candidate);
-                if (string.IsNullOrWhiteSpace(validated))
-                    return false;
-
-                defaultValueSql = validated;
-                return true;
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-        }
+            => ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(raw, out defaultValueSql);
 
         private static bool HasBalancedOuterParentheses(string value)
-        {
-            var depth = 0;
-            char? quote = null;
-            for (var i = 0; i < value.Length; i++)
-            {
-                var ch = value[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < value.Length && value[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                    depth++;
-                else if (ch == ')')
-                    depth--;
-
-                if (depth == 0 && i < value.Length - 1)
-                    return false;
-                if (depth < 0)
-                    return false;
-            }
-
-            return depth == 0 && quote is null;
-        }
+            => ScaffoldSqlMetadataParser.HasBalancedOuterParentheses(value);
 
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
-        {
-            var kindSet = kinds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var feature in features)
-            {
-                if (!kindSet.Contains(feature.Kind)
-                    || string.IsNullOrWhiteSpace(feature.Name))
-                {
-                    continue;
-                }
+            => ScaffoldFeatureConfigurationBuilder.BuildFeatureNameMap(ConvertFeatureInputs(features), kinds);
 
-                if (!result.TryGetValue(feature.TableKey, out var names))
-                {
-                    names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    result[feature.TableKey] = names;
-                }
-
-                names.Add(feature.Name);
-            }
-
-            return result.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlySet<string>)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
-
-        private static HashSet<string> BuildProviderNativeTemporalHistoryTableKeys(
+        private static HashSet<string> BuildProviderNativeTemporalTableKeys(
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var feature in features)
-            {
-                if (string.Equals(feature.Kind, "TemporalTable", StringComparison.OrdinalIgnoreCase)
-                    && feature.Detail.Contains("history table", StringComparison.OrdinalIgnoreCase))
-                {
-                    result.Add(feature.TableKey);
-                }
-            }
+            => ScaffoldFeatureConfigurationBuilder.BuildProviderNativeTemporalTableKeys(ConvertFeatureInputs(features));
 
-            return result;
-        }
+        private static HashSet<string> BuildProviderOwnedWriteBlockedTableKeys(
+            IReadOnlySet<string> providerNativeTemporalTableKeys,
+            IReadOnlySet<string> providerOwnedTriggerTableKeys,
+            IReadOnlySet<string> providerSpecificIdentityStrategyTableKeys,
+            IReadOnlySet<string> providerSpecificDefaultTableKeys,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> providerSpecificColumnTypesByTable)
+            => ScaffoldFeatureConfigurationBuilder.BuildProviderOwnedWriteBlockedTableKeys(
+                providerNativeTemporalTableKeys,
+                providerOwnedTriggerTableKeys,
+                providerSpecificIdentityStrategyTableKeys,
+                providerSpecificDefaultTableKeys,
+                providerSpecificColumnTypesByTable);
+
+        private static HashSet<string> BuildFeatureTableKeys(
+            IEnumerable<ScaffoldUnsupportedFeature> features,
+            params string[] kinds)
+            => ScaffoldFeatureConfigurationBuilder.BuildFeatureTableKeys(ConvertFeatureInputs(features), kinds);
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildFeatureDetailMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
-        {
-            var kindSet = kinds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var feature in features)
-            {
-                if (!kindSet.Contains(feature.Kind)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || string.IsNullOrWhiteSpace(feature.Detail))
-                {
-                    continue;
-                }
-
-                if (!result.TryGetValue(feature.TableKey, out var table))
-                {
-                    table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    result[feature.TableKey] = table;
-                }
-
-                table[feature.Name] = feature.Detail;
-            }
-
-            return result.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyDictionary<string, string>)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
-
-        private static bool IsLegacyCascadeShape(ScaffoldRelationship relationship)
-            => (string.Equals(relationship.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(relationship.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
-               && string.Equals(relationship.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase);
-
-        private static string FormatReferentialAction(string action)
-        {
-            if (!TryParseReferentialAction(action, out var referentialAction))
-                referentialAction = ReferentialAction.NoAction;
-
-            return referentialAction switch
-            {
-                ReferentialAction.Cascade => "ReferentialAction.Cascade",
-                ReferentialAction.SetNull => "ReferentialAction.SetNull",
-                ReferentialAction.Restrict => "ReferentialAction.Restrict",
-                ReferentialAction.SetDefault => "ReferentialAction.SetDefault",
-                _ => "ReferentialAction.NoAction"
-            };
-        }
+            => ScaffoldFeatureConfigurationBuilder.BuildFeatureDetailMap(ConvertFeatureInputs(features), kinds);
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
             IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var result = new Dictionary<string, Dictionary<string, ScaffoldDecimalPrecision>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var feature in features)
-            {
-                if (!string.Equals(feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(feature.Name)
-                    || !TryParseDecimalPrecision(feature.Detail, out var precision, out var scale))
-                {
-                    continue;
-                }
+            => ConvertDecimalPrecisionMap(ScaffoldFeatureConfigurationBuilder.BuildDecimalPrecisionMap(ConvertFeatureInputs(features)));
 
-                if (!result.TryGetValue(feature.TableKey, out var table))
-                {
-                    table = new Dictionary<string, ScaffoldDecimalPrecision>(StringComparer.OrdinalIgnoreCase);
-                    result[feature.TableKey] = table;
-                }
-
-                table[feature.Name] = new ScaffoldDecimalPrecision(precision, scale);
-            }
-
-            return result.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyDictionary<string, ScaffoldDecimalPrecision>)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
-
-        private static bool TryParseDecimalPrecision(string? typeName, out int precision, out int scale)
-        {
-            precision = 0;
-            scale = 0;
-            if (string.IsNullOrWhiteSpace(typeName))
-                return false;
-
-            var open = typeName.IndexOf('(');
-            var comma = typeName.IndexOf(',', open + 1);
-            var close = typeName.IndexOf(')', comma + 1);
-            if (open < 0 || comma < 0 || close < 0)
-                return false;
-
-            var baseName = typeName[..open].Trim();
-            if (!baseName.EndsWith("decimal", StringComparison.OrdinalIgnoreCase)
-                && !baseName.EndsWith("numeric", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), NumberStyles.None, CultureInfo.InvariantCulture, out precision)
-                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), NumberStyles.None, CultureInfo.InvariantCulture, out scale)
-                && precision > 0
-                && scale >= 0
-                && scale <= precision;
-        }
+        private static bool TryParseDecimalPrecision(string? typeName, out int precision, out int? scale)
+            => ScaffoldSqlMetadataParser.TryParseDecimalPrecision(typeName, out precision, out scale);
 
         private static bool TryParseIdentityOptions(string? detail, out long seed, out long increment)
-        {
-            seed = 0;
-            increment = 0;
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var keywordIndex = 0;
-            if (!TryConsumeSqlKeyword(detail, ref keywordIndex, "IDENTITY"))
-                return false;
-
-            while (keywordIndex < detail.Length && char.IsWhiteSpace(detail[keywordIndex]))
-                keywordIndex++;
-
-            if (keywordIndex >= detail.Length || detail[keywordIndex] != '(')
-                return false;
-
-            var open = keywordIndex;
-            var comma = detail.IndexOf(',', open + 1);
-            var close = detail.IndexOf(')', comma + 1);
-            if (open < 0 || comma < 0 || close < 0)
-                return false;
-
-            return long.TryParse(detail.AsSpan(open + 1, comma - open - 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out seed)
-                && long.TryParse(detail.AsSpan(comma + 1, close - comma - 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out increment)
-                && increment != 0;
-        }
+            => ScaffoldSqlMetadataParser.TryParseIdentityOptions(detail, out seed, out increment);
 
         private static HashSet<string> GetOrCreateMemberNames(
             Dictionary<string, HashSet<string>> memberNamesByTable,
             string tableKey)
-        {
-            if (!memberNamesByTable.TryGetValue(tableKey, out var names))
-            {
-                names = CreateReservedMemberNameSet();
-                memberNamesByTable[tableKey] = names;
-            }
-
-            return names;
-        }
+            => ScaffoldColumnPropertyNameBuilder.GetOrCreateMemberNames(memberNamesByTable, tableKey);
 
         private static HashSet<string> CreateReservedMemberNameSet()
-            => typeof(object)
-                .GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-                .Select(member => member.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            => ScaffoldColumnPropertyNameBuilder.CreateReservedMemberNameSet();
 
-        private static async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetPrimaryKeyColumnNamesAsync(
+        private static Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetPrimaryKeyColumnNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var providerName = provider.GetType().Name;
-            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            => ScaffoldKeyDiscovery.GetPrimaryKeyColumnNamesAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
 
-            if (provider is SqliteProvider)
-            {
-                var sqliteResult = new Dictionary<string, List<(int Ordinal, string Column)>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var table in tables)
-                {
-                    await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
-                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    var keyColumns = new List<(int Ordinal, string Column)>();
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        if (!ReaderHasColumn(reader, "name")
-                            || !ReaderHasColumn(reader, "pk"))
-                        {
-                            continue;
-                        }
-
-                        var ordinal = Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture);
-                        if (ordinal <= 0)
-                        {
-                            continue;
-                        }
-
-                        var name = Convert.ToString(reader["name"]);
-                        if (!string.IsNullOrWhiteSpace(name))
-                            keyColumns.Add((ordinal, name));
-                    }
-
-                    sqliteResult[TableKey(table.Schema, table.Name)] = keyColumns;
-                }
-
-                return ToOrderedColumnDictionary(sqliteResult);
-            }
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryOrderedColumnNameMapAsync(connection, tableKeys, """
-                    SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ColumnName, ic.key_ordinal AS Ordinal
-                    FROM sys.tables t
-                    INNER JOIN sys.indexes i ON i.object_id = t.object_id AND i.is_primary_key = 1
-                    INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-                    WHERE t.is_ms_shipped = 0
-                    ORDER BY SCHEMA_NAME(t.schema_id), t.name, ic.key_ordinal
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryOrderedColumnNameMapAsync(connection, tableKeys, """
-                    SELECT ns.nspname AS TableSchema, cls.relname AS TableName, att.attname AS ColumnName, keys.ordinality AS Ordinal
-                    FROM pg_constraint con
-                    INNER JOIN pg_class cls ON cls.oid = con.conrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = cls.relnamespace
-                    CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS keys(attnum, ordinality)
-                    INNER JOIN pg_attribute att ON att.attrelid = cls.oid AND att.attnum = keys.attnum
-                    WHERE con.contype = 'p'
-                      AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
-                    ORDER BY ns.nspname, cls.relname, keys.ordinality
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryOrderedColumnNameMapAsync(connection, tableKeys, """
-                    SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ColumnName, ordinal_position AS Ordinal
-                    FROM information_schema.key_column_usage
-                    WHERE table_schema = DATABASE()
-                      AND constraint_name = 'PRIMARY'
-                    ORDER BY table_name, ordinal_position
-                    """).ConfigureAwait(false);
-            }
-
-            var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var table in tables)
-            {
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
-                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
-                var schema = reader.GetSchemaTable()!;
-                var keyColumns = new List<string>();
-                foreach (DataRow row in schema.Rows)
-                {
-                    if (row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool isKey && isKey)
-                        keyColumns.Add(row["ColumnName"]!.ToString()!);
-                }
-
-                result[TableKey(table.Schema, table.Name)] = keyColumns;
-            }
-
-            return result;
-        }
+        private static Task<IReadOnlyDictionary<string, string>> GetPrimaryKeyConstraintNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTable> tables)
+            => ScaffoldKeyDiscovery.GetPrimaryKeyConstraintNamesAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> QueryOrderedColumnNameMapAsync(
             DbConnection connection,
@@ -6357,122 +2030,14 @@ namespace nORM.Scaffolding
                     .ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
-        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetIdentityColumnNamesAsync(
+        private static Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetIdentityColumnNamesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var providerName = provider.GetType().Name;
-            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            if (provider is SqliteProvider)
-            {
-                var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var table in tables)
-                {
-                    await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
-                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        rows.Add((
-                            Convert.ToString(reader["name"]) ?? string.Empty,
-                            Convert.ToString(reader["type"]) ?? string.Empty,
-                            ReaderHasColumn(reader, "pk")
-                                ? Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture)
-                                : 0));
-                    }
-
-                    var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
-                    if (primaryKeyColumns.Length != 1)
-                        continue;
-
-                    var key = primaryKeyColumns[0];
-                    if (key.Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var tableKey = TableKey(table.Schema, table.Name);
-                        result[tableKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };
-                    }
-                }
-
-                return ToReadOnlySetDictionary(result);
-            }
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryColumnNameMapAsync(connection, tableKeys, """
-                    SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ColumnName
-                    FROM sys.identity_columns ic
-                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
-                    WHERE t.is_ms_shipped = 0
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryColumnNameMapAsync(connection, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND (
-                          is_identity = 'YES'
-                          OR column_default LIKE 'nextval(%'
-                      )
-                    """).ConfigureAwait(false);
-            }
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-            {
-                return await QueryColumnNameMapAsync(connection, tableKeys, """
-                    SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ColumnName
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND LOWER(extra) LIKE '%auto_increment%'
-                    """).ConfigureAwait(false);
-            }
-
-            return new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> QueryColumnNameMapAsync(
-            DbConnection connection,
-            HashSet<string> tableKeys,
-            string sql)
-        {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
-                if (!tableKeys.Contains(tableKey))
-                    continue;
-
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName))
-                    continue;
-
-                if (!result.TryGetValue(tableKey, out var columns))
-                {
-                    columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    result[tableKey] = columns;
-                }
-
-                columns.Add(columnName);
-            }
-
-            return ToReadOnlySetDictionary(result);
-        }
-
-        private static IReadOnlyDictionary<string, IReadOnlySet<string>> ToReadOnlySetDictionary(
-            Dictionary<string, HashSet<string>> source)
-            => source.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlySet<string>)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
+            => ScaffoldColumnDiscovery.GetIdentityColumnNamesAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
 
         private static string GetColumnPropertyName(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
@@ -6488,54 +2053,11 @@ namespace nORM.Scaffolding
             return EscapeCSharpIdentifier(ToPascalCase(columnName));
         }
 
-        private static async Task<IReadOnlyList<ScaffoldTable>> QueryTablesAsync(DbConnection connection, string sql)
-        {
-            var tables = new List<ScaffoldTable>();
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var schema = reader.IsDBNull(0) ? null : reader.GetString(0);
-                var table = reader.GetString(1);
-                tables.Add(new ScaffoldTable(table, string.IsNullOrWhiteSpace(schema) ? null : schema));
-            }
-
-            return tables
-                .OrderBy(t => t.Schema ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(t => t.Name, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldTable>> GetSchemaTablesAsync(DbConnection connection)
-        {
-            var schema = await connection.GetSchemaAsync("Tables").ConfigureAwait(false);
-            var tables = new List<ScaffoldTable>();
-            foreach (DataRow row in schema.Rows)
-            {
-                var tableType = row.Table.Columns.Contains("TABLE_TYPE") ? row["TABLE_TYPE"]?.ToString() : null;
-                if (tableType != null && !string.Equals(tableType, "TABLE", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var tableName = row["TABLE_NAME"]?.ToString();
-                if (string.IsNullOrWhiteSpace(tableName))
-                    continue;
-
-                var schemaName = row.Table.Columns.Contains("TABLE_SCHEMA")
-                    ? row["TABLE_SCHEMA"]?.ToString()
-                    : null;
-
-                tables.Add(new ScaffoldTable(tableName, string.IsNullOrWhiteSpace(schemaName) ? null : schemaName));
-            }
-
-            return tables
-                .OrderBy(t => t.Schema ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(t => t.Name, StringComparer.Ordinal)
-                .ToArray();
-        }
-
         private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
-            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>(), Array.Empty<ScaffoldManyToManyJoin>());
+            => ScaffoldContext(namespaceName, contextName, entities, pluralizeQueryProperties: true);
+
+        private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities, bool pluralizeQueryProperties)
+            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>(), Array.Empty<ScaffoldManyToManyJoin>(), pluralizeQueryProperties: pluralizeQueryProperties);
 
         private static string ScaffoldContextWithRelationships(
             string namespaceName,
@@ -6551,7 +2073,13 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
             IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null,
             IReadOnlyList<ScaffoldSkippedObject>? sequenceStubs = null,
-            IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null)
+            IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
+            IReadOnlyList<ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
+            IReadOnlyList<ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
+            bool pluralizeQueryProperties = true,
+            bool useNullableReferenceTypes = true,
+            string? entityNamespaceName = null,
+            bool useDatabaseNames = false)
         {
             compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
             defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
@@ -6561,1853 +2089,223 @@ namespace nORM.Scaffolding
             collationConfigurations ??= Array.Empty<ScaffoldCollationConfiguration>();
             sequenceStubs ??= Array.Empty<ScaffoldSkippedObject>();
             identityOptionConfigurations ??= Array.Empty<ScaffoldIdentityOptionConfiguration>();
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                sb.AppendLine("// <auto-generated/>");
-                sb.AppendLine("#nullable enable");
-                sb.AppendLine("using System.Data.Common;");
-                if ((routineStubs?.Count > 0) || sequenceStubs.Count > 0)
-                {
-                    sb.AppendLine("using System.Collections.Generic;");
-                    sb.AppendLine("using System.Threading;");
-                    sb.AppendLine("using System.Threading.Tasks;");
-                }
-                sb.AppendLine("using System.Linq;");
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || (routineStubs?.Count > 0))
-                    sb.AppendLine("using System;");
-                sb.AppendLine("using nORM.Core;");
-                sb.AppendLine("using nORM.Configuration;");
-                sb.AppendLine("using nORM.Providers;");
-                sb.AppendLine();
-                sb.AppendLine($"namespace {namespaceName};");
-                sb.AppendLine();
-                sb.AppendLine($"public class {EscapeCSharpIdentifier(contextName)} : DbContext");
-                sb.AppendLine("{");
-                if (relationships.Count == 0 && manyToManyJoins.Count == 0 && compositePrimaryKeys.Count == 0 && defaultValueConfigurations.Count == 0 && checkConstraintConfigurations.Count == 0 && computedColumnConfigurations.Count == 0 && expressionIndexConfigurations.Count == 0 && collationConfigurations.Count == 0 && identityOptionConfigurations.Count == 0)
-                {
-                    sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, options) {{ }}");
-                }
-                else
-                {
-                    sb.AppendLine($"    public {EscapeCSharpIdentifier(contextName)}(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null) : base(cn, provider, ConfigureOptions(options)) {{ }}");
-                }
-                sb.AppendLine();
-                var queryPropertyNames = CreateReservedContextMemberNameSet();
-                foreach (var entity in entities.OrderBy(e => e))
-                {
-                    var safeEntity = EscapeCSharpIdentifier(entity);
-                    var queryProperty = MakeUnique(Pluralize(safeEntity), queryPropertyNames);
-                    sb.AppendLine($"    public IQueryable<{safeEntity}> {queryProperty} => this.Query<{safeEntity}>();");
-                }
-
-                if (routineStubs?.Count > 0)
-                {
-                    AppendRoutineStubs(sb, routineStubs, queryPropertyNames);
-                }
-
-                if (sequenceStubs.Count > 0)
-                {
-                    AppendSequenceStubs(sb, sequenceStubs, queryPropertyNames);
-                }
-
-                if (relationships.Count > 0 || manyToManyJoins.Count > 0 || compositePrimaryKeys.Count > 0 || defaultValueConfigurations.Count > 0 || checkConstraintConfigurations.Count > 0 || computedColumnConfigurations.Count > 0 || expressionIndexConfigurations.Count > 0 || collationConfigurations.Count > 0 || identityOptionConfigurations.Count > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("    private static DbContextOptions ConfigureOptions(DbContextOptions? options)");
-                    sb.AppendLine("    {");
-                    sb.AppendLine("        var configuredOptions = options?.Clone() ?? new DbContextOptions();");
-                    sb.AppendLine("        var configure = configuredOptions.OnModelCreating;");
-                    sb.AppendLine("        configuredOptions.OnModelCreating = mb =>");
-                    sb.AppendLine("        {");
-                    sb.AppendLine("            configure?.Invoke(mb);");
-                    foreach (var key in compositePrimaryKeys
-                        .OrderBy(k => k.EntityName, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(key.EntityName);
-                        sb.AppendLine($"            mb.Entity<{entity}>().HasKey({FormatScaffoldKeySelector("e", key.PropertyNames)});");
-                    }
-                    foreach (var defaultValue in defaultValueConfigurations
-                        .OrderBy(d => d.EntityName, StringComparer.Ordinal)
-                        .ThenBy(d => d.PropertyName, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(defaultValue.EntityName);
-                        var property = EscapeCSharpIdentifier(defaultValue.PropertyName);
-                        var sql = EscapeStringLiteral(defaultValue.DefaultValueSql);
-                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\");");
-                    }
-                    foreach (var identity in identityOptionConfigurations
-                        .OrderBy(i => i.EntityName, StringComparer.Ordinal)
-                        .ThenBy(i => i.PropertyName, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(identity.EntityName);
-                        var property = EscapeCSharpIdentifier(identity.PropertyName);
-                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasIdentityOptions({identity.Seed.ToString(CultureInfo.InvariantCulture)}, {identity.Increment.ToString(CultureInfo.InvariantCulture)});");
-                    }
-                    foreach (var check in checkConstraintConfigurations
-                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
-                        .ThenBy(c => c.Name, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(check.EntityName);
-                        var name = EscapeStringLiteral(check.Name);
-                        var sql = EscapeStringLiteral(check.Sql);
-                        sb.AppendLine($"            mb.Entity<{entity}>().HasCheckConstraint(\"{name}\", \"{sql}\");");
-                    }
-                    foreach (var computed in computedColumnConfigurations
-                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
-                        .ThenBy(c => c.PropertyName, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(computed.EntityName);
-                        var property = EscapeCSharpIdentifier(computed.PropertyName);
-                        var sql = EscapeStringLiteral(computed.Sql);
-                        var storedSuffix = computed.Stored ? ", stored: true" : string.Empty;
-                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasComputedColumnSql(\"{sql}\"{storedSuffix});");
-                    }
-                    foreach (var collation in collationConfigurations
-                        .OrderBy(c => c.EntityName, StringComparer.Ordinal)
-                        .ThenBy(c => c.PropertyName, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(collation.EntityName);
-                        var property = EscapeCSharpIdentifier(collation.PropertyName);
-                        var value = EscapeStringLiteral(collation.Collation);
-                        sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasCollation(\"{value}\");");
-                    }
-                    foreach (var expressionIndex in expressionIndexConfigurations
-                        .OrderBy(i => i.EntityName, StringComparer.Ordinal)
-                        .ThenBy(i => i.Name, StringComparer.Ordinal))
-                    {
-                        var entity = EscapeCSharpIdentifier(expressionIndex.EntityName);
-                        var name = EscapeStringLiteral(expressionIndex.Name);
-                        var expressionSql = EscapeStringLiteral(expressionIndex.ExpressionSql);
-                        var uniqueSuffix = expressionIndex.IsUnique ? ", isUnique: true" : string.Empty;
-                        var filterSuffix = string.IsNullOrWhiteSpace(expressionIndex.FilterSql) ? string.Empty : $", filterSql: \"{EscapeStringLiteral(expressionIndex.FilterSql)}\"";
-                        sb.AppendLine($"            mb.Entity<{entity}>().HasExpressionIndex(\"{name}\", \"{expressionSql}\"{uniqueSuffix}{filterSuffix});");
-                    }
-                    foreach (var relationship in relationships
-                        .OrderBy(r => r.PrincipalEntityName, StringComparer.Ordinal)
-                        .ThenBy(r => r.DependentEntityName, StringComparer.Ordinal)
-                        .ThenBy(r => r.CollectionNavigationName, StringComparer.Ordinal)
-                        .ThenBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
-                        .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
-                    {
-                        var principal = EscapeCSharpIdentifier(relationship.PrincipalEntityName);
-                        var dependent = EscapeCSharpIdentifier(relationship.DependentEntityName);
-                        var collection = EscapeCSharpIdentifier(relationship.CollectionNavigationName);
-                        var reference = EscapeCSharpIdentifier(relationship.ReferenceNavigationName);
-                        var foreignKey = FormatScaffoldKeySelector("d", relationship.ForeignKeyPropertyNames);
-                        var principalKey = FormatScaffoldKeySelector("p", relationship.PrincipalKeyPropertyNames);
-                        sb.AppendLine($"            mb.Entity<{principal}>()");
-                        sb.AppendLine($"                .HasMany(p => p.{collection})");
-                        sb.AppendLine($"                .WithOne(d => d.{reference})");
-                        if (IsLegacyCascadeShape(relationship))
-                        {
-                            var cascadeSuffix = relationship.CascadeDelete ? string.Empty : ", cascadeDelete: false";
-                            if (!string.IsNullOrWhiteSpace(relationship.ConstraintName))
-                            {
-                                var constraintName = EscapeStringLiteral(relationship.ConstraintName);
-                                cascadeSuffix = relationship.CascadeDelete
-                                    ? $", \"{constraintName}\""
-                                    : $", \"{constraintName}\", false";
-                            }
-
-                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}{cascadeSuffix});");
-                        }
-                        else
-                        {
-                            var constraintNameSuffix = string.IsNullOrWhiteSpace(relationship.ConstraintName)
-                                ? string.Empty
-                                : $", \"{EscapeStringLiteral(relationship.ConstraintName)}\"";
-                            sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {FormatReferentialAction(relationship.OnDelete)}, {FormatReferentialAction(relationship.OnUpdate)}{constraintNameSuffix});");
-                        }
-                    }
-                    foreach (var join in manyToManyJoins
-                        .OrderBy(j => j.LeftEntityName, StringComparer.Ordinal)
-                        .ThenBy(j => j.RightEntityName, StringComparer.Ordinal)
-                        .ThenBy(j => j.LeftCollectionNavigationName, StringComparer.Ordinal)
-                        .ThenBy(j => j.RightCollectionNavigationName, StringComparer.Ordinal)
-                        .ThenBy(j => j.JoinTableKey, StringComparer.Ordinal))
-                    {
-                        var left = EscapeCSharpIdentifier(join.LeftEntityName);
-                        var right = EscapeCSharpIdentifier(join.RightEntityName);
-                        var collection = EscapeCSharpIdentifier(join.LeftCollectionNavigationName);
-                        var inverseCollection = EscapeCSharpIdentifier(join.RightCollectionNavigationName);
-                        var joinTable = EscapeStringLiteral(join.JoinTableName);
-                        var joinSchema = join.JoinTableSchema is null ? null : EscapeStringLiteral(join.JoinTableSchema);
-                        var leftKey = FormatScaffoldKeySelector("p", join.LeftPrincipalKeyProperties);
-                        var rightKey = FormatScaffoldKeySelector("p", join.RightPrincipalKeyProperties);
-                        sb.AppendLine($"            mb.Entity<{left}>()");
-                        sb.AppendLine($"                .HasMany<{right}>(p => p.{collection})");
-                        sb.AppendLine($"                .WithMany(p => p.{inverseCollection})");
-                        if (joinSchema is null && !join.IsComposite && join.UsesPrimaryKeys)
-                        {
-                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
-                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\");");
-                        }
-                        else if (joinSchema is null && join.UsesPrimaryKeys)
-                        {
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)});");
-                        }
-                        else if (joinSchema is null && !join.IsComposite)
-                        {
-                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
-                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\", {leftKey}, {rightKey});");
-                        }
-                        else if (joinSchema is null)
-                        {
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, {leftKey}, {rightKey});");
-                        }
-                        else if (!join.IsComposite && join.UsesPrimaryKeys)
-                        {
-                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
-                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\", schema: \"{joinSchema}\");");
-                        }
-                        else if (join.UsesPrimaryKeys)
-                        {
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, schema: \"{joinSchema}\");");
-                        }
-                        else if (!join.IsComposite)
-                        {
-                            var leftFk = EscapeStringLiteral(join.LeftForeignKeyColumn);
-                            var rightFk = EscapeStringLiteral(join.RightForeignKeyColumn);
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", \"{leftFk}\", \"{rightFk}\", {leftKey}, {rightKey}, schema: \"{joinSchema}\");");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"                .UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, {leftKey}, {rightKey}, schema: \"{joinSchema}\");");
-                        }
-                    }
-                    sb.AppendLine("        };");
-                    sb.AppendLine("        return configuredOptions;");
-                    sb.AppendLine("    }");
-                }
-
-                sb.AppendLine("}");
-                return sb.ToString();
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
+            precisionConfigurations ??= Array.Empty<ScaffoldPrecisionConfiguration>();
+            columnFacetConfigurations ??= Array.Empty<ScaffoldColumnFacetConfiguration>();
+            routineStubs ??= Array.Empty<ScaffoldSkippedObject>();
+            return ScaffoldContextWriter.Write(new ScaffoldContextInfo(
+                namespaceName,
+                contextName,
+                entities.ToArray(),
+                ConvertContextRelationshipInfos(relationships),
+                ConvertManyToManyJoinInfos(manyToManyJoins),
+                ConvertRoutineStubInfos(routineStubs),
+                ConvertContextPrimaryKeyInfos(compositePrimaryKeys),
+                ConvertContextDefaultValueInfos(defaultValueConfigurations),
+                ConvertContextCheckConstraintInfos(checkConstraintConfigurations),
+                ConvertContextComputedColumnInfos(computedColumnConfigurations),
+                ConvertContextExpressionIndexInfos(expressionIndexConfigurations),
+                ConvertContextCollationInfos(collationConfigurations),
+                ConvertContextSequenceInfos(sequenceStubs),
+                ConvertContextIdentityOptionInfos(identityOptionConfigurations),
+                ConvertContextPrecisionInfos(precisionConfigurations),
+                ConvertContextColumnFacetInfos(columnFacetConfigurations),
+                pluralizeQueryProperties,
+                useNullableReferenceTypes,
+                entityNamespaceName,
+                useDatabaseNames));
         }
 
-        private static void AppendRoutineStubs(StringBuilder sb, IReadOnlyList<ScaffoldSkippedObject> routineStubs, HashSet<string> memberNames)
+        private static ScaffoldContextRelationshipInfo[] ConvertContextRelationshipInfos(IReadOnlyList<ScaffoldRelationship> relationships)
         {
-            foreach (var routine in routineStubs
-                .OrderBy(r => r.Schema ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(r => r.Name, StringComparer.Ordinal)
-                .ThenBy(r => r.Detail, StringComparer.Ordinal))
+            var converted = new ScaffoldContextRelationshipInfo[relationships.Count];
+            for (var i = 0; i < relationships.Count; i++)
             {
-                var metadata = BuildSkippedObjectMetadata(routine);
-                var routineType = Convert.ToString(metadata.TryGetValue("routineType", out var type) ? type : null) ?? "routine";
-                var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
-                var outputParameterCount = metadata.TryGetValue("outputParameterCount", out var outputCountValue) && outputCountValue is int outputCount
-                    ? outputCount
-                    : 0;
-                var inputParameters = GetRoutineInputParameters(metadata);
-                var inputParameterDataTypes = GetRoutineInputParameterDataTypes(metadata);
-                var outputParameters = GetRoutineOutputParameters(metadata);
-                var discoveredInputParameterCount = GetRoutineInputParameterCount(metadata);
-                var methodBase = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
-                var parameterType = inputParameters.Count > 0
-                    ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Parameters", memberNames)
-                    : null;
-                var scalarSetResultColumn = TryGetScalarSetReturningRoutineResultColumn(metadata, out var scalarSetColumn)
-                    ? scalarSetColumn
-                    : (RoutineResultColumn?)null;
-                var resultColumns = scalarSetResultColumn.HasValue
-                    ? new[] { scalarSetResultColumn.Value }
-                    : GetRoutineResultColumns(metadata);
-                var resultType = resultColumns.Count > 0
-                    ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Result", memberNames)
-                    : null;
-                var hasKnownNoResultSet = !IsFunctionCallShape(callShape)
-                    && metadata.ContainsKey("resultColumns")
-                    && resultColumns.Count == 0;
-                var outputFactory = outputParameters.Count > 0
-                    ? MakeUnique("Create" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "OutputParameters", memberNames)
-                    : null;
-                var routineNameExpression = FormatProviderEscapedRoutineName(routine);
-                var parameterSummary = FormatRoutineParameterSummary(metadata);
-                var isFunctionCallShape = IsFunctionCallShape(callShape);
-                var isScalarFunction = string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
-
-                if (parameterType != null)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine($"    public sealed class {parameterType}");
-                    sb.AppendLine("    {");
-                    foreach (var parameter in inputParameters)
-                        sb.AppendLine($"        public {parameter.TypeName} {parameter.Name} {{ get; init; }}");
-                    sb.AppendLine("    }");
-                }
-
-                if (resultType != null)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine($"    public sealed class {resultType}");
-                    sb.AppendLine("    {");
-                    foreach (var column in resultColumns)
-                    {
-                        var initializer = RequiresDefaultInitializer(column.TypeName) ? " = default!;" : string.Empty;
-                        sb.AppendLine($"        public {column.TypeName} {column.Name} {{ get; set; }}{initializer}");
-                    }
-                    sb.AppendLine("    }");
-                }
-
-                sb.AppendLine();
-                sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}`.</summary>");
-                if (!string.IsNullOrWhiteSpace(parameterSummary))
-                    sb.AppendLine($"    /// <remarks>Parameters discovered at scaffold time: {EscapeXmlDocumentation(parameterSummary)}. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                else
-                    sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                var requiresPositionalFunctionArguments = isFunctionCallShape
-                    && discoveredInputParameterCount > 0
-                    && inputParameters.Count == 0;
-                var requiresDictionaryRoutineArguments = !isFunctionCallShape
-                    && discoveredInputParameterCount > 0
-                    && inputParameters.Count == 0;
-                var parameterSignature = requiresPositionalFunctionArguments
-                    ? "object?[]? arguments = null"
-                    : requiresDictionaryRoutineArguments ? "IReadOnlyDictionary<string, object?>? parameters = null"
-                    : parameterType == null ? "object? parameters = null" : $"{parameterType}? parameters = null";
-                if (isFunctionCallShape)
-                {
-                    var streamMethod = isScalarFunction
-                        ? null
-                        : MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
-                    var scalarValueMethod = isScalarFunction
-                        ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueAsync", memberNames)
-                        : null;
-                    var scalarValueType = isScalarFunction
-                        ? MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "ValueResult", memberNames)
-                        : null;
-                    AppendFunctionRoutineStub(
-                        sb,
-                        methodBase,
-                        streamMethod,
-                        scalarValueMethod,
-                        scalarValueType,
-                        routine,
-                        parameterSignature,
-                        parameterType,
-                        inputParameters,
-                        resultType,
-                        scalar: isScalarFunction,
-                        usePositionalArguments: requiresPositionalFunctionArguments,
-                        expectedArgumentCount: discoveredInputParameterCount,
-                        inputParameterDataTypes: inputParameterDataTypes,
-                        scalarSetReturnsValue: scalarSetResultColumn.HasValue);
-                }
-                else
-                {
-                    var storedProcedureParameters = FormatStoredProcedureParameterArgument(
-                        routine,
-                        discoveredInputParameterCount);
-                    if (hasKnownNoResultSet)
-                    {
-                        sb.AppendLine($"    public Task<int> {methodBase}({parameterSignature}, CancellationToken ct = default)");
-                        sb.AppendLine($"        => ExecuteStoredProcedureNonQueryAsync({routineNameExpression}, ct, {storedProcedureParameters});");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                        sb.AppendLine($"        => ExecuteStoredProcedureAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
-                        if (resultType != null)
-                        {
-                            sb.AppendLine();
-                            sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
-                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                            sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
-                            sb.AppendLine($"        => ExecuteStoredProcedureAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
-                        }
-
-                        var streamMethod = MakeUnique("Stream" + EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "Async", memberNames);
-                        sb.AppendLine();
-                        sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
-                        sb.AppendLine("    /// <remarks>Use the buffered wrapper when output parameters are required. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                        sb.AppendLine($"    public IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                        sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<TResult>({routineNameExpression}, ct, {storedProcedureParameters});");
-                        if (resultType != null)
-                        {
-                            sb.AppendLine();
-                            sb.AppendLine($"    /// <summary>Streams provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
-                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                            sb.AppendLine($"    public IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, CancellationToken ct = default)");
-                            sb.AppendLine($"        => ExecuteStoredProcedureAsAsyncEnumerable<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters});");
-                        }
-                    }
-                }
-
-                if (outputParameterCount > 0 && !isFunctionCallShape)
-                {
-                    var outputMethod = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(routine.Name)) + "WithOutputAsync", memberNames);
-                    var storedProcedureParameters = FormatStoredProcedureParameterArgument(
-                        routine,
-                        discoveredInputParameterCount);
-                    sb.AppendLine();
-                    sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters.</summary>");
-                    if (hasKnownNoResultSet)
-                    {
-                        sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                        sb.AppendLine($"    public Task<StoredProcedureNonQueryResult> {outputMethod}({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters)");
-                        sb.AppendLine($"        => ExecuteStoredProcedureNonQueryWithOutputAsync({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
-                    }
-                    else
-                    {
-                        sb.AppendLine("    /// <remarks>Pass explicit <see cref=\"OutputParameter\"/> definitions for provider output values. Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-                        sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters) where TResult : class, new()");
-                        sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
-                        if (resultType != null)
-                        {
-                            sb.AppendLine();
-                            sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters and the scaffold-discovered result shape.</summary>");
-                            sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                            sb.AppendLine($"    public Task<StoredProcedureResult<{resultType}>> {outputMethod}({parameterSignature}, CancellationToken ct = default, params OutputParameter[] outputParameters)");
-                            sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters}, outputParameters);");
-                        }
-                    }
-
-                    if (outputFactory != null)
-                    {
-                        sb.AppendLine();
-                        sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with output parameters discovered at scaffold time.</summary>");
-                        sb.AppendLine("    /// <remarks>Use this overload when the scaffolded output parameter metadata still matches the database routine. Pass explicit output parameters to the overload with <c>params OutputParameter[]</c> after routine signature changes.</remarks>");
-                        if (hasKnownNoResultSet)
-                        {
-                            sb.AppendLine($"    public Task<StoredProcedureNonQueryResult> {outputMethod}({parameterSignature}, CancellationToken ct = default)");
-                            sb.AppendLine($"        => ExecuteStoredProcedureNonQueryWithOutputAsync({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"    public Task<StoredProcedureResult<TResult>> {outputMethod}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-                            sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<TResult>({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
-                            if (resultType != null)
-                            {
-                                sb.AppendLine();
-                                sb.AppendLine($"    /// <summary>Executes provider-bound {EscapeXmlDocumentation(routineType)} `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` with scaffold-discovered output parameters and result shape.</summary>");
-                                sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                                sb.AppendLine($"    public Task<StoredProcedureResult<{resultType}>> {outputMethod}({parameterSignature}, CancellationToken ct = default)");
-                                sb.AppendLine($"        => ExecuteStoredProcedureWithOutputAsync<{resultType}>({routineNameExpression}, ct, {storedProcedureParameters}, {outputFactory}());");
-                            }
-                        }
-
-                        sb.AppendLine();
-                        sb.AppendLine($"    /// <summary>Creates output parameter definitions discovered for `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` at scaffold time.</summary>");
-                        sb.AppendLine($"    public static OutputParameter[] {outputFactory}()");
-                        sb.AppendLine("        => new[]");
-                        sb.AppendLine("        {");
-                        foreach (var parameter in outputParameters)
-                        {
-                            sb.AppendLine($"            {FormatRoutineOutputParameterCreation(parameter)},");
-                        }
-                        sb.AppendLine("        };");
-                    }
-                }
+                var relationship = relationships[i];
+                converted[i] = new ScaffoldContextRelationshipInfo(
+                    relationship.DependentEntityName,
+                    relationship.PrincipalEntityName,
+                    relationship.ReferenceNavigationName,
+                    relationship.CollectionNavigationName,
+                    relationship.IsUniqueDependentKey,
+                    relationship.CascadeDelete,
+                    relationship.OnDelete,
+                    relationship.OnUpdate,
+                    relationship.ConstraintName,
+                    relationship.ForeignKeyPropertyNames,
+                    relationship.PrincipalKeyPropertyNames);
             }
 
-            sb.AppendLine();
-            sb.AppendLine("    private static object? RequireScaffoldedRoutineParameters(object? parameters, int expectedInputCount, string routineName)");
-            sb.AppendLine("    {");
-            sb.AppendLine("        if (expectedInputCount <= 0)");
-            sb.AppendLine("            return parameters;");
-            sb.AppendLine();
-            sb.AppendLine("        if (parameters is null)");
-            sb.AppendLine("            throw new NormConfigurationException($\"Routine `{routineName}` was scaffolded with {expectedInputCount} input parameters; pass a parameter object containing the scaffolded inputs.\");");
-            sb.AppendLine();
-            sb.AppendLine("        if (parameters is IReadOnlyDictionary<string, object?> dictionary && dictionary.Count != expectedInputCount)");
-            sb.AppendLine("            throw new NormConfigurationException($\"Routine `{routineName}` was scaffolded with {expectedInputCount} input parameters; pass exactly {expectedInputCount} dictionary entries using the provider parameter names.\");");
-            sb.AppendLine();
-            sb.AppendLine("        return parameters;");
-            sb.AppendLine("    }");
+            return converted;
         }
 
-        private static bool IsFunctionCallShape(string? callShape)
-            => string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
-
-        private static void AppendSequenceStubs(StringBuilder sb, IReadOnlyList<ScaffoldSkippedObject> sequenceStubs, HashSet<string> memberNames)
+        private static ScaffoldManyToManyJoinInfo[] ConvertManyToManyJoinInfos(IReadOnlyList<ScaffoldManyToManyJoin> joins)
         {
-            foreach (var sequence in sequenceStubs
-                .OrderBy(s => s.Schema ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(s => s.Name, StringComparer.Ordinal))
+            var converted = new ScaffoldManyToManyJoinInfo[joins.Count];
+            for (var i = 0; i < joins.Count; i++)
             {
-                var provider = ParseSequenceProvider(sequence.Detail);
-                if (provider is not ("sqlserver" or "postgres"))
-                    continue;
-
-                var valueType = MapSequenceValueType(sequence.Detail);
-                var valueTypeName = GetTypeName(valueType, allowNull: false);
-                var methodBase = MakeUnique("Next" + EscapeCSharpIdentifier(ToPascalCase(sequence.Name)) + "ValueAsync", memberNames);
-                var resultType = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(sequence.Name)) + "SequenceValue", memberNames);
-
-                sb.AppendLine();
-                sb.AppendLine($"    private sealed class {resultType}");
-                sb.AppendLine("    {");
-                sb.AppendLine($"        public {valueTypeName} Value {{ get; set; }}");
-                sb.AppendLine("    }");
-                sb.AppendLine();
-                sb.AppendLine($"    /// <summary>Gets the next provider-bound value from sequence `{EscapeXmlDocumentation(QualifiedRoutineName(sequence))}`.</summary>");
-                sb.AppendLine("    /// <remarks>Sequence DDL and allocation semantics remain provider-owned and are not translated by nORM.</remarks>");
-                sb.AppendLine($"    public async Task<{valueTypeName}> {methodBase}(CancellationToken ct = default)");
-                sb.AppendLine("    {");
-                sb.AppendLine($"        var rows = await QueryUnchangedAsync<{resultType}>({FormatSequenceSqlExpression(sequence, provider)}, ct).ConfigureAwait(false);");
-                sb.AppendLine("        if (rows.Count == 0)");
-                sb.AppendLine($"            throw new NormConfigurationException(\"Sequence `{EscapeStringLiteral(QualifiedRoutineName(sequence))}` did not return a value.\");");
-                sb.AppendLine("        return rows[0].Value;");
-                sb.AppendLine("    }");
-            }
-        }
-
-        private static string ParseSequenceProvider(string detail)
-        {
-            if (detail.StartsWith("SQL Server", StringComparison.OrdinalIgnoreCase))
-                return "sqlserver";
-            if (detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase))
-                return "postgres";
-            return string.Empty;
-        }
-
-        private static Type MapSequenceValueType(string detail)
-        {
-            var dataType = ParseSemicolonValue(detail, "dataType");
-            var normalized = dataType.Split('(', 2)[0].Trim().ToLowerInvariant();
-            return normalized switch
-            {
-                "tinyint" => typeof(byte),
-                "smallint" => typeof(short),
-                "int" or "integer" => typeof(int),
-                "bigint" => typeof(long),
-                "decimal" or "numeric" => typeof(decimal),
-                _ => typeof(long)
-            };
-        }
-
-        private static string FormatSequenceSqlExpression(ScaffoldSkippedObject sequence, string provider)
-        {
-            var escapedValueAlias = " + Provider.Escape(\"Value\")";
-            var sequenceName = FormatProviderEscapedRoutineName(sequence);
-            if (provider == "sqlserver")
-                return "\"SELECT NEXT VALUE FOR \" + " + sequenceName + " + \" AS \"" + escapedValueAlias;
-
-            return "\"SELECT nextval('\" + (" + sequenceName + ").Replace(\"'\", \"''\") + \"'::regclass) AS \"" + escapedValueAlias;
-        }
-
-        private static void AppendFunctionRoutineStub(
-            StringBuilder sb,
-            string methodBase,
-            string? streamMethod,
-            string? scalarValueMethod,
-            string? scalarValueType,
-            ScaffoldSkippedObject routine,
-            string parameterSignature,
-            string? parameterType,
-            IReadOnlyList<RoutineStubParameter> inputParameters,
-            string? resultType,
-            bool scalar,
-            bool usePositionalArguments,
-            int expectedArgumentCount,
-            IReadOnlyList<string> inputParameterDataTypes,
-            bool scalarSetReturnsValue = false)
-        {
-            sb.AppendLine($"    public Task<List<TResult>> {methodBase}<TResult>({parameterSignature}, CancellationToken ct = default) where TResult : class, new()");
-            sb.AppendLine("    {");
-            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
-            AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-            AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
-            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-            if (scalar || scalarSetReturnsValue)
-                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
-            else
-                sb.AppendLine("        return QueryUnchangedAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
-            sb.AppendLine("    }");
-
-            if (!scalar && resultType != null)
-            {
-                sb.AppendLine();
-                sb.AppendLine($"    /// <summary>Executes provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and materializes the scaffold-discovered result shape.</summary>");
-                sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                sb.AppendLine($"    public Task<List<{resultType}>> {methodBase}({parameterSignature}, CancellationToken ct = default)");
-                sb.AppendLine("    {");
-                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
-                AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
-                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-                if (scalarSetReturnsValue)
-                    sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
-                else
-                    sb.AppendLine($"        return QueryUnchangedAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
-                sb.AppendLine("    }");
+                var join = joins[i];
+                converted[i] = new ScaffoldManyToManyJoinInfo(
+                    join.JoinTableKey,
+                    join.LeftTableKey,
+                    join.RightTableKey,
+                    join.JoinTableName,
+                    join.JoinTableSchema,
+                    join.LeftEntityName,
+                    join.RightEntityName,
+                    join.LeftForeignKeyColumns,
+                    join.RightForeignKeyColumns,
+                    join.LeftPrincipalKeyProperties,
+                    join.RightPrincipalKeyProperties,
+                    join.LeftOnDelete,
+                    join.LeftOnUpdate,
+                    join.RightOnDelete,
+                    join.RightOnUpdate,
+                    join.UsesPrimaryKeys,
+                    join.LeftCollectionNavigationName,
+                    join.RightCollectionNavigationName);
             }
 
-            if (scalar && scalarValueType != null)
+            return converted;
+        }
+
+        private static ScaffoldRoutineStubInfo[] ConvertRoutineStubInfos(IReadOnlyList<ScaffoldSkippedObject> routineStubs)
+        {
+            var converted = new ScaffoldRoutineStubInfo[routineStubs.Count];
+            for (var i = 0; i < routineStubs.Count; i++)
             {
-                sb.AppendLine();
-                sb.AppendLine($"    private sealed class {scalarValueType}<TValue>");
-                sb.AppendLine("    {");
-                sb.AppendLine("        public TValue? Value { get; set; }");
-                sb.AppendLine("    }");
-                sb.AppendLine();
-                sb.AppendLine($"    /// <summary>Executes provider-bound scalar function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` and returns its single value.</summary>");
-                sb.AppendLine("    /// <remarks>The routine body is provider-owned and is not translated by nORM.</remarks>");
-                sb.AppendLine($"    public async Task<TValue?> {scalarValueMethod}<TValue>({parameterSignature}, CancellationToken ct = default)");
-                sb.AppendLine("    {");
-                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
-                AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
-                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-                sb.AppendLine($"        var rows = await QueryUnchangedAsync<{scalarValueType}<TValue>>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args).ConfigureAwait(false);");
-                sb.AppendLine("        return rows.Count == 0 ? default : rows[0].Value;");
-                sb.AppendLine("    }");
+                var routine = routineStubs[i];
+                converted[i] = new ScaffoldRoutineStubInfo(
+                    routine.Schema,
+                    routine.Name,
+                    routine.Kind,
+                    routine.Detail,
+                    routine.Comment,
+                    BuildSkippedObjectMetadata(routine));
             }
 
-            if (streamMethod is null)
-                return;
-
-            sb.AppendLine();
-            sb.AppendLine($"    /// <summary>Streams provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows without buffering the full result set.</summary>");
-            sb.AppendLine("    /// <remarks>Routine bodies are provider-owned and are not translated by nORM.</remarks>");
-            sb.AppendLine($"    public async IAsyncEnumerable<TResult> {streamMethod}<TResult>({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default) where TResult : class, new()");
-            sb.AppendLine("    {");
-            sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
-            AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-            AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
-            sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-            if (scalarSetReturnsValue)
-                sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
-            else
-                sb.AppendLine("        var rows = QueryUnchangedStreamAsync<TResult>(\"SELECT * FROM \" + invocation, ct, args);");
-            sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
-            sb.AppendLine("            yield return row;");
-            sb.AppendLine("    }");
-
-            if (resultType != null)
-            {
-                sb.AppendLine();
-                sb.AppendLine($"    /// <summary>Streams provider-bound table-valued function `{EscapeXmlDocumentation(QualifiedRoutineName(routine))}` rows using the scaffold-discovered result shape.</summary>");
-                sb.AppendLine("    /// <remarks>Use the generic overload after routine result shape changes.</remarks>");
-                sb.AppendLine($"    public async IAsyncEnumerable<{resultType}> {streamMethod}({parameterSignature}, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)");
-                sb.AppendLine("    {");
-                sb.AppendLine(FormatRoutineArgumentArray(parameterType, inputParameters, usePositionalArguments));
-                AppendFunctionArgumentCountGuard(sb, routine, expectedArgumentCount);
-                AppendFunctionPlaceholderLine(sb, routine, inputParameterDataTypes, expectedArgumentCount);
-                sb.AppendLine($"        var invocation = {FormatProviderEscapedRoutineName(routine)} + \"(\" + placeholders + \")\";");
-                if (scalarSetReturnsValue)
-                    sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\"), ct, args);");
-                else
-                    sb.AppendLine($"        var rows = QueryUnchangedStreamAsync<{resultType}>(\"SELECT * FROM \" + invocation, ct, args);");
-                sb.AppendLine("        await foreach (var row in rows.ConfigureAwait(false))");
-                sb.AppendLine("            yield return row;");
-                sb.AppendLine("    }");
-            }
+            return converted;
         }
 
-        private static void AppendFunctionArgumentCountGuard(
-            StringBuilder sb,
-            ScaffoldSkippedObject routine,
-            int expectedArgumentCount)
-        {
-            if (expectedArgumentCount <= 0)
-                return;
-
-            sb.AppendLine($"        if (args.Length != {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)})");
-            sb.AppendLine($"            throw new NormConfigurationException(\"Function `{EscapeStringLiteral(QualifiedRoutineName(routine))}` was scaffolded with {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)} input parameters; pass exactly {expectedArgumentCount.ToString(CultureInfo.InvariantCulture)} arguments in scaffolded order.\");");
-        }
-
-        private static string FormatStoredProcedureParameterArgument(ScaffoldSkippedObject routine, int expectedInputParameterCount)
-        {
-            if (expectedInputParameterCount <= 0)
-                return "parameters";
-
-            return $"RequireScaffoldedRoutineParameters(parameters, {expectedInputParameterCount.ToString(CultureInfo.InvariantCulture)}, {FormatProviderEscapedRoutineName(routine)})";
-        }
-
-        private static string FormatRoutineArgumentArray(string? parameterType, IReadOnlyList<RoutineStubParameter> inputParameters, bool usePositionalArguments = false)
-        {
-            if (usePositionalArguments)
-                return "        var args = arguments is null ? System.Array.Empty<object>() : System.Array.ConvertAll(arguments, value => (object)(value ?? System.DBNull.Value));";
-
-            if (parameterType is null || inputParameters.Count == 0)
-                return "        var args = System.Array.Empty<object>();";
-
-            var values = inputParameters
-                .Select(parameter => $"(object?)parameters.{parameter.Name} ?? System.DBNull.Value")
+        private static ScaffoldContextPrimaryKeyInfo[] ConvertContextPrimaryKeyInfos(IReadOnlyList<ScaffoldPrimaryKey> primaryKeys)
+            => primaryKeys
+                .Select(key => new ScaffoldContextPrimaryKeyInfo(key.EntityName, key.PropertyNames, key.ConstraintName))
                 .ToArray();
-            return "        var args = parameters is null ? System.Array.Empty<object>() : new object[] { " + string.Join(", ", values) + " };";
-        }
 
-        private static void AppendFunctionPlaceholderLine(
-            StringBuilder sb,
-            ScaffoldSkippedObject routine,
-            IReadOnlyList<string> inputParameterDataTypes,
-            int expectedArgumentCount)
-        {
-            var postgresCastTypes = GetPostgresFunctionArgumentCastTypes(routine, inputParameterDataTypes, expectedArgumentCount);
-            if (postgresCastTypes.Count == 0)
-            {
-                sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i));");
-                return;
-            }
-
-            sb.AppendLine("        var casts = new[] { " + string.Join(", ", postgresCastTypes.Select(type => $"\"{EscapeStringLiteral(type)}\"")) + " };");
-            sb.AppendLine("        var placeholders = string.Join(\", \", System.Linq.Enumerable.Range(0, args.Length).Select(i => Provider.ParamPrefix + \"p\" + i + \"::\" + casts[i]));");
-        }
-
-        private static IReadOnlyList<string> GetPostgresFunctionArgumentCastTypes(
-            ScaffoldSkippedObject routine,
-            IReadOnlyList<string> inputParameterDataTypes,
-            int expectedArgumentCount)
-        {
-            if (!routine.Detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase)
-                || expectedArgumentCount <= 0
-                || inputParameterDataTypes.Count != expectedArgumentCount)
-            {
-                return Array.Empty<string>();
-            }
-
-            var castTypes = new List<string>(inputParameterDataTypes.Count);
-            foreach (var dataType in inputParameterDataTypes)
-            {
-                if (!TryMapPostgresFunctionArgumentCastType(dataType, out var castType))
-                    return Array.Empty<string>();
-
-                castTypes.Add(castType);
-            }
-
-            return castTypes;
-        }
-
-        private static bool TryMapPostgresFunctionArgumentCastType(string? dataType, out string castType)
-        {
-            var normalized = NormalizeRoutineDataType(dataType ?? string.Empty);
-            if (TryMapPostgresFunctionArrayArgumentCastType(normalized, out castType))
-                return true;
-
-            castType = normalized switch
-            {
-                "integer" or "int" or "int4" => "integer",
-                "bigint" or "int8" => "bigint",
-                "smallint" or "int2" => "smallint",
-                "boolean" or "bool" => "boolean",
-                "uuid" => "uuid",
-                "date" => "date",
-                "text" => "text",
-                "citext" => "citext",
-                "json" => "json",
-                "jsonb" => "jsonb",
-                "xml" => "xml",
-                "character varying" or "varchar" => "character varying",
-                "character" or "char" => "character",
-                "numeric" or "decimal" => "numeric",
-                "real" or "float4" => "real",
-                "double precision" or "float8" => "double precision",
-                "bytea" => "bytea",
-                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
-                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
-                "time without time zone" or "time" => "time without time zone",
-                "time with time zone" or "timetz" => "time with time zone",
-                "interval" => "interval",
-                _ => string.Empty
-            };
-
-            return castType.Length > 0;
-        }
-
-        private static bool TryMapPostgresFunctionArrayArgumentCastType(string normalized, out string castType)
-        {
-            castType = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            if (open < 0)
-                return false;
-
-            var close = normalized.IndexOf(')', open + 1);
-            var element = (close > open
-                    ? normalized.Substring(open + 1, close - open - 1)
-                    : normalized[(open + 1)..])
-                .Trim()
-                .TrimStart('_');
-
-            castType = element switch
-            {
-                "int2" or "smallint" => "smallint[]",
-                "int4" or "integer" => "integer[]",
-                "int8" or "bigint" => "bigint[]",
-                "float4" or "real" => "real[]",
-                "float8" or "double precision" => "double precision[]",
-                "numeric" or "decimal" => "numeric[]",
-                "bool" or "boolean" => "boolean[]",
-                "uuid" => "uuid[]",
-                "text" => "text[]",
-                "varchar" or "character varying" => "character varying[]",
-                "bpchar" or "char" or "character" => "character[]",
-                "citext" => "citext[]",
-                "bytea" => "bytea[]",
-                "date" => "date[]",
-                "time" or "time without time zone" => "time without time zone[]",
-                "timetz" or "time with time zone" => "time with time zone[]",
-                "interval" => "interval[]",
-                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
-                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
-                _ => string.Empty
-            };
-
-            return castType.Length > 0;
-        }
-
-        private static string FormatProviderEscapedRoutineName(ScaffoldSkippedObject routine)
-        {
-            var name = EscapeStringLiteral(routine.Name);
-            if (string.IsNullOrWhiteSpace(routine.Schema))
-                return $"Provider.Escape(\"{name}\")";
-
-            var schema = EscapeStringLiteral(routine.Schema!);
-            return $"Provider.Escape(\"{schema}\") + \".\" + Provider.Escape(\"{name}\")";
-        }
-
-        private static string QualifiedRoutineName(ScaffoldSkippedObject routine)
-            => string.IsNullOrWhiteSpace(routine.Schema) ? routine.Name : routine.Schema + "." + routine.Name;
-
-        private static string ParseSemicolonValue(string detail, string key)
-        {
-            var values = ParseSemicolonValues(detail, out _);
-            return values.TryGetValue(key, out var value) ? value : string.Empty;
-        }
-
-        private static IReadOnlyDictionary<string, string> ParseRoutineSemicolonValues(string detail, out string header)
-        {
-            var keyOrders = GetRoutineSemicolonValueKeyOrders(detail);
-            return ParseSemicolonValues(detail, out header, keyOrders);
-        }
-
-        private static IReadOnlyDictionary<string, string> ParseSemicolonValues(
-            string detail,
-            out string header,
-            IReadOnlyList<IReadOnlyList<string>>? keyOrders = null)
-        {
-            var markers = new List<SemicolonValueMarker>();
-            for (var i = 0; i < detail.Length; i++)
-            {
-                if (detail[i] == ';' && TryReadSemicolonValueMarker(detail, i, out var key, out var valueStart))
-                    markers.Add(new SemicolonValueMarker(i, key, valueStart));
-            }
-
-            if (keyOrders is { Count: > 0 })
-                markers = SelectBestOrderedSemicolonValueMarkers(detail, markers, keyOrders);
-
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (markers.Count == 0)
-            {
-                header = detail.Trim();
-                return values;
-            }
-
-            header = detail[..markers[0].SemicolonIndex].Trim();
-            for (var i = 0; i < markers.Count; i++)
-            {
-                var marker = markers[i];
-                var valueEnd = i + 1 < markers.Count ? markers[i + 1].SemicolonIndex : detail.Length;
-                values[marker.Key] = detail.Substring(marker.ValueStart, valueEnd - marker.ValueStart).Trim();
-            }
-
-            return values;
-        }
-
-        private static List<SemicolonValueMarker> SelectBestOrderedSemicolonValueMarkers(
-            string detail,
-            IReadOnlyList<SemicolonValueMarker> markers,
-            IReadOnlyList<IReadOnlyList<string>> keyOrders)
-        {
-            var best = new List<SemicolonValueMarker>();
-            foreach (var keyOrder in keyOrders)
-            {
-                var candidate = SelectOrderedSemicolonValueMarkers(detail, markers, keyOrder);
-                if (candidate.Count > best.Count)
-                    best = candidate;
-            }
-
-            return best;
-        }
-
-        private static List<SemicolonValueMarker> SelectOrderedSemicolonValueMarkers(
-            string detail,
-            IReadOnlyList<SemicolonValueMarker> markers,
-            IReadOnlyList<string> keyOrder)
-        {
-            var result = new List<SemicolonValueMarker>();
-            var expectedIndex = 0;
-            foreach (var marker in markers)
-            {
-                var matchIndex = IndexOfSemicolonValueKey(keyOrder, marker.Key, expectedIndex);
-                if (matchIndex < 0)
-                    continue;
-
-                if (result.Count > 0)
-                {
-                    var previous = result[^1];
-                    var value = detail.Substring(previous.ValueStart, marker.SemicolonIndex - previous.ValueStart);
-                    if (!IsCompleteSemicolonValue(previous.Key, value))
-                        continue;
-                }
-
-                result.Add(marker);
-                expectedIndex = matchIndex + 1;
-            }
-
-            return result;
-        }
-
-        private static int IndexOfSemicolonValueKey(IReadOnlyList<string> keyOrder, string key, int start)
-        {
-            for (var i = start; i < keyOrder.Count; i++)
-            {
-                if (keyOrder[i].Equals(key, StringComparison.OrdinalIgnoreCase))
-                    return i;
-            }
-
-            return -1;
-        }
-
-        private static IReadOnlyList<IReadOnlyList<string>> GetRoutineSemicolonValueKeyOrders(string detail)
-        {
-            var firstMarker = detail.IndexOf(';');
-            var header = firstMarker < 0 ? detail.Trim() : detail[..firstMarker].Trim();
-            if (header.StartsWith("SQL Server stored procedure", StringComparison.OrdinalIgnoreCase))
-            {
-                return new[]
-                {
-                    new[] { "parameters", "outputParameters", "parameterModes", "resultColumns" }
-                };
-            }
-
-            if (header.StartsWith("SQL Server ", StringComparison.OrdinalIgnoreCase))
-            {
-                return new[]
-                {
-                    new[] { "parameters", "outputParameters", "callShape", "parameterModes", "dataType", "resultColumns" },
-                    new[] { "parameters", "outputParameters", "parameterModes", "callShape", "dataType", "resultColumns" }
-                };
-            }
-
-            if (header.StartsWith("PostgreSQL ", StringComparison.OrdinalIgnoreCase)
-                || header.StartsWith("MySQL ", StringComparison.OrdinalIgnoreCase))
-            {
-                return new[]
-                {
-                    new[] { "parameters", "outputParameters", "parameterModes", "callShape", "dataType" },
-                    new[] { "parameters", "outputParameters", "callShape", "parameterModes", "dataType" }
-                };
-            }
-
-            return Array.Empty<IReadOnlyList<string>>();
-        }
-
-        private static bool IsCompleteSemicolonValue(string key, string value)
-        {
-            if (key.Equals("parameters", StringComparison.OrdinalIgnoreCase)
-                || key.Equals("outputParameters", StringComparison.OrdinalIgnoreCase))
-            {
-                return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
-            }
-
-            if (key.Equals("parameterModes", StringComparison.OrdinalIgnoreCase))
-                return IsCompleteRoutineParameterModes(value);
-
-            if (key.Equals("resultColumns", StringComparison.OrdinalIgnoreCase))
-                return IsCompleteRoutineResultColumns(value);
-
-            return true;
-        }
-
-        private static bool IsCompleteRoutineParameterModes(string parameterModes)
-        {
-            if (string.IsNullOrWhiteSpace(parameterModes))
-                return true;
-
-            var parts = SplitRoutineParameterModes(parameterModes);
-            return parts.Count > 0 && parts.All(part => TryParseRoutineParameterMode(part, out _, out _, out _));
-        }
-
-        private static bool IsCompleteRoutineResultColumns(string resultColumns)
-        {
-            if (string.IsNullOrWhiteSpace(resultColumns))
-                return true;
-
-            var parts = SplitRoutineResultColumns(resultColumns);
-            return parts.Count > 0 && parts.All(part => TryParseRoutineResultColumnParts(part, out _, out _, out _));
-        }
-
-        private static bool TryReadSemicolonValueMarker(
-            string detail,
-            int semicolonIndex,
-            out string key,
-            out int valueStart)
-        {
-            key = string.Empty;
-            valueStart = 0;
-
-            var index = semicolonIndex + 1;
-            var sawWhitespace = false;
-            while (index < detail.Length && char.IsWhiteSpace(detail[index]))
-            {
-                sawWhitespace = true;
-                index++;
-            }
-
-            if (!sawWhitespace || index >= detail.Length || !char.IsLetter(detail[index]))
-                return false;
-
-            var keyStart = index;
-            while (index < detail.Length && char.IsLetterOrDigit(detail[index]))
-                index++;
-
-            var keyEnd = index;
-            while (index < detail.Length && char.IsWhiteSpace(detail[index]))
-                index++;
-
-            if (index >= detail.Length || detail[index] != '=')
-                return false;
-
-            key = detail.Substring(keyStart, keyEnd - keyStart);
-            if (!IsKnownSemicolonValueKey(key))
-                return false;
-
-            valueStart = index + 1;
-            return true;
-        }
-
-        private static bool IsKnownSemicolonValueKey(string key)
-            => key.Equals("parameters", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("outputParameters", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("parameterModes", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("resultColumns", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("callShape", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("dataType", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("baseObject", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("baseType", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("eventType", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("status", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("intervalValue", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("intervalField", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("executeAt", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("starts", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("ends", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("expression", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("filterSql", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("indexSql", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("indexType", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("accessMethod", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("prefixColumns", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("hasNullsNotDistinct", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("hasNonDefaultOperatorClass", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("hasIndexCollation", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("hasNonDefaultNullOrdering", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("timing", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("event", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("orientation", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("triggerSql", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("isDisabled", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("isInsteadOf", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("temporalType", StringComparison.OrdinalIgnoreCase)
-               || key.Equals("historyTable", StringComparison.OrdinalIgnoreCase);
-
-        private static string FormatRoutineParameterSummary(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            return string.Join(", ", parameters.Select(parameter =>
-            {
-                var name = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null) ?? "parameter";
-                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                return string.Join(" ", new[] { name, mode, dataType }.Where(part => !string.IsNullOrWhiteSpace(part)));
-            }));
-        }
-
-        private static IReadOnlyList<RoutineStubParameter> GetRoutineInputParameters(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                return Array.Empty<RoutineStubParameter>();
-            }
-
-            var names = new List<RoutineStubParameter>();
-            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var parameter in parameters)
-            {
-                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                if (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var rawName = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
-                var normalized = NormalizeRoutineParameterName(rawName);
-                if (string.IsNullOrWhiteSpace(normalized))
-                    return Array.Empty<RoutineStubParameter>();
-
-                var escaped = EscapeCSharpIdentifier(normalized);
-                if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
-                    return Array.Empty<RoutineStubParameter>();
-
-                if (!usedNames.Add(escaped))
-                    return Array.Empty<RoutineStubParameter>();
-
-                var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                names.Add(new RoutineStubParameter(escaped, GetRoutineParameterTypeName(dataType), dataType ?? string.Empty));
-            }
-
-            return names.ToArray();
-        }
-
-        private static IReadOnlyList<string> GetRoutineInputParameterDataTypes(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            var dataTypes = new List<string>();
-            foreach (var parameter in parameters)
-            {
-                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                if (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                dataTypes.Add(Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null) ?? string.Empty);
-            }
-
-            return dataTypes.ToArray();
-        }
-
-        private static int GetRoutineInputParameterCount(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                return 0;
-            }
-
-            var count = 0;
-            foreach (var parameter in parameters)
-            {
-                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                if (!string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private static IReadOnlyList<RoutineOutputParameter> GetRoutineOutputParameters(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                return Array.Empty<RoutineOutputParameter>();
-            }
-
-            var names = new List<RoutineOutputParameter>();
-            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var parameter in parameters)
-            {
-                var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                if (!string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(mode, "INOUT", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(mode, "RETURN", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var rawName = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
-                var normalized = NormalizeRoutineParameterName(rawName);
-                if (string.IsNullOrWhiteSpace(normalized))
-                    return Array.Empty<RoutineOutputParameter>();
-
-                var escaped = EscapeCSharpIdentifier(normalized);
-                if (!string.Equals(escaped.TrimStart('@'), normalized, StringComparison.Ordinal))
-                    return Array.Empty<RoutineOutputParameter>();
-
-                if (!usedNames.Add(normalized))
-                    return Array.Empty<RoutineOutputParameter>();
-
-                var dataType = Convert.ToString(parameter.TryGetValue("dataType", out var d) ? d : null);
-                var (precision, scale) = GetRoutineParameterPrecisionScale(dataType);
-                names.Add(new RoutineOutputParameter(
-                    normalized,
-                    GetRoutineParameterDbTypeName(dataType),
-                    GetRoutineParameterSize(dataType),
-                    precision,
-                    scale,
-                    GetRoutineParameterDirection(mode)));
-            }
-
-            return names.ToArray();
-        }
-
-        private static IReadOnlyList<RoutineResultColumn> GetRoutineResultColumns(IReadOnlyDictionary<string, object?> metadata)
-        {
-            if (!TryGetRoutineResultColumnMetadata(metadata, out var columns))
-            {
-                return Array.Empty<RoutineResultColumn>();
-            }
-
-            var result = new List<RoutineResultColumn>();
-            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (var i = 0; i < columns.Count; i++)
-            {
-                var column = columns[i];
-                var rawName = Convert.ToString(column.TryGetValue("name", out var n) ? n : null);
-                var baseName = string.IsNullOrWhiteSpace(rawName)
-                    ? "Column" + (i + 1).ToString(CultureInfo.InvariantCulture)
-                    : ToPascalCase(rawName);
-                var escaped = EscapeCSharpIdentifier(baseName);
-                var unique = escaped;
-                var suffix = 2;
-                while (!usedNames.Add(unique))
-                    unique = escaped + suffix++.ToString(CultureInfo.InvariantCulture);
-
-                var dataType = Convert.ToString(column.TryGetValue("dataType", out var d) ? d : null);
-                var nullable = column.TryGetValue("nullable", out var isNullable) && isNullable is true;
-                result.Add(new RoutineResultColumn(unique, GetRoutineResultColumnTypeName(dataType, nullable)));
-            }
-
-            return result.ToArray();
-        }
-
-        private static bool TryGetRoutineResultColumnMetadata(
-            IReadOnlyDictionary<string, object?> metadata,
-            out IReadOnlyList<IReadOnlyDictionary<string, object?>> columns)
-        {
-            if (metadata.TryGetValue("resultColumns", out var columnsValue)
-                && columnsValue is IReadOnlyList<IReadOnlyDictionary<string, object?>> resultColumns
-                && resultColumns.Count > 0)
-            {
-                columns = resultColumns;
-                return true;
-            }
-
-            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
-            if (!string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase)
-                || !metadata.TryGetValue("parameters", out var parametersValue)
-                || parametersValue is not IReadOnlyList<IReadOnlyDictionary<string, object?>> parameters
-                || parameters.Count == 0)
-            {
-                columns = Array.Empty<IReadOnlyDictionary<string, object?>>();
-                return false;
-            }
-
-            columns = parameters
-                .Where(parameter =>
-                {
-                    var mode = Convert.ToString(parameter.TryGetValue("mode", out var m) ? m : null);
-                    var name = Convert.ToString(parameter.TryGetValue("name", out var n) ? n : null);
-                    return !string.IsNullOrWhiteSpace(name)
-                           && !string.Equals(name, "return", StringComparison.OrdinalIgnoreCase)
-                           && (string.Equals(mode, "OUT", StringComparison.OrdinalIgnoreCase)
-                               || string.Equals(mode, "INOUT", StringComparison.OrdinalIgnoreCase));
-                })
+        private static ScaffoldContextDefaultValueInfo[] ConvertContextDefaultValueInfos(IReadOnlyList<ScaffoldDefaultValueConfiguration> defaultValues)
+            => defaultValues
+                .Select(defaultValue => new ScaffoldContextDefaultValueInfo(defaultValue.EntityName, defaultValue.PropertyName, defaultValue.DefaultValueSql))
                 .ToArray();
-            return columns.Count > 0;
-        }
 
-        private static bool TryGetScalarSetReturningRoutineResultColumn(
-            IReadOnlyDictionary<string, object?> metadata,
-            out RoutineResultColumn column)
-        {
-            column = default;
-            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
-            if (!string.Equals(callShape, "table-valued-function", StringComparison.OrdinalIgnoreCase))
-                return false;
+        private static ScaffoldContextCheckConstraintInfo[] ConvertContextCheckConstraintInfos(IReadOnlyList<ScaffoldCheckConstraintConfiguration> checks)
+            => checks
+                .Select(check => new ScaffoldContextCheckConstraintInfo(check.EntityName, check.Name, check.Sql))
+                .ToArray();
 
-            if (TryGetRoutineResultColumnMetadata(metadata, out var discoveredColumns)
-                && discoveredColumns.Count > 0)
-            {
-                return false;
-            }
+        private static ScaffoldContextComputedColumnInfo[] ConvertContextComputedColumnInfos(IReadOnlyList<ScaffoldComputedColumnConfiguration> computedColumns)
+            => computedColumns
+                .Select(computed => new ScaffoldContextComputedColumnInfo(computed.EntityName, computed.PropertyName, computed.Sql, computed.Stored))
+                .ToArray();
 
-            var dataType = Convert.ToString(metadata.TryGetValue("dataType", out var d) ? d : null);
-            if (string.IsNullOrWhiteSpace(dataType))
-                return false;
+        private static ScaffoldContextExpressionIndexInfo[] ConvertContextExpressionIndexInfos(IReadOnlyList<ScaffoldExpressionIndexConfiguration> expressionIndexes)
+            => expressionIndexes
+                .Select(index => new ScaffoldContextExpressionIndexInfo(index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
+                .ToArray();
 
-            var normalized = NormalizeRoutineDataType(dataType);
-            if (normalized is "record" or "table" or "void")
-                return false;
+        private static ScaffoldContextCollationInfo[] ConvertContextCollationInfos(IReadOnlyList<ScaffoldCollationConfiguration> collations)
+            => collations
+                .Select(collation => new ScaffoldContextCollationInfo(collation.EntityName, collation.PropertyName, collation.Collation))
+                .ToArray();
 
-            var typeName = GetRoutineResultColumnTypeName(dataType, nullable: false);
-            if (string.Equals(typeName, "object?", StringComparison.Ordinal))
-                return false;
+        private static ScaffoldContextSequenceInfo[] ConvertContextSequenceInfos(IReadOnlyList<ScaffoldSkippedObject> sequenceStubs)
+            => sequenceStubs
+                .Select(sequence => new ScaffoldContextSequenceInfo(sequence.Schema, sequence.Name, sequence.Detail, sequence.Comment))
+                .ToArray();
 
-            column = new RoutineResultColumn("Value", typeName);
-            return true;
-        }
+        private static ScaffoldContextIdentityOptionInfo[] ConvertContextIdentityOptionInfos(IReadOnlyList<ScaffoldIdentityOptionConfiguration> identityOptions)
+            => identityOptions
+                .Select(identity => new ScaffoldContextIdentityOptionInfo(identity.EntityName, identity.PropertyName, identity.Seed, identity.Increment))
+                .ToArray();
 
-        private static string FormatRoutineOutputParameterCreation(RoutineOutputParameter parameter)
-        {
-            var baseCall = $"new OutputParameter(\"{EscapeStringLiteral(parameter.Name)}\", System.Data.DbType.{parameter.DbType}";
-            if (parameter.Precision.HasValue && parameter.Scale.HasValue)
-            {
-                baseCall += $", (byte){parameter.Precision.Value.ToString(CultureInfo.InvariantCulture)}, (byte){parameter.Scale.Value.ToString(CultureInfo.InvariantCulture)}";
-                var hasNonDefaultDecimalDirection = !string.Equals(parameter.Direction, nameof(ParameterDirection.Output), StringComparison.Ordinal);
-                return hasNonDefaultDecimalDirection
-                    ? baseCall + ", System.Data.ParameterDirection." + parameter.Direction + ")"
-                    : baseCall + ")";
-            }
+        private static ScaffoldContextPrecisionInfo[] ConvertContextPrecisionInfos(IReadOnlyList<ScaffoldPrecisionConfiguration> precisionConfigurations)
+            => precisionConfigurations
+                .Select(precision => new ScaffoldContextPrecisionInfo(precision.EntityName, precision.PropertyName, precision.Precision, precision.Scale))
+                .ToArray();
 
-            var hasNonDefaultDirection = !string.Equals(parameter.Direction, nameof(ParameterDirection.Output), StringComparison.Ordinal);
-            if (!parameter.Size.HasValue && !hasNonDefaultDirection)
-                return baseCall + ")";
-
-            var sizeArgument = parameter.Size.HasValue
-                ? parameter.Size.Value.ToString(CultureInfo.InvariantCulture)
-                : "null";
-            if (!hasNonDefaultDirection)
-                return baseCall + ", " + sizeArgument + ")";
-
-            return baseCall + ", " + sizeArgument + ", System.Data.ParameterDirection." + parameter.Direction + ")";
-        }
+        private static ScaffoldContextColumnFacetInfo[] ConvertContextColumnFacetInfos(IReadOnlyList<ScaffoldColumnFacetConfiguration> columnFacetConfigurations)
+            => columnFacetConfigurations
+                .Select(facet => new ScaffoldContextColumnFacetInfo(facet.EntityName, facet.PropertyName, facet.MaxLength, facet.IsUnicode, facet.IsFixedLength))
+                .ToArray();
 
         private static (byte? Precision, byte? Scale) GetRoutineParameterPrecisionScale(string? dataType)
-        {
-            if (string.IsNullOrWhiteSpace(dataType))
-                return (null, null);
+            => ScaffoldRoutineTypeMapper.GetRoutineParameterPrecisionScale(dataType);
 
-            var trimmed = dataType.Trim();
-            var open = trimmed.IndexOf('(');
-            if (open < 0)
-                return (null, null);
-
-            var close = trimmed.IndexOf(')', open + 1);
-            if (close < 0)
-                return (null, null);
-
-            var normalized = trimmed[..open].Trim().ToLowerInvariant();
-            if (normalized is not ("decimal" or "numeric"))
-                return (null, null);
-
-            var parts = trimmed.Substring(open + 1, close - open - 1)
-                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2)
-                return (null, null);
-
-            return byte.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var precision)
-                   && byte.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var scale)
-                ? (precision, scale)
-                : (null, null);
-        }
-
-        private static string GetRoutineParameterDirection(string? mode)
-            => mode?.Trim().ToUpperInvariant() switch
-            {
-                "INOUT" => nameof(ParameterDirection.InputOutput),
-                "RETURN" => nameof(ParameterDirection.ReturnValue),
-                _ => nameof(ParameterDirection.Output)
-            };
-
-        private static int? GetRoutineParameterSize(string? dataType)
-        {
-            if (string.IsNullOrWhiteSpace(dataType))
-                return null;
-
-            var trimmed = dataType.Trim();
-            var open = trimmed.IndexOf('(');
-            if (open < 0)
-                return null;
-
-            var close = trimmed.IndexOf(')', open + 1);
-            if (close < 0)
-                return null;
-
-            var normalized = trimmed[..open].Trim().ToLowerInvariant();
-            if (normalized is "character varying" or "varying character")
-                normalized = "varchar";
-            else if (normalized is "national character varying")
-                normalized = "nvarchar";
-            else if (normalized is "character")
-                normalized = "char";
-
-            if (normalized is not ("char" or "varchar" or "nchar" or "nvarchar" or "binary" or "varbinary"))
-                return null;
-
-            var value = trimmed.Substring(open + 1, close - open - 1).Trim();
-            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var size) && size > 0
-                ? size
-                : null;
-        }
-
-        private static string GetRoutineParameterTypeName(string? dataType)
-        {
-            if (string.IsNullOrWhiteSpace(dataType))
-                return "object?";
-
-            var normalized = NormalizeRoutineDataType(dataType);
-            if (TryMapPostgresArrayRoutineType(normalized, out var arrayTypeName))
-                return arrayTypeName + "?";
-
-            normalized = normalized switch
-            {
-                "character varying" or "varying character" => "varchar",
-                "national character varying" => "nvarchar",
-                "character" => "char",
-                "double precision" => "double",
-                "timestamp without time zone" => "timestamp",
-                "timestamp with time zone" => "timestamptz",
-                "time without time zone" or "time with time zone" => "time",
-                _ => normalized
-            };
-
-            return normalized switch
-            {
-                "int" or "integer" or "int4" or "mediumint" => "int?",
-                "int unsigned" or "mediumint unsigned" => "uint?",
-                "bigint" or "int8" => "long?",
-                "bigint unsigned" => "ulong?",
-                "smallint" or "int2" => "short?",
-                "smallint unsigned" => "ushort?",
-                "tinyint" => "byte?",
-                "tinyint unsigned" => "byte?",
-                "bit" or "bool" or "boolean" => "bool?",
-                "decimal" or "numeric" or "money" or "smallmoney" => "decimal?",
-                "float" or "float8" or "double" => "double?",
-                "real" or "float4" => "float?",
-                "date" => "DateOnly?",
-                "time" => "TimeOnly?",
-                "interval" => "TimeSpan?",
-                "datetime" or "datetime2" or "smalldatetime" or "timestamp" => "DateTime?",
-                "datetimeoffset" or "timestamptz" => "DateTimeOffset?",
-                "uniqueidentifier" or "uuid" => "Guid?",
-                "table type" => "DbParameter?",
-                "sysname" => "string?",
-                "bpchar" => "string?",
-                "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => "string?",
-                "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => "byte[]?",
-                _ => "object?"
-            };
-        }
-
-        private static string GetRoutineParameterDbTypeName(string? dataType)
-        {
-            if (string.IsNullOrWhiteSpace(dataType))
-                return nameof(DbType.Object);
-
-            var normalized = NormalizeRoutineDataType(dataType);
-            if (TryMapPostgresArrayRoutineType(normalized, out _))
-                return nameof(DbType.Object);
-
-            normalized = normalized switch
-            {
-                "character varying" or "varying character" => "varchar",
-                "national character varying" => "nvarchar",
-                "character" => "char",
-                "double precision" => "double",
-                "timestamp without time zone" => "timestamp",
-                "timestamp with time zone" => "timestamptz",
-                "time without time zone" or "time with time zone" => "time",
-                _ => normalized
-            };
-
-            return normalized switch
-            {
-                "int" or "integer" or "int4" or "mediumint" => nameof(DbType.Int32),
-                "int unsigned" or "mediumint unsigned" => nameof(DbType.UInt32),
-                "bigint" or "int8" => nameof(DbType.Int64),
-                "bigint unsigned" => nameof(DbType.UInt64),
-                "smallint" or "int2" => nameof(DbType.Int16),
-                "smallint unsigned" => nameof(DbType.UInt16),
-                "tinyint" => nameof(DbType.Byte),
-                "tinyint unsigned" => nameof(DbType.Byte),
-                "bit" or "bool" or "boolean" => nameof(DbType.Boolean),
-                "decimal" or "numeric" or "money" or "smallmoney" => nameof(DbType.Decimal),
-                "float" or "float8" or "double" => nameof(DbType.Double),
-                "real" or "float4" => nameof(DbType.Single),
-                "date" => nameof(DbType.Date),
-                "time" or "interval" => nameof(DbType.Time),
-                "datetime" or "datetime2" or "smalldatetime" or "timestamp" => nameof(DbType.DateTime),
-                "datetimeoffset" or "timestamptz" => nameof(DbType.DateTimeOffset),
-                "uniqueidentifier" or "uuid" => nameof(DbType.Guid),
-                "sysname" => nameof(DbType.String),
-                "bpchar" => nameof(DbType.String),
-                "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "citext" or "xml" or "json" or "jsonb" or "enum" or "set" => nameof(DbType.String),
-                "binary" or "varbinary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" => nameof(DbType.Binary),
-                _ => nameof(DbType.Object)
-            };
-        }
-
-        private static string GetRoutineResultColumnTypeName(string? dataType, bool nullable)
-        {
-            var typeName = GetRoutineParameterTypeName(dataType);
-            if (typeName.EndsWith("?", StringComparison.Ordinal))
-                return nullable ? typeName : typeName[..^1];
-
-            return nullable && typeName is not "object?" ? typeName + "?" : typeName;
-        }
-
-        private static bool RequiresDefaultInitializer(string typeName)
-            => !typeName.EndsWith("?", StringComparison.Ordinal)
-               && (typeName == "string" || typeName.EndsWith("[]", StringComparison.Ordinal));
-
-        private static string NormalizeRoutineDataType(string dataType)
-        {
-            var normalized = dataType.Trim().ToLowerInvariant();
-            var isUnsigned = normalized.Contains(" unsigned", StringComparison.Ordinal);
-            var paren = normalized.IndexOf('(');
-            var baseType = paren >= 0 ? normalized[..paren].Trim() : normalized;
-
-            if (paren >= 0 && (baseType == "array" || baseType == "user-defined" || baseType == "table type"))
-            {
-                var close = normalized.IndexOf(')', paren + 1);
-                if (close > paren)
-                {
-                    var inner = normalized.Substring(paren + 1, close - paren - 1).Trim();
-                    if (!string.IsNullOrWhiteSpace(inner))
-                    {
-                        if (baseType == "array")
-                            return "array (" + inner + ")";
-
-                        if (baseType == "table type")
-                            return "table type";
-
-                        var userDefined = inner.TrimStart('_');
-                        if (userDefined is "citext" or "json" or "jsonb" or "xml" or "uuid")
-                            return userDefined;
-                    }
-                }
-            }
-
-            normalized = isUnsigned && !baseType.EndsWith(" unsigned", StringComparison.Ordinal)
-                ? baseType + " unsigned"
-                : baseType;
-
-            return normalized switch
-            {
-                "integer unsigned" => "int unsigned",
-                "character varying" or "varying character" => "varchar",
-                "national character varying" => "nvarchar",
-                "character" => "char",
-                "double precision" => "double",
-                "timestamp without time zone" => "timestamp",
-                "timestamp with time zone" => "timestamptz",
-                "time without time zone" or "time with time zone" => "time",
-                _ => normalized
-            };
-        }
-
-        private static bool TryMapPostgresArrayRoutineType(string normalized, out string typeName)
-        {
-            typeName = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            var close = normalized.IndexOf(')', open + 1);
-            if (open < 0 || close <= open)
-                return false;
-
-            var element = normalized.Substring(open + 1, close - open - 1).Trim().TrimStart('_');
-            typeName = element switch
-            {
-                "int2" or "smallint" => "short[]",
-                "int4" or "integer" => "int[]",
-                "int8" or "bigint" => "long[]",
-                "float4" or "real" => "float[]",
-                "float8" or "double precision" => "double[]",
-                "numeric" or "decimal" => "decimal[]",
-                "bool" or "boolean" => "bool[]",
-                "uuid" => "Guid[]",
-                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => "string[]",
-                "bytea" => "byte[][]",
-                "date" => "DateOnly[]",
-                "time" or "time without time zone" or "time with time zone" => "TimeOnly[]",
-                "interval" => "TimeSpan[]",
-                "timestamp" or "timestamp without time zone" => "DateTime[]",
-                "timestamptz" or "timestamp with time zone" => "DateTimeOffset[]",
-                _ => string.Empty
-            };
-
-            return typeName.Length > 0;
-        }
-
-        private static string NormalizeRoutineParameterName(string? name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return string.Empty;
-
-            return name.Trim().TrimStart('@', ':', '?');
-        }
-
-        private static string FormatScaffoldKeySelector(string parameterName, IReadOnlyList<string> propertyNames)
-        {
-            if (propertyNames.Count == 1)
-                return $"{parameterName} => {parameterName}.{EscapeCSharpIdentifier(propertyNames[0])}";
-
-            return $"{parameterName} => new {{ {string.Join(", ", propertyNames.Select(name => parameterName + "." + EscapeCSharpIdentifier(name)))} }}";
-        }
-
-        private static string FormatStringArrayLiteral(IReadOnlyList<string> values)
-            => "new[] { " + string.Join(", ", values.Select(value => "\"" + EscapeStringLiteral(value) + "\"")) + " }";
+        private static void AppendNullableDirective(StringBuilder sb, bool useNullableReferenceTypes)
+            => sb.AppendLine(useNullableReferenceTypes ? "#nullable enable" : "#nullable disable");
 
         /// <summary>
         /// Returns a C# type name with correct nullability for value or reference types.
         /// </summary>
-        private static string GetTypeName(Type type, bool allowNull)
-        {
-            string name = type.IsArray && type != typeof(byte[])
-                ? GetTypeName(type.GetElementType()!, allowNull: false) + "[]"
-                : type == typeof(byte[]) ? "byte[]" : type switch
-            {
-                var t when t == typeof(int) => "int",
-                var t when t == typeof(long) => "long",
-                var t when t == typeof(short) => "short",
-                var t when t == typeof(byte) => "byte",
-                var t when t == typeof(sbyte) => "sbyte",
-                var t when t == typeof(uint) => "uint",
-                var t when t == typeof(ulong) => "ulong",
-                var t when t == typeof(ushort) => "ushort",
-                var t when t == typeof(bool) => "bool",
-                var t when t == typeof(char) => "char",
-                var t when t == typeof(string) => "string",
-                var t when t == typeof(DateTime) => "DateTime",
-                var t when t == typeof(DateOnly) => "DateOnly",
-                var t when t == typeof(DateTimeOffset) => "DateTimeOffset",
-                var t when t == typeof(TimeOnly) => "TimeOnly",
-                var t when t == typeof(TimeSpan) => "TimeSpan",
-                var t when t == typeof(decimal) => "decimal",
-                var t when t == typeof(double) => "double",
-                var t when t == typeof(float) => "float",
-                var t when t == typeof(Guid) => "Guid",
-                _ => type.FullName ?? type.Name
-            };
-
-            // Add '?' if the DB allows nulls (for both value types and reference types)
-            if (allowNull)
-            {
-                name += "?";
-            }
-
-            return name;
-        }
+        private static string GetTypeName(Type type, bool allowNull, bool useNullableReferenceTypes = true)
+            => ScaffoldTypeNameHelper.GetTypeName(type, allowNull, useNullableReferenceTypes);
 
         private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
-        {
-            if (clrType != typeof(string) && clrType != typeof(byte[]))
-                return null;
+            => ScaffoldEntitySourceBuilder.GetScaffoldMaxLength(clrType, row);
 
-            if (!row.Table.Columns.Contains("ColumnSize") || row["ColumnSize"] == DBNull.Value)
-                return null;
-
-            return int.TryParse(row["ColumnSize"]!.ToString(), out var size) && size > 0 && size < int.MaxValue
-                ? size
-                : null;
-        }
+        private static bool IsUnboundedScaffoldMaxLength(int size)
+            => ScaffoldEntitySourceBuilder.IsUnboundedScaffoldMaxLength(size);
 
         private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null, string? providerSpecificColumnType = null)
-        {
-            if (provider is SqliteProvider && IsSqliteUuidDeclaredType(declaredType))
-                return typeof(Guid);
+            => ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+                provider,
+                clrType,
+                allowNull,
+                isKey,
+                isAuto,
+                declaredType,
+                providerSpecificColumnType);
 
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
-                && TryMapPostgresArrayType(providerSpecificColumnType, out var arrayType))
-            {
-                return arrayType;
-            }
+        private static bool TryMapSqlServerAliasBaseClrType(string? detail, out Type type)
+            => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrType(detail, out type);
 
-            if (provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase)
-                && TryMapMySqlUnsignedType(providerSpecificColumnType, out var unsignedType))
-            {
-                return unsignedType;
-            }
+        private static string NormalizeSqlServerAliasBaseTypeName(string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.NormalizeSqlServerAliasBaseTypeName(typeText);
 
-            if (provider is SqliteProvider
-                && isKey
-                && isAuto
-                && !allowNull
-                && clrType == typeof(int))
-            {
-                // SQLite INTEGER PRIMARY KEY aliases the 64-bit rowid even when
-                // provider schema metadata reports Int32 for small test values.
-                return typeof(long);
-            }
+        private static int? GetSqlServerAliasBaseMaxLength(string? detail)
+            => ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLength(detail);
 
-            return clrType;
-        }
+        private static int? GetSqlServerAliasBaseMaxLengthFromTypeText(string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLengthFromTypeText(typeText);
 
         private static bool TryMapMySqlUnsignedType(string? detail, out Type type)
-        {
-            type = typeof(object);
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var normalized = NormalizeMySqlUnsignedTypeDetail(detail);
-            if (!normalized.Contains("unsigned", StringComparison.Ordinal))
-                return false;
-
-            type = normalized switch
-            {
-                "tinyint unsigned" => typeof(byte),
-                "smallint unsigned" => typeof(ushort),
-                "mediumint unsigned" or "int unsigned" or "integer unsigned" => typeof(uint),
-                "bigint unsigned" => typeof(ulong),
-                _ => typeof(object)
-            };
-
-            return type != typeof(object);
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(detail, out type);
 
         private static string NormalizeMySqlUnsignedTypeDetail(string detail)
-        {
-            var normalized = detail.Trim().ToLowerInvariant();
-            var unsignedIndex = normalized.IndexOf("unsigned", StringComparison.Ordinal);
-            if (unsignedIndex < 0)
-                return normalized;
-
-            var baseType = normalized[..unsignedIndex].Trim();
-            var paren = baseType.IndexOf('(');
-            if (paren >= 0)
-                baseType = baseType[..paren].Trim();
-
-            return baseType.Length == 0 ? normalized : baseType + " unsigned";
-        }
+            => ScaffoldProviderSpecificTypeClassifier.NormalizeMySqlUnsignedTypeDetail(detail);
 
         private static bool TryMapPostgresArrayType(string? detail, out Type arrayType)
-        {
-            arrayType = typeof(object[]);
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var normalized = detail.Trim().ToLowerInvariant();
-            if (normalized.Contains("domain", StringComparison.OrdinalIgnoreCase))
-                normalized = GetPostgresDomainProbeCastType(detail).Trim().ToLowerInvariant();
-
-            if (TryMapPostgresArrayCastType(normalized, out arrayType))
-                return true;
-
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            var close = normalized.IndexOf(')', open + 1);
-            var element = open >= 0 && close > open
-                ? normalized.Substring(open + 1, close - open - 1).Trim()
-                : string.Empty;
-            element = element.TrimStart('_');
-
-            var elementType = element switch
-            {
-                "int2" or "smallint" => typeof(short),
-                "int4" or "integer" => typeof(int),
-                "int8" or "bigint" => typeof(long),
-                "float4" or "real" => typeof(float),
-                "float8" or "double precision" => typeof(double),
-                "numeric" or "decimal" => typeof(decimal),
-                "bool" or "boolean" => typeof(bool),
-                "uuid" => typeof(Guid),
-                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => typeof(string),
-                "bytea" => typeof(byte[]),
-                "date" => typeof(DateOnly),
-                "time" or "time without time zone" or "time with time zone" => typeof(TimeOnly),
-                "interval" => typeof(TimeSpan),
-                "timestamp" or "timestamp without time zone" => typeof(DateTime),
-                "timestamptz" or "timestamp with time zone" => typeof(DateTimeOffset),
-                _ => null
-            };
-
-            if (elementType is null)
-                return false;
-
-            arrayType = elementType.MakeArrayType();
-            return true;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayType(detail, out arrayType);
 
         private static bool TryMapPostgresArrayCastType(string normalized, out Type arrayType)
-        {
-            arrayType = typeof(object[]);
-            if (!normalized.EndsWith("[]", StringComparison.Ordinal))
-                return false;
-
-            var element = normalized[..^2].Trim();
-            var elementType = element switch
-            {
-                "smallint" => typeof(short),
-                "integer" => typeof(int),
-                "bigint" => typeof(long),
-                "real" => typeof(float),
-                "double precision" => typeof(double),
-                "numeric" => typeof(decimal),
-                "boolean" => typeof(bool),
-                "uuid" => typeof(Guid),
-                "text" or "character varying" or "character" or "citext" => typeof(string),
-                "bytea" => typeof(byte[]),
-                "date" => typeof(DateOnly),
-                "time without time zone" or "time with time zone" => typeof(TimeOnly),
-                "interval" => typeof(TimeSpan),
-                "timestamp without time zone" => typeof(DateTime),
-                "timestamp with time zone" => typeof(DateTimeOffset),
-                _ => null
-            };
-
-            if (elementType is null)
-                return false;
-
-            arrayType = elementType.MakeArrayType();
-            return true;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(normalized, out arrayType);
 
         private static bool IsSqliteUuidDeclaredType(string? declaredType)
-            => !string.IsNullOrWhiteSpace(declaredType)
-               && declaredType.Trim().ToUpperInvariant().Contains("UUID", StringComparison.Ordinal);
+            => ScaffoldEntitySourceBuilder.IsSqliteUuidDeclaredType(declaredType);
 
         /// <summary>
         /// Converts a database object name to PascalCase by removing separators and capitalizing
         /// the first letter of each segment.
         /// </summary>
         private static string ToPascalCase(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return name;
+            => ScaffoldNameHelper.ToPascalCase(name);
 
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                var segmentStart = 0;
-                for (var i = 0; i <= name.Length; i++)
-                {
-                    if (i < name.Length && char.IsLetterOrDigit(name[i]))
-                        continue;
+        private static string ToScaffoldClrName(string databaseName, bool useDatabaseNames)
+            => ScaffoldNameHelper.ToScaffoldClrName(databaseName, useDatabaseNames);
 
-                    AppendPascalSegment(sb, name.AsSpan(segmentStart, i - segmentStart));
-                    segmentStart = i + 1;
-                }
+        private static string ToScaffoldClrNamePart(string databaseName, bool useDatabaseNames)
+            => ScaffoldNameHelper.ToScaffoldClrNamePart(databaseName, useDatabaseNames);
 
-                return sb.ToString();
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
-        }
+        private static string ToNavigationName(string generatedName)
+            => ScaffoldNameHelper.ToNavigationName(generatedName);
 
         /// <summary>
         /// Returns the last segment of a dot-delimited identifier.
@@ -8474,128 +2372,10 @@ namespace nORM.Scaffolding
         /// prefixed with <c>@</c>; other invalid characters are replaced with underscores.
         /// </summary>
         private static string EscapeCSharpIdentifier(string identifier)
-        {
-            if (string.IsNullOrWhiteSpace(identifier))
-                return "_";
-
-            if (identifier[0] == '@' && IsValidEscapedCSharpIdentifier(identifier))
-                return identifier;
-
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                for (var i = 0; i < identifier.Length; i++)
-                {
-                    var ch = identifier[i];
-                    var valid = i == 0
-                        ? char.IsLetter(ch) || ch == '_'
-                        : char.IsLetterOrDigit(ch) || ch == '_';
-
-                    if (valid)
-                    {
-                        sb.Append(ch);
-                    }
-                    else if (i == 0 && char.IsDigit(ch))
-                    {
-                        sb.Append('_').Append(ch);
-                    }
-                    else
-                    {
-                        sb.Append('_');
-                    }
-                }
-
-                if (sb.Length == 0)
-                    sb.Append('_');
-
-                var escaped = sb.ToString();
-                return _csharpKeywords.Contains(escaped) ? "@" + escaped : escaped;
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
-        }
-
-        private static bool IsValidEscapedCSharpIdentifier(string identifier)
-        {
-            if (identifier.Length == 1)
-                return false;
-
-            var first = identifier[1];
-            if (!(char.IsLetter(first) || first == '_'))
-                return false;
-
-            for (var i = 2; i < identifier.Length; i++)
-            {
-                var ch = identifier[i];
-                if (!(char.IsLetterOrDigit(ch) || ch == '_'))
-                    return false;
-            }
-
-            return true;
-        }
+            => ScaffoldNameHelper.EscapeCSharpIdentifier(identifier);
 
         private static bool IsValidNamespaceName(string namespaceName)
-        {
-            if (string.IsNullOrWhiteSpace(namespaceName))
-                return false;
-
-            foreach (var segment in namespaceName.Split('.'))
-            {
-                if (!IsValidNamespaceSegment(segment))
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static bool IsValidNamespaceSegment(string segment)
-        {
-            if (string.IsNullOrWhiteSpace(segment))
-                return false;
-
-            var start = segment[0] == '@' ? 1 : 0;
-            if (start == segment.Length)
-                return false;
-
-            if (!(char.IsLetter(segment[start]) || segment[start] == '_'))
-                return false;
-
-            for (var i = start + 1; i < segment.Length; i++)
-            {
-                if (!(char.IsLetterOrDigit(segment[i]) || segment[i] == '_'))
-                    return false;
-            }
-
-            if (start == 0 && _csharpKeywords.Contains(segment))
-                return false;
-
-            return true;
-        }
-
-        private static void AppendPascalSegment(StringBuilder sb, ReadOnlySpan<char> segment)
-        {
-            if (segment.IsEmpty)
-                return;
-
-            var hasLower = false;
-            for (var i = 0; i < segment.Length; i++)
-            {
-                if (char.IsLower(segment[i]))
-                {
-                    hasLower = true;
-                    break;
-                }
-            }
-
-            sb.Append(char.ToUpperInvariant(segment[0]));
-            for (var i = 1; i < segment.Length; i++)
-            {
-                sb.Append(hasLower ? segment[i] : char.ToLowerInvariant(segment[i]));
-            }
-        }
+            => ScaffoldNameHelper.IsValidNamespaceName(namespaceName);
 
         private static string TableKey(string? schema, string table)
             => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;
@@ -8615,70 +2395,33 @@ namespace nORM.Scaffolding
         }
 
         private static string MakeUnique(string baseName, HashSet<string> existingNames)
-        {
-            var candidate = EscapeCSharpIdentifier(string.IsNullOrWhiteSpace(baseName) ? "_" : baseName);
-            var unique = candidate;
-            var suffix = 2;
-            while (existingNames.Contains(unique))
-            {
-                unique = candidate + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                suffix++;
-            }
-
-            existingNames.Add(unique);
-            return unique;
-        }
+            => ScaffoldNameHelper.MakeUnique(baseName, existingNames);
 
         private static string MakeUniqueContextName(string contextName, IEnumerable<string> entityNames)
-        {
-            var existingNames = new HashSet<string>(entityNames, StringComparer.OrdinalIgnoreCase);
-            if (!existingNames.Contains(contextName))
-                return contextName;
-
-            var preferred = contextName.EndsWith("Context", StringComparison.Ordinal)
-                ? contextName
-                : contextName + "Context";
-            return MakeUnique(preferred, existingNames);
-        }
+            => ScaffoldNameHelper.MakeUniqueContextName(contextName, entityNames);
 
         private static string Pluralize(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return "Items";
+            => ScaffoldNameHelper.Pluralize(name);
 
-            if (name.EndsWith("y", StringComparison.OrdinalIgnoreCase)
-                && name.Length > 1
-                && !"aeiou".Contains(char.ToLowerInvariant(name[^2]), StringComparison.Ordinal))
-            {
-                return name[..^1] + "ies";
-            }
-
-            if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith("x", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith("z", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith("ch", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith("sh", StringComparison.OrdinalIgnoreCase))
-            {
-                return name + "es";
-            }
-
-            return name + "s";
-        }
-
-        private static readonly HashSet<string> _csharpKeywords = new(StringComparer.Ordinal)
-        {
-            // Reserved keywords
-            "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const",
-            "continue","decimal","default","delegate","do","double","else","enum","event","explicit","extern",
-            "false","finally","fixed","float","for","foreach","goto","if","implicit","in","int","interface",
-            "internal","is","lock","long","namespace","new","null","object","operator","out","override","params",
-            "private","protected","public","readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc",
-            "static","string","struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked",
-            "unsafe","ushort","using","virtual","void","volatile","while",
-            // Contextual keywords commonly used as identifiers in database column names
-            "record","partial","var","dynamic","async","await","nameof","when","and","or","not","with",
-            "init","required","file","scoped","global","managed","unmanaged","nint","nuint","value","yield"
-        };
+        private sealed record ScaffoldFeatureConfigurations(
+            IReadOnlyList<ScaffoldUnsupportedFeature> GeneratedModelFeatureDiagnostics,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ProviderSpecificColumnTypesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultValuesByTable,
+            IReadOnlySet<string> ProviderSpecificDefaultTableKeys,
+            IReadOnlyList<ScaffoldCheckConstraintConfiguration> CheckConstraints,
+            IReadOnlyList<ScaffoldExpressionIndexConfiguration> ExpressionIndexConfigurations,
+            IReadOnlyList<ScaffoldCollationConfiguration> CollationConfigurations,
+            IReadOnlyList<ScaffoldComputedColumnConfiguration> ComputedColumnConfigurations,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> ComputedColumnsByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> DecimalPrecisionByTable,
+            IReadOnlyList<ScaffoldPrecisionConfiguration> PrecisionConfigurations,
+            IReadOnlyList<ScaffoldColumnFacetConfiguration> ColumnFacetConfigurations,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> RowVersionColumnsByTable,
+            IReadOnlySet<string> ProviderNativeTemporalTableKeys,
+            IReadOnlySet<string> ProviderOwnedTriggerTableKeys,
+            IReadOnlyList<ScaffoldIdentityOptionConfiguration> IdentityOptionConfigurations,
+            IReadOnlySet<string> ProviderSpecificIdentityStrategyTableKeys,
+            IReadOnlySet<string> ProviderOwnedWriteBlockedTableKeys);
 
         private readonly record struct ScaffoldTable(string Name, string? Schema);
 
@@ -8686,33 +2429,13 @@ namespace nORM.Scaffolding
             string? Schema,
             string Name,
             string Kind,
-            string Detail);
-
-        private readonly record struct RoutineStubParameter(
-            string Name,
-            string TypeName,
-            string DataType);
-
-        private readonly record struct RoutineOutputParameter(
-            string Name,
-            string DbType,
-            int? Size,
-            byte? Precision,
-            byte? Scale,
-            string Direction);
-
-        private readonly record struct RoutineResultColumn(
-            string Name,
-            string TypeName);
-
-        private readonly record struct SemicolonValueMarker(
-            int SemicolonIndex,
-            string Key,
-            int ValueStart);
+            string Detail,
+            string? Comment);
 
         private readonly record struct ScaffoldPrimaryKey(
             string EntityName,
-            string[] PropertyNames);
+            string[] PropertyNames,
+            string? ConstraintName);
 
         private readonly record struct ScaffoldDefaultValueConfiguration(
             string TableKey,
@@ -8728,6 +2451,23 @@ namespace nORM.Scaffolding
             string PropertyName,
             long Seed,
             long Increment);
+
+        private readonly record struct ScaffoldPrecisionConfiguration(
+            string TableKey,
+            string EntityName,
+            string ColumnName,
+            string PropertyName,
+            int Precision,
+            int? Scale);
+
+        private readonly record struct ScaffoldColumnFacetConfiguration(
+            string TableKey,
+            string EntityName,
+            string ColumnName,
+            string PropertyName,
+            int? MaxLength,
+            bool? IsUnicode,
+            bool IsFixedLength);
 
         private readonly record struct ScaffoldCheckConstraintConfiguration(
             string TableKey,
@@ -8780,7 +2520,10 @@ namespace nORM.Scaffolding
             int Ordinal,
             bool IsDescending,
             bool IsIncluded,
-            string? FilterSql);
+            IndexNullSortOrder NullSortOrder,
+            bool NullsNotDistinct,
+            string? FilterSql,
+            bool IsSyntheticName = false);
 
         private readonly record struct ScaffoldRelationship(
             string DependentTableKey,
@@ -8791,6 +2534,7 @@ namespace nORM.Scaffolding
             string PrincipalKeyPropertyName,
             string ReferenceNavigationName,
             string CollectionNavigationName,
+            bool IsUniqueDependentKey,
             bool CascadeDelete,
             string OnDelete,
             string OnUpdate,
@@ -8799,6 +2543,8 @@ namespace nORM.Scaffolding
             public IReadOnlyList<string> ForeignKeyPropertyNames { get; init; } = new[] { ForeignKeyPropertyName };
 
             public IReadOnlyList<string> PrincipalKeyPropertyNames { get; init; } = new[] { PrincipalKeyPropertyName };
+
+            public bool IsRequired { get; init; }
 
             public bool IsComposite => ForeignKeyPropertyNames.Count > 1 || PrincipalKeyPropertyNames.Count > 1;
         }
@@ -8815,6 +2561,10 @@ namespace nORM.Scaffolding
             string[] RightForeignKeyColumns,
             string[] LeftPrincipalKeyProperties,
             string[] RightPrincipalKeyProperties,
+            string LeftOnDelete,
+            string LeftOnUpdate,
+            string RightOnDelete,
+            string RightOnUpdate,
             bool UsesPrimaryKeys,
             string LeftCollectionNavigationName,
             string RightCollectionNavigationName)
@@ -8826,20 +2576,13 @@ namespace nORM.Scaffolding
             public bool IsComposite => LeftForeignKeyColumns.Length > 1 || RightForeignKeyColumns.Length > 1;
         }
 
-        private readonly record struct ScaffoldPossibleJoinTableDiagnostic(
-            string TableKey,
-            string[] PrincipalTables,
-            string[] ConstraintNames,
-            string[] Reasons,
-            IReadOnlyDictionary<string, object?> Metadata);
-
         private readonly record struct ScaffoldManyToManyNavigation(
             string TargetEntityName,
             string CollectionNavigationName);
 
         private readonly record struct ScaffoldDecimalPrecision(
             int Precision,
-            int Scale);
+            int? Scale);
 
         private readonly record struct ScaffoldUnsupportedFeature(
             string TableKey,

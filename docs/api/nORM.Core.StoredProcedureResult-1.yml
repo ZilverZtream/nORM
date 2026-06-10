@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: StoredProcedureResult
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 22
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -74,7 +74,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 22
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -115,7 +115,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Results
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 22
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -148,7 +148,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OutputParameters
     path: src/nORM/Core/StoredProcedureResult.cs
-    startLine: 22
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core

@@ -5,12 +5,16 @@ items:
   id: SchemaDiff
   parent: nORM.Migration
   children:
+  - nORM.Migration.SchemaDiff.AddedCheckConstraints
   - nORM.Migration.SchemaDiff.AddedColumns
+  - nORM.Migration.SchemaDiff.AddedExpressionIndexes
   - nORM.Migration.SchemaDiff.AddedForeignKeys
   - nORM.Migration.SchemaDiff.AddedIndexes
   - nORM.Migration.SchemaDiff.AddedTables
   - nORM.Migration.SchemaDiff.AlteredColumns
+  - nORM.Migration.SchemaDiff.DroppedCheckConstraints
   - nORM.Migration.SchemaDiff.DroppedColumns
+  - nORM.Migration.SchemaDiff.DroppedExpressionIndexes
   - nORM.Migration.SchemaDiff.DroppedForeignKeys
   - nORM.Migration.SchemaDiff.DroppedIndexes
   - nORM.Migration.SchemaDiff.DroppedTables
@@ -32,7 +36,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiff
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 504
+    startLine: 1212
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -84,7 +88,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedTables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 507
+    startLine: 1215
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -115,7 +119,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 509
+    startLine: 1217
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -146,7 +150,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AlteredColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 511
+    startLine: 1219
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -177,18 +181,18 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedIndexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 513
+    startLine: 1221
   assemblies:
   - nORM
   namespace: nORM.Migration
   summary: Indexes that appear in the new snapshot but not in the old.
   example: []
   syntax:
-    content: public List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)> AddedIndexes { get; }
+    content: public List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending)> AddedIndexes { get; }
     parameters: []
     return:
-      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}}
-    content.vb: Public ReadOnly Property AddedIndexes As List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String()))
+      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}}
+    content.vb: Public ReadOnly Property AddedIndexes As List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String(), Descending As Boolean()))
   overload: nORM.Migration.SchemaDiff.AddedIndexes*
 - uid: nORM.Migration.SchemaDiff.DroppedIndexes
   commentId: P:nORM.Migration.SchemaDiff.DroppedIndexes
@@ -208,7 +212,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedIndexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 515
+    startLine: 1223
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -239,7 +243,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedTables
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 517
+    startLine: 1225
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -270,7 +274,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 519
+    startLine: 1227
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -301,7 +305,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 521
+    startLine: 1229
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -332,7 +336,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 523
+    startLine: 1231
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -345,6 +349,130 @@ items:
       type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ForeignKeySchema}}
     content.vb: Public ReadOnly Property DroppedForeignKeys As List(Of (Table As TableSchema, ForeignKey As ForeignKeySchema))
   overload: nORM.Migration.SchemaDiff.DroppedForeignKeys*
+- uid: nORM.Migration.SchemaDiff.AddedCheckConstraints
+  commentId: P:nORM.Migration.SchemaDiff.AddedCheckConstraints
+  id: AddedCheckConstraints
+  parent: nORM.Migration.SchemaDiff
+  langs:
+  - csharp
+  - vb
+  name: AddedCheckConstraints
+  nameWithType: SchemaDiff.AddedCheckConstraints
+  fullName: nORM.Migration.SchemaDiff.AddedCheckConstraints
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddedCheckConstraints
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 1233
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: CHECK constraints present in the new snapshot but not the old for an existing table.
+  example: []
+  syntax:
+    content: public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> AddedCheckConstraints { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
+    content.vb: Public ReadOnly Property AddedCheckConstraints As List(Of (Table As TableSchema, CheckConstraint As CheckConstraintSchema))
+  overload: nORM.Migration.SchemaDiff.AddedCheckConstraints*
+- uid: nORM.Migration.SchemaDiff.DroppedCheckConstraints
+  commentId: P:nORM.Migration.SchemaDiff.DroppedCheckConstraints
+  id: DroppedCheckConstraints
+  parent: nORM.Migration.SchemaDiff
+  langs:
+  - csharp
+  - vb
+  name: DroppedCheckConstraints
+  nameWithType: SchemaDiff.DroppedCheckConstraints
+  fullName: nORM.Migration.SchemaDiff.DroppedCheckConstraints
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DroppedCheckConstraints
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 1235
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: CHECK constraints present in the old snapshot but not the new for an existing table.
+  example: []
+  syntax:
+    content: public List<(TableSchema Table, CheckConstraintSchema CheckConstraint)> DroppedCheckConstraints { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
+    content.vb: Public ReadOnly Property DroppedCheckConstraints As List(Of (Table As TableSchema, CheckConstraint As CheckConstraintSchema))
+  overload: nORM.Migration.SchemaDiff.DroppedCheckConstraints*
+- uid: nORM.Migration.SchemaDiff.AddedExpressionIndexes
+  commentId: P:nORM.Migration.SchemaDiff.AddedExpressionIndexes
+  id: AddedExpressionIndexes
+  parent: nORM.Migration.SchemaDiff
+  langs:
+  - csharp
+  - vb
+  name: AddedExpressionIndexes
+  nameWithType: SchemaDiff.AddedExpressionIndexes
+  fullName: nORM.Migration.SchemaDiff.AddedExpressionIndexes
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddedExpressionIndexes
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 1237
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Expression indexes present in the new snapshot but not the old for an existing table.
+  example: []
+  syntax:
+    content: public List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)> AddedExpressionIndexes { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}}
+    content.vb: Public ReadOnly Property AddedExpressionIndexes As List(Of (Table As TableSchema, ExpressionIndex As ExpressionIndexSchema))
+  overload: nORM.Migration.SchemaDiff.AddedExpressionIndexes*
+- uid: nORM.Migration.SchemaDiff.DroppedExpressionIndexes
+  commentId: P:nORM.Migration.SchemaDiff.DroppedExpressionIndexes
+  id: DroppedExpressionIndexes
+  parent: nORM.Migration.SchemaDiff
+  langs:
+  - csharp
+  - vb
+  name: DroppedExpressionIndexes
+  nameWithType: SchemaDiff.DroppedExpressionIndexes
+  fullName: nORM.Migration.SchemaDiff.DroppedExpressionIndexes
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DroppedExpressionIndexes
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 1239
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Expression indexes present in the old snapshot but not the new for an existing table.
+  example: []
+  syntax:
+    content: public List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)> DroppedExpressionIndexes { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}}
+    content.vb: Public ReadOnly Property DroppedExpressionIndexes As List(Of (Table As TableSchema, ExpressionIndex As ExpressionIndexSchema))
+  overload: nORM.Migration.SchemaDiff.DroppedExpressionIndexes*
 - uid: nORM.Migration.SchemaDiff.RenamedColumns
   commentId: P:nORM.Migration.SchemaDiff.RenamedColumns
   id: RenamedColumns
@@ -363,7 +491,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RenamedColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 529
+    startLine: 1245
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -399,7 +527,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasChanges
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 532
+    startLine: 1248
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -430,11 +558,14 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasDestructiveChanges
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 541
+    startLine: 1260
   assemblies:
   - nORM
   namespace: nORM.Migration
-  summary: Indicates whether the diff contains operations that can remove data or weaken schema-enforced integrity.
+  summary: >-
+    Indicates whether the diff contains operations that can remove data or weaken
+
+    schema-enforced integrity.
   example: []
   syntax:
     content: public bool HasDestructiveChanges { get; }
@@ -461,7 +592,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDestructiveChangeWarnings
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 546
+    startLine: 1265
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -1733,17 +1864,17 @@ references:
   name: AddedIndexes
   nameWithType: SchemaDiff.AddedIndexes
   fullName: nORM.Migration.SchemaDiff.AddedIndexes
-- uid: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}}
-  commentId: T:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}}
+- uid: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}}
+  commentId: T:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}}
   parent: System.Collections.Generic
   definition: System.Collections.Generic.List`1
   href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
-  name: List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)>
-  nameWithType: List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)>
-  fullName: System.Collections.Generic.List<(nORM.Migration.TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames)>
-  nameWithType.vb: List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String()))
-  fullName.vb: System.Collections.Generic.List(Of (Table As nORM.Migration.TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String()))
-  name.vb: List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String()))
+  name: List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending)>
+  nameWithType: List<(TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending)>
+  fullName: System.Collections.Generic.List<(nORM.Migration.TableSchema Table, string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending)>
+  nameWithType.vb: List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String(), Descending As Boolean()))
+  fullName.vb: System.Collections.Generic.List(Of (Table As nORM.Migration.TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String(), Descending As Boolean()))
+  name.vb: List(Of (Table As TableSchema, IndexName As String, IsUnique As Boolean, ColumnNames As String(), Descending As Boolean()))
   spec.csharp:
   - uid: System.Collections.Generic.List`1
     name: List
@@ -1755,9 +1886,9 @@ references:
     name: TableSchema
     href: nORM.Migration.TableSchema.html
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.Table
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.Table
     name: Table
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.table
   - name: ','
   - name: " "
   - uid: System.String
@@ -1765,9 +1896,9 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.IndexName
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.IndexName
     name: IndexName
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.indexname
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.indexname
   - name: ','
   - name: " "
   - uid: System.Boolean
@@ -1775,9 +1906,9 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.IsUnique
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.IsUnique
     name: IsUnique
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.isunique
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.isunique
   - name: ','
   - name: " "
   - uid: System.String
@@ -1787,9 +1918,21 @@ references:
   - name: '['
   - name: ']'
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.ColumnNames
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.ColumnNames
     name: ColumnNames
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.columnnames
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.columnnames
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '['
+  - name: ']'
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.Descending
+    name: Descending
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.descending
   - name: )
   - name: '>'
   spec.vb:
@@ -1801,9 +1944,9 @@ references:
   - name: Of
   - name: " "
   - name: (
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.Table
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.Table
     name: Table
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.table
   - name: " "
   - name: As
   - name: " "
@@ -1812,9 +1955,9 @@ references:
     href: nORM.Migration.TableSchema.html
   - name: ','
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.IndexName
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.IndexName
     name: IndexName
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.indexname
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.indexname
   - name: " "
   - name: As
   - name: " "
@@ -1824,9 +1967,9 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.string
   - name: ','
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.IsUnique
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.IsUnique
     name: IsUnique
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.isunique
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.isunique
   - name: " "
   - name: As
   - name: " "
@@ -1836,9 +1979,9 @@ references:
     href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: ','
   - name: " "
-  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[]}.ColumnNames
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.ColumnNames
     name: ColumnNames
-    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[]-.columnnames
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.columnnames
   - name: " "
   - name: As
   - name: " "
@@ -1846,6 +1989,20 @@ references:
     name: String
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,System.String,System.Boolean,System.String[],System.Boolean[]}.Descending
+    name: Descending
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,system.string,system.boolean,system.string[],system.boolean[]-.descending
+  - name: " "
+  - name: As
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: (
   - name: )
   - name: )
@@ -2016,6 +2173,164 @@ references:
   name: DroppedForeignKeys
   nameWithType: SchemaDiff.DroppedForeignKeys
   fullName: nORM.Migration.SchemaDiff.DroppedForeignKeys
+- uid: nORM.Migration.SchemaDiff.AddedCheckConstraints*
+  commentId: Overload:nORM.Migration.SchemaDiff.AddedCheckConstraints
+  href: nORM.Migration.SchemaDiff.html#nORM_Migration_SchemaDiff_AddedCheckConstraints
+  name: AddedCheckConstraints
+  nameWithType: SchemaDiff.AddedCheckConstraints
+  fullName: nORM.Migration.SchemaDiff.AddedCheckConstraints
+- uid: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
+  commentId: T:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<(TableSchema Table, CheckConstraintSchema CheckConstraint)>
+  nameWithType: List<(TableSchema Table, CheckConstraintSchema CheckConstraint)>
+  fullName: System.Collections.Generic.List<(nORM.Migration.TableSchema Table, nORM.Migration.CheckConstraintSchema CheckConstraint)>
+  nameWithType.vb: List(Of (Table As TableSchema, CheckConstraint As CheckConstraintSchema))
+  fullName.vb: System.Collections.Generic.List(Of (Table As nORM.Migration.TableSchema, CheckConstraint As nORM.Migration.CheckConstraintSchema))
+  name.vb: List(Of (Table As TableSchema, CheckConstraint As CheckConstraintSchema))
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: (
+  - uid: nORM.Migration.TableSchema
+    name: TableSchema
+    href: nORM.Migration.TableSchema.html
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}.Table
+    name: Table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.checkconstraintschema-.table
+  - name: ','
+  - name: " "
+  - uid: nORM.Migration.CheckConstraintSchema
+    name: CheckConstraintSchema
+    href: nORM.Migration.CheckConstraintSchema.html
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}.CheckConstraint
+    name: CheckConstraint
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.checkconstraintschema-.checkconstraint
+  - name: )
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: (
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}.Table
+    name: Table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.checkconstraintschema-.table
+  - name: " "
+  - name: As
+  - name: " "
+  - uid: nORM.Migration.TableSchema
+    name: TableSchema
+    href: nORM.Migration.TableSchema.html
+  - name: ','
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.CheckConstraintSchema}.CheckConstraint
+    name: CheckConstraint
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.checkconstraintschema-.checkconstraint
+  - name: " "
+  - name: As
+  - name: " "
+  - uid: nORM.Migration.CheckConstraintSchema
+    name: CheckConstraintSchema
+    href: nORM.Migration.CheckConstraintSchema.html
+  - name: )
+  - name: )
+- uid: nORM.Migration.SchemaDiff.DroppedCheckConstraints*
+  commentId: Overload:nORM.Migration.SchemaDiff.DroppedCheckConstraints
+  href: nORM.Migration.SchemaDiff.html#nORM_Migration_SchemaDiff_DroppedCheckConstraints
+  name: DroppedCheckConstraints
+  nameWithType: SchemaDiff.DroppedCheckConstraints
+  fullName: nORM.Migration.SchemaDiff.DroppedCheckConstraints
+- uid: nORM.Migration.SchemaDiff.AddedExpressionIndexes*
+  commentId: Overload:nORM.Migration.SchemaDiff.AddedExpressionIndexes
+  href: nORM.Migration.SchemaDiff.html#nORM_Migration_SchemaDiff_AddedExpressionIndexes
+  name: AddedExpressionIndexes
+  nameWithType: SchemaDiff.AddedExpressionIndexes
+  fullName: nORM.Migration.SchemaDiff.AddedExpressionIndexes
+- uid: System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}}
+  commentId: T:System.Collections.Generic.List{System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.List`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  name: List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)>
+  nameWithType: List<(TableSchema Table, ExpressionIndexSchema ExpressionIndex)>
+  fullName: System.Collections.Generic.List<(nORM.Migration.TableSchema Table, nORM.Migration.ExpressionIndexSchema ExpressionIndex)>
+  nameWithType.vb: List(Of (Table As TableSchema, ExpressionIndex As ExpressionIndexSchema))
+  fullName.vb: System.Collections.Generic.List(Of (Table As nORM.Migration.TableSchema, ExpressionIndex As nORM.Migration.ExpressionIndexSchema))
+  name.vb: List(Of (Table As TableSchema, ExpressionIndex As ExpressionIndexSchema))
+  spec.csharp:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: (
+  - uid: nORM.Migration.TableSchema
+    name: TableSchema
+    href: nORM.Migration.TableSchema.html
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}.Table
+    name: Table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.expressionindexschema-.table
+  - name: ','
+  - name: " "
+  - uid: nORM.Migration.ExpressionIndexSchema
+    name: ExpressionIndexSchema
+    href: nORM.Migration.ExpressionIndexSchema.html
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}.ExpressionIndex
+    name: ExpressionIndex
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.expressionindexschema-.expressionindex
+  - name: )
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: (
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}.Table
+    name: Table
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.expressionindexschema-.table
+  - name: " "
+  - name: As
+  - name: " "
+  - uid: nORM.Migration.TableSchema
+    name: TableSchema
+    href: nORM.Migration.TableSchema.html
+  - name: ','
+  - name: " "
+  - uid: System.ValueTuple{nORM.Migration.TableSchema,nORM.Migration.ExpressionIndexSchema}.ExpressionIndex
+    name: ExpressionIndex
+    href: https://learn.microsoft.com/dotnet/api/system.valuetuple-norm.migration.tableschema,norm.migration.expressionindexschema-.expressionindex
+  - name: " "
+  - name: As
+  - name: " "
+  - uid: nORM.Migration.ExpressionIndexSchema
+    name: ExpressionIndexSchema
+    href: nORM.Migration.ExpressionIndexSchema.html
+  - name: )
+  - name: )
+- uid: nORM.Migration.SchemaDiff.DroppedExpressionIndexes*
+  commentId: Overload:nORM.Migration.SchemaDiff.DroppedExpressionIndexes
+  href: nORM.Migration.SchemaDiff.html#nORM_Migration_SchemaDiff_DroppedExpressionIndexes
+  name: DroppedExpressionIndexes
+  nameWithType: SchemaDiff.DroppedExpressionIndexes
+  fullName: nORM.Migration.SchemaDiff.DroppedExpressionIndexes
 - uid: nORM.Migration.ColumnSchema
   commentId: T:nORM.Migration.ColumnSchema
   href: nORM.Migration.ColumnSchema.html

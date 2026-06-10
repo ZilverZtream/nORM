@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -922,6 +922,7 @@ public class UtilityCoverageTests
     // ══════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void DbConcurrencyException_CanBeCreated_WithMessage()
     {
         var ex = new DbConcurrencyException("Conflict detected");
@@ -929,6 +930,7 @@ public class UtilityCoverageTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void DbConcurrencyException_CanBeCreated_WithInnerException()
     {
         var inner = new Exception("inner");

@@ -1,0 +1,208 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  id: ReferentialAction
+  parent: nORM.Configuration
+  children:
+  - nORM.Configuration.ReferentialAction.Cascade
+  - nORM.Configuration.ReferentialAction.NoAction
+  - nORM.Configuration.ReferentialAction.Restrict
+  - nORM.Configuration.ReferentialAction.SetDefault
+  - nORM.Configuration.ReferentialAction.SetNull
+  langs:
+  - csharp
+  - vb
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
+  type: Enum
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReferentialAction
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 8
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Describes the database referential action emitted for a foreign key in
+
+    migration snapshots and provider DDL.
+  example: []
+  syntax:
+    content: public enum ReferentialAction
+    content.vb: Public Enum ReferentialAction
+- uid: nORM.Configuration.ReferentialAction.NoAction
+  commentId: F:nORM.Configuration.ReferentialAction.NoAction
+  id: NoAction
+  parent: nORM.Configuration.ReferentialAction
+  langs:
+  - csharp
+  - vb
+  name: NoAction
+  nameWithType: ReferentialAction.NoAction
+  fullName: nORM.Configuration.ReferentialAction.NoAction
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NoAction
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 11
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: No explicit provider action; providers use their default no-action semantics.
+  example: []
+  syntax:
+    content: NoAction = 0
+    return:
+      type: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.ReferentialAction.Cascade
+  commentId: F:nORM.Configuration.ReferentialAction.Cascade
+  id: Cascade
+  parent: nORM.Configuration.ReferentialAction
+  langs:
+  - csharp
+  - vb
+  name: Cascade
+  nameWithType: ReferentialAction.Cascade
+  fullName: nORM.Configuration.ReferentialAction.Cascade
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Cascade
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Delete or update dependent rows when the principal row changes.
+  example: []
+  syntax:
+    content: Cascade = 1
+    return:
+      type: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.ReferentialAction.SetNull
+  commentId: F:nORM.Configuration.ReferentialAction.SetNull
+  id: SetNull
+  parent: nORM.Configuration.ReferentialAction
+  langs:
+  - csharp
+  - vb
+  name: SetNull
+  nameWithType: ReferentialAction.SetNull
+  fullName: nORM.Configuration.ReferentialAction.SetNull
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SetNull
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 17
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Set dependent foreign-key columns to <code>NULL</code>.
+  example: []
+  syntax:
+    content: SetNull = 2
+    return:
+      type: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.ReferentialAction.Restrict
+  commentId: F:nORM.Configuration.ReferentialAction.Restrict
+  id: Restrict
+  parent: nORM.Configuration.ReferentialAction
+  langs:
+  - csharp
+  - vb
+  name: Restrict
+  nameWithType: ReferentialAction.Restrict
+  fullName: nORM.Configuration.ReferentialAction.Restrict
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Restrict
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Restrict the principal change while dependents exist.
+  example: []
+  syntax:
+    content: Restrict = 3
+    return:
+      type: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.ReferentialAction.SetDefault
+  commentId: F:nORM.Configuration.ReferentialAction.SetDefault
+  id: SetDefault
+  parent: nORM.Configuration.ReferentialAction
+  langs:
+  - csharp
+  - vb
+  name: SetDefault
+  nameWithType: ReferentialAction.SetDefault
+  fullName: nORM.Configuration.ReferentialAction.SetDefault
+  type: Field
+  source:
+    remote:
+      path: src/nORM/Configuration/ReferentialAction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SetDefault
+    path: src/nORM/Configuration/ReferentialAction.cs
+    startLine: 23
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Set dependent foreign-key columns to their database defaults.
+  example: []
+  syntax:
+    content: SetDefault = 4
+    return:
+      type: nORM.Configuration.ReferentialAction
+references:
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction

@@ -2,174 +2,167 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace nORM.Tests;
 
 /// <summary>
-/// Enforces the v1 public-API supportability classification.
-///
-/// Each public namespace is assigned exactly one of four stability labels:
-///   StableUser      — application code depends on these types; breaking changes
-///                     require a major version bump.
-///   StableProvider  — provider and mapping implementors depend on these; subject
-///                     to the same breaking-change policy as StableUser.
-///   StableTooling   — CLI, migrations, scaffolding, source-generation; stable for
-///                     the v1 tooling contract, but not the runtime embedding API.
-///   Unsupported     — types that are public for technical reasons (source-gen
-///                     codegen targets, internal utilities) but carry no stability
-///                     guarantee for v1.  Consumers may not depend on them.
-///
-/// Adding a new public namespace without updating this test is a build-time
-/// signal to confirm the intended stability category before shipping.
+/// Enforces the v1 public API support-tier map from docs/namespace-policy.md.
+/// The docs are the release promise; this test keeps the shipped baseline from
+/// gaining unclassified or stale namespace entries.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
 public sealed class PublicApiClassificationTests
 {
-    // ── Classification registry ───────────────────────────────────────────────
-
-    private enum StabilityCategory { StableUser, StableProvider, StableTooling, Unsupported }
-
-    private static readonly Dictionary<string, StabilityCategory> NamespaceClassification =
-        new(StringComparer.Ordinal)
-        {
-            // Extension methods for ILogger — stable user surface.
-            ["Microsoft.Extensions.Logging"] = StabilityCategory.StableUser,
-
-            // Primary user-facing surface: DbContext, query operators, LINQ extensions,
-            // change tracking, exceptions, JSON helpers, caching extensions.
-            ["nORM.Configuration"]  = StabilityCategory.StableUser,
-            ["nORM.Core"]           = StabilityCategory.StableUser,
-            ["nORM.Enterprise"]     = StabilityCategory.StableUser,
-
-            // Provider and mapping contracts: DatabaseProvider base class, Column,
-            // TableMapping, value converters, attributes.
-            ["nORM.Mapping"]        = StabilityCategory.StableProvider,
-            ["nORM.Providers"]      = StabilityCategory.StableProvider,
-
-            // Navigation lazy-loading helpers — stable user surface for eager/lazy nav.
-            ["nORM.Navigation"]     = StabilityCategory.StableUser,
-
-            // Query builder utilities and SQL functions — stable user surface.
-            ["nORM.Query"]          = StabilityCategory.StableUser,
-
-            // Tooling: migration runners, SQL generators, schema diff, design-time
-            // factory interface, scaffolder.
-            ["nORM.Migration"]      = StabilityCategory.StableTooling,
-            ["nORM.Scaffolding"]    = StabilityCategory.StableTooling,
-
-            // Source generation: compile-time query attributes and materializer store.
-            // Stable for the source-gen tooling contract.
-            ["nORM.SourceGeneration"] = StabilityCategory.StableTooling,
-
-            // AdaptiveTimeoutManager: public for advanced operator configuration but
-            // not committed to v1 stability — behaviour and shape may change.
-            ["nORM.Execution"]      = StabilityCategory.Unsupported,
-
-            // Implementation utilities (ConcurrentLruCache, ParameterOptimizer).
-            // Public for use by provider packages; not a stable end-user API.
-            ["nORM.Internal"]       = StabilityCategory.Unsupported,
-        };
-
-    // ── Tests ─────────────────────────────────────────────────────────────────
-
     [Fact]
-    public void Every_public_type_in_shipped_api_has_a_stability_classification()
+    public void Every_public_api_entry_in_shipped_baseline_has_a_documented_support_tier()
     {
-        var baselinePath = GetBaselinePath();
-        var typeLines = File.ReadAllLines(baselinePath)
-            .Where(static l => l.StartsWith("T:", StringComparison.Ordinal))
-            .ToList();
+        var typeNamespaces = ReadShippedTypeNamespaces();
+        var policy = ReadNamespacePolicy();
+        var typeNames = typeNamespaces.Keys
+            .OrderByDescending(static type => type.Length)
+            .ToArray();
 
         var unclassified = new List<string>();
-        foreach (var line in typeLines)
+        foreach (var line in ReadPublicApiLines())
         {
-            var ns = ExtractNamespace(line[2..]); // strip "T:"
-            if (!NamespaceClassification.ContainsKey(ns))
-                unclassified.Add($"{line}  →  namespace '{ns}' not in classification registry");
+            var typeName = line.StartsWith("T:", StringComparison.Ordinal)
+                ? line[2..]
+                : FindOwningType(line[2..], typeNames);
+            if (typeName is null)
+            {
+                unclassified.Add(line + " -> owning type not found in shipped baseline");
+                continue;
+            }
+
+            var ns = typeNamespaces[typeName];
+            if (!policy.TryGetValue(ns, out var tier) || string.IsNullOrWhiteSpace(tier))
+                unclassified.Add(line + " -> namespace '" + ns + "' has no documented support tier");
         }
 
         Assert.True(unclassified.Count == 0,
-            "Unclassified public types found. Add their namespace to NamespaceClassification:\n" +
+            "Public API entries without documented support tiers:\n" +
             string.Join("\n", unclassified));
     }
 
     [Fact]
-    public void No_uncovered_namespaces_exist_in_shipped_api()
+    public void Namespace_policy_matches_shipped_public_namespaces()
     {
-        var baselinePath = GetBaselinePath();
-        var actualNamespaces = File.ReadAllLines(baselinePath)
-            .Where(static l => l.StartsWith("T:", StringComparison.Ordinal))
-            .Select(static l => ExtractNamespace(l[2..]))
+        var shipped = ReadShippedTypeNamespaces()
+            .Values
+            .ToHashSet(StringComparer.Ordinal);
+        var documented = ReadNamespacePolicy()
+            .Keys
             .ToHashSet(StringComparer.Ordinal);
 
-        var coveredNamespaces = NamespaceClassification.Keys.ToHashSet(StringComparer.Ordinal);
+        var missing = shipped.Except(documented).OrderBy(static ns => ns, StringComparer.Ordinal).ToArray();
+        var stale = documented.Except(shipped).OrderBy(static ns => ns, StringComparer.Ordinal).ToArray();
 
-        var missing = actualNamespaces.Except(coveredNamespaces).OrderBy(static x => x).ToList();
-        Assert.True(missing.Count == 0,
-            "Namespaces in PublicApi.Shipped.txt have no classification entry:\n" +
+        Assert.True(missing.Length == 0,
+            "Namespaces in PublicApi.Shipped.txt are missing from docs/namespace-policy.md:\n" +
             string.Join("\n", missing));
+        Assert.True(stale.Length == 0,
+            "Namespaces in docs/namespace-policy.md have no shipped public types:\n" +
+            string.Join("\n", stale));
     }
 
     [Fact]
-    public void StableUser_and_StableProvider_categories_are_non_empty()
+    public void Namespace_policy_records_required_v1_support_tiers()
     {
-        var stableUser = NamespaceClassification.Values.Count(static v => v == StabilityCategory.StableUser);
-        var stableProvider = NamespaceClassification.Values.Count(static v => v == StabilityCategory.StableProvider);
+        var policy = ReadNamespacePolicy();
 
-        Assert.True(stableUser >= 4,
-            $"Expected at least 4 StableUser namespace groups, got {stableUser}.");
-        Assert.True(stableProvider >= 2,
-            $"Expected at least 2 StableProvider namespace groups, got {stableProvider}.");
+        Assert.Contains(policy, entry => entry.Value.Contains("Stable user API", StringComparison.Ordinal));
+        Assert.Contains(policy, entry => entry.Value.Contains("Stable provider API", StringComparison.Ordinal));
+        Assert.Contains(policy, entry => entry.Value.Contains("Stable tooling", StringComparison.Ordinal));
+        Assert.Equal("Stable user API", policy["nORM.Execution"]);
+        Assert.Contains("Deprecated namespace", policy["nORM.Internal"], StringComparison.Ordinal);
+        Assert.Contains("relocation", policy["nORM.Internal"], StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Unsupported_namespaces_are_explicitly_declared_not_discovered_by_accident()
+    private static string GetRepoRoot()
     {
-        // Every Unsupported entry must exist in the shipped API — prevents zombie
-        // classifications for removed namespaces.
-        var baselinePath = GetBaselinePath();
-        var actualNamespaces = File.ReadAllLines(baselinePath)
-            .Where(static l => l.StartsWith("T:", StringComparison.Ordinal))
-            .Select(static l => ExtractNamespace(l[2..]))
-            .ToHashSet(StringComparer.Ordinal);
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "nORM.sln")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
 
-        var zombies = NamespaceClassification
-            .Where(static kv => kv.Value == StabilityCategory.Unsupported)
-            .Select(static kv => kv.Key)
-            .Where(ns => !actualNamespaces.Contains(ns))
-            .ToList();
-
-        Assert.True(zombies.Count == 0,
-            "Unsupported namespaces in classification have no types in the shipped API (stale entries):\n" +
-            string.Join("\n", zombies));
+        throw new DirectoryNotFoundException("Could not locate repository root containing nORM.sln.");
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static string GetBaselinePath()
     {
-        var path = Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "PublicApi.Shipped.txt"));
-        Assert.True(File.Exists(path),
-            $"PublicApi.Shipped.txt not found at {path}.");
+        var path = Path.Combine(GetRepoRoot(), "tests", "PublicApi.Shipped.txt");
+        Assert.True(File.Exists(path), "PublicApi.Shipped.txt not found at " + path + ".");
         return path;
     }
 
+    private static string GetNamespacePolicyPath()
+    {
+        var path = Path.Combine(GetRepoRoot(), "docs", "namespace-policy.md");
+        Assert.True(File.Exists(path), "docs/namespace-policy.md not found at " + path + ".");
+        return path;
+    }
+
+    private static IReadOnlyList<string> ReadPublicApiLines()
+        => File.ReadAllLines(GetBaselinePath())
+            .Where(static line => line.Length > 2 && !line.StartsWith("#", StringComparison.Ordinal))
+            .ToArray();
+
+    private static IReadOnlyDictionary<string, string> ReadShippedTypeNamespaces()
+        => ReadPublicApiLines()
+            .Where(static line => line.StartsWith("T:", StringComparison.Ordinal))
+            .Select(static line => line[2..])
+            .ToDictionary(static type => type, ExtractNamespace, StringComparer.Ordinal);
+
+    private static IReadOnlyDictionary<string, string> ReadNamespacePolicy()
+    {
+        var rows = new Dictionary<string, string>(StringComparer.Ordinal);
+        var inApprovedTable = false;
+        var rowPattern = new Regex(@"^\|\s*`(?<namespace>[^`]+)`\s*\|\s*(?<tier>[^|]+?)\s*\|", RegexOptions.CultureInvariant);
+
+        foreach (var line in File.ReadLines(GetNamespacePolicyPath()))
+        {
+            if (line.StartsWith("## Approved Namespaces", StringComparison.Ordinal))
+            {
+                inApprovedTable = true;
+                continue;
+            }
+
+            if (inApprovedTable && line.StartsWith("## ", StringComparison.Ordinal))
+                break;
+            if (!inApprovedTable)
+                continue;
+
+            var match = rowPattern.Match(line);
+            if (!match.Success)
+                continue;
+
+            var ns = match.Groups["namespace"].Value.Trim();
+            var tier = Regex.Replace(match.Groups["tier"].Value, @"[*_]", string.Empty, RegexOptions.CultureInvariant).Trim();
+            rows[ns] = tier;
+        }
+
+        Assert.NotEmpty(rows);
+        return rows;
+    }
+
+    private static string? FindOwningType(string memberLineBody, IReadOnlyList<string> typeNames)
+        => typeNames.FirstOrDefault(type => memberLineBody.StartsWith(type + ".", StringComparison.Ordinal));
+
     private static string ExtractNamespace(string typeName)
     {
-        // Strip generic arity suffix from the type name before parsing namespace.
-        // e.g.  "nORM.Core.INormQueryable{`0}"  →  "nORM.Core"
-        //       "Microsoft.Extensions.Logging.DbContextLoggingExtensions"  →  "Microsoft.Extensions.Logging"
         var bare = typeName.Split('{')[0].Split('[')[0];
         var segments = bare.Split('.');
-        if (segments.Length < 2) return bare;
+        if (segments.Length < 2)
+            return bare;
 
-        // Special-case Microsoft.Extensions.Logging — three-segment namespace.
         if (segments[0] == "Microsoft" && segments.Length >= 3)
             return string.Join(".", segments[0], segments[1], segments[2]);
 
-        // nORM.SubNamespace — two-segment.
         return string.Join(".", segments[0], segments[1]);
     }
 }

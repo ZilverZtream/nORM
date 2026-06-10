@@ -176,8 +176,8 @@ public class DatabaseScaffolderPrivateMethodTests
 
     private static string InvokeGetTypeName(Type type, bool allowNull)
     {
-        var m = GetMethod("GetTypeName", new[] { typeof(Type), typeof(bool) });
-        return (string)m.Invoke(null, new object[] { type, allowNull })!;
+        var m = GetMethod("GetTypeName", new[] { typeof(Type), typeof(bool), typeof(bool) });
+        return (string)m.Invoke(null, new object[] { type, allowNull, true })!;
     }
 
     private static (string Sql, bool Stored) InvokeNormalizeScaffoldComputedSql(string raw)
@@ -190,6 +190,24 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var m = GetMethod("NormalizeScaffoldCheckSql", new[] { typeof(string) });
         return (string)m.Invoke(null, new object[] { raw })!;
+    }
+
+    private static (bool Normalized, string Sql) InvokeTryNormalizeScaffoldDefaultSql(string? raw)
+    {
+        var m = GetMethod("TryNormalizeScaffoldDefaultSql", new[] { typeof(string), typeof(string).MakeByRefType() });
+        object?[] args = { raw, string.Empty };
+        var normalized = (bool)m.Invoke(null, args)!;
+        return (normalized, (string)args[1]!);
+    }
+
+    private static (bool Normalized, string Sql) InvokeTryNormalizeDynamicDefaultSql(string? raw)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("TryNormalizeDynamicDefaultSql", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(string).MakeByRefType() }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryNormalizeDynamicDefaultSql");
+        object?[] args = { raw, string.Empty };
+        var normalized = (bool)m.Invoke(null, args)!;
+        return (normalized, (string)args[1]!);
     }
 
     private static (bool Parsed, long Seed, long Increment) InvokeTryParseIdentityOptions(string? detail)
@@ -214,16 +232,16 @@ public class DatabaseScaffolderPrivateMethodTests
         return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
     }
 
-    private static Array CreateDynamicDecimalColumnInfoArray(int precision, int scale)
+    private static Array CreateDynamicDecimalColumnInfoArray(int precision, int? scale)
     {
         var generatorType = typeof(DynamicEntityTypeGenerator);
         var columnInfoType = generatorType.GetNestedType("ColumnInfo", BindingFlags.NonPublic)
             ?? throw new MissingMemberException(nameof(DynamicEntityTypeGenerator), "ColumnInfo");
         var decimalPrecisionType = generatorType.GetNestedType("ScaffoldDecimalPrecision", BindingFlags.NonPublic)
             ?? throw new MissingMemberException(nameof(DynamicEntityTypeGenerator), "ScaffoldDecimalPrecision");
-        var decimalPrecision = Activator.CreateInstance(decimalPrecisionType, precision, scale)!;
+        var decimalPrecision = Activator.CreateInstance(decimalPrecisionType, new object?[] { precision, scale })!;
         var ctor = columnInfoType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Single(constructor => constructor.GetParameters().Length == 13);
+            .Single(constructor => constructor.GetParameters().Length == 15);
         var column = ctor.Invoke(new object?[]
         {
             "Amount",
@@ -238,6 +256,8 @@ public class DatabaseScaffolderPrivateMethodTests
             null,
             false,
             null,
+            null,
+            false,
             decimalPrecision
         });
         var columns = Array.CreateInstance(columnInfoType, 1);
@@ -245,22 +265,22 @@ public class DatabaseScaffolderPrivateMethodTests
         return columns;
     }
 
-    private static Type InvokeDynamicBuildTypeWithDecimalPrecision(int precision, int scale)
+    private static Type InvokeDynamicBuildTypeWithDecimalPrecision(int precision, int? scale)
     {
         var columns = CreateDynamicDecimalColumnInfoArray(precision, scale);
         var m = typeof(DynamicEntityTypeGenerator)
             .GetMethod("BuildDynamicType", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "BuildDynamicType");
-        return (Type)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns })!;
+        return (Type)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns, false })!;
     }
 
-    private static string InvokeDynamicSchemaDescriptorWithDecimalPrecision(int precision, int scale)
+    private static string InvokeDynamicSchemaDescriptorWithDecimalPrecision(int precision, int? scale)
     {
         var columns = CreateDynamicDecimalColumnInfoArray(precision, scale);
         var m = typeof(DynamicEntityTypeGenerator)
             .GetMethod("BuildSchemaDescriptor", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "BuildSchemaDescriptor");
-        return (string)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns })!;
+        return (string)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns, false })!;
     }
 
     private static (bool Mapped, Type Type) InvokeTryMapMySqlUnsignedType(Type declaringType, string detail)
@@ -271,6 +291,16 @@ public class DatabaseScaffolderPrivateMethodTests
         object?[] args = { detail, typeof(object) };
         var mapped = (bool)m.Invoke(null, args)!;
         return (mapped, (Type)args[1]!);
+    }
+
+    private static (bool Parsed, string[] Values) InvokeTryParseBoundedMySqlSetValues(Type declaringType, string detail)
+    {
+        var m = declaringType
+            .GetMethod("TryParseBoundedMySqlSetValues", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(string[]).MakeByRefType() }, null)
+            ?? throw new MissingMethodException(declaringType.Name, "TryParseBoundedMySqlSetValues");
+        object?[] args = { detail, Array.Empty<string>() };
+        var parsed = (bool)m.Invoke(null, args)!;
+        return (parsed, (string[])args[1]!);
     }
 
     private static (string Sql, IReadOnlyDictionary<string, object?> Parameters) InvokeDynamicMySqlMetadataProbe(string methodName)
@@ -285,6 +315,15 @@ public class DatabaseScaffolderPrivateMethodTests
         return (
             connection.LastCommandText,
             connection.LastParameters.ToDictionary(pair => pair.Key, pair => pair.Value));
+    }
+
+    private static bool InvokeDynamicHasWriteBlockingProviderSpecificColumns(DbConnection connection)
+    {
+        var method = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("HasWriteBlockingProviderSpecificColumns", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(string), typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "HasWriteBlockingProviderSpecificColumns");
+
+        return (bool)method.Invoke(null, new object?[] { connection, "tenant_catalog", "Orders" })!;
     }
 
     private static string? InvokeResolveUniqueUnqualifiedSchema(DbConnection connection, string tableName)
@@ -308,7 +347,11 @@ public class DatabaseScaffolderPrivateMethodTests
 
     private sealed class DynamicMySqlMetadataProbeConnection : DbConnection
     {
+        private readonly IReadOnlyList<string> _columnTypes;
         private ConnectionState _state = ConnectionState.Open;
+
+        public DynamicMySqlMetadataProbeConnection(params string[] columnTypes)
+            => _columnTypes = columnTypes;
 
         public string LastCommandText { get; private set; } = string.Empty;
         public Dictionary<string, object?> LastParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -336,6 +379,14 @@ public class DatabaseScaffolderPrivateMethodTests
             LastParameters.Clear();
             foreach (DbParameter parameter in parameters)
                 LastParameters[parameter.ParameterName] = parameter.Value;
+        }
+
+        internal DbDataReader ExecuteReader(string commandText, DbParameterCollection parameters)
+        {
+            Capture(commandText, parameters);
+            return _columnTypes.Count == 0
+                ? new EmptyMetadataReader()
+                : new SingleColumnMetadataReader("ColumnType", _columnTypes);
         }
     }
 
@@ -373,8 +424,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
         protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
         {
-            _connection.Capture(CommandText, _parameterSource.Parameters);
-            return new EmptyMetadataReader();
+            return _connection.ExecuteReader(CommandText, _parameterSource.Parameters);
         }
 
         protected override void Dispose(bool disposing)
@@ -601,6 +651,12 @@ public class DatabaseScaffolderPrivateMethodTests
         return (string)m.Invoke(null, new object[] { ns, ctxName, entities })!;
     }
 
+    private static string InvokeScaffoldContext(string ns, string ctxName, IEnumerable<string> entities, bool pluralizeQueryProperties)
+    {
+        var m = GetMethod("ScaffoldContext", new[] { typeof(string), typeof(string), typeof(IEnumerable<string>), typeof(bool) });
+        return (string)m.Invoke(null, new object[] { ns, ctxName, entities, pluralizeQueryProperties })!;
+    }
+
     private static string InvokeScaffoldContextWithNamedRelationship()
     {
         var scaffolder = typeof(DatabaseScaffolder);
@@ -614,6 +670,8 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
         var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
         var relationship = Activator.CreateInstance(
             relationshipType,
             "Book",
@@ -624,6 +682,7 @@ public class DatabaseScaffolderPrivateMethodTests
             "Id",
             "Author",
             "Books",
+            false,
             false,
             "NO ACTION",
             "NO ACTION",
@@ -639,21 +698,17 @@ public class DatabaseScaffolderPrivateMethodTests
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 0);
         var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
         relationships.SetValue(relationship, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "Author", "Book" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "Author", "Book" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, false })!;
     }
 
-    private static string InvokeScaffoldContextWithRoutineStub()
-        => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32); resultColumns=Id:int:0|Name:nvarchar(40):0");
-
-    private static string InvokeScaffoldContextWithRoutineReturnStub()
-        => InvokeScaffoldContextWithRoutine("dbo", "ApplyDiscount", "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@orderId:IN:int,return:RETURN:int");
-
-    private static string InvokeScaffoldContextWithRoutine(string? schema, string name, string detail)
+    private static string InvokeScaffoldContextWithPrimaryKeyConstraintName()
     {
         var scaffolder = typeof(DatabaseScaffolder);
         var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
@@ -666,12 +721,62 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
         var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
+        var primaryKey = Activator.CreateInstance(
+            primaryKeyType,
+            "User",
+            new[] { "Id" },
+            "PK_User_Custom")!;
+        var relationships = Array.CreateInstance(relationshipType, 0);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 0);
+        var primaryKeys = Array.CreateInstance(primaryKeyType, 1);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
+        var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
+        primaryKeys.SetValue(primaryKey, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
+
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, false })!;
+    }
+
+    private static string InvokeScaffoldContextWithRoutineStub()
+        => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32); resultColumns=Id:int:0|Name:nvarchar(40):0");
+
+    private static string InvokeScaffoldContextWithRoutineReturnStub()
+        => InvokeScaffoldContextWithRoutine("dbo", "ApplyDiscount", "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@orderId:IN:int,return:RETURN:int");
+
+    private static string InvokeScaffoldContextWithRoutine(string? schema, string name, string detail, bool useDatabaseNames = false)
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
         var routine = Activator.CreateInstance(
             skippedObjectType,
             schema,
             name,
             "Routine",
-            detail)!;
+            detail,
+            null)!;
         var relationships = Array.CreateInstance(relationshipType, 0);
         var manyToMany = Array.CreateInstance(manyToManyType, 0);
         var routines = Array.CreateInstance(skippedObjectType, 1);
@@ -683,15 +788,17 @@ public class DatabaseScaffolderPrivateMethodTests
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 0);
         var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
         routines.SetValue(routine, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, useDatabaseNames })!;
     }
 
-    private static string InvokeScaffoldContextWithSequence(string? schema, string name, string detail)
+    private static string InvokeScaffoldContextWithSequence(string? schema, string name, string detail, bool useDatabaseNames = false)
     {
         var scaffolder = typeof(DatabaseScaffolder);
         var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
@@ -704,12 +811,15 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
         var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
         var sequence = Activator.CreateInstance(
             skippedObjectType,
             schema,
             name,
             "Sequence",
-            detail)!;
+            detail,
+            null)!;
         var relationships = Array.CreateInstance(relationshipType, 0);
         var manyToMany = Array.CreateInstance(manyToManyType, 0);
         var routines = Array.CreateInstance(skippedObjectType, 0);
@@ -721,12 +831,14 @@ public class DatabaseScaffolderPrivateMethodTests
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 1);
         var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
         sequences.SetValue(sequence, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, useDatabaseNames })!;
     }
 
     private static string InvokeScaffoldContextWithIdentityOptions()
@@ -742,6 +854,8 @@ public class DatabaseScaffolderPrivateMethodTests
         var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
         var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
         var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
         var identity = Activator.CreateInstance(
             identityOptionType,
             "dbo.Users",
@@ -761,15 +875,125 @@ public class DatabaseScaffolderPrivateMethodTests
         var collations = Array.CreateInstance(collationType, 0);
         var sequences = Array.CreateInstance(skippedObjectType, 0);
         var identityOptions = Array.CreateInstance(identityOptionType, 1);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
         identityOptions.SetValue(identity, 0);
         var method = scaffolder
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => m.Name == "ScaffoldContextWithRelationships");
 
-        return (string)method.Invoke(null, new object[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions })!;
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "User" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, false })!;
     }
 
     // ── ToPascalCase ────────────────────────────────────────────────────────
+
+    private static string InvokeScaffoldContextWithPrecision(int? scale = 6)
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
+        var precision = Activator.CreateInstance(
+            precisionType,
+            new object?[]
+            {
+                "dbo.Invoices",
+                "Invoice",
+                "Amount",
+                "Amount",
+                28,
+                scale
+            })!;
+        var relationships = Array.CreateInstance(relationshipType, 0);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 0);
+        var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
+        var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 1);
+        var columnFacets = Array.CreateInstance(columnFacetType, 0);
+        precisions.SetValue(precision, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
+
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "Invoice" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, false })!;
+    }
+
+    private static string InvokeScaffoldContextWithColumnFacets()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var relationshipType = scaffolder.GetNestedType("ScaffoldRelationship", BindingFlags.NonPublic)!;
+        var manyToManyType = scaffolder.GetNestedType("ScaffoldManyToManyJoin", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var primaryKeyType = scaffolder.GetNestedType("ScaffoldPrimaryKey", BindingFlags.NonPublic)!;
+        var defaultValueType = scaffolder.GetNestedType("ScaffoldDefaultValueConfiguration", BindingFlags.NonPublic)!;
+        var checkConstraintType = scaffolder.GetNestedType("ScaffoldCheckConstraintConfiguration", BindingFlags.NonPublic)!;
+        var computedColumnType = scaffolder.GetNestedType("ScaffoldComputedColumnConfiguration", BindingFlags.NonPublic)!;
+        var expressionIndexType = scaffolder.GetNestedType("ScaffoldExpressionIndexConfiguration", BindingFlags.NonPublic)!;
+        var collationType = scaffolder.GetNestedType("ScaffoldCollationConfiguration", BindingFlags.NonPublic)!;
+        var identityOptionType = scaffolder.GetNestedType("ScaffoldIdentityOptionConfiguration", BindingFlags.NonPublic)!;
+        var precisionType = scaffolder.GetNestedType("ScaffoldPrecisionConfiguration", BindingFlags.NonPublic)!;
+        var columnFacetType = scaffolder.GetNestedType("ScaffoldColumnFacetConfiguration", BindingFlags.NonPublic)!;
+        var codeFacet = Activator.CreateInstance(
+            columnFacetType,
+            new object?[]
+            {
+                "dbo.Customers",
+                "Customer",
+                "Code",
+                "Code",
+                40,
+                false,
+                true
+            })!;
+        var tokenFacet = Activator.CreateInstance(
+            columnFacetType,
+            new object?[]
+            {
+                "dbo.Customers",
+                "Customer",
+                "Token",
+                "Token",
+                16,
+                null,
+                true
+            })!;
+        var relationships = Array.CreateInstance(relationshipType, 0);
+        var manyToMany = Array.CreateInstance(manyToManyType, 0);
+        var routines = Array.CreateInstance(skippedObjectType, 0);
+        var primaryKeys = Array.CreateInstance(primaryKeyType, 0);
+        var defaultValues = Array.CreateInstance(defaultValueType, 0);
+        var checkConstraints = Array.CreateInstance(checkConstraintType, 0);
+        var computedColumns = Array.CreateInstance(computedColumnType, 0);
+        var expressionIndexes = Array.CreateInstance(expressionIndexType, 0);
+        var collations = Array.CreateInstance(collationType, 0);
+        var sequences = Array.CreateInstance(skippedObjectType, 0);
+        var identityOptions = Array.CreateInstance(identityOptionType, 0);
+        var precisions = Array.CreateInstance(precisionType, 0);
+        var columnFacets = Array.CreateInstance(columnFacetType, 2);
+        columnFacets.SetValue(codeFacet, 0);
+        columnFacets.SetValue(tokenFacet, 1);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "ScaffoldContextWithRelationships");
+
+        return (string)method.Invoke(null, new object?[] { "MyApp", "AppDbContext", new[] { "Customer" }, relationships, manyToMany, routines, primaryKeys, defaultValues, checkConstraints, computedColumns, expressionIndexes, collations, sequences, identityOptions, precisions, columnFacets, true, true, null, false })!;
+    }
 
     [Fact]
     public void ToPascalCase_UnderscoreSeparated_ReturnsPascalCase()
@@ -832,6 +1056,45 @@ public class DatabaseScaffolderPrivateMethodTests
         var sql = InvokeNormalizeScaffoldCheckSql(raw);
 
         Assert.Equal(expectedSql, sql);
+    }
+
+    [Theory]
+    [InlineData("'active'::text")]
+    [InlineData("'draft'::character varying")]
+    [InlineData("'{}'::jsonb")]
+    [InlineData("'00000000-0000-0000-0000-000000000000'::uuid")]
+    [InlineData("42::integer")]
+    [InlineData("3.14::numeric(10, 2)")]
+    [InlineData("true::boolean")]
+    [InlineData("now()::timestamp without time zone")]
+    [InlineData("CURRENT_TIMESTAMP::timestamp with time zone")]
+    [InlineData("now() AT TIME ZONE 'utc'")]
+    [InlineData("CURRENT_TIMESTAMP(6) AT TIME ZONE 'utc'::text")]
+    [InlineData("timezone('utc'::text, now())")]
+    public void NormalizeDefaultSql_StaticAndDynamic_AcceptSafePostgresCasts(string raw)
+    {
+        var staticResult = InvokeTryNormalizeScaffoldDefaultSql(raw);
+        var dynamicResult = InvokeTryNormalizeDynamicDefaultSql(raw);
+
+        Assert.True(staticResult.Normalized);
+        Assert.Equal(raw, staticResult.Sql);
+        Assert.True(dynamicResult.Normalized);
+        Assert.Equal(raw, dynamicResult.Sql);
+    }
+
+    [Theory]
+    [InlineData("'active'::text; DROP TABLE Users")]
+    [InlineData("'active'::text -- comment")]
+    [InlineData("0::integer /* comment */")]
+    [InlineData("now()::timestamp without time zone; DELETE FROM Users")]
+    [InlineData("now() AT TIME ZONE current_user")]
+    [InlineData("timezone('utc', unsafe())")]
+    [InlineData("timezone('utc', now()); DROP TABLE Users")]
+    [InlineData("'active'::\"quoted\"")]
+    public void NormalizeDefaultSql_StaticAndDynamic_RejectUnsafePostgresCasts(string raw)
+    {
+        Assert.False(InvokeTryNormalizeScaffoldDefaultSql(raw).Normalized);
+        Assert.False(InvokeTryNormalizeDynamicDefaultSql(raw).Normalized);
     }
 
     [Theory]
@@ -999,7 +1262,8 @@ public class DatabaseScaffolderPrivateMethodTests
             new[]
             {
                 typeof(IReadOnlyDictionary<string, IReadOnlyList<string>>),
-                typeof(IReadOnlyDictionary<string, string>)
+                typeof(IReadOnlyDictionary<string, string>),
+                typeof(bool)
             });
         var orderedColumns = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1012,7 +1276,7 @@ public class DatabaseScaffolderPrivateMethodTests
 
         var result = (IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>)method.Invoke(
             null,
-            new object[] { orderedColumns, entityByTable })!;
+            new object[] { orderedColumns, entityByTable, false })!;
 
         Assert.Equal("User2", result["User"]["User"]);
         Assert.Equal("Id", result["User"]["Id"]);
@@ -1101,18 +1365,47 @@ public class DatabaseScaffolderPrivateMethodTests
 
     [Theory]
     [InlineData("decimal(28,6)", true, 28, 6)]
+    [InlineData("decimal(28, 6)", true, 28, 6)]
     [InlineData("numeric(19,4)", true, 19, 4)]
-    [InlineData("varchar(20)", false, 0, 0)]
-    public void TryParseDecimalPrecision_ParsesProviderNumericDeclarations(string typeName, bool expected, int expectedPrecision, int expectedScale)
+    [InlineData("numeric(10)", true, 10, null)]
+    [InlineData("numeric ( 19 , 4 )", true, 19, 4)]
+    [InlineData("DOMAIN (public.price_amount -> numeric(12, 3))", true, 12, 3)]
+    [InlineData("varchar(20)", false, 0, null)]
+    [InlineData("mydecimal(18,2)", false, 0, null)]
+    [InlineData("decimal(18,,2)", false, 0, null)]
+    [InlineData("decimal(18,)", false, 0, null)]
+    [InlineData("decimal(,2)", false, 0, null)]
+    [InlineData("decimal(4,5)", false, 0, null)]
+    public void TryParseDecimalPrecision_ParsesProviderNumericDeclarations(string typeName, bool expected, int expectedPrecision, int? expectedScale)
     {
-        var method = GetMethod("TryParseDecimalPrecision", new[] { typeof(string), typeof(int).MakeByRefType(), typeof(int).MakeByRefType() });
-        var args = new object[] { typeName, 0, 0 };
+        var method = GetMethod("TryParseDecimalPrecision", new[] { typeof(string), typeof(int).MakeByRefType(), typeof(int?).MakeByRefType() });
+        var args = new object?[] { typeName, 0, null };
 
         var result = (bool)method.Invoke(null, args)!;
 
         Assert.Equal(expected, result);
-        Assert.Equal(expectedPrecision, (int)args[1]);
-        Assert.Equal(expectedScale, (int)args[2]);
+        Assert.Equal(expectedPrecision, (int)args[1]!);
+        Assert.Equal(expectedScale, args[2] is int scale ? scale : null);
+    }
+
+    [Theory]
+    [InlineData("decimal(18,2)", 18, 2)]
+    [InlineData("decimal(18)", 18, null)]
+    [InlineData("numeric(18,0)", 18, 0)]
+    [InlineData("decimal(18,,2)", null, null)]
+    [InlineData("decimal(18,)", null, null)]
+    [InlineData("decimal(,2)", null, null)]
+    [InlineData("decimal(4,5)", null, null)]
+    public void GetRoutineParameterPrecisionScale_RejectsMalformedPrecisionScale(string typeName, int? expectedPrecision, int? expectedScale)
+    {
+        var method = GetMethod("GetRoutineParameterPrecisionScale", new[] { typeof(string) });
+
+        var result = ((byte? Precision, byte? Scale))method.Invoke(null, new object?[] { typeName })!;
+        var actualPrecision = result.Precision.HasValue ? (int?)result.Precision.Value : null;
+        var actualScale = result.Scale.HasValue ? (int?)result.Scale.Value : null;
+
+        Assert.Equal(expectedPrecision, actualPrecision);
+        Assert.Equal(expectedScale, actualScale);
     }
 
     [Fact]
@@ -1162,6 +1455,7 @@ public class DatabaseScaffolderPrivateMethodTests
     [InlineData(typeof(int), 32, null)]
     [InlineData(typeof(string), 0, null)]
     [InlineData(typeof(string), int.MaxValue, null)]
+    [InlineData(typeof(string), 1073741823, null)]
     public void GetScaffoldMaxLength_StaticAndDynamic_UseBoundedStringAndBinarySizes(Type clrType, int columnSize, int? expected)
     {
         Assert.Equal(expected, InvokeGetScaffoldMaxLength(clrType, columnSize));
@@ -1181,14 +1475,24 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void DynamicBuildType_DecimalPrecisionWithoutScale_EmitsPrecisionOnlyColumnTypeName()
+    {
+        var type = InvokeDynamicBuildTypeWithDecimalPrecision(10, null);
+        var amount = type.GetProperty("Amount")!;
+        var column = Assert.Single(amount.GetCustomAttributes(typeof(ColumnAttribute), inherit: false).Cast<ColumnAttribute>());
+
+        Assert.Equal("decimal(10)", column.TypeName);
+    }
+
+    [Fact]
     public void DynamicSchemaDescriptor_DecimalPrecision_AffectsCacheIdentity()
     {
         var first = InvokeDynamicSchemaDescriptorWithDecimalPrecision(18, 2);
         var second = InvokeDynamicSchemaDescriptorWithDecimalPrecision(28, 6);
 
         Assert.NotEqual(first, second);
-        Assert.Contains("18,2", first, StringComparison.Ordinal);
-        Assert.Contains("28,6", second, StringComparison.Ordinal);
+        Assert.Contains("decimal(18,2)", first, StringComparison.Ordinal);
+        Assert.Contains("decimal(28,6)", second, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1209,6 +1513,38 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
         Assert.Equal("tenant_catalog", parameters["@schemaName"]);
         Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Fact]
+    public void DynamicMySqlSetWriteBlockingProbe_UsesColumnTypeParserInput()
+    {
+        var (sql, parameters) = InvokeDynamicMySqlMetadataProbe("HasWriteBlockingMySqlSetColumns");
+
+        Assert.Contains("column_type AS ColumnType", sql, StringComparison.Ordinal);
+        Assert.Contains("data_type = 'set'", sql, StringComparison.Ordinal);
+        Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
+        Assert.Equal("tenant_catalog", parameters["@schemaName"]);
+        Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Theory]
+    [InlineData("set('read','write','admin')", false)]
+    [InlineData("set('read', 'write')", false)]
+    [InlineData("set('a','b','c','d','e','f','g','h')", false)]
+    [InlineData("set('a','b','c','d','e','f','g','h','i')", true)]
+    [InlineData("set('read,write','admin')", true)]
+    [InlineData("set('read','read')", true)]
+    [InlineData("set('read' 'write')", true)]
+    [InlineData("set('read',)", true)]
+    [InlineData("set(,'read')", true)]
+    public void DynamicMySqlWriteBlockingProviderSpecificColumns_MarksUnsafeSetShapes(string columnType, bool expected)
+    {
+        var connection = new DynamicMySqlMetadataProbeConnection(columnType);
+
+        Assert.Equal(expected, InvokeDynamicHasWriteBlockingProviderSpecificColumns(connection));
+        Assert.Contains("data_type = 'set'", connection.LastCommandText, StringComparison.Ordinal);
+        Assert.Equal("tenant_catalog", connection.LastParameters["@schemaName"]);
+        Assert.Equal("Orders", connection.LastParameters["@tableName"]);
     }
 
     [Fact]
@@ -1292,10 +1628,109 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("user-defined type (dbo.EmailAddress -> nvarchar(320))", "nvarchar(320)", typeof(string))]
+    [InlineData("user-defined type (dbo.MoneyAmount -> decimal(18,4))", "decimal(18,4)", typeof(decimal))]
+    [InlineData("user-defined type (dbo.TokenBytes -> varbinary(64))", "varbinary(64)", typeof(byte[]))]
+    [InlineData("user-defined type (dbo.ExternalToken -> uniqueidentifier)", "uniqueidentifier", typeof(Guid))]
+    [InlineData("user-defined type (dbo.CreatedOn -> datetimeoffset)", "datetimeoffset", typeof(DateTimeOffset))]
+    [InlineData("user-defined type (dbo.WorkDay -> date)", "date", typeof(DateOnly))]
+    [InlineData("user-defined type (dbo.StartAt -> time)", "time", typeof(TimeOnly))]
+    public void NormalizeScaffoldClrType_MapsSafeSqlServerAliasBaseTypeWhenSchemaTypeIsVague(string detail, string baseType, Type expected)
+    {
+        var method = GetMethod(
+            "NormalizeScaffoldClrType",
+            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("TryMapSqlServerAliasBaseClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryMapSqlServerAliasBaseClrType");
+
+        var result = (Type)method.Invoke(
+            null,
+            new object?[] { new SqlServerProvider(), typeof(object), false, false, false, null, detail })!;
+        object?[] dynamicArgs = { baseType, null };
+
+        Assert.Equal(expected, result);
+        Assert.True((bool)dynamicMethod.Invoke(null, dynamicArgs)!);
+        Assert.Equal(expected, (Type)dynamicArgs[1]!);
+    }
+
+    [Fact]
+    public void NormalizeScaffoldClrType_DoesNotMapUnsafeSqlServerAliasBaseType()
+    {
+        var method = GetMethod(
+            "NormalizeScaffoldClrType",
+            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("TryMapSqlServerAliasBaseClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryMapSqlServerAliasBaseClrType");
+
+        var result = (Type)method.Invoke(
+            null,
+            new object?[] { new SqlServerProvider(), typeof(object), false, false, false, null, "user-defined type (dbo.Shape -> geography)" })!;
+        object?[] dynamicArgs = { "geography", null };
+
+        Assert.Equal(typeof(object), result);
+        Assert.False((bool)dynamicMethod.Invoke(null, dynamicArgs)!);
+    }
+
+    [Theory]
+    [InlineData("user-defined type (dbo.EmailAddress -> nvarchar(320))", "nvarchar(320)", 320)]
+    [InlineData("user-defined type (dbo.Code -> varchar(40))", "varchar(40)", 40)]
+    [InlineData("user-defined type (dbo.TokenBytes -> varbinary(64))", "varbinary(64)", 64)]
+    [InlineData("user-defined type (dbo.FixedToken -> binary(16))", "binary(16)", 16)]
+    [InlineData("user-defined type (dbo.Notes -> nvarchar(max))", "nvarchar(max)", null)]
+    [InlineData("user-defined type (dbo.Amount -> decimal(18,4))", "decimal(18,4)", null)]
+    public void SqlServerAliasBaseMaxLength_StaticAndDynamic_ParseBoundedTextAndBinaryFacets(string detail, string baseType, int? expected)
+    {
+        var staticMethod = GetMethod("GetSqlServerAliasBaseMaxLength", new[] { typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("GetSqlServerAliasBaseMaxLengthFromTypeText", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "GetSqlServerAliasBaseMaxLengthFromTypeText");
+
+        Assert.Equal(expected, (int?)staticMethod.Invoke(null, new object[] { detail }));
+        Assert.Equal(expected, (int?)dynamicMethod.Invoke(null, new object[] { baseType }));
+    }
+
+    [Theory]
+    [InlineData("set('read','write','admin')", true, 3)]
+    [InlineData("set('read', 'write')", true, 2)]
+    [InlineData("set('a','b','c','d','e','f','g','h')", true, 8)]
+    [InlineData("set('a','b','c','d','e','f','g','h','i')", false, 0)]
+    [InlineData("set('read,write','admin')", false, 0)]
+    [InlineData("set('read','read')", false, 0)]
+    [InlineData("set('read' 'write')", false, 0)]
+    [InlineData("set('read',)", false, 0)]
+    [InlineData("set(,'read')", false, 0)]
+    [InlineData("enum('read','write')", false, 0)]
+    public void TryParseBoundedMySqlSetValues_StaticAndDynamic_MatchWriteSafety(string detail, bool expected, int expectedCount)
+    {
+        var staticResult = InvokeTryParseBoundedMySqlSetValues(typeof(DatabaseScaffolder), detail);
+        var dynamicResult = InvokeTryParseBoundedMySqlSetValues(typeof(DynamicEntityTypeGenerator), detail);
+
+        Assert.Equal(expected, staticResult.Parsed);
+        Assert.Equal(expected, dynamicResult.Parsed);
+        Assert.Equal(expectedCount, staticResult.Values.Length);
+        Assert.Equal(expectedCount, dynamicResult.Values.Length);
+    }
+
+    [Theory]
     [InlineData("JSON", false)]
     [InlineData("XML", false)]
     [InlineData("UUID", false)]
     [InlineData("GEOMETRY", true)]
+    [InlineData("GEOMETRY_JSON", true)]
+    [InlineData("JSON GEOMETRY", true)]
+    [InlineData("XML_GEOGRAPHY", true)]
+    [InlineData("POINT", true)]
+    [InlineData("POINT_JSON", true)]
+    [InlineData("POLYGON", true)]
+    [InlineData("MULTIPOLYGON", true)]
+    [InlineData("GEOMETRYCOLLECTION", true)]
+    [InlineData("UUID[]", true)]
+    [InlineData("APPOINTMENT", false)]
+    [InlineData("CABINET", false)]
+    [InlineData("ENUMERATION", false)]
+    [InlineData("SETTINGS", false)]
     [InlineData("TEXT", false)]
     [InlineData("INTEGER", false)]
     public void IsSqliteProviderSpecificDeclaredType_FlagsProviderShapedTypes(string declaredType, bool expected)
@@ -1305,22 +1740,91 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("JSON", false)]
+    [InlineData("XML", false)]
+    [InlineData("UUID", false)]
+    [InlineData("GEOMETRY", true)]
+    [InlineData("GEOMETRY_JSON", true)]
+    [InlineData("JSON GEOMETRY", true)]
+    [InlineData("XML_GEOGRAPHY", true)]
+    [InlineData("POINT", true)]
+    [InlineData("POINT_JSON", true)]
+    [InlineData("POLYGON", true)]
+    [InlineData("MULTIPOLYGON", true)]
+    [InlineData("GEOMETRYCOLLECTION", true)]
+    [InlineData("UUID[]", true)]
+    [InlineData("APPOINTMENT", false)]
+    [InlineData("CABINET", false)]
+    [InlineData("ENUMERATION", false)]
+    [InlineData("SETTINGS", false)]
+    [InlineData("TEXT", false)]
+    [InlineData("INTEGER", false)]
+    public void IsWriteBlockingSqliteDeclaredType_Dynamic_MatchesStaticDeclaredTypeSafety(string declaredType, bool expected)
+    {
+        var method = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("IsWriteBlockingSqliteDeclaredType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "IsWriteBlockingSqliteDeclaredType");
+
+        Assert.Equal(expected, (bool)method.Invoke(null, new object[] { declaredType })!);
+    }
+
+    [Theory]
+    [InlineData("UUID", true)]
+    [InlineData("uuid", true)]
+    [InlineData("UUID TEXT", true)]
+    [InlineData("UUID_JSON", true)]
+    [InlineData("UUID[]", false)]
+    [InlineData("GEOMETRY_UUID", false)]
+    [InlineData("MYUUID", false)]
+    public void IsSqliteUuidDeclaredType_StaticAndDynamic_RequiresSafeUuidToken(string declaredType, bool expected)
+    {
+        var staticMethod = GetMethod("IsSqliteUuidDeclaredType", new[] { typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("IsSqliteUuidDeclaredType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "IsSqliteUuidDeclaredType");
+
+        Assert.Equal(expected, (bool)staticMethod.Invoke(null, new object[] { declaredType })!);
+        Assert.Equal(expected, (bool)dynamicMethod.Invoke(null, new object[] { declaredType })!);
+    }
+
+    [Theory]
     [InlineData("xml", true)]
     [InlineData("json", true)]
     [InlineData("jsonb", true)]
     [InlineData("uuid", true)]
+    [InlineData("USER-DEFINED (citext)", true)]
     [InlineData("USER-DEFINED (uuid)", true)]
     [InlineData("year", true)]
     [InlineData("geometry", false)]
+    [InlineData("geography", false)]
+    [InlineData("hierarchyid", false)]
+    [InlineData("sql_variant", false)]
     [InlineData("inet", false)]
+    [InlineData("cidr", false)]
+    [InlineData("macaddr", false)]
+    [InlineData("tsvector", false)]
+    [InlineData("tsquery", false)]
+    [InlineData("point", false)]
+    [InlineData("linestring", false)]
+    [InlineData("multipolygon", false)]
+    [InlineData("geometrycollection", false)]
     [InlineData("enum", false)]
     [InlineData("enum('draft','paid','cancelled')", true)]
+    [InlineData("enum('draft', 'paid')", true)]
+    [InlineData("enum('draft' 'paid')", false)]
+    [InlineData("enum('draft',)", false)]
+    [InlineData("enum(,'draft')", false)]
     [InlineData("ENUM (public.customer_status: 'draft','active','archived')", true)]
+    [InlineData("ENUM (public.customer_status: 'draft', 'active')", true)]
+    [InlineData("ENUM (public.customer_status: 'draft' 'active')", false)]
+    [InlineData("ENUM (public.customer_status: 'draft',)", false)]
+    [InlineData("ENUM (public.customer_status: ,'draft')", false)]
     [InlineData("set('read','write','admin')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false)]
     [InlineData("set('read,write','admin')", false)]
     [InlineData("DOMAIN (public.email_address -> character varying)", false)]
+    [InlineData("DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))", false)]
     [InlineData("user-defined type (dbo.EmailAddress -> nvarchar)", false)]
     [InlineData("int unsigned", false)]
     [InlineData("bigint unsigned", false)]
@@ -1328,6 +1832,335 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });
         Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+    }
+
+    [Fact]
+    public void HasWriteBlockingProviderSpecificColumnTypes_AllowsSafeScalarsAndUnsignedButBlocksProviderOwnedTypes()
+    {
+        var m = GetMethod("HasWriteBlockingProviderSpecificColumnTypes", new[] { typeof(IReadOnlyDictionary<string, string>) });
+
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "json" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Year"] = "year" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Count"] = "int unsigned" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "decimal(18,4) unsigned" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "numeric(18,4) unsigned" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_address -> character varying)" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (_int4))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar)" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.TokenBytes -> varbinary(64))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.ExternalToken -> uniqueidentifier)" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "geometry" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "geography" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Path"] = "hierarchyid" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "sql_variant" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Address"] = "inet" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "cidr" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Mac"] = "macaddr" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Search"] = "tsvector" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "point" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "multipolygon" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_range -> cidr)" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "DOMAIN (public.payload -> USER-DEFINED (custom_payload))" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Custom"] = "user-defined type (dbo.CustomPayload)" } })!);
+    }
+
+    [Fact]
+    public void BuildEnumCheckConstraintConfigurations_EmitsCheckForPostgresDomainEnum()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildEnumCheckConstraintConfigurations",
+            new[]
+            {
+                typeof(IReadOnlyDictionary<string, string>),
+                typeof(IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>),
+                typeof(IEnumerable<>).MakeGenericType(featureType)
+            });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Customers"] = "Customer"
+        };
+        var propertiesByTable = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Customers"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Status"] = "Status"
+            }
+        };
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Customers",
+            "ProviderSpecificColumnType",
+            "Status",
+            "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))")!, 0);
+
+        var result = ((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, propertiesByTable, features })!)
+            .Cast<object>()
+            .ToArray();
+
+        var check = Assert.Single(result);
+        Assert.Equal("public.Customers", check.GetType().GetProperty("TableKey")!.GetValue(check));
+        Assert.Equal("Customer", check.GetType().GetProperty("EntityName")!.GetValue(check));
+        Assert.Equal("CK_Customer_Status_Enum", check.GetType().GetProperty("Name")!.GetValue(check));
+        Assert.Equal("Status IN ('draft', 'active', 'archived')", check.GetType().GetProperty("Sql")!.GetValue(check));
+    }
+
+    [Fact]
+    public void BuildCheckConstraintConfigurations_ReplacesSyntheticConstraintNameWithStableName()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildCheckConstraintConfigurations",
+            new[]
+            {
+                typeof(IReadOnlyDictionary<string, string>),
+                typeof(IEnumerable<>).MakeGenericType(featureType)
+            });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["dbo.Orders"] = "Order"
+        };
+        var feature = Activator.CreateInstance(
+            featureType,
+            "dbo.Orders",
+            "CheckConstraint",
+            "CK__Orders__Amount__12345678",
+            "([Amount]>(0))")!;
+        featureType.GetProperty("Metadata")!.SetValue(
+            feature,
+            new Dictionary<string, object?> { ["isSyntheticName"] = true });
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(feature, 0);
+
+        var result = ((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>()
+            .ToArray();
+
+        var check = Assert.Single(result);
+        var name = Assert.IsType<string>(check.GetType().GetProperty("Name")!.GetValue(check));
+        Assert.StartsWith("CK_Order_", name, StringComparison.Ordinal);
+        Assert.DoesNotContain("CK__Orders__", name, StringComparison.Ordinal);
+        Assert.Equal("[Amount]>(0)", check.GetType().GetProperty("Sql")!.GetValue(check));
+    }
+
+    [Theory]
+    [InlineData("character varying(320)", "character varying(320)")]
+    [InlineData("varchar(64)", "character varying(64)")]
+    [InlineData("character(12)", "character(12)")]
+    [InlineData("char(8)", "character(8)")]
+    [InlineData("numeric(10,2)", "numeric(10,2)")]
+    [InlineData("decimal(18, 4)", "numeric(18,4)")]
+    [InlineData("numeric(18,,2)", "text")]
+    [InlineData("numeric(18,)", "text")]
+    [InlineData("numeric(,2)", "text")]
+    [InlineData("varchar()", "text")]
+    [InlineData("USER-DEFINED (citext)", "citext")]
+    [InlineData("USER-DEFINED (uuid)", "uuid")]
+    [InlineData("ARRAY (_int4)", "integer[]")]
+    [InlineData("ARRAY (_text)", "text[]")]
+    [InlineData("ARRAY (_bytea)", "bytea[]")]
+    [InlineData("ARRAY (_timestamptz)", "timestamp with time zone[]")]
+    public void NormalizePostgresDomainProbeCastType_StaticAndDynamic_NormalizesSafeFacetsAndTextCastsMalformedTypes(string typeText, string expected)
+    {
+        var staticMethod = GetMethod("NormalizePostgresDomainProbeCastType", new[] { typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("NormalizePostgresDomainProbeCastType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizePostgresDomainProbeCastType");
+
+        Assert.Equal(expected, (string)staticMethod.Invoke(null, new object[] { typeText })!);
+        Assert.Equal(expected, (string)dynamicMethod.Invoke(null, new object[] { typeText })!);
+    }
+
+    [Theory]
+    [InlineData("USER-DEFINED (citext)", "citext")]
+    [InlineData("USER-DEFINED (uuid)", "uuid")]
+    [InlineData("USER-DEFINED (custom_payload)", "text")]
+    public void TryGetPostgresSchemaProbeCastType_Static_PreservesSafeUdtsAndTextCastsUnsafe(string detail, string expected)
+    {
+        var method = GetMethod("TryGetPostgresSchemaProbeCastType", new[] { typeof(string), typeof(string).MakeByRefType() });
+        object?[] args = { detail, null };
+
+        Assert.True((bool)method.Invoke(null, args)!);
+        Assert.Equal(expected, args[1]);
+    }
+
+    [Fact]
+    public void ShouldMarkScaffoldedEntityReadOnly_BlocksUnparsedIdentityStrategyAndUnmodeledDefaults()
+    {
+        var m = GetMethod(
+            "ShouldMarkScaffoldedEntityReadOnly",
+            new[]
+            {
+                typeof(string),
+                typeof(IReadOnlySet<string>),
+                typeof(IReadOnlySet<string>),
+                typeof(IReadOnlySet<string>),
+                typeof(IReadOnlySet<string>),
+                typeof(IReadOnlySet<string>),
+                typeof(IReadOnlyDictionary<string, string>),
+                typeof(IReadOnlyDictionary<string, IReadOnlyList<string>>)
+            });
+        var emptyTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identityStrategyTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "dbo.Orders"
+        };
+        var defaultTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "dbo.AuditRows"
+        };
+        var primaryKeys = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["dbo.Orders"] = new[] { "Id" },
+            ["dbo.AuditRows"] = new[] { "Id" },
+            ["dbo.Customers"] = new[] { "Id" },
+            ["public.Customers"] = new[] { "Id" }
+        };
+
+        Assert.True((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.Orders",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                identityStrategyTables,
+                emptyTables,
+                null,
+                primaryKeys
+            })!);
+        Assert.True((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.AuditRows",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                defaultTables,
+                null,
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.Orders",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                null,
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "public.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" },
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "public.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" },
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "public.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" },
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" },
+                primaryKeys
+            })!);
+        Assert.False((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" },
+                primaryKeys
+            })!);
+        Assert.True((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "public.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" },
+                primaryKeys
+            })!);
+        Assert.True((bool)m.Invoke(
+            null,
+            new object?[]
+            {
+                "dbo.Customers",
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                emptyTables,
+                new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" },
+                primaryKeys
+            })!);
     }
 
     [Fact]
@@ -1415,7 +2248,7 @@ public class DatabaseScaffolderPrivateMethodTests
             "public.Documents",
             "ExpressionIndex",
             "IX_Documents_MySqlExpression",
-            "MySQL expression index; expression=LOWER(`Name`)")!, 0);
+            "MySQL expression index; expression=(LOWER(`Name`)), `Score`; isUnique=true")!, 0);
 
         var mySqlExpressionResult = (System.Collections.ICollection)method.Invoke(
             null,
@@ -1424,8 +2257,19 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.Single((System.Collections.IEnumerable)ordinaryResult);
         Assert.Empty((System.Collections.IEnumerable)providerSpecificResult);
         Assert.Empty((System.Collections.IEnumerable)includedExpressionResult);
-        Assert.Empty((System.Collections.IEnumerable)descendingExpressionResult);
-        Assert.Empty((System.Collections.IEnumerable)mySqlExpressionResult);
+        var descendingExpression = Assert.Single((System.Collections.IEnumerable)descendingExpressionResult);
+        Assert.NotNull(descendingExpression);
+        Assert.Equal(
+            "lower(\"Name\") DESC",
+            descendingExpression.GetType().GetProperty("ExpressionSql")!.GetValue(descendingExpression));
+        var mySqlExpression = Assert.Single((System.Collections.IEnumerable)mySqlExpressionResult);
+        Assert.NotNull(mySqlExpression);
+        Assert.Equal(
+            "(LOWER(`Name`)), `Score`",
+            mySqlExpression.GetType().GetProperty("ExpressionSql")!.GetValue(mySqlExpression));
+        Assert.Equal(
+            true,
+            mySqlExpression.GetType().GetProperty("IsUnique")!.GetValue(mySqlExpression));
     }
 
     [Fact]
@@ -1681,7 +2525,7 @@ public class DatabaseScaffolderPrivateMethodTests
     public void ScaffoldContext_ContainsClassName()
     {
         var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "User", "Order" });
-        Assert.Contains("class AppDbContext", code);
+        Assert.Contains("public partial class AppDbContext", code);
     }
 
     [Fact]
@@ -1707,11 +2551,46 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_UsesRowsSuffixForDescriptorQueryPropertyNames()
+    {
+        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "SchemaFiltered", "AuditData", "CustomerInfo" });
+        Assert.Contains("IQueryable<SchemaFiltered> SchemaFilteredRows", code);
+        Assert.Contains("IQueryable<AuditData> AuditDataRows", code);
+        Assert.Contains("IQueryable<CustomerInfo> CustomerInfoRows", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_PluralizesCommonIrregularQueryPropertyNames()
+    {
+        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Person", "Child" });
+        Assert.Contains("IQueryable<Person> People", code);
+        Assert.Contains("IQueryable<Child> Children", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_CanDisablePluralizedQueryPropertyNames()
+    {
+        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "Category", "User" }, pluralizeQueryProperties: false);
+        Assert.Contains("IQueryable<Category> Category", code);
+        Assert.Contains("IQueryable<User> User", code);
+        Assert.DoesNotContain("IQueryable<Category> Categories", code);
+        Assert.DoesNotContain("IQueryable<User> Users", code);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithForeignKeyConstraintName_EmitsNamedRelationshipConfiguration()
     {
         var code = InvokeScaffoldContextWithNamedRelationship();
 
         Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, \"FK_Book_Author_Custom\", false);", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithPrimaryKeyConstraintName_EmitsNamedKeyConfiguration()
+    {
+        var code = InvokeScaffoldContextWithPrimaryKeyConstraintName();
+
+        Assert.Contains("mb.Entity<User>().HasKey(e => e.Id, \"PK_User_Custom\");", code);
     }
 
     [Fact]
@@ -1728,6 +2607,19 @@ public class DatabaseScaffolderPrivateMethodTests
     {
         var code = InvokeScaffoldContext("MyApp", "AppDbContext", Array.Empty<string>());
         Assert.Contains(": DbContext", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_EmitsPartialCustomizationHook()
+    {
+        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "User" });
+
+        Assert.Contains("public partial class AppDbContext : DbContext", code);
+        Assert.Contains(": base(cn, provider, ConfigureOptions(options))", code);
+        Assert.Contains(": base(connectionString, provider, ConfigureOptions(options))", code);
+        Assert.Contains("configure?.Invoke(mb);", code);
+        Assert.Contains("OnModelCreatingPartial(mb);", code);
+        Assert.Contains("static partial void OnModelCreatingPartial(ModelBuilder modelBuilder);", code);
     }
 
     [Fact]
@@ -1797,6 +2689,39 @@ public class DatabaseScaffolderPrivateMethodTests
     // ── ScaffoldAsync (public integration) ─────────────────────────────────
 
     [Fact]
+    public void ScaffoldContext_WithUseDatabaseNames_RoutineStubPreservesLegalRoutineAndResultColumnNames()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "calculate_risk",
+            "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@customer_id:IN:int; resultColumns=total_value:decimal(18,2):0",
+            useDatabaseNames: true);
+
+        Assert.Contains("public sealed class calculate_riskParameters", code);
+        Assert.Contains("public int? customer_id { get; init; }", code);
+        Assert.Contains("public sealed class calculate_riskResult", code);
+        Assert.Contains("public decimal total_value { get; set; }", code);
+        Assert.Contains("Task<List<TResult>> calculate_riskAsync<TResult>(calculate_riskParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("Task<List<calculate_riskResult>> calculate_riskAsync(calculate_riskParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("IAsyncEnumerable<calculate_riskResult> Streamcalculate_riskAsync(calculate_riskParameters? parameters = null, CancellationToken ct = default)", code);
+        Assert.DoesNotContain("CalculateRisk", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("TotalValue", code, StringComparison.Ordinal);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_database_names_routine_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithKnownNoResultProcedure_EmitsNonQueryWrapper()
     {
         var code = InvokeScaffoldContextWithRoutine(
@@ -1826,6 +2751,18 @@ public class DatabaseScaffolderPrivateMethodTests
         Assert.DoesNotContain("StoredProcedureResult<TResult> FinalizeLedgerWithOutputAsync", code);
         Assert.DoesNotContain("FinalizeLedgerAsync<TResult>", code);
         Assert.DoesNotContain("StreamFinalizeLedgerAsync", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithPrecisionOnlyRoutineOutput_EmitsNullableScaleOutputParameter()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "GetLedgerTotal",
+            "SQL Server stored procedure; parameters=1; outputParameters=1; parameterModes=@total:OUT:decimal(18); resultColumns=");
+
+        Assert.Contains("public static OutputParameter[] CreateGetLedgerTotalOutputParameters()", code);
+        Assert.Contains("new OutputParameter(\"total\", System.Data.DbType.Decimal, null, (byte)18, null, System.Data.ParameterDirection.Output, null)", code);
     }
 
     [Fact]
@@ -1859,12 +2796,13 @@ public class DatabaseScaffolderPrivateMethodTests
         var code = InvokeScaffoldContextWithRoutine(
             "dbo",
             "ImportLines",
-            "SQL Server stored procedure; parameters=3; outputParameters=0; parameterModes=@email:IN:nvarchar(320),@login:IN:sysname,@items:IN:table type (dbo.LineItemList)");
+            "SQL Server stored procedure; parameters=4; outputParameters=0; parameterModes=@email:IN:nvarchar(320),@amount:IN:decimal(18,4),@login:IN:sysname,@items:IN:table type (dbo.LineItemList)");
 
         Assert.Contains("public string? email { get; init; }", code);
+        Assert.Contains("public decimal? amount { get; init; }", code);
         Assert.Contains("public string? login { get; init; }", code);
         Assert.Contains("public DbParameter? items { get; init; }", code);
-        Assert.Contains("Parameters discovered at scaffold time: @email IN nvarchar(320), @login IN sysname, @items IN table type (dbo.LineItemList)", code);
+        Assert.Contains("Parameters discovered at scaffold time: @email IN nvarchar(320), @amount IN decimal(18,4), @login IN sysname, @items IN table type (dbo.LineItemList)", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_sqlserver_alias_routine_" + Guid.NewGuid().ToString("N"));
         try
@@ -2463,12 +3401,55 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithUseDatabaseNames_SequenceStubPreservesLegalSequenceName()
+    {
+        var code = InvokeScaffoldContextWithSequence(
+            "public",
+            "invoice_no",
+            "PostgreSQL sequence; dataType=integer",
+            useDatabaseNames: true);
+
+        Assert.Contains("private sealed class invoice_noSequenceValue", code);
+        Assert.Contains("public async Task<int> Nextinvoice_noValueAsync(CancellationToken ct = default)", code);
+        Assert.Contains("QueryUnchangedAsync<invoice_noSequenceValue>", code);
+        Assert.DoesNotContain("InvoiceNoSequenceValue", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("NextInvoiceNoValueAsync", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithIdentityOptions_EmitsFluentSeedAndIncrement()
     {
         var code = InvokeScaffoldContextWithIdentityOptions();
 
         Assert.Contains("mb.Entity<User>().Property(e => e.Id).HasIdentityOptions(1000, 25);", code);
         Assert.Contains("ConfigureOptions(options)", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithDecimalPrecision_EmitsFluentPrecision()
+    {
+        var code = InvokeScaffoldContextWithPrecision();
+
+        Assert.Contains("mb.Entity<Invoice>().Property(e => e.Amount).HasPrecision(28, 6);", code);
+        Assert.Contains("ConfigureOptions(options)", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithDecimalPrecisionWithoutScale_EmitsPrecisionOnlyFluentPrecision()
+    {
+        var code = InvokeScaffoldContextWithPrecision(null);
+
+        Assert.Contains("mb.Entity<Invoice>().Property(e => e.Amount).HasPrecision(28);", code);
+        Assert.DoesNotContain("HasPrecision(28,", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithColumnFacets_EmitsLengthUnicodeAndFixedLengthFluentConfiguration()
+    {
+        var code = InvokeScaffoldContextWithColumnFacets();
+
+        Assert.Contains("mb.Entity<Customer>().Property(e => e.Code).HasMaxLength(40).IsUnicode(false).IsFixedLength();", code);
+        Assert.Contains("mb.Entity<Customer>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", code);
     }
 
     [Fact]
@@ -2532,7 +3513,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextFile = Path.Combine(dir, "_1BadCtx.cs");
             Assert.True(File.Exists(contextFile));
             var contextCode = File.ReadAllText(contextFile);
-            Assert.Contains("public class _1BadCtx : DbContext", contextCode);
+            Assert.Contains("public partial class _1BadCtx : DbContext", contextCode);
         }
         finally
         {
@@ -2559,13 +3540,172 @@ public class DatabaseScaffolderPrivateMethodTests
             var entityCode = File.ReadAllText(Path.Combine(dir, "Widget.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "WidgetContext.cs"));
 
-            Assert.Contains("public class Widget", entityCode);
-            Assert.Contains("public class WidgetContext : DbContext", contextCode);
+            Assert.Contains("public partial class Widget", entityCode);
+            Assert.Contains("public partial class WidgetContext : DbContext", contextCode);
         }
         finally
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNullableReferenceTypesDisabled_EmitsNullableDisabledCode()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Parent (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL,
+                Note TEXT NULL
+            );
+            CREATE TABLE Child (
+                Id INTEGER PRIMARY KEY,
+                ParentId INTEGER NOT NULL,
+                Payload TEXT NOT NULL,
+                CONSTRAINT FK_Child_Parent FOREIGN KEY (ParentId) REFERENCES Parent(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_nullable_disabled_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "NullableDisabledContext",
+                new ScaffoldOptions { UseNullableReferenceTypes = false });
+
+            var parentCode = File.ReadAllText(Path.Combine(dir, "Parent.cs"));
+            var childCode = File.ReadAllText(Path.Combine(dir, "Child.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "NullableDisabledContext.cs"));
+
+            Assert.Contains("#nullable disable", parentCode);
+            Assert.Contains("#nullable disable", contextCode);
+            Assert.Contains("public string Name { get; set; }", parentCode);
+            Assert.Contains("public string Note { get; set; }", parentCode);
+            Assert.DoesNotContain("string? Note", parentCode);
+            Assert.DoesNotContain("= default!;", parentCode);
+            Assert.Contains("public Parent Parent { get; set; }", childCode);
+            Assert.Contains("DbContextOptions options = null", contextCode);
+            Assert.DoesNotContain("DbContextOptions? options", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithContextDirectoryAndNamespace_WritesContextSeparatelyAndImportsEntities()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE ContextPlaced (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs.Entities",
+                "PlacedContext",
+                new ScaffoldOptions
+                {
+                    ContextDirectory = "Data/Contexts",
+                    ContextNamespace = "TestNs.Contexts"
+                });
+
+            var entityPath = Path.Combine(dir, "ContextPlaced.cs");
+            var contextPath = Path.Combine(dir, "Data", "Contexts", "PlacedContext.cs");
+            Assert.True(File.Exists(entityPath));
+            Assert.True(File.Exists(contextPath));
+
+            var entityCode = File.ReadAllText(entityPath);
+            var contextCode = File.ReadAllText(contextPath);
+            Assert.Contains("namespace TestNs.Entities;", entityCode);
+            Assert.Contains("namespace TestNs.Contexts;", contextCode);
+            Assert.Contains("using TestNs.Entities;", contextCode);
+            Assert.Contains("IQueryable<ContextPlaced> ContextPlacedRows", contextCode);
+
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithContextOutputDirectory_WritesContextOutsideEntityOutput()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE ContextAbsolute (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var root = Path.Combine(Path.GetTempPath(), "san_scaffold_context_output_" + Guid.NewGuid().ToString("N"));
+        var entityOutput = Path.Combine(root, "Models");
+        var contextOutput = Path.Combine(root, "Data", "Contexts");
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                entityOutput,
+                "TestNs.Entities",
+                "AbsoluteContext",
+                new ScaffoldOptions
+                {
+                    ContextOutputDirectory = contextOutput,
+                    ContextNamespace = "TestNs.Contexts"
+                });
+
+            var entityPath = Path.Combine(entityOutput, "ContextAbsolute.cs");
+            var contextPath = Path.Combine(contextOutput, "AbsoluteContext.cs");
+            Assert.True(File.Exists(entityPath));
+            Assert.True(File.Exists(contextPath));
+
+            var contextCode = File.ReadAllText(contextPath);
+            Assert.Contains("namespace TestNs.Contexts;", contextCode);
+            Assert.Contains("using TestNs.Entities;", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUnsafeContextDirectory_ThrowsNormConfigurationException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE UnsafeContextPath (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+            DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "UnsafeContext",
+                new ScaffoldOptions { ContextDirectory = "..\\Outside" }));
+
+        Assert.Contains("relative child directory", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2651,14 +3791,18 @@ public class DatabaseScaffolderPrivateMethodTests
 
             var authorCode = File.ReadAllText(Path.Combine(dir, "SchemaAuthor.cs"));
             var bookCode = File.ReadAllText(Path.Combine(dir, "SchemaBook.cs"));
+            var viewCode = File.ReadAllText(Path.Combine(dir, "SchemaBookView.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "AttachedCtx.cs"));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("[Table(\"SchemaAuthor\", Schema = \"aux\")]", authorCode);
             Assert.Contains("[Table(\"SchemaBook\", Schema = \"aux\")]", bookCode);
+            Assert.Contains("[Table(\"SchemaBookView\", Schema = \"aux\")]", viewCode);
+            Assert.Contains("[ReadOnlyEntity]", viewCode);
             Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
             Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false)", contextCode);
+            Assert.Contains("IQueryable<SchemaBookView> SchemaBookViews", contextCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title\")]", bookCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title_Filtered\", FilterSql = \"Title <> ''\")]", bookCode);
             Assert.Contains("aux.SchemaBook", warnings);
@@ -2668,12 +3812,9 @@ public class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Default");
             Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBook" && item.GetProperty("kind").GetString() == "Trigger");
+            Assert.Contains(providerOwned.EnumerateArray(), item => item.GetProperty("table").GetString() == "aux.SchemaBookView" && item.GetProperty("kind").GetString() == "MissingPrimaryKey");
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
-            Assert.Contains(skippedObjects.EnumerateArray(), item =>
-                item.GetProperty("name").GetString() == "aux.SchemaBookView" &&
-                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
-                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "View" &&
-                item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean());
+            Assert.Empty(skippedObjects.EnumerateArray());
         }
         finally
         {
@@ -2857,13 +3998,258 @@ public class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("public List<Book> Books { get; set; } = new();", authorCode);
             Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
-            Assert.Contains("public Author? Author { get; set; }", bookCode);
+            Assert.Contains("public Author Author { get; set; } = default!;", bookCode);
             Assert.Contains(".HasMany(p => p.Books)", contextCode);
             Assert.Contains(".WithOne(d => d.Author)", contextCode);
             Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
             Assert.Contains("configure?.Invoke(mb);", contextCode);
             Assert.Contains("var configuredOptions = options?.Clone() ?? new DbContextOptions();", contextCode);
             Assert.DoesNotContain("options.OnModelCreating =", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUniqueForeignKey_GeneratesOneToOneNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE User (
+                Id INTEGER PRIMARY KEY,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE UserProfile (
+                Id INTEGER PRIMARY KEY,
+                UserId INTEGER NOT NULL UNIQUE,
+                DisplayName TEXT NOT NULL,
+                CONSTRAINT FK_UserProfile_User FOREIGN KEY (UserId) REFERENCES User(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_one_to_one_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "OneToOneCtx");
+
+            var userCode = File.ReadAllText(Path.Combine(dir, "User.cs"));
+            var profileCode = File.ReadAllText(Path.Combine(dir, "UserProfile.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "OneToOneCtx.cs"));
+
+            Assert.Contains("public UserProfile? UserProfile { get; set; }", userCode);
+            Assert.DoesNotContain("List<UserProfile>", userCode, StringComparison.Ordinal);
+            Assert.Contains("[ForeignKey(nameof(UserId))]", profileCode);
+            Assert.Contains("public User User { get; set; } = default!;", profileCode);
+            Assert.Contains(".HasOne(p => p.UserProfile)", contextCode);
+            Assert.Contains(".WithOne(d => d.User)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.UserId, p => p.Id, cascadeDelete: false);", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNullableUniqueForeignKey_GeneratesOptionalOneToOneNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Person (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE PersonAvatar (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                PersonId INTEGER NULL UNIQUE,
+                Url TEXT NOT NULL,
+                CONSTRAINT FK_PersonAvatar_Person FOREIGN KEY (PersonId) REFERENCES Person(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_optional_one_to_one_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "OptionalOneToOneCtx");
+
+            var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
+            var avatarCode = File.ReadAllText(Path.Combine(dir, "PersonAvatar.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "OptionalOneToOneCtx.cs"));
+
+            Assert.Contains("public PersonAvatar? PersonAvatar { get; set; }", personCode);
+            Assert.DoesNotContain("List<PersonAvatar>", personCode, StringComparison.Ordinal);
+            Assert.Matches(@"public (int|long)\? PersonId \{ get; set; \}", avatarCode);
+            Assert.Contains("[ForeignKey(nameof(PersonId))]", avatarCode);
+            Assert.Contains("public Person? Person { get; set; }", avatarCode);
+            Assert.DoesNotContain("public Person Person { get; set; } = default!;", avatarCode, StringComparison.Ordinal);
+            Assert.Contains(".HasOne(p => p.PersonAvatar)", contextCode);
+            Assert.Contains(".WithOne(d => d.Person)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.PersonId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithCompositeUniqueForeignKey_GeneratesOneToOneNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Account (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                AccountNo INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                UNIQUE (TenantId, AccountNo)
+            );
+            CREATE TABLE AccountProfile (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                AccountNo INTEGER NOT NULL,
+                DisplayName TEXT NOT NULL,
+                UNIQUE (TenantId, AccountNo),
+                CONSTRAINT FK_AccountProfile_Account FOREIGN KEY (TenantId, AccountNo) REFERENCES Account(TenantId, AccountNo)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_composite_one_to_one_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeOneToOneCtx");
+
+            var accountCode = File.ReadAllText(Path.Combine(dir, "Account.cs"));
+            var profileCode = File.ReadAllText(Path.Combine(dir, "AccountProfile.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeOneToOneCtx.cs"));
+
+            Assert.Contains("public AccountProfile? AccountProfile { get; set; }", accountCode);
+            Assert.DoesNotContain("List<AccountProfile>", accountCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("[ForeignKey(", profileCode, StringComparison.Ordinal);
+            Assert.Contains("public Account Account { get; set; } = default!;", profileCode);
+            Assert.Contains(".HasOne(p => p.AccountProfile)", contextCode);
+            Assert.Contains(".WithOne(d => d.Account)", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithNullableCompositeUniqueForeignKey_GeneratesOptionalOneToOneNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Account (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                AccountNo INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                UNIQUE (TenantId, AccountNo)
+            );
+            CREATE TABLE AccountProfile (
+                Id INTEGER PRIMARY KEY,
+                TenantId INTEGER NOT NULL,
+                AccountNo INTEGER NULL,
+                DisplayName TEXT NOT NULL,
+                UNIQUE (TenantId, AccountNo),
+                CONSTRAINT FK_AccountProfile_Account FOREIGN KEY (TenantId, AccountNo) REFERENCES Account(TenantId, AccountNo)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_optional_composite_one_to_one_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "OptionalCompositeOneToOneCtx");
+
+            var accountCode = File.ReadAllText(Path.Combine(dir, "Account.cs"));
+            var profileCode = File.ReadAllText(Path.Combine(dir, "AccountProfile.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "OptionalCompositeOneToOneCtx.cs"));
+
+            Assert.Contains("public AccountProfile? AccountProfile { get; set; }", accountCode);
+            Assert.DoesNotContain("List<AccountProfile>", accountCode, StringComparison.Ordinal);
+            Assert.Matches(@"public (int|long) TenantId \{ get; set; \}", profileCode);
+            Assert.Matches(@"public (int|long)\? AccountNo \{ get; set; \}", profileCode);
+            Assert.DoesNotContain("[ForeignKey(", profileCode, StringComparison.Ordinal);
+            Assert.Contains("public Account? Account { get; set; }", profileCode);
+            Assert.DoesNotContain("public Account Account { get; set; } = default!;", profileCode, StringComparison.Ordinal);
+            Assert.Contains(".HasOne(p => p.AccountProfile)", contextCode);
+            Assert.Contains(".WithOne(d => d.Account)", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSharedPrimaryKeyForeignKey_GeneratesOneToOneNavigationsAndModelConfig()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Customer (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE CustomerProfile (
+                Id INTEGER NOT NULL PRIMARY KEY,
+                DisplayName TEXT NOT NULL,
+                CONSTRAINT FK_CustomerProfile_Customer FOREIGN KEY (Id) REFERENCES Customer(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SharedPkOneToOneCtx");
+
+            var customerCode = File.ReadAllText(Path.Combine(dir, "Customer.cs"));
+            var profileCode = File.ReadAllText(Path.Combine(dir, "CustomerProfile.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SharedPkOneToOneCtx.cs"));
+
+            Assert.Contains("public CustomerProfile? CustomerProfile { get; set; }", customerCode);
+            Assert.DoesNotContain("List<CustomerProfile>", customerCode, StringComparison.Ordinal);
+            Assert.Contains("[ForeignKey(nameof(Id))]", profileCode);
+            Assert.Contains("public Customer Customer { get; set; } = default!;", profileCode);
+            Assert.Contains(".HasOne(p => p.CustomerProfile)", contextCode);
+            Assert.Contains(".WithOne(d => d.Customer)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.Id, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {
@@ -2905,9 +4291,9 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public List<Shipment> ShipmentsByBillingAddressId { get; set; } = new();", addressCode);
             Assert.Contains("public List<Shipment> ShipmentsByShippingAddressId { get; set; } = new();", addressCode);
             Assert.Contains("[ForeignKey(nameof(BillingAddressId))]", shipmentCode);
-            Assert.Contains("public Address? BillingAddress { get; set; }", shipmentCode);
+            Assert.Contains("public Address BillingAddress { get; set; } = default!;", shipmentCode);
             Assert.Contains("[ForeignKey(nameof(ShippingAddressId))]", shipmentCode);
-            Assert.Contains("public Address? ShippingAddress { get; set; }", shipmentCode);
+            Assert.Contains("public Address ShippingAddress { get; set; } = default!;", shipmentCode);
             Assert.DoesNotContain("public Address? Address { get; set; }", shipmentCode);
             Assert.Contains(".HasMany(p => p.ShipmentsByBillingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.BillingAddress)", contextCode);
@@ -2915,6 +4301,118 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(".HasMany(p => p.ShipmentsByShippingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.ShippingAddress)", contextCode);
             Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id, cascadeDelete: false);", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithMultipleCompositeForeignKeysToSamePrincipal_UsesDistinguishingRoleNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Account (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TenantId INTEGER NOT NULL,
+                AccountNo INTEGER NOT NULL,
+                Name TEXT NOT NULL,
+                UNIQUE (TenantId, AccountNo)
+            );
+            CREATE TABLE AccountTransfer (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TenantId INTEGER NOT NULL,
+                PrimaryAccountNo INTEGER NOT NULL,
+                BackupAccountNo INTEGER NOT NULL,
+                Amount INTEGER NOT NULL,
+                CONSTRAINT FK_Transfer_PrimaryAccount FOREIGN KEY (TenantId, PrimaryAccountNo) REFERENCES Account(TenantId, AccountNo),
+                CONSTRAINT FK_Transfer_BackupAccount FOREIGN KEY (TenantId, BackupAccountNo) REFERENCES Account(TenantId, AccountNo)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CompositeRoleContext");
+
+            var accountCode = File.ReadAllText(Path.Combine(dir, "Account.cs"));
+            var transferCode = File.ReadAllText(Path.Combine(dir, "AccountTransfer.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeRoleContext.cs"));
+
+            Assert.Contains("public List<AccountTransfer> AccountTransfersByBackupAccountNo { get; set; } = new();", accountCode);
+            Assert.Contains("public List<AccountTransfer> AccountTransfersByPrimaryAccountNo { get; set; } = new();", accountCode);
+            Assert.Contains("public Account BackupAccount { get; set; } = default!;", transferCode);
+            Assert.Contains("public Account PrimaryAccount { get; set; } = default!;", transferCode);
+            Assert.DoesNotContain("public Account Tenant", transferCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("AccountTransfersByTenantId", accountCode, StringComparison.Ordinal);
+            Assert.Contains(".HasMany(p => p.AccountTransfersByBackupAccountNo)", contextCode);
+            Assert.Contains(".WithOne(d => d.BackupAccount)", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.BackupAccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasMany(p => p.AccountTransfersByPrimaryAccountNo)", contextCode);
+            Assert.Contains(".WithOne(d => d.PrimaryAccount)", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.PrimaryAccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithMultipleUniqueForeignKeysToSamePrincipal_UsesRoleBasedOneToOneNavigationNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Account (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE AccountProfile (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                PrimaryAccountId INTEGER NOT NULL UNIQUE,
+                BackupAccountId INTEGER NOT NULL UNIQUE,
+                DisplayName TEXT NOT NULL,
+                CONSTRAINT FK_Profile_PrimaryAccount FOREIGN KEY (PrimaryAccountId) REFERENCES Account(Id),
+                CONSTRAINT FK_Profile_BackupAccount FOREIGN KEY (BackupAccountId) REFERENCES Account(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "UniqueRoleOneToOneContext");
+
+            var accountCode = File.ReadAllText(Path.Combine(dir, "Account.cs"));
+            var profileCode = File.ReadAllText(Path.Combine(dir, "AccountProfile.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "UniqueRoleOneToOneContext.cs"));
+
+            Assert.Contains("public AccountProfile? AccountProfileByBackupAccountId { get; set; }", accountCode);
+            Assert.Contains("public AccountProfile? AccountProfileByPrimaryAccountId { get; set; }", accountCode);
+            Assert.DoesNotContain("List<AccountProfile>", accountCode, StringComparison.Ordinal);
+            Assert.Contains("[ForeignKey(nameof(BackupAccountId))]", profileCode);
+            Assert.Contains("public Account BackupAccount { get; set; } = default!;", profileCode);
+            Assert.Contains("[ForeignKey(nameof(PrimaryAccountId))]", profileCode);
+            Assert.Contains("public Account PrimaryAccount { get; set; } = default!;", profileCode);
+            Assert.DoesNotContain("public Account Account { get; set; }", profileCode, StringComparison.Ordinal);
+            Assert.Contains(".HasOne(p => p.AccountProfileByBackupAccountId)", contextCode);
+            Assert.Contains(".WithOne(d => d.BackupAccount)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BackupAccountId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasOne(p => p.AccountProfileByPrimaryAccountId)", contextCode);
+            Assert.Contains(".WithOne(d => d.PrimaryAccount)", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.PrimaryAccountId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {
@@ -2949,9 +4447,9 @@ public class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("[ForeignKey(nameof(ParentId))]", personCode);
             Assert.Contains("public Person? Parent { get; set; }", personCode);
-            Assert.Contains("public List<Person> PersonsByParentId { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> PeopleByParentId { get; set; } = new();", personCode);
             Assert.DoesNotContain("public Person? Person { get; set; }", personCode);
-            Assert.Contains(".HasMany(p => p.PersonsByParentId)", contextCode);
+            Assert.Contains(".HasMany(p => p.PeopleByParentId)", contextCode);
             Assert.Contains(".WithOne(d => d.Parent)", contextCode);
             Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -2995,7 +4493,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public string Books { get; set; } = default!;", authorCode);
             Assert.Contains("public List<Book> BooksByAuthorId { get; set; } = new();", authorCode);
             Assert.Contains("public string Author { get; set; } = default!;", bookCode);
-            Assert.Contains("public Author? Author2 { get; set; }", bookCode);
+            Assert.Contains("public Author Author2 { get; set; } = default!;", bookCode);
             Assert.Contains(".HasMany(p => p.BooksByAuthorId)", contextCode);
             Assert.Contains(".WithOne(d => d.Author2)", contextCode);
         }
@@ -3031,6 +4529,36 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("using nORM.Configuration;", entityCode);
             Assert.Contains("[Index(\"IX_IndexedWidget_Code\", IsUnique = true)]", entityCode);
             Assert.Contains("[Index(\"IX_IndexedWidget_Name\")]", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUnnamedSqliteUniqueConstraint_UsesStableIndexName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE UniqueConstraintWidget (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Code TEXT NOT NULL UNIQUE,
+                Name TEXT NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "UniqueConstraintIndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "UniqueConstraintWidget.cs"));
+            Assert.Contains("[Index(\"UX_UniqueConstraintWidget_Code\", IsUnique = true)]", entityCode);
+            Assert.DoesNotContain("sqlite_autoindex", entityCode, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -3143,7 +4671,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithDescendingPartialExpressionIndex_ReportsStructuredIndexMetadata()
+    public async Task ScaffoldAsync_WithDescendingPartialExpressionIndex_EmitsExpressionIndexMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -3166,30 +4694,13 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ExpressionWarningIndexCtx");
 
             var contextCode = File.ReadAllText(Path.Combine(dir, "ExpressionWarningIndexCtx.cs"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
 
-            Assert.DoesNotContain("HasExpressionIndex(\"IX_IndexedExpressionWarning_LowerName_Desc\"", contextCode, StringComparison.Ordinal);
-            var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
-            var expressionIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "ExpressionIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
-            var expressionMetadata = expressionIndex.GetProperty("metadata");
-            Assert.True(expressionMetadata.GetProperty("expressionBased").GetBoolean());
-            Assert.Equal("lower(Name) DESC", expressionMetadata.GetProperty("expressionSql").GetString());
-            Assert.Equal("Active = 1", expressionMetadata.GetProperty("filterSql").GetString());
-            Assert.True(expressionMetadata.GetProperty("isUnique").GetBoolean());
-            Assert.Contains("CREATE UNIQUE INDEX IX_IndexedExpressionWarning_LowerName_Desc", expressionMetadata.GetProperty("indexSql").GetString(), StringComparison.Ordinal);
-
-            var partialIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "PartialIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
-            Assert.Equal("Active = 1", partialIndex.GetProperty("metadata").GetProperty("filterSql").GetString());
-
-            var descendingIndex = Assert.Single(providerOwned.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "DescendingIndex" &&
-                item.GetProperty("name").GetString() == "IX_IndexedExpressionWarning_LowerName_Desc");
-            Assert.True(descendingIndex.GetProperty("metadata").GetProperty("descending").GetBoolean());
-            Assert.Equal("lower(Name) DESC", descendingIndex.GetProperty("metadata").GetProperty("keySql").GetString());
+            Assert.Contains(
+                "mb.Entity<IndexedExpressionWarning>().HasExpressionIndex(\"IX_IndexedExpressionWarning_LowerName_Desc\", \"lower(Name) DESC\", isUnique: true, filterSql: \"Active = 1\");",
+                contextCode,
+                StringComparison.Ordinal);
+            Assert.False(File.Exists(warningJsonPath), "Supported descending expression indexes should be emitted instead of warned.");
         }
         finally
         {
@@ -3232,7 +4743,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "CompositeFkCtx.cs"));
 
             Assert.Contains("List<TenantOrderLine>", principalCode);
-            Assert.Contains("public TenantOrder?", dependentCode);
+            Assert.Contains("public TenantOrder TenantOrder { get; set; } = default!;", dependentCode);
             Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderId }, p => new { p.TenantId, p.OrderId }, cascadeDelete: false);", contextCode);
             Assert.Contains("mb.Entity<TenantOrder>().HasKey(e => new { e.TenantId, e.OrderId });", contextCode);
             Assert.Contains("mb.Entity<TenantOrderLine>().HasKey(e => new { e.TenantId, e.OrderId, e.LineNo });", contextCode);
@@ -3321,7 +4832,7 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true, Order = 0)]", principalCode);
             Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true, Order = 1)]", principalCode);
             Assert.Contains("List<ExternalOrderEvent>", principalCode);
-            Assert.Contains("public ExternalOrder?", dependentCode);
+            Assert.Contains("public ExternalOrder ExternalOrder { get; set; } = default!;", dependentCode);
             Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, cascadeDelete: false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
@@ -3334,7 +4845,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithForeignKeyToNullableUniqueIndex_DoesNotEmitUnsafeNavigation()
+    public async Task ScaffoldAsync_WithForeignKeyToNullableUniqueIndex_EmitsAlternateKeyNavigation()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -3364,19 +4875,14 @@ public class DatabaseScaffolderPrivateMethodTests
             var principalCode = File.ReadAllText(Path.Combine(dir, "NullableAltCustomer.cs"));
             var dependentCode = File.ReadAllText(Path.Combine(dir, "NullableAltOrder.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "NullableUniqueFkCtx.cs"));
-            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
-            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("[Index(\"UX_NullableAltCustomer_ExternalId\", IsUnique = true)]", principalCode);
-            Assert.DoesNotContain("List<NullableAltOrder>", principalCode);
-            Assert.DoesNotContain("[ForeignKey(", dependentCode);
-            Assert.DoesNotContain("public NullableAltCustomer?", dependentCode);
-            Assert.DoesNotContain("HasForeignKey", contextCode);
-            Assert.Contains("RelationshipPrincipalKey", warnings);
-            Assert.Contains("exact ordered unfiltered non-null unique index", warnings);
-            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
-                item.GetProperty("name").GetString() == "sqlite_fk_0");
+            Assert.Contains("public List<NullableAltOrder> NullableAltOrders { get; set; } = new();", principalCode);
+            Assert.Contains("[ForeignKey(nameof(CustomerExternalId))]", dependentCode);
+            Assert.Contains("public NullableAltCustomer NullableAltCustomer { get; set; } = default!;", dependentCode);
+            Assert.Contains(".HasForeignKey(d => d.CustomerExternalId, p => p.ExternalId, cascadeDelete: false);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -3414,10 +4920,15 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FeatureOwnedCtx");
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "FeatureOwned.cs"));
+            var viewCode = File.ReadAllText(Path.Combine(dir, "FeatureOwnedView.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "FeatureOwnedCtx.cs"));
             var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode);
+            Assert.Contains("[ReadOnlyEntity]", entityCode);
+            Assert.Contains("[ReadOnlyEntity]", viewCode);
+            Assert.Contains("[Table(\"FeatureOwnedView\")]", viewCode);
+            Assert.Contains("IQueryable<FeatureOwnedView> FeatureOwnedViews", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasDefaultValueSql(\"'new'\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().HasCheckConstraint(\"CK_FeatureOwned_Name\", \"length(Name) > 0\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name)\");", contextCode);
@@ -3436,17 +4947,17 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
             Assert.DoesNotContain("CheckConstraint", warnings);
-            Assert.Contains("Skipped Database Objects", warnings);
+            Assert.DoesNotContain("Skipped Database Objects", warnings);
             Assert.Contains("FeatureOwnedView", warnings);
             var summary = warningJson.RootElement.GetProperty("summary");
             Assert.Equal(2, summary.GetProperty("totalWarnings").GetInt32());
-            Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("providerOwnedSchemaFeatures").GetInt32());
-            Assert.Equal(1, summary.GetProperty("sectionCounts").GetProperty("skippedDatabaseObjects").GetInt32());
+            Assert.Equal(2, summary.GetProperty("sectionCounts").GetProperty("providerOwnedSchemaFeatures").GetInt32());
+            Assert.Equal(0, summary.GetProperty("sectionCounts").GetProperty("skippedDatabaseObjects").GetInt32());
             Assert.False(summary.GetProperty("codes").TryGetProperty("SCF100", out _));
-            Assert.Equal(1, summary.GetProperty("codes").GetProperty("SCF200").GetInt32());
+            Assert.Equal(1, summary.GetProperty("codes").GetProperty("SCF116").GetInt32());
             Assert.False(summary.GetProperty("categories").TryGetProperty("schema-feature", out _));
             Assert.Equal(1, summary.GetProperty("categories").GetProperty("database-object").GetInt32());
-            Assert.Equal(1, summary.GetProperty("categories").GetProperty("query-object").GetInt32());
+            Assert.Equal(1, summary.GetProperty("categories").GetProperty("table-shape").GetInt32());
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Default");
             Assert.DoesNotContain(providerOwned.EnumerateArray(), item => item.GetProperty("kind").GetString() == "Computed");
@@ -3462,20 +4973,20 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Equal("TR_FeatureOwned_Audit", triggerMetadata.GetProperty("triggerName").GetString());
             Assert.True(triggerMetadata.GetProperty("providerOwnedDdl").GetBoolean());
             Assert.False(triggerMetadata.GetProperty("generatedModelConfigurationSupported").GetBoolean());
+            Assert.True(triggerMetadata.GetProperty("readOnlyEntity").GetBoolean());
+            Assert.False(triggerMetadata.GetProperty("generatedWritesSupported").GetBoolean());
+            Assert.Equal("provider-owned-trigger", triggerMetadata.GetProperty("reason").GetString());
             Assert.True(triggerMetadata.GetProperty("definitionAvailable").GetBoolean());
             Assert.Contains("CREATE TRIGGER TR_FeatureOwned_Audit", triggerMetadata.GetProperty("triggerSql").GetString(), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                item.GetProperty("table").GetString() == "FeatureOwnedView" &&
+                item.GetProperty("code").GetString() == "SCF116" &&
+                item.GetProperty("category").GetString() == "table-shape");
             Assert.All(providerOwned.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
             Assert.All(providerOwned.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
             var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects");
-            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("name").GetString() == "FeatureOwnedView");
-            Assert.Contains(skippedObjects.EnumerateArray(), item => item.GetProperty("kind").GetString() == "View" && item.GetProperty("code").GetString() == "SCF200" && item.GetProperty("category").GetString() == "query-object");
-            Assert.Contains(skippedObjects.EnumerateArray(), item =>
-                item.GetProperty("kind").GetString() == "View" &&
-                item.GetProperty("metadata").GetProperty("provider").GetString() == "SQLite" &&
-                item.GetProperty("metadata").GetProperty("targetKind").GetString() == "View" &&
-                item.GetProperty("metadata").GetProperty("queryArtifactSupported").GetBoolean());
-            Assert.All(skippedObjects.EnumerateArray(), item => Assert.Equal("Warning", item.GetProperty("severity").GetString()));
-            Assert.All(skippedObjects.EnumerateArray(), item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("suggestedAction").GetString())));
+            Assert.Empty(skippedObjects.EnumerateArray());
         }
         finally
         {
@@ -3516,6 +5027,8 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Shape", warnings);
             Assert.DoesNotContain("PortableText |", warnings);
             Assert.Contains("using System;", entityCode);
+            Assert.Contains("using nORM.Configuration;", entityCode);
+            Assert.Contains("[ReadOnlyEntity]", entityCode);
             Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
             Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
             Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
@@ -3525,7 +5038,53 @@ public class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                 item.GetProperty("name").GetString() == "Shape" &&
                 item.GetProperty("category").GetString() == "schema-feature" &&
-                item.GetProperty("metadata").GetProperty("providerType").GetString() == "GEOMETRY");
+                item.GetProperty("metadata").GetProperty("providerType").GetString() == "GEOMETRY" &&
+                item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean() &&
+                item.GetProperty("metadata").GetProperty("reason").GetString() == "provider-specific-column-type");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUnmodeledDefault_MarksTypeReadOnly()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DefaultOwned (
+                Id INTEGER PRIMARY KEY,
+                Status TEXT NOT NULL DEFAULT (lower('NEW'))
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DefaultOwnedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "DefaultOwned.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "DefaultOwnedCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[ReadOnlyEntity]", entityCode);
+            Assert.DoesNotContain("HasDefaultValueSql", contextCode, StringComparison.Ordinal);
+            var defaultDiagnostic = Assert.Single(
+                warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(),
+                item => item.GetProperty("kind").GetString() == "Default" &&
+                        item.GetProperty("name").GetString() == "Status");
+            Assert.Equal("SCF100", defaultDiagnostic.GetProperty("code").GetString());
+            var metadata = defaultDiagnostic.GetProperty("metadata");
+            Assert.Contains("lower('NEW')", metadata.GetProperty("defaultSql").GetString(), StringComparison.Ordinal);
+            Assert.True(metadata.GetProperty("readOnlyEntity").GetBoolean());
+            Assert.False(metadata.GetProperty("generatedWritesSupported").GetBoolean());
+            Assert.Equal("provider-specific-default", metadata.GetProperty("reason").GetString());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -3674,6 +5233,51 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithTableFilterAndEmitQueryArtifacts_DoesNotReportUnselectedVirtualTableShadows()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE KeepMe (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE VIRTUAL TABLE SearchDocs USING fts5(Content);
+            """;
+        try
+        {
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException ex)
+        {
+            if (Skip.If(true, $"SQLite FTS5 virtual tables are not available in this build: {ex.Message}")) return;
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "FilteredVirtualCtx",
+                new ScaffoldOptions { Tables = new[] { "KeepMe" }, EmitQueryArtifacts = true });
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredVirtualCtx.cs"));
+
+            Assert.True(File.Exists(Path.Combine(dir, "KeepMe.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "SearchDocs.cs")));
+            Assert.Contains("IQueryable<KeepMe> KeepMes", contextCode);
+            Assert.DoesNotContain("SearchDocs", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCheckInIdentifierName_DoesNotEmitCheckConstraintDiagnostic()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -3750,6 +5354,74 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public void BuildRelationships_WithUnknownReferentialAction_SuppressesRelationship()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
+        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
+        var foreignKeys = Array.CreateInstance(foreignKeyType, 1);
+        foreignKeys.SetValue(Activator.CreateInstance(
+            foreignKeyType,
+            null,
+            "Child",
+            "ParentId",
+            null,
+            "Parent",
+            "Id",
+            "FK_Child_Parent",
+            1,
+            "PROVIDER CASCADE",
+            "NO ACTION",
+            false)!, 0);
+
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Child"] = "Child",
+            ["Parent"] = "Parent"
+        };
+        var columnProperties = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Child"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Id"] = "Id",
+                ["ParentId"] = "ParentId"
+            },
+            ["Parent"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Id"] = "Id"
+            }
+        };
+        var primaryKeys = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Child"] = new[] { "Id" },
+            ["Parent"] = new[] { "Id" }
+        };
+        var nonNullableColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Child"] = new HashSet<string>(new[] { "Id", "ParentId" }, StringComparer.OrdinalIgnoreCase),
+            ["Parent"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase)
+        };
+        var memberNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var indexes = Array.CreateInstance(indexType, 0);
+        var method = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "BuildRelationships");
+
+        var relationships = (System.Collections.IEnumerable)method.Invoke(null, new object?[]
+        {
+            foreignKeys,
+            entityByTable,
+            columnProperties,
+            primaryKeys,
+            indexes,
+            nonNullableColumns,
+            memberNames
+        })!;
+
+        Assert.Empty(relationships.Cast<object>());
     }
 
     [Fact]
@@ -4084,6 +5756,47 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithPureJoinTableReferentialActions_EmitsActionAwareManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id) ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id) ON DELETE RESTRICT ON UPDATE NO ACTION
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "JoinActionCtx");
+
+            Assert.False(File.Exists(Path.Combine(dir, "AuthorBook.cs")));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "JoinActionCtx.cs"));
+
+            Assert.Contains(".HasMany<Book>(p => p.Books)", contextCode);
+            Assert.Contains(".WithMany(p => p.Authors)", contextCode);
+            Assert.Contains(".UsingTable(\"AuthorBook\", new[] { \"AuthorId\" }, new[] { \"BookId\" }, ReferentialAction.Cascade, ReferentialAction.Cascade, ReferentialAction.Restrict, ReferentialAction.NoAction);", contextCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPureJoinTableProviderOwnedFeature_RestoresDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -4130,6 +5843,167 @@ public class DatabaseScaffolderPrivateMethodTests
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithProviderOwnedWriteBlockedBridge_DoesNotEmitManyToManyMapping()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE Book (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+            CREATE TABLE AuthorBook (
+                AuthorId INTEGER NOT NULL,
+                BookId INTEGER NOT NULL,
+                PRIMARY KEY (AuthorId, BookId),
+                CONSTRAINT FK_AuthorBook_Author FOREIGN KEY (AuthorId) REFERENCES Author(Id),
+                CONSTRAINT FK_AuthorBook_Book FOREIGN KEY (BookId) REFERENCES Book(Id)
+            );
+            CREATE TRIGGER TR_AuthorBook_Audit
+            AFTER INSERT ON AuthorBook
+            BEGIN
+                SELECT 1;
+            END;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ProviderOwnedBridgeCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "ProviderOwnedBridgeCtx.cs"));
+            var bridgeCode = File.ReadAllText(Path.Combine(dir, "AuthorBook.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            Assert.DoesNotContain(".UsingTable(\"AuthorBook\"", contextCode, StringComparison.Ordinal);
+            Assert.Contains("[ReadOnlyEntity]", bridgeCode, StringComparison.Ordinal);
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "Trigger" &&
+                item.GetProperty("table").GetString() == "AuthorBook" &&
+                item.GetProperty("name").GetString() == "TR_AuthorBook_Audit");
+
+            var join = Assert.Single(warningJson.RootElement.GetProperty("possibleManyToManyJoinTables").EnumerateArray());
+            Assert.Equal("AuthorBook", join.GetProperty("table").GetString());
+            Assert.Contains(join.GetProperty("reasons").EnumerateArray(), item => item.GetString() == "provider-owned-write-blocking-schema");
+            Assert.True(join.GetProperty("metadata").GetProperty("providerOwnedWriteBlockingSchema").GetBoolean());
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildManyToManyJoins_WithUnknownReferentialAction_SuppressesUsingTable()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var tableType = scaffolder.GetNestedType("ScaffoldTable", BindingFlags.NonPublic)!;
+        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
+        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
+        var tables = Array.CreateInstance(tableType, 3);
+        tables.SetValue(Activator.CreateInstance(tableType, "Author", null)!, 0);
+        tables.SetValue(Activator.CreateInstance(tableType, "Book", null)!, 1);
+        tables.SetValue(Activator.CreateInstance(tableType, "AuthorBook", null)!, 2);
+        var foreignKeys = Array.CreateInstance(foreignKeyType, 2);
+        foreignKeys.SetValue(Activator.CreateInstance(
+            foreignKeyType,
+            null,
+            "AuthorBook",
+            "AuthorId",
+            null,
+            "Author",
+            "Id",
+            "FK_AuthorBook_Author",
+            1,
+            "PROVIDER CASCADE",
+            "NO ACTION",
+            false)!, 0);
+        foreignKeys.SetValue(Activator.CreateInstance(
+            foreignKeyType,
+            null,
+            "AuthorBook",
+            "BookId",
+            null,
+            "Book",
+            "Id",
+            "FK_AuthorBook_Book",
+            1,
+            "NO ACTION",
+            "NO ACTION",
+            false)!, 1);
+
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = "Author",
+            ["Book"] = "Book",
+            ["AuthorBook"] = "AuthorBook"
+        };
+        var columnProperties = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Id"] = "Id" },
+            ["Book"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Id"] = "Id" },
+            ["AuthorBook"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["AuthorId"] = "AuthorId",
+                ["BookId"] = "BookId"
+            }
+        };
+        var primaryKeys = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new[] { "Id" },
+            ["Book"] = new[] { "Id" },
+            ["AuthorBook"] = new[] { "AuthorId", "BookId" }
+        };
+        var emptySets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+        var emptyTableKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var indexes = Array.CreateInstance(indexType, 0);
+        var nonNullableColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
+            ["Book"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
+            ["AuthorBook"] = new HashSet<string>(new[] { "AuthorId", "BookId" }, StringComparer.OrdinalIgnoreCase)
+        };
+        var memberNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var buildJoins = scaffolder
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(m => m.Name == "BuildManyToManyJoins");
+
+        var joins = (System.Collections.IEnumerable)buildJoins.Invoke(null, new object?[]
+        {
+            foreignKeys,
+            tables,
+            entityByTable,
+            columnProperties,
+            primaryKeys,
+            emptySets,
+            emptySets,
+            indexes,
+            nonNullableColumns,
+            emptyTableKeys,
+            memberNames
+        })!;
+
+        Assert.Empty(joins.Cast<object>());
+
+        var reasonsMethod = scaffolder.GetMethod("BuildPossibleJoinTableReasons", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var reasons = (string[])reasonsMethod.Invoke(null, new object?[]
+        {
+            "AuthorBook",
+            foreignKeys,
+            primaryKeys,
+            columnProperties,
+            nonNullableColumns,
+            emptySets,
+            emptySets,
+            indexes,
+            emptyTableKeys
+        })!;
+
+        Assert.Contains("referential-action-not-scaffoldable", reasons);
     }
 
     [Fact]
@@ -4243,10 +6117,10 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.False(File.Exists(Path.Combine(dir, "PersonRelationship.cs")));
             var personCode = File.ReadAllText(Path.Combine(dir, "Person.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
-            Assert.Contains("public List<Person> PersonsByMenteeId { get; set; } = new();", personCode);
-            Assert.Contains("public List<Person> PersonsByMentorId { get; set; } = new();", personCode);
-            Assert.Contains(".HasMany<Person>(p => p.PersonsByMenteeId)", contextCode);
-            Assert.Contains(".WithMany(p => p.PersonsByMentorId)", contextCode);
+            Assert.Contains("public List<Person> PeopleByMenteeId { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> PeopleByMentorId { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.PeopleByMenteeId)", contextCode);
+            Assert.Contains(".WithMany(p => p.PeopleByMentorId)", contextCode);
             Assert.Contains(".UsingTable(\"PersonRelationship\", \"MenteeId\", \"MentorId\");", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
@@ -4291,8 +6165,8 @@ public class DatabaseScaffolderPrivateMethodTests
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("CreatedAt { get; set; }", joinCode);
-            Assert.Contains("public Author?", joinCode);
-            Assert.Contains("public Book?", joinCode);
+            Assert.Contains("public Author Author { get; set; } = default!;", joinCode);
+            Assert.Contains("public Book Book { get; set; } = default!;", joinCode);
             Assert.Contains("public List<AuthorBook>", authorCode);
             Assert.Contains("public List<AuthorBook>", bookCode);
             Assert.Contains(".HasMany(p => p.AuthorBooks)", contextCode);
@@ -4312,8 +6186,9 @@ public class DatabaseScaffolderPrivateMethodTests
             Assert.Contains(joinTables[0].GetProperty("reasons").EnumerateArray(), item => item.GetString() == "payload-columns");
             Assert.Contains("UsingTable", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             Assert.Contains("NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated primary keys or exact ordered unfiltered non-null unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
-            Assert.Contains("generated surrogate primary key plus an exact unfiltered non-null unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("all FK columns are NOT NULL", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated primary keys or exact ordered unfiltered unique indexes", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+            Assert.Contains("generated surrogate primary key plus an exact unfiltered unique index", joinTables[0].GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
             var metadata = joinTables[0].GetProperty("metadata");
             Assert.Equal(2, metadata.GetProperty("foreignKeyConstraintCount").GetInt32());
             Assert.Equal(new[] { "AuthorId", "BookId" }, metadata.GetProperty("foreignKeyColumns").EnumerateArray().Select(item => item.GetString()).ToArray());
@@ -5027,10 +6902,10 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "SelfJoinCtx.cs"));
 
             Assert.False(File.Exists(Path.Combine(dir, "PersonFriend.cs")));
-            Assert.Contains("public List<Person> PersonsByPersonId { get; set; } = new();", personCode);
-            Assert.Contains("public List<Person> PersonsByFriendId { get; set; } = new();", personCode);
-            Assert.Contains(".HasMany<Person>(p => p.PersonsByPersonId)", contextCode);
-            Assert.Contains(".WithMany(p => p.PersonsByFriendId)", contextCode);
+            Assert.Contains("public List<Person> PeopleByPersonId { get; set; } = new();", personCode);
+            Assert.Contains("public List<Person> PeopleByFriendId { get; set; } = new();", personCode);
+            Assert.Contains(".HasMany<Person>(p => p.PeopleByPersonId)", contextCode);
+            Assert.Contains(".WithMany(p => p.PeopleByFriendId)", contextCode);
             Assert.Contains(".UsingTable(\"PersonFriend\", \"PersonId\", \"FriendId\");", contextCode);
         }
         finally
@@ -5060,13 +6935,80 @@ public class DatabaseScaffolderPrivateMethodTests
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "MyCtx3");
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "BadTable.cs"));
-            Assert.Contains("public class BadTable", entityCode);
+            Assert.Contains("public partial class BadTable", entityCode);
             Assert.Contains("[Required]", entityCode);
             Assert.Contains("public string _1stName { get; set; } = default!;", entityCode);
             Assert.Contains("public long? HasSpace", entityCode);
             Assert.Contains("public string? Class", entityCode);
             Assert.DoesNotContain("@1st-name", entityCode);
             Assert.DoesNotContain("Has space", entityCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUseDatabaseNames_PreservesLegalDatabaseNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE customer (
+                customer_id INTEGER PRIMARY KEY,
+                display_name TEXT NOT NULL
+            );
+            CREATE TABLE order_line (
+                order_id INTEGER PRIMARY KEY,
+                billing_customer_id INTEGER NOT NULL REFERENCES customer(customer_id),
+                shipping_customer_id INTEGER NULL REFERENCES customer(customer_id),
+                SKU TEXT NOT NULL,
+                "class" TEXT NULL,
+                "has space" TEXT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "DatabaseNamesCtx",
+                new ScaffoldOptions { UseDatabaseNames = true });
+
+            var entityPath = Path.Combine(dir, "order_line.cs");
+            Assert.True(File.Exists(entityPath));
+            var entityCode = File.ReadAllText(entityPath);
+            var customerCode = File.ReadAllText(Path.Combine(dir, "customer.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "DatabaseNamesCtx.cs"));
+
+            Assert.Contains("public partial class order_line", entityCode);
+            Assert.Contains("public long order_id { get; set; }", entityCode);
+            Assert.Contains("public long billing_customer_id { get; set; }", entityCode);
+            Assert.Contains("public long? shipping_customer_id { get; set; }", entityCode);
+            Assert.Contains("public string SKU { get; set; } = default!;", entityCode);
+            Assert.Contains("public string? @class { get; set; }", entityCode);
+            Assert.Contains("public string? has_space { get; set; }", entityCode);
+            Assert.Contains("public customer BillingCustomer { get; set; } = default!;", entityCode);
+            Assert.Contains("public customer? ShippingCustomer { get; set; }", entityCode);
+            Assert.Contains("public List<order_line> OrderLinesByBillingCustomerId { get; set; } = new();", customerCode);
+            Assert.Contains("public List<order_line> OrderLinesByShippingCustomerId { get; set; } = new();", customerCode);
+            Assert.Contains("IQueryable<customer> customers", contextCode);
+            Assert.Contains("IQueryable<order_line> order_lines", contextCode);
+            Assert.Contains(".HasMany(p => p.OrderLinesByBillingCustomerId)", contextCode);
+            Assert.Contains(".WithOne(d => d.BillingCustomer)", contextCode);
+            Assert.Contains(".HasMany(p => p.OrderLinesByShippingCustomerId)", contextCode);
+            Assert.Contains(".WithOne(d => d.ShippingCustomer)", contextCode);
+            Assert.DoesNotContain("OrderLine", entityCode);
+            Assert.DoesNotContain("OrderId", entityCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
         {
@@ -5091,7 +7033,7 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextPath = Path.Combine(dir, "_1BadContext.cs");
             Assert.True(File.Exists(contextPath));
             var contextCode = File.ReadAllText(contextPath);
-            Assert.Contains("public class _1BadContext : DbContext", contextCode);
+            Assert.Contains("public partial class _1BadContext : DbContext", contextCode);
             Assert.Contains("public _1BadContext(DbConnection cn, DatabaseProvider provider, DbContextOptions? options = null)", contextCode);
             Assert.DoesNotContain("1-bad context", contextCode);
         }
@@ -5301,6 +7243,90 @@ public class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredCtx.cs"));
             Assert.Contains("IQueryable<KeepMe> KeepMes", contextCode);
             Assert.DoesNotContain("SkipMes", contextCode);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSchemaFilter_GeneratesRequestedSchemasAndExplicitTables()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS auxa;
+            ATTACH DATABASE ':memory:' AS auxb;
+            CREATE TABLE MainKeep (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE MainSkip (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "auxa"."SchemaKeepOne" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "auxa"."SchemaKeepTwo" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "auxb"."SchemaSkip" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "SchemaFilteredCtx",
+                new ScaffoldOptions
+                {
+                    Schemas = new[] { "auxa" },
+                    Tables = new[] { "MainKeep" }
+                });
+
+            Assert.True(File.Exists(Path.Combine(dir, "MainKeep.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "SchemaKeepOne.cs")));
+            Assert.True(File.Exists(Path.Combine(dir, "SchemaKeepTwo.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "MainSkip.cs")));
+            Assert.False(File.Exists(Path.Combine(dir, "SchemaSkip.cs")));
+
+            var schemaEntityCode = File.ReadAllText(Path.Combine(dir, "SchemaKeepOne.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SchemaFilteredCtx.cs"));
+            Assert.Contains("[Table(\"SchemaKeepOne\", Schema = \"auxa\")]", schemaEntityCode);
+            Assert.Contains("IQueryable<MainKeep> MainKeeps", contextCode);
+            Assert.Contains("IQueryable<SchemaKeepOne> SchemaKeepOnes", contextCode);
+            Assert.Contains("IQueryable<SchemaKeepTwo> SchemaKeepTwos", contextCode);
+            Assert.DoesNotContain("MainSkips", contextCode);
+            Assert.DoesNotContain("SchemaSkips", contextCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithMissingSchemaFilter_ThrowsNormConfigurationException()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "CREATE TABLE Existing (Id INTEGER PRIMARY KEY)";
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
+                DatabaseScaffolder.ScaffoldAsync(
+                    cn,
+                    new SqliteProvider(),
+                    dir,
+                    "TestNs",
+                    "MissingSchemaCtx",
+                    new ScaffoldOptions { Schemas = new[] { "missing_schema" } }));
+
+            Assert.Contains("schema filter did not match", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("missing_schema", ex.Message, StringComparison.Ordinal);
         }
         finally
         {
@@ -5570,7 +7596,7 @@ public class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithViewTableFilter_ThrowsSkippedObjectDiagnostic()
+    public async Task ScaffoldAsync_WithViewTableFilter_GeneratesQueryArtifact()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -5584,18 +7610,23 @@ public class DatabaseScaffolderPrivateMethodTests
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
         try
         {
-            var ex = await Assert.ThrowsAsync<NormConfigurationException>(() =>
-                DatabaseScaffolder.ScaffoldAsync(
-                    cn,
-                    new SqliteProvider(),
-                    dir,
-                    "TestNs",
-                    "FilteredCtx",
-                    new ScaffoldOptions { Tables = new[] { "ExistingView" } }));
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "FilteredCtx",
+                new ScaffoldOptions { Tables = new[] { "ExistingView" } });
 
-            Assert.Contains("matched database object", ex.Message);
-            Assert.Contains("View ExistingView", ex.Message);
-            Assert.Contains("does not emit as entity classes", ex.Message);
+            var viewCode = File.ReadAllText(Path.Combine(dir, "ExistingView.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "FilteredCtx.cs"));
+            var warnings = File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.md"));
+
+            Assert.Contains("[Table(\"ExistingView\")]", viewCode);
+            Assert.Contains("[ReadOnlyEntity]", viewCode);
+            Assert.Contains("IQueryable<ExistingView> ExistingViews", contextCode);
+            Assert.Contains("MissingPrimaryKey", warnings);
+            Assert.DoesNotContain("View ExistingView", warnings);
         }
         finally
         {
@@ -5644,6 +7675,45 @@ public class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                 item.GetProperty("table").GetString() == "ExistingView");
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSchemaFilter_IncludesQueryArtifactsInSchema()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Existing (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE VIEW ExistingView AS SELECT Id, Name FROM Existing;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "SchemaViewCtx",
+                new ScaffoldOptions { Schemas = new[] { "main" } });
+
+            var tableCode = File.ReadAllText(Path.Combine(dir, "Existing.cs"));
+            var viewCode = File.ReadAllText(Path.Combine(dir, "ExistingView.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "SchemaViewCtx.cs"));
+
+            Assert.Contains("[Table(\"Existing\")]", tableCode);
+            Assert.Contains("[Table(\"ExistingView\")]", viewCode);
+            Assert.Contains("[ReadOnlyEntity]", viewCode);
+            Assert.Contains("IQueryable<Existing> Existings", contextCode);
+            Assert.Contains("IQueryable<ExistingView> ExistingViews", contextCode);
         }
         finally
         {

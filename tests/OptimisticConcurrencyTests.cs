@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,6 +10,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class OptimisticConcurrencyTests
 {
     [Xunit.Trait("Category", "Fast")]

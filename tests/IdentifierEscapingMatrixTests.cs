@@ -1,4 +1,4 @@
-using nORM.Providers;
+﻿using nORM.Providers;
 using Xunit;
 
 namespace nORM.Tests;
@@ -227,6 +227,7 @@ public class IdentifierEscapingMatrixTests
     [InlineData("Users;DROP TABLE X")]
     [InlineData("Users--comment")]
     [InlineData("Users/*comment*/")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void AllProviders_AdversarialName_WrappedSafelyByEscape(string name)
     {
         // The Escape method should wrap the identifier so the adversarial chars

@@ -382,6 +382,33 @@ namespace nORM.Query
 
                 var source = t.Visit(node.Arguments[0]);
                 if (originalProjection != null
+                    && IsGroupingProjection(originalProjection)
+                    && t._groupBy.Count > 0
+                    && !t.IsPostMaterializeTailMode)
+                {
+                    var groupProjection = t.ExpandProjection(originalProjection);
+                    t._projection = groupProjection;
+                    t._clientProjection = pendingClientProjection;
+                    t._clientProjectionResultType = pendingClientProjectionResultType;
+                    if (shouldLogClientEvaluation)
+                    {
+                        t._ctx.Options.Logger?.LogQuery(
+                            "-- CLIENT-EVAL: Projection split for client-side evaluation",
+                            EmptyParamDict,
+                            TimeSpan.Zero,
+                            0);
+                    }
+
+                    var sourceFromSql = QueryTranslator.ExtractSourceFromClause(t._sql.ToString());
+                    var groupBySql = PooledStringBuilder.Join(t._groupBy);
+                    var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                    t._sql.Clear();
+                    t._streamingGroupByKeySelector = null;
+                    t.BuildGroupBySelectClause(groupProjection, groupBySql, alias, sourceFromSql);
+                    return source;
+                }
+
+                if (originalProjection != null
                     && t.IsPostMaterializeTailMode
                     && t.CurrentPostMaterializeElementType == originalProjection.Parameters[0].Type)
                 {
@@ -412,6 +439,11 @@ namespace nORM.Query
 
                 return source;
             }
+
+            private static bool IsGroupingProjection(LambdaExpression projection)
+                => projection.Parameters.Count == 1
+                   && projection.Parameters[0].Type.IsGenericType
+                   && projection.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>);
 
             private static MethodCallExpression RewriteGroupByThenSelect(
                 MethodCallExpression groupByCall,

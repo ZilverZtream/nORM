@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// rather than creating their own independent transaction.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class BulkTransactionAtomicityTests
 {
     private class Item
@@ -140,6 +141,7 @@ public class BulkTransactionAtomicityTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task Postgres_BulkUpdate_BatchFailure_RollsBackEarlierBatches_Live()
     {
         var cs = LiveProviderEnvironment.GetConnectionString("postgres");

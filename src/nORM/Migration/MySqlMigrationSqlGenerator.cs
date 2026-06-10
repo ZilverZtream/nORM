@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using nORM.Configuration;
 
 namespace nORM.Migration
 {
@@ -19,6 +20,12 @@ namespace nORM.Migration
     {
         /// <summary>Default MySQL fallback type for unmapped CLR types.</summary>
         private const string FallbackSqlType = "LONGTEXT";
+
+        /// <summary>Conservative utf8mb4-safe MySQL VARCHAR bound before LONGTEXT fallback.</summary>
+        private const int MaxBoundedVarCharLength = 16383;
+
+        /// <summary>Conservative MySQL VARBINARY bound before BLOB fallback.</summary>
+        private const int MaxBoundedVarBinaryLength = 16383;
 
         private static readonly Dictionary<string, string> TypeMap = new()
         {
@@ -59,7 +66,7 @@ namespace nORM.Migration
             return string.Join(".", id.Split('.').Select(Esc));
         }
 
-        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql) ResolveIndex(
+        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql) ResolveIndex(
             TableSchema table,
             string indexName,
             bool isUnique,
@@ -72,16 +79,18 @@ namespace nORM.Migration
                     return index;
             }
 
-            return (indexName, isUnique, columnNames, descending, Array.Empty<string>(), null);
+            return (indexName, isUnique, columnNames, descending, Array.Empty<IndexNullSortOrder>(), Array.Empty<string>(), false, null);
         }
 
         private static string BuildIndexSql(TableSchema table, string indexName, bool isUnique, string[] columnNames, bool[] descending)
         {
             var index = ResolveIndex(table, indexName, isUnique, columnNames, descending);
             EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+            EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+            EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
             EnsureNoFilter(index.FilterSql, index.IndexName);
             var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-            return $"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})";
+            return $"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)})";
         }
 
         private static bool IsImplicitUniqueColumn(ColumnSchema column)
@@ -205,7 +214,6 @@ namespace nORM.Migration
             // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
             {
-                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -235,9 +243,13 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
                     EnsureNoFilter(index.FilterSql, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)})");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    up.Add(BuildExpressionIndexSql(table, expressionIndex));
             }
 
             // UP-6: Add columns to existing tables.
@@ -276,7 +288,7 @@ namespace nORM.Migration
             foreach (var (table, fk) in diff.AddedForeignKeys)
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
-                throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
+                up.Add(BuildExpressionIndexSql(table, expressionIndex));
 
             // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
 
@@ -287,6 +299,8 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {EscTable(table.Name)} DROP CHECK {Esc(check.ConstraintName)}");
             foreach (var (table, indexName, _, _, _) in diff.AddedIndexes)
                 down.Add($"DROP INDEX {Esc(indexName)} ON {EscTable(table.Name)}");
+            foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
+                down.Add($"DROP INDEX {Esc(expressionIndex.Name)} ON {EscTable(table.Name)}");
 
             // DOWN-2: Drop columns that were added in UP-6.
             foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
@@ -359,7 +373,6 @@ namespace nORM.Migration
             // DOWN-6: Restore tables that were dropped in UP-2.
             foreach (var table in diff.DroppedTables)
             {
-                EnsureNoExpressionIndexes(table.ExpressionIndexes, table.Name);
                 var colDefs = table.Columns.Select(c =>
                 {
                     if (IsComputedColumn(c))
@@ -384,9 +397,13 @@ namespace nORM.Migration
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
                     EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
+                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
+                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
                     EnsureNoFilter(index.FilterSql, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)})");
+                    down.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)})");
                 }
+                foreach (var expressionIndex in table.ExpressionIndexes)
+                    down.Add(BuildExpressionIndexSql(table, expressionIndex));
             }
 
             // DOWN-7: Restore FK constraints that were dropped in UP-1.
@@ -402,7 +419,7 @@ namespace nORM.Migration
             foreach (var (table, fk) in diff.DroppedForeignKeys)
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
-                throw new NotSupportedException($"MySQL expression index '{expressionIndex.Name}' on table '{table.Name}' is not scaffolded as provider-neutral DDL. Use a generated column plus a normal index.");
+                down.Add(BuildExpressionIndexSql(table, expressionIndex));
 
             // Rename columns — MySQL 8.0+ supports ALTER TABLE t RENAME COLUMN old TO new.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
@@ -428,8 +445,11 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
-            if (IsDecimalWithPrecision(column))
-                return $"DECIMAL({column.Precision!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{column.Scale!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+            if (TryGetDecimalWithPrecisionType(column, out var decimalSql))
+                return decimalSql;
+
+            if (TryGetBoundedStringOrBinaryType(column, out var boundedSql))
+                return boundedSql;
 
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
@@ -446,11 +466,55 @@ namespace nORM.Migration
             return sql;
         }
 
-        private static bool IsDecimalWithPrecision(ColumnSchema column)
-            => string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
-            && column.Precision is > 0
-            && column.Scale is >= 0
-            && column.Scale <= column.Precision;
+        private static bool TryGetBoundedStringOrBinaryType(ColumnSchema column, out string sql)
+        {
+            sql = string.Empty;
+            if (column.MaxLength is not > 0)
+                return false;
+
+            if (string.Equals(column.ClrType, typeof(string).FullName, StringComparison.Ordinal))
+            {
+                if (column.MaxLength.Value <= MaxBoundedVarCharLength)
+                {
+                    var typeName = column.IsFixedLength ? "CHAR" : "VARCHAR";
+                    sql = $"{typeName}({column.MaxLength.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (string.Equals(column.ClrType, typeof(byte[]).FullName, StringComparison.Ordinal))
+            {
+                if (column.MaxLength.Value <= MaxBoundedVarBinaryLength)
+                {
+                    var typeName = column.IsFixedLength ? "BINARY" : "VARBINARY";
+                    sql = $"{typeName}({column.MaxLength.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetDecimalWithPrecisionType(ColumnSchema column, out string sql)
+        {
+            sql = string.Empty;
+            if (!string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
+                || column.Precision is not > 0
+                || (column.Scale.HasValue && (column.Scale.Value < 0 || column.Scale.Value > column.Precision.Value)))
+            {
+                return false;
+            }
+
+            var precision = column.Precision.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            sql = column.Scale.HasValue
+                ? $"DECIMAL({precision},{column.Scale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
+                : $"DECIMAL({precision})";
+            return true;
+        }
 
         private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;
 
@@ -497,7 +561,7 @@ namespace nORM.Migration
             return action;
         }
 
-        private static string FormatIndexColumns(string[] columnNames, bool[] descending)
+        private static string FormatIndexColumns(string[] columnNames, bool[] descending, IndexNullSortOrder[] _)
             => string.Join(", ", columnNames.Select((name, index) =>
                 Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
 
@@ -507,16 +571,29 @@ namespace nORM.Migration
                 throw new NotSupportedException($"MySQL does not support INCLUDE columns for index '{indexName}'. Use key columns only or keep the covering-index tuning in provider-specific migration code.");
         }
 
+        private static void EnsureNoNullsNotDistinct(bool nullsNotDistinct, string indexName)
+        {
+            if (nullsNotDistinct)
+                throw new NotSupportedException($"MySQL does not support PostgreSQL NULLS NOT DISTINCT semantics for index '{indexName}'. Keep that unique-index behavior in PostgreSQL-specific migration code.");
+        }
+
+        private static void EnsureNoNullSortOrders(IndexNullSortOrder[] nullSortOrders, string indexName)
+        {
+            if (nullSortOrders.Any(static order => order != IndexNullSortOrder.Default))
+                throw new NotSupportedException($"MySQL does not support provider-neutral NULLS FIRST/LAST index ordering for index '{indexName}'. Keep that ordering in provider-specific migration code.");
+        }
+
         private static void EnsureNoFilter(string? filterSql, string indexName)
         {
             if (!string.IsNullOrWhiteSpace(filterSql))
                 throw new NotSupportedException($"MySQL does not support filtered indexes for index '{indexName}'. Keep the predicate in provider-specific migration code or remodel it as a generated column plus ordinary index.");
         }
 
-        private static void EnsureNoExpressionIndexes(IReadOnlyList<ExpressionIndexSchema> expressionIndexes, string tableName)
+        private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
         {
-            if (expressionIndexes.Count > 0)
-                throw new NotSupportedException($"MySQL expression indexes on table '{tableName}' are not scaffolded as provider-neutral DDL. Use generated columns plus normal indexes.");
+            EnsureNoFilter(expressionIndex.FilterSql, expressionIndex.Name);
+            var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
+            return $"CREATE {unique}INDEX {Esc(expressionIndex.Name)} ON {EscTable(table.Name)} ({expressionIndex.ExpressionSql.Trim()})";
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -34,6 +34,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class CacheFaultInjectionStressTests : IDisposable
 {
     // ── Entity types ────────────────────────────────────────────────────────
@@ -942,6 +943,7 @@ public class CacheFaultInjectionStressTests : IDisposable
     // ═════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.CacheMemory)]
     public async Task BoundedCacheEvictionUnderContention_30Tasks_SizeBounded_ValuesCorrect()
     {
         const int maxSize = 50;

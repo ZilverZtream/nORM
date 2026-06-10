@@ -596,7 +596,11 @@ namespace nORM.Mapping
                     rightKeyColumns,
                     leftNavProp,
                     rightNavProp,
-                    p));
+                    p,
+                    m2m.LeftOnDelete,
+                    m2m.LeftOnUpdate,
+                    m2m.RightOnDelete,
+                    m2m.RightOnUpdate));
             }
         }
 

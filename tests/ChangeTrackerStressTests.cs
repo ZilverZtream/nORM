@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -21,6 +21,7 @@ namespace nORM.Tests;
 /// not internal implementation details.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ChangeTrackerStressTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

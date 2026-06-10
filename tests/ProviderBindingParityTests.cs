@@ -99,6 +99,8 @@ public class PPG40Child
 }
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class ProviderBindingParityTests
 {
     // -- Helpers ----------------------------------------------------------------

@@ -1,4 +1,5 @@
 using System.Linq;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Configuration;
@@ -7,18 +8,19 @@ using Xunit;
 
 namespace nORM.Tests
 {
-    [Xunit.Trait("Category", "Fast")]
-    public class CollidingValue
+    public readonly struct CollidingValue
     {
-        public string Value { get; set; } = string.Empty;
+        public CollidingValue(string value) => Value = value;
+        public string Value { get; }
         public override int GetHashCode() => 1;
     }
 
     [Xunit.Trait("Category", "Fast")]
     public class CollisionEntity
     {
+        [Key]
         public int Id { get; set; }
-        public CollidingValue Data { get; set; } = new();
+        public CollidingValue Data { get; set; }
     }
 
     [Xunit.Trait("Category", "Fast")]
@@ -30,9 +32,9 @@ namespace nORM.Tests
             using var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();
             using var ctx = new DbContext(cn, new SqliteProvider());
-            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue { Value = "A" } };
+            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue("A") };
             ctx.Attach(entity);
-            entity.Data = new CollidingValue { Value = "B" };
+            entity.Data = new CollidingValue("B");
             var entry = ctx.ChangeTracker.Entries.Single();
             var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
@@ -48,9 +50,9 @@ namespace nORM.Tests
             using var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();
             using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions { UsePreciseChangeTracking = true });
-            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue { Value = "A" } };
+            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue("A") };
             ctx.Attach(entity);
-            entity.Data = new CollidingValue { Value = "B" };
+            entity.Data = new CollidingValue("B");
             var entry = ctx.ChangeTracker.Entries.Single();
             var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
@@ -66,9 +68,9 @@ namespace nORM.Tests
             using var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();
             using var ctx = new DbContext(cn, new SqliteProvider());
-            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue { Value = "A" } };
+            var entity = new CollisionEntity { Id = 1, Data = new CollidingValue("A") };
             ctx.Attach(entity);
-            entity.Data = new CollidingValue { Value = "B" };
+            entity.Data = new CollidingValue("B");
             var detect = typeof(ChangeTracker).GetMethod("DetectChanges", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             detect!.Invoke(ctx.ChangeTracker, null);
             var state = ctx.ChangeTracker.Entries.Single().State;

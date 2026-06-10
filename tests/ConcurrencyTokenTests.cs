@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// entity property value.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrencyTokenTests
 {
     [Xunit.Trait("Category", "Fast")]

@@ -6,8 +6,13 @@ items:
   parent: nORM.Configuration
   children:
   - nORM.Configuration.IndexAttribute.#ctor(System.String)
+  - nORM.Configuration.IndexAttribute.FilterSql
+  - nORM.Configuration.IndexAttribute.IsDescending
+  - nORM.Configuration.IndexAttribute.IsIncluded
   - nORM.Configuration.IndexAttribute.IsUnique
   - nORM.Configuration.IndexAttribute.Name
+  - nORM.Configuration.IndexAttribute.NullSortOrder
+  - nORM.Configuration.IndexAttribute.NullsNotDistinct
   - nORM.Configuration.IndexAttribute.Order
   langs:
   - csharp
@@ -23,7 +28,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexAttribute
     path: src/nORM/Configuration/IndexAttribute.cs
-    startLine: 9
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -122,7 +127,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IndexAttribute.cs
-    startLine: 16
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -157,7 +162,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Configuration/IndexAttribute.cs
-    startLine: 25
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -188,7 +193,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Configuration/IndexAttribute.cs
-    startLine: 28
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -219,7 +224,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Order
     path: src/nORM/Configuration/IndexAttribute.cs
-    startLine: 34
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -235,6 +240,161 @@ items:
       type: System.Int32
     content.vb: Public Property Order As Integer
   overload: nORM.Configuration.IndexAttribute.Order*
+- uid: nORM.Configuration.IndexAttribute.IsDescending
+  commentId: P:nORM.Configuration.IndexAttribute.IsDescending
+  id: IsDescending
+  parent: nORM.Configuration.IndexAttribute
+  langs:
+  - csharp
+  - vb
+  name: IsDescending
+  nameWithType: IndexAttribute.IsDescending
+  fullName: nORM.Configuration.IndexAttribute.IsDescending
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsDescending
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 52
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets or sets whether this key column is ordered descending within the index.
+  example: []
+  syntax:
+    content: public bool IsDescending { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsDescending As Boolean
+  overload: nORM.Configuration.IndexAttribute.IsDescending*
+- uid: nORM.Configuration.IndexAttribute.IsIncluded
+  commentId: P:nORM.Configuration.IndexAttribute.IsIncluded
+  id: IsIncluded
+  parent: nORM.Configuration.IndexAttribute
+  langs:
+  - csharp
+  - vb
+  name: IsIncluded
+  nameWithType: IndexAttribute.IsIncluded
+  fullName: nORM.Configuration.IndexAttribute.IsIncluded
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsIncluded
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 57
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets or sets whether this column is an included, non-key column in the index.
+  example: []
+  syntax:
+    content: public bool IsIncluded { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsIncluded As Boolean
+  overload: nORM.Configuration.IndexAttribute.IsIncluded*
+- uid: nORM.Configuration.IndexAttribute.NullsNotDistinct
+  commentId: P:nORM.Configuration.IndexAttribute.NullsNotDistinct
+  id: NullsNotDistinct
+  parent: nORM.Configuration.IndexAttribute
+  langs:
+  - csharp
+  - vb
+  name: NullsNotDistinct
+  nameWithType: IndexAttribute.NullsNotDistinct
+  fullName: nORM.Configuration.IndexAttribute.NullsNotDistinct
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullsNotDistinct
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets or sets whether a unique PostgreSQL index treats null values as equal.
+  example: []
+  syntax:
+    content: public bool NullsNotDistinct { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property NullsNotDistinct As Boolean
+  overload: nORM.Configuration.IndexAttribute.NullsNotDistinct*
+- uid: nORM.Configuration.IndexAttribute.NullSortOrder
+  commentId: P:nORM.Configuration.IndexAttribute.NullSortOrder
+  id: NullSortOrder
+  parent: nORM.Configuration.IndexAttribute
+  langs:
+  - csharp
+  - vb
+  name: NullSortOrder
+  nameWithType: IndexAttribute.NullSortOrder
+  fullName: nORM.Configuration.IndexAttribute.NullSortOrder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullSortOrder
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 67
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets or sets explicit null ordering for this index key column.
+  example: []
+  syntax:
+    content: public IndexNullSortOrder NullSortOrder { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+    content.vb: Public Property NullSortOrder As IndexNullSortOrder
+  overload: nORM.Configuration.IndexAttribute.NullSortOrder*
+- uid: nORM.Configuration.IndexAttribute.FilterSql
+  commentId: P:nORM.Configuration.IndexAttribute.FilterSql
+  id: FilterSql
+  parent: nORM.Configuration.IndexAttribute
+  langs:
+  - csharp
+  - vb
+  name: FilterSql
+  nameWithType: IndexAttribute.FilterSql
+  fullName: nORM.Configuration.IndexAttribute.FilterSql
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IndexAttribute.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FilterSql
+    path: src/nORM/Configuration/IndexAttribute.cs
+    startLine: 72
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Gets or sets the provider-specific filter predicate for a filtered/partial index.
+  example: []
+  syntax:
+    content: public string? FilterSql { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property FilterSql As String
+  overload: nORM.Configuration.IndexAttribute.FilterSql*
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -2798,3 +2958,40 @@ references:
   nameWithType.vb: Integer
   fullName.vb: Integer
   name.vb: Integer
+- uid: nORM.Configuration.IndexAttribute.IsDescending*
+  commentId: Overload:nORM.Configuration.IndexAttribute.IsDescending
+  href: nORM.Configuration.IndexAttribute.html#nORM_Configuration_IndexAttribute_IsDescending
+  name: IsDescending
+  nameWithType: IndexAttribute.IsDescending
+  fullName: nORM.Configuration.IndexAttribute.IsDescending
+- uid: nORM.Configuration.IndexAttribute.IsIncluded*
+  commentId: Overload:nORM.Configuration.IndexAttribute.IsIncluded
+  href: nORM.Configuration.IndexAttribute.html#nORM_Configuration_IndexAttribute_IsIncluded
+  name: IsIncluded
+  nameWithType: IndexAttribute.IsIncluded
+  fullName: nORM.Configuration.IndexAttribute.IsIncluded
+- uid: nORM.Configuration.IndexAttribute.NullsNotDistinct*
+  commentId: Overload:nORM.Configuration.IndexAttribute.NullsNotDistinct
+  href: nORM.Configuration.IndexAttribute.html#nORM_Configuration_IndexAttribute_NullsNotDistinct
+  name: NullsNotDistinct
+  nameWithType: IndexAttribute.NullsNotDistinct
+  fullName: nORM.Configuration.IndexAttribute.NullsNotDistinct
+- uid: nORM.Configuration.IndexAttribute.NullSortOrder*
+  commentId: Overload:nORM.Configuration.IndexAttribute.NullSortOrder
+  href: nORM.Configuration.IndexAttribute.html#nORM_Configuration_IndexAttribute_NullSortOrder
+  name: NullSortOrder
+  nameWithType: IndexAttribute.NullSortOrder
+  fullName: nORM.Configuration.IndexAttribute.NullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration.IndexAttribute.FilterSql*
+  commentId: Overload:nORM.Configuration.IndexAttribute.FilterSql
+  href: nORM.Configuration.IndexAttribute.html#nORM_Configuration_IndexAttribute_FilterSql
+  name: FilterSql
+  nameWithType: IndexAttribute.FilterSql
+  fullName: nORM.Configuration.IndexAttribute.FilterSql

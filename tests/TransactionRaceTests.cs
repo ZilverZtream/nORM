@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -34,6 +34,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.TransactionStress)]
 public class TransactionRaceTests
 {
     // ── Test entity ───────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ public class TransactionRaceTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task DbContextTransaction_ConcurrentCommitAndDispose_NoUnhandledExceptions()
     {
         // The _completed atomic gate in DbContextTransaction ensures that concurrent
@@ -455,6 +457,7 @@ public class TransactionRaceTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Transaction_ConcurrentReads_NoInterference()
     {
         var (cn, ctx) = CreateDb();
@@ -532,6 +535,7 @@ public class TransactionRaceTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task HighConcurrency_ManySequentialSaveChanges_CountCorrect()
     {
         // Use a single context with sequential saves (not parallel — SQLite single-writer)

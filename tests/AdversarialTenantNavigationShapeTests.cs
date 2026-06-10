@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// in a single shared SQLite DB with overlapping PKs across tenants.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialTenantNavigationShapeTests
 {
     // ── Entity definitions ────────────────────────────────────────────────────

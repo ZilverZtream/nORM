@@ -24,6 +24,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class CompileTimeQueryLifecycleTests
 {
     // ── Domain model ──────────────────────────────────────────────────────────

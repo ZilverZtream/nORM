@@ -5,12 +5,19 @@ items:
   id: RelationshipConfiguration
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)
+  - nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction)
   - nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Reflection.PropertyInfo,System.Boolean)
   - nORM.Configuration.RelationshipConfiguration.CascadeDelete
+  - nORM.Configuration.RelationshipConfiguration.ConstraintName
   - nORM.Configuration.RelationshipConfiguration.DependentNavigation
   - nORM.Configuration.RelationshipConfiguration.DependentType
   - nORM.Configuration.RelationshipConfiguration.ForeignKey
+  - nORM.Configuration.RelationshipConfiguration.ForeignKeys
+  - nORM.Configuration.RelationshipConfiguration.OnDelete
+  - nORM.Configuration.RelationshipConfiguration.OnUpdate
   - nORM.Configuration.RelationshipConfiguration.PrincipalKey
+  - nORM.Configuration.RelationshipConfiguration.PrincipalKeys
   - nORM.Configuration.RelationshipConfiguration.PrincipalNavigation
   langs:
   - csharp
@@ -26,7 +33,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelationshipConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 88
+    startLine: 187
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -70,7 +77,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 88
+    startLine: 187
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -96,7 +103,7 @@ items:
       description: Foreign key property on the dependent entity.
     - id: CascadeDelete
       type: System.Boolean
-      description: Whether dependent entities should be cascade deleted.
+      description: Whether dependent entities should be cascade deleted through the tracked object graph.
     content.vb: Public Sub New(PrincipalNavigation As PropertyInfo, DependentType As Type, DependentNavigation As PropertyInfo, PrincipalKey As PropertyInfo, ForeignKey As PropertyInfo, CascadeDelete As Boolean = True)
   overload: nORM.Configuration.RelationshipConfiguration.#ctor*
   nameWithType.vb: RelationshipConfiguration.New(PropertyInfo, Type, PropertyInfo, PropertyInfo, PropertyInfo, Boolean)
@@ -120,7 +127,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalNavigation
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 88
+    startLine: 187
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -151,7 +158,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 88
+    startLine: 187
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -182,7 +189,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentNavigation
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 89
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -213,7 +220,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalKey
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 89
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -244,7 +251,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKey
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 89
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -275,11 +282,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CascadeDelete
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 89
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  summary: Whether dependent entities should be cascade deleted.
+  summary: Whether dependent entities should be cascade deleted through the tracked object graph.
   example: []
   syntax:
     content: public bool CascadeDelete { get; init; }
@@ -288,6 +295,251 @@ items:
       type: System.Boolean
     content.vb: Public Property CascadeDelete As Boolean
   overload: nORM.Configuration.RelationshipConfiguration.CascadeDelete*
+- uid: nORM.Configuration.RelationshipConfiguration.PrincipalKeys
+  commentId: P:nORM.Configuration.RelationshipConfiguration.PrincipalKeys
+  id: PrincipalKeys
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: PrincipalKeys
+  nameWithType: RelationshipConfiguration.PrincipalKeys
+  fullName: nORM.Configuration.RelationshipConfiguration.PrincipalKeys
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PrincipalKeys
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 191
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Ordered principal key properties for this relationship.
+  example: []
+  syntax:
+    content: public IReadOnlyList<PropertyInfo> PrincipalKeys { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    content.vb: Public Property PrincipalKeys As IReadOnlyList(Of PropertyInfo)
+  overload: nORM.Configuration.RelationshipConfiguration.PrincipalKeys*
+- uid: nORM.Configuration.RelationshipConfiguration.ForeignKeys
+  commentId: P:nORM.Configuration.RelationshipConfiguration.ForeignKeys
+  id: ForeignKeys
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ForeignKeys
+  nameWithType: RelationshipConfiguration.ForeignKeys
+  fullName: nORM.Configuration.RelationshipConfiguration.ForeignKeys
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ForeignKeys
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 195
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Ordered foreign key properties on the dependent entity.
+  example: []
+  syntax:
+    content: public IReadOnlyList<PropertyInfo> ForeignKeys { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    content.vb: Public Property ForeignKeys As IReadOnlyList(Of PropertyInfo)
+  overload: nORM.Configuration.RelationshipConfiguration.ForeignKeys*
+- uid: nORM.Configuration.RelationshipConfiguration.OnDelete
+  commentId: P:nORM.Configuration.RelationshipConfiguration.OnDelete
+  id: OnDelete
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: OnDelete
+  nameWithType: RelationshipConfiguration.OnDelete
+  fullName: nORM.Configuration.RelationshipConfiguration.OnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OnDelete
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 198
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database referential action to emit for principal deletes.
+  example: []
+  syntax:
+    content: public ReferentialAction OnDelete { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property OnDelete As ReferentialAction
+  overload: nORM.Configuration.RelationshipConfiguration.OnDelete*
+- uid: nORM.Configuration.RelationshipConfiguration.OnUpdate
+  commentId: P:nORM.Configuration.RelationshipConfiguration.OnUpdate
+  id: OnUpdate
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: OnUpdate
+  nameWithType: RelationshipConfiguration.OnUpdate
+  fullName: nORM.Configuration.RelationshipConfiguration.OnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OnUpdate
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 201
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database referential action to emit for principal key updates.
+  example: []
+  syntax:
+    content: public ReferentialAction OnUpdate { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property OnUpdate As ReferentialAction
+  overload: nORM.Configuration.RelationshipConfiguration.OnUpdate*
+- uid: nORM.Configuration.RelationshipConfiguration.ConstraintName
+  commentId: P:nORM.Configuration.RelationshipConfiguration.ConstraintName
+  id: ConstraintName
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ConstraintName
+  nameWithType: RelationshipConfiguration.ConstraintName
+  fullName: nORM.Configuration.RelationshipConfiguration.ConstraintName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ConstraintName
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 204
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Optional database foreign key constraint name to preserve in migration snapshots.
+  example: []
+  syntax:
+    content: public string? ConstraintName { get; init; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property ConstraintName As String
+  overload: nORM.Configuration.RelationshipConfiguration.ConstraintName*
+- uid: nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)
+  commentId: M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)
+  id: '#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Boolean)'
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RelationshipConfiguration(PropertyInfo, Type, PropertyInfo?, IReadOnlyList<PropertyInfo>, IReadOnlyList<PropertyInfo>, bool)
+  nameWithType: RelationshipConfiguration.RelationshipConfiguration(PropertyInfo, Type, PropertyInfo?, IReadOnlyList<PropertyInfo>, IReadOnlyList<PropertyInfo>, bool)
+  fullName: nORM.Configuration.RelationshipConfiguration.RelationshipConfiguration(System.Reflection.PropertyInfo, System.Type, System.Reflection.PropertyInfo?, System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>, System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>, bool)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 207
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Creates a relationship configuration backed by multiple key columns.
+  example: []
+  syntax:
+    content: public RelationshipConfiguration(PropertyInfo principalNavigation, Type dependentType, PropertyInfo? dependentNavigation, IReadOnlyList<PropertyInfo> principalKeys, IReadOnlyList<PropertyInfo> foreignKeys, bool cascadeDelete = true)
+    parameters:
+    - id: principalNavigation
+      type: System.Reflection.PropertyInfo
+    - id: dependentType
+      type: System.Type
+    - id: dependentNavigation
+      type: System.Reflection.PropertyInfo
+    - id: principalKeys
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    - id: foreignKeys
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    - id: cascadeDelete
+      type: System.Boolean
+    content.vb: Public Sub New(principalNavigation As PropertyInfo, dependentType As Type, dependentNavigation As PropertyInfo, principalKeys As IReadOnlyList(Of PropertyInfo), foreignKeys As IReadOnlyList(Of PropertyInfo), cascadeDelete As Boolean = True)
+  overload: nORM.Configuration.RelationshipConfiguration.#ctor*
+  nameWithType.vb: RelationshipConfiguration.New(PropertyInfo, Type, PropertyInfo, IReadOnlyList(Of PropertyInfo), IReadOnlyList(Of PropertyInfo), Boolean)
+  fullName.vb: nORM.Configuration.RelationshipConfiguration.New(System.Reflection.PropertyInfo, System.Type, System.Reflection.PropertyInfo, System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo), System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo), Boolean)
+  name.vb: New(PropertyInfo, Type, PropertyInfo, IReadOnlyList(Of PropertyInfo), IReadOnlyList(Of PropertyInfo), Boolean)
+- uid: nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction)
+  commentId: M:nORM.Configuration.RelationshipConfiguration.#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction)
+  id: '#ctor(System.Reflection.PropertyInfo,System.Type,System.Reflection.PropertyInfo,System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction)'
+  parent: nORM.Configuration.RelationshipConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RelationshipConfiguration(PropertyInfo, Type, PropertyInfo?, IReadOnlyList<PropertyInfo>, IReadOnlyList<PropertyInfo>, ReferentialAction, ReferentialAction)
+  nameWithType: RelationshipConfiguration.RelationshipConfiguration(PropertyInfo, Type, PropertyInfo?, IReadOnlyList<PropertyInfo>, IReadOnlyList<PropertyInfo>, ReferentialAction, ReferentialAction)
+  fullName: nORM.Configuration.RelationshipConfiguration.RelationshipConfiguration(System.Reflection.PropertyInfo, System.Type, System.Reflection.PropertyInfo?, System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>, System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 234
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Creates a relationship configuration backed by multiple key columns and explicit database referential actions.
+  example: []
+  syntax:
+    content: public RelationshipConfiguration(PropertyInfo principalNavigation, Type dependentType, PropertyInfo? dependentNavigation, IReadOnlyList<PropertyInfo> principalKeys, IReadOnlyList<PropertyInfo> foreignKeys, ReferentialAction onDelete, ReferentialAction onUpdate)
+    parameters:
+    - id: principalNavigation
+      type: System.Reflection.PropertyInfo
+    - id: dependentType
+      type: System.Type
+    - id: dependentNavigation
+      type: System.Reflection.PropertyInfo
+    - id: principalKeys
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    - id: foreignKeys
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    - id: onDelete
+      type: nORM.Configuration.ReferentialAction
+    - id: onUpdate
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Sub New(principalNavigation As PropertyInfo, dependentType As Type, dependentNavigation As PropertyInfo, principalKeys As IReadOnlyList(Of PropertyInfo), foreignKeys As IReadOnlyList(Of PropertyInfo), onDelete As ReferentialAction, onUpdate As ReferentialAction)
+  overload: nORM.Configuration.RelationshipConfiguration.#ctor*
+  nameWithType.vb: RelationshipConfiguration.New(PropertyInfo, Type, PropertyInfo, IReadOnlyList(Of PropertyInfo), IReadOnlyList(Of PropertyInfo), ReferentialAction, ReferentialAction)
+  fullName.vb: nORM.Configuration.RelationshipConfiguration.New(System.Reflection.PropertyInfo, System.Type, System.Reflection.PropertyInfo, System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo), System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo), nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction)
+  name.vb: New(PropertyInfo, Type, PropertyInfo, IReadOnlyList(Of PropertyInfo), IReadOnlyList(Of PropertyInfo), ReferentialAction, ReferentialAction)
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1412,3 +1664,151 @@ references:
   name: CascadeDelete
   nameWithType: RelationshipConfiguration.CascadeDelete
   fullName: nORM.Configuration.RelationshipConfiguration.CascadeDelete
+- uid: nORM.Configuration.RelationshipConfiguration.PrincipalKeys*
+  commentId: Overload:nORM.Configuration.RelationshipConfiguration.PrincipalKeys
+  href: nORM.Configuration.RelationshipConfiguration.html#nORM_Configuration_RelationshipConfiguration_PrincipalKeys
+  name: PrincipalKeys
+  nameWithType: RelationshipConfiguration.PrincipalKeys
+  fullName: nORM.Configuration.RelationshipConfiguration.PrincipalKeys
+- uid: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<PropertyInfo>
+  nameWithType: IReadOnlyList<PropertyInfo>
+  fullName: System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>
+  nameWithType.vb: IReadOnlyList(Of PropertyInfo)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo)
+  name.vb: IReadOnlyList(Of PropertyInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Configuration.RelationshipConfiguration.ForeignKeys*
+  commentId: Overload:nORM.Configuration.RelationshipConfiguration.ForeignKeys
+  href: nORM.Configuration.RelationshipConfiguration.html#nORM_Configuration_RelationshipConfiguration_ForeignKeys
+  name: ForeignKeys
+  nameWithType: RelationshipConfiguration.ForeignKeys
+  fullName: nORM.Configuration.RelationshipConfiguration.ForeignKeys
+- uid: nORM.Configuration.RelationshipConfiguration.OnDelete*
+  commentId: Overload:nORM.Configuration.RelationshipConfiguration.OnDelete
+  href: nORM.Configuration.RelationshipConfiguration.html#nORM_Configuration_RelationshipConfiguration_OnDelete
+  name: OnDelete
+  nameWithType: RelationshipConfiguration.OnDelete
+  fullName: nORM.Configuration.RelationshipConfiguration.OnDelete
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.RelationshipConfiguration.OnUpdate*
+  commentId: Overload:nORM.Configuration.RelationshipConfiguration.OnUpdate
+  href: nORM.Configuration.RelationshipConfiguration.html#nORM_Configuration_RelationshipConfiguration_OnUpdate
+  name: OnUpdate
+  nameWithType: RelationshipConfiguration.OnUpdate
+  fullName: nORM.Configuration.RelationshipConfiguration.OnUpdate
+- uid: nORM.Configuration.RelationshipConfiguration.ConstraintName*
+  commentId: Overload:nORM.Configuration.RelationshipConfiguration.ConstraintName
+  href: nORM.Configuration.RelationshipConfiguration.html#nORM_Configuration_RelationshipConfiguration_ConstraintName
+  name: ConstraintName
+  nameWithType: RelationshipConfiguration.ConstraintName
+  fullName: nORM.Configuration.RelationshipConfiguration.ConstraintName
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String

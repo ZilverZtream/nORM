@@ -38,6 +38,26 @@ function Test-ProviderConfigured {
         [Environment]::GetEnvironmentVariable("NORM_TEST_${Name}_CS"))
 }
 
+function New-ProviderFloorEvidence {
+    param(
+        [string]$Name,
+        [bool]$Configured,
+        [string]$MinimumVersion,
+        [string]$FloorLabel,
+        [string[]]$RequiredFloorFeatures
+    )
+
+    [pscustomobject]@{
+        Name = $Name
+        Configured = $Configured
+        MinimumVersion = $MinimumVersion
+        FloorLabel = $FloorLabel
+        RequiredFloorFeatures = $RequiredFloorFeatures
+        ActualServerVersion = $null
+        ActualServerVersionSource = 'not captured by rc-artifact-manifest; use dotnet-norm portability certify target reports for live floor proof'
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $commit = (& git -C $root rev-parse HEAD).Trim()
@@ -49,10 +69,64 @@ $processArch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchi
 $generatedUtc = [DateTime]::UtcNow.ToString('O')
 
 $providers = @(
-    [pscustomobject]@{ Name = 'SQL Server'; Configured = (Test-ProviderConfigured 'SQLSERVER') }
-    [pscustomobject]@{ Name = 'PostgreSQL'; Configured = (Test-ProviderConfigured 'POSTGRES') }
-    [pscustomobject]@{ Name = 'MySQL'; Configured = (Test-ProviderConfigured 'MYSQL') }
-    [pscustomobject]@{ Name = 'SQLite'; Configured = $true }
+    New-ProviderFloorEvidence `
+        -Name 'SQL Server' `
+        -Configured (Test-ProviderConfigured 'SQLSERVER') `
+        -MinimumVersion '13.0' `
+        -FloorLabel 'SQL Server 2016' `
+        -RequiredFloorFeatures @(
+            'JSON_VALUE JSON translation',
+            'ROW_NUMBER/window translation',
+            'IDENTITY plus OUTPUT generated-value retrieval',
+            'sp_rename column rename',
+            'SAVE TRANSACTION savepoints',
+            'IF NOT EXISTS idempotent join-table insert',
+            'nORM-managed temporal history/triggers',
+            'provider-native temporal DDL and AS OF translation',
+            'native bulk insert',
+            'native tenant session context')
+    New-ProviderFloorEvidence `
+        -Name 'PostgreSQL' `
+        -Configured (Test-ProviderConfigured 'POSTGRES') `
+        -MinimumVersion '12.0' `
+        -FloorLabel 'PostgreSQL 12' `
+        -RequiredFloorFeatures @(
+            'jsonb JSON translation',
+            'ROW_NUMBER/window translation',
+            'GENERATED AS IDENTITY plus RETURNING generated-value retrieval',
+            'ALTER TABLE RENAME COLUMN',
+            'SAVEPOINT savepoints',
+            'ON CONFLICT DO NOTHING idempotent join-table insert',
+            'nORM-managed temporal history/triggers',
+            'native bulk insert',
+            'native tenant session context')
+    New-ProviderFloorEvidence `
+        -Name 'MySQL' `
+        -Configured (Test-ProviderConfigured 'MYSQL') `
+        -MinimumVersion '8.0' `
+        -FloorLabel 'MySQL 8.0' `
+        -RequiredFloorFeatures @(
+            'JSON_EXTRACT JSON translation',
+            'ROW_NUMBER/window translation',
+            'AUTO_INCREMENT plus LAST_INSERT_ID generated-value retrieval',
+            'ALTER TABLE RENAME COLUMN',
+            'SAVEPOINT savepoints',
+            'INSERT IGNORE idempotent join-table insert',
+            'nORM-managed temporal history/triggers',
+            'native bulk insert')
+    New-ProviderFloorEvidence `
+        -Name 'SQLite' `
+        -Configured $true `
+        -MinimumVersion '3.25' `
+        -FloorLabel 'SQLite 3.25' `
+        -RequiredFloorFeatures @(
+            'JSON1 json_extract JSON translation',
+            'ROW_NUMBER/window translation',
+            'rowid/AUTOINCREMENT generated-value retrieval',
+            'ALTER TABLE RENAME COLUMN',
+            'SAVEPOINT savepoints',
+            'INSERT OR IGNORE idempotent join-table insert',
+            'nORM-managed temporal history/triggers')
 )
 
 $testResults = Get-RelativeFiles @('tests/TestResults')
@@ -130,10 +204,12 @@ $lines.Add("- Working tree clean: $([string]::IsNullOrWhiteSpace($status))")
 $lines.Add('')
 $lines.Add('## Providers')
 $lines.Add('')
-$lines.Add('| Provider | Configured |')
-$lines.Add('| --- | --- |')
+$lines.Add('| Provider | Configured | Minimum Version | Floor Label | Required Floor Features | Actual Server Version |')
+$lines.Add('| --- | --- | --- | --- | --- | --- |')
 foreach ($provider in $providers) {
-    $lines.Add("| $($provider.Name) | $($provider.Configured) |")
+    $actualVersion = if ($provider.ActualServerVersion) { $provider.ActualServerVersion } else { 'not captured; see provider mobility target report' }
+    $features = ($provider.RequiredFloorFeatures -join '<br>')
+    $lines.Add("| $($provider.Name) | $($provider.Configured) | $($provider.MinimumVersion) | $($provider.FloorLabel) | $features | $actualVersion |")
 }
 
 # Packages — rendered separately with hash column

@@ -120,6 +120,15 @@ namespace nORM.Migration
         // comparisons in SchemaDiffer.Diff do not require extra null guards. If ClrType is empty
         // on a ColumnSchema produced by external code, treat it as a configuration concern.
         public string ClrType { get; set; } = string.Empty;
+        /// <summary>Optional maximum length for bounded text or binary columns.</summary>
+        public int? MaxLength { get; set; }
+        /// <summary>
+        /// Optional Unicode text storage hint. <c>false</c> requests non-Unicode text where the provider distinguishes it;
+        /// <c>true</c> requests Unicode text; <c>null</c> uses the provider default.
+        /// </summary>
+        public bool? IsUnicode { get; set; }
+        /// <summary>True when bounded text or binary storage should use a fixed-length provider type.</summary>
+        public bool IsFixedLength { get; set; }
         /// <summary>Optional decimal/numeric precision for providers that support fixed-precision decimals.</summary>
         public int? Precision { get; set; }
         /// <summary>Optional decimal/numeric scale for providers that support fixed-precision decimals.</summary>
@@ -167,6 +176,10 @@ namespace nORM.Migration
         public bool IsDescending { get; set; }
         /// <summary>True when this column is an included, non-key column.</summary>
         public bool IsIncluded { get; set; }
+        /// <summary>True when a unique PostgreSQL index treats null values as equal.</summary>
+        public bool NullsNotDistinct { get; set; }
+        /// <summary>Explicit provider null ordering for this index key column.</summary>
+        public IndexNullSortOrder NullSortOrder { get; set; }
         /// <summary>Provider-specific filter predicate for a filtered/partial index.</summary>
         public string? FilterSql { get; set; }
     }
@@ -264,7 +277,8 @@ namespace nORM.Migration
                         continue;
                     // Exclude collection/enumerable navigation properties (e.g. List<Post>, ICollection<T>)
                     if (typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType)
-                        && prop.PropertyType != typeof(string))
+                        && prop.PropertyType != typeof(string)
+                        && prop.PropertyType != typeof(byte[]))
                         continue;
                     // Exclude reference navigation properties (class types that are not mappable scalars)
                     if (!IsMappableType(prop.PropertyType))
@@ -279,6 +293,7 @@ namespace nORM.Migration
                     var isPk = pkNames.Contains(prop.Name);
                     var dbGenAttr = prop.GetCustomAttribute<DatabaseGeneratedAttribute>();
                     var renameAttr = prop.GetCustomAttribute<RenameColumnAttr>();
+                    var storeFacets = ParseStringBinaryFacets(colAttr?.TypeName, clr);
                     var (precision, scale) = TryParseDecimalPrecision(colAttr?.TypeName, clr);
                     var indexAttrs = indexAttributesByProperty[prop];
                     var firstIndexAttr = indexAttrs.FirstOrDefault();
@@ -293,6 +308,9 @@ namespace nORM.Migration
                         // full generic form (e.g. "System.Collections.Generic.List`1[System.Int32]")
                         // which is unambiguous, unlike Name which gives just "List`1".
                         ClrType = clr.FullName ?? clr.ToString(),
+                        MaxLength = GetMaxLength(prop, clr, colAttr, storeFacets),
+                        IsUnicode = storeFacets.IsUnicode,
+                        IsFixedLength = storeFacets.IsFixedLength,
                         Precision = precision,
                         Scale = scale,
                         IsNullable = !prop.PropertyType.IsValueType || Nullable.GetUnderlyingType(prop.PropertyType) != null,
@@ -319,6 +337,8 @@ namespace nORM.Migration
                             Order = indexAttr.Order,
                             IsDescending = indexAttr.IsDescending,
                             IsIncluded = indexAttr.IsIncluded,
+                            NullsNotDistinct = indexAttr.NullsNotDistinct,
+                            NullSortOrder = indexAttr.NullSortOrder,
                             FilterSql = indexAttr.FilterSql
                         });
                     }
@@ -406,6 +426,7 @@ namespace nORM.Migration
 
                 // Count PK columns so that composite PKs do not produce per-column UNIQUE constraints.
                 var pkCount = map.Columns.Count(c => c.IsKey);
+                var primaryKeyConstraintName = GetPrimaryKeyConstraintName(map.FluentConfiguration, map.TableName);
                 var indexAttributesByProperty = BuildIndexAttributesByProperty(map.Columns);
                 var indexColumnCounts = BuildIndexColumnCounts(indexAttributesByProperty);
 
@@ -415,7 +436,8 @@ namespace nORM.Migration
                     var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
                     var isNullable = col.IsNullable;
                     var columnAttr = GetColumnAttribute(col);
-                    var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
+                    var (precision, scale) = GetPrecision(col, clrType, columnConfiguration, columnAttr);
+                    var storeFacets = ParseStringBinaryFacets(columnAttr?.TypeName, clrType);
                     ComputedColumnConfiguration? computedColumn = null;
                     columnConfiguration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
                     IdentityOptionsConfiguration? identityOptions = null;
@@ -429,6 +451,9 @@ namespace nORM.Migration
                         // Use ToString() as fallback: for constructed generic types it returns the
                         // full generic form, which is unambiguous, unlike Name which gives just "List`1".
                         ClrType      = clrType.FullName ?? clrType.ToString(),
+                        MaxLength    = GetMaxLength(col, clrType, columnConfiguration, columnAttr, storeFacets),
+                        IsUnicode    = GetUnicode(col, clrType, columnConfiguration, storeFacets),
+                        IsFixedLength = GetFixedLength(col, clrType, columnConfiguration, storeFacets),
                         Precision    = precision,
                         Scale        = scale,
                         IsNullable   = isNullable,
@@ -436,7 +461,7 @@ namespace nORM.Migration
                         // Only mark IsUnique for single-column PKs; composite PKs must NOT
                         // emit per-column UNIQUE constraints.
                         IsUnique     = col.IsKey && pkCount == 1,
-                        IndexName    = col.IsKey ? $"PK_{map.TableName}" : null,
+                        IndexName    = col.IsKey ? primaryKeyConstraintName : null,
                         IndexOrder   = null,
                         IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity,
                         IdentitySeed = identityOptions?.Seed,
@@ -569,14 +594,18 @@ namespace nORM.Migration
                         ConstraintName   = $"FK_{join.TableName}_{map.TableName}_{string.Join("_", join.LeftFkColumns)}",
                         DependentColumns = join.LeftFkColumns.ToArray(),
                         PrincipalTable   = map.TableName,
-                        PrincipalColumns = join.LeftKeyColumns.Select(c => c.Name).ToArray()
+                        PrincipalColumns = join.LeftKeyColumns.Select(c => c.Name).ToArray(),
+                        OnDelete         = ToForeignKeyActionSql(join.LeftOnDelete),
+                        OnUpdate         = ToForeignKeyActionSql(join.LeftOnUpdate)
                     });
                     joinTable.ForeignKeys.Add(new ForeignKeySchema
                     {
                         ConstraintName   = $"FK_{join.TableName}_{rightTable.Name}_{string.Join("_", join.RightFkColumns)}",
                         DependentColumns = join.RightFkColumns.ToArray(),
                         PrincipalTable   = rightTable.Name,
-                        PrincipalColumns = join.RightKeyColumns.Select(c => c.Name).ToArray()
+                        PrincipalColumns = join.RightKeyColumns.Select(c => c.Name).ToArray(),
+                        OnDelete         = ToForeignKeyActionSql(join.RightOnDelete),
+                        OnUpdate         = ToForeignKeyActionSql(join.RightOnUpdate)
                     });
 
                     snapshot.Tables.Add(joinTable);
@@ -636,7 +665,8 @@ namespace nORM.Migration
             var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
             var isNullable = col.IsNullable;
             var columnAttr = GetColumnAttribute(col);
-            var (precision, scale) = TryParseDecimalPrecision(columnAttr?.TypeName, clrType);
+            var (precision, scale) = GetPrecision(col, clrType, configuration, columnAttr);
+            var storeFacets = ParseStringBinaryFacets(columnAttr?.TypeName, clrType);
             ComputedColumnConfiguration? computedColumn = null;
             configuration?.ComputedColumnSql.TryGetValue(col.Prop, out computedColumn);
             IdentityOptionsConfiguration? identityOptions = null;
@@ -644,16 +674,20 @@ namespace nORM.Migration
             string? collation = null;
             configuration?.Collations.TryGetValue(col.Prop, out collation);
             var dbGenerated = GetDatabaseGeneratedOption(col);
+            var primaryKeyConstraintName = GetPrimaryKeyConstraintName(configuration, tableName);
             var column = new ColumnSchema
             {
                 Name = col.Name,
                 ClrType = clrType.FullName ?? clrType.ToString(),
+                MaxLength = GetMaxLength(col, clrType, configuration, columnAttr, storeFacets),
+                IsUnicode = GetUnicode(col, clrType, configuration, storeFacets),
+                IsFixedLength = GetFixedLength(col, clrType, configuration, storeFacets),
                 Precision = precision,
                 Scale = scale,
                 IsNullable = isNullable,
                 IsPrimaryKey = col.IsKey,
                 IsUnique = col.IsKey && pkCount == 1,
-                IndexName = col.IsKey ? $"PK_{tableName}" : null,
+                IndexName = col.IsKey ? primaryKeyConstraintName : null,
                 IsIdentity = dbGenerated == DatabaseGeneratedOption.Identity,
                 IdentitySeed = identityOptions?.Seed,
                 IdentityIncrement = identityOptions?.Increment,
@@ -668,6 +702,11 @@ namespace nORM.Migration
             ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
             return column;
         }
+
+        private static string GetPrimaryKeyConstraintName(IEntityTypeConfiguration? configuration, string tableName)
+            => !string.IsNullOrWhiteSpace(configuration?.PrimaryKeyConstraintName)
+                ? configuration.PrimaryKeyConstraintName!
+                : $"PK_{tableName}";
 
         private static void AddConfiguredOwnedNavigationTableMetadata(TableSchema table, IEntityTypeConfiguration configuration)
         {
@@ -710,6 +749,108 @@ namespace nORM.Migration
             => column.IsShadow
                 ? null
                 : column.Prop.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption;
+
+        private static int? GetMaxLength(Column column, Type clrType)
+            => column.IsShadow
+                ? null
+                : GetMaxLength(column.Prop, clrType, GetColumnAttribute(column), ParseStringBinaryFacets(GetColumnAttribute(column)?.TypeName, clrType));
+
+        private static int? GetMaxLength(
+            Column column,
+            Type clrType,
+            IEntityTypeConfiguration? configuration,
+            ColumnAttribute? columnAttribute,
+            ScaffoldStringBinaryFacets storeFacets)
+        {
+            if (!column.IsShadow
+                && configuration?.MaxLengths.TryGetValue(column.Prop, out var configuredMaxLength) == true)
+            {
+                return configuredMaxLength;
+            }
+
+            return column.IsShadow
+                ? null
+                : GetMaxLength(column.Prop, clrType, columnAttribute, storeFacets);
+        }
+
+        private static int? GetMaxLength(
+            PropertyInfo property,
+            Type clrType,
+            ColumnAttribute? columnAttribute,
+            ScaffoldStringBinaryFacets storeFacets)
+        {
+            if (clrType != typeof(string) && clrType != typeof(byte[]))
+                return null;
+
+            var maxLengthAttribute = property.GetCustomAttribute<MaxLengthAttribute>();
+            var length = maxLengthAttribute?.Length > 0
+                ? maxLengthAttribute.Length
+                : (int?)null;
+
+            if (clrType == typeof(string))
+            {
+                var stringLengthAttribute = property.GetCustomAttribute<StringLengthAttribute>();
+                if (stringLengthAttribute?.MaximumLength > 0)
+                {
+                    length = length.HasValue
+                        ? Math.Min(length.Value, stringLengthAttribute.MaximumLength)
+                        : stringLengthAttribute.MaximumLength;
+                }
+            }
+
+            return length ?? storeFacets.MaxLength;
+        }
+
+        private static bool? GetUnicode(
+            Column column,
+            Type clrType,
+            IEntityTypeConfiguration? configuration,
+            ScaffoldStringBinaryFacets storeFacets)
+        {
+            if (clrType != typeof(string))
+                return null;
+
+            if (!column.IsShadow
+                && configuration?.UnicodeSettings.TryGetValue(column.Prop, out var configuredUnicode) == true)
+            {
+                return configuredUnicode;
+            }
+
+            return storeFacets.IsUnicode;
+        }
+
+        private static bool GetFixedLength(
+            Column column,
+            Type clrType,
+            IEntityTypeConfiguration? configuration,
+            ScaffoldStringBinaryFacets storeFacets)
+        {
+            if (clrType != typeof(string) && clrType != typeof(byte[]))
+                return false;
+
+            if (!column.IsShadow
+                && configuration?.FixedLengthSettings.TryGetValue(column.Prop, out var configuredFixedLength) == true)
+            {
+                return configuredFixedLength;
+            }
+
+            return storeFacets.IsFixedLength;
+        }
+
+        private static (int? Precision, int? Scale) GetPrecision(
+            Column column,
+            Type clrType,
+            IEntityTypeConfiguration? configuration,
+            ColumnAttribute? columnAttribute)
+        {
+            if (!column.IsShadow
+                && configuration?.Precisions.TryGetValue(column.Prop, out var configuredPrecision) == true)
+            {
+                return (configuredPrecision.Precision, configuredPrecision.Scale);
+            }
+
+            return TryParseDecimalPrecision(columnAttribute?.TypeName, clrType);
+        }
 
         private static Dictionary<PropertyInfo, IndexAttribute[]> BuildIndexAttributesByProperty(IEnumerable<Column> columns)
             => columns
@@ -759,6 +900,8 @@ namespace nORM.Migration
                     Order = indexAttr.Order,
                     IsDescending = indexAttr.IsDescending,
                     IsIncluded = indexAttr.IsIncluded,
+                    NullsNotDistinct = indexAttr.NullsNotDistinct,
+                    NullSortOrder = indexAttr.NullSortOrder,
                     FilterSql = indexAttr.FilterSql
                 });
             }
@@ -889,35 +1032,132 @@ namespace nORM.Migration
                 : tableAttribute.Schema + "." + tableAttribute.Name;
         }
 
+        private readonly record struct ScaffoldStringBinaryFacets(int? MaxLength, bool? IsUnicode, bool IsFixedLength);
+
+        private static ScaffoldStringBinaryFacets ParseStringBinaryFacets(string? typeName, Type clrType)
+        {
+            if ((clrType != typeof(string) && clrType != typeof(byte[]))
+                || string.IsNullOrWhiteSpace(typeName))
+            {
+                return default;
+            }
+
+            var normalized = NormalizeStoreTypeName(typeName);
+            var open = normalized.LastIndexOf('(');
+            var close = open >= 0 ? normalized.IndexOf(')', open + 1) : -1;
+            if ((open >= 0 && close != normalized.Length - 1)
+                || (open < 0 && normalized.Contains(')', StringComparison.Ordinal)))
+            {
+                return default;
+            }
+
+            var baseName = (open >= 0 ? normalized[..open] : normalized).Trim();
+            var args = open >= 0 && close > open
+                ? normalized.Substring(open + 1, close - open - 1)
+                    .Split(',', StringSplitOptions.TrimEntries)
+                : Array.Empty<string>();
+            if (args.Length > 1 || args.Any(static arg => arg.Length == 0))
+                return default;
+
+            var maxLength = args.Length == 1
+                && !string.Equals(args[0], "max", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out var parsedLength)
+                && parsedLength > 0
+                ? parsedLength
+                : (int?)null;
+
+            return clrType == typeof(byte[])
+                ? baseName switch
+                {
+                    "binary" => new ScaffoldStringBinaryFacets(maxLength, null, true),
+                    "varbinary" => new ScaffoldStringBinaryFacets(maxLength, null, false),
+                    _ => default
+                }
+                : baseName switch
+                {
+                    "nchar" or "national character" => new ScaffoldStringBinaryFacets(maxLength, true, true),
+                    "nvarchar" or "national character varying" => new ScaffoldStringBinaryFacets(maxLength, true, false),
+                    "char" => new ScaffoldStringBinaryFacets(maxLength, false, true),
+                    "varchar" => new ScaffoldStringBinaryFacets(maxLength, false, false),
+                    "text" => new ScaffoldStringBinaryFacets(null, false, false),
+                    "ntext" => new ScaffoldStringBinaryFacets(null, true, false),
+                    "character" => new ScaffoldStringBinaryFacets(maxLength, null, true),
+                    "character varying" or "varying character" => new ScaffoldStringBinaryFacets(maxLength, null, false),
+                    _ => default
+                };
+        }
+
+        private static string NormalizeStoreTypeName(string typeName)
+        {
+            var normalized = typeName.Trim().ToLowerInvariant();
+            if (normalized.StartsWith("domain (", StringComparison.Ordinal) && normalized.EndsWith(")", StringComparison.Ordinal))
+            {
+                var arrow = normalized.LastIndexOf("->", StringComparison.Ordinal);
+                if (arrow >= 0)
+                    normalized = normalized.Substring(arrow + 2, normalized.Length - arrow - 3).Trim();
+            }
+
+            var open = normalized.IndexOf('(');
+            var baseName = open >= 0 ? normalized[..open].Trim() : normalized;
+            var lastDot = baseName.LastIndexOf('.');
+            if (lastDot >= 0 && lastDot + 1 < baseName.Length)
+                normalized = baseName[(lastDot + 1)..] + (open >= 0 ? normalized[open..] : string.Empty);
+
+            return normalized;
+        }
+
         private static (int? Precision, int? Scale) TryParseDecimalPrecision(string? typeName, Type clrType)
         {
             if (clrType != typeof(decimal) || string.IsNullOrWhiteSpace(typeName))
                 return (null, null);
 
-            var open = typeName.IndexOf('(');
-            var comma = typeName.IndexOf(',', open + 1);
-            var close = typeName.IndexOf(')', comma + 1);
-            if (open < 0 || comma < 0 || close < 0)
+            var open = typeName.LastIndexOf('(');
+            var close = typeName.IndexOf(')', open + 1);
+            if (open < 0 || close < 0)
                 return (null, null);
 
             var baseName = typeName[..open].Trim();
-            if (!baseName.EndsWith("decimal", StringComparison.OrdinalIgnoreCase)
-                && !baseName.EndsWith("numeric", StringComparison.OrdinalIgnoreCase))
+            if (!EndsWithDelimitedTypeName(baseName, "decimal")
+                && !EndsWithDelimitedTypeName(baseName, "numeric"))
             {
                 return (null, null);
             }
 
-            if (int.TryParse(typeName.AsSpan(open + 1, comma - open - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var precision)
-                && int.TryParse(typeName.AsSpan(comma + 1, close - comma - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var scale)
-                && precision > 0
-                && scale >= 0
-                && scale <= precision)
+            var precisionAndScaleText = typeName.Substring(open + 1, close - open - 1);
+            var parts = precisionAndScaleText
+                .Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length is < 1 or > 2)
+                return (null, null);
+
+            if (int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var precision)
+                && precision > 0)
             {
-                return (precision, scale);
+                if (parts.Length == 1)
+                    return (precision, null);
+
+                if (int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var scale)
+                    && scale >= 0
+                    && scale <= precision)
+                {
+                    return (precision, scale);
+                }
             }
 
             return (null, null);
         }
+
+        private static bool EndsWithDelimitedTypeName(string text, string typeName)
+        {
+            var trimmed = text.TrimEnd();
+            if (!trimmed.EndsWith(typeName, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var prefixLength = trimmed.Length - typeName.Length;
+            return prefixLength == 0 || !IsTypeNameIdentifierChar(trimmed[prefixLength - 1]);
+        }
+
+        private static bool IsTypeNameIdentifierChar(char value)
+            => char.IsLetterOrDigit(value) || value == '_';
 
         /// <summary>
         /// Emits a debug diagnostic when a FK's dependent type is not registered in the current
@@ -1045,6 +1285,9 @@ namespace nORM.Migration
                     .Select(x => x.Column)
                     .FirstOrDefault(x =>
                         string.Equals(x.ClrType, column.ClrType, StringComparison.OrdinalIgnoreCase) &&
+                        x.MaxLength == column.MaxLength &&
+                        x.IsUnicode == column.IsUnicode &&
+                        x.IsFixedLength == column.IsFixedLength &&
                         x.Precision == column.Precision &&
                         x.Scale == column.Scale &&
                         x.IsNullable == column.IsNullable);
@@ -1118,6 +1361,11 @@ namespace nORM.Migration
                 warnings.Add($"Alter column '{column}' narrows precision/scale from '{FormatPrecisionScale(oldColumn)}' to '{FormatPrecisionScale(newColumn)}' and may truncate existing values.");
             }
 
+            if (NarrowsMaxLength(oldColumn, newColumn))
+            {
+                warnings.Add($"Alter column '{column}' narrows max length from '{FormatMaxLength(oldColumn)}' to '{FormatMaxLength(newColumn)}' and may truncate existing values.");
+            }
+
             if (oldColumn.IsPrimaryKey && !newColumn.IsPrimaryKey)
             {
                 warnings.Add($"Alter column '{column}' drops primary key membership and will stop enforcing entity identity.");
@@ -1171,6 +1419,17 @@ namespace nORM.Migration
                     : string.Create(
                         CultureInfo.InvariantCulture,
                         $"{column.Precision.Value},{column.Scale.Value}");
+
+        private static bool NarrowsMaxLength(ColumnSchema oldColumn, ColumnSchema newColumn)
+        {
+            if (oldColumn.MaxLength == newColumn.MaxLength || newColumn.MaxLength is null)
+                return false;
+
+            return oldColumn.MaxLength is null || newColumn.MaxLength.Value < oldColumn.MaxLength.Value;
+        }
+
+        private static string FormatMaxLength(ColumnSchema column)
+            => column.MaxLength?.ToString(CultureInfo.InvariantCulture) ?? "unbounded";
     }
 
     /// <summary>
@@ -1252,6 +1511,9 @@ namespace nORM.Migration
                     if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
                     else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
+                        || oldCol.MaxLength != col.MaxLength
+                        || oldCol.IsUnicode != col.IsUnicode
+                        || oldCol.IsFixedLength != col.IsFixedLength
                         || oldCol.Precision != col.Precision
                         || oldCol.Scale != col.Scale
                         || oldCol.IsNullable != col.IsNullable
@@ -1284,7 +1546,7 @@ namespace nORM.Migration
                 var oldIndexes = BuildIndexMap(oldTable);
                 var newIndexes = BuildIndexMap(newTable);
 
-                foreach (var (name, (isUnique, cols, descending, included, filterSql)) in newIndexes)
+                foreach (var (name, (isUnique, cols, descending, nullSortOrders, included, nullsNotDistinct, filterSql)) in newIndexes)
                 {
                     if (!oldIndexes.ContainsKey(name))
                     {
@@ -1294,13 +1556,14 @@ namespace nORM.Migration
                     else
                     {
                         // Index exists in both — check for definition changes
-                        var (oldIsUnique, oldCols, oldDescending, oldIncluded, oldFilterSql) = oldIndexes[name];
+                        var (oldIsUnique, oldCols, oldDescending, oldNullSortOrders, oldIncluded, oldNullsNotDistinct, oldFilterSql) = oldIndexes[name];
                         // Compare column lists in declared order; (A,B) and (B,A) are semantically distinct indexes.
                         var colsChanged = !oldCols.SequenceEqual(cols, StringComparer.OrdinalIgnoreCase);
                         var directionChanged = !oldDescending.SequenceEqual(descending);
+                        var nullSortOrderChanged = !oldNullSortOrders.SequenceEqual(nullSortOrders);
                         var includedChanged = !oldIncluded.SequenceEqual(included, StringComparer.OrdinalIgnoreCase);
                         var filterChanged = !string.Equals(oldFilterSql, filterSql, StringComparison.OrdinalIgnoreCase);
-                        if (oldIsUnique != isUnique || colsChanged || directionChanged || includedChanged || filterChanged)
+                        if (oldIsUnique != isUnique || colsChanged || directionChanged || nullSortOrderChanged || includedChanged || oldNullsNotDistinct != nullsNotDistinct || filterChanged)
                         {
                             if (!IsSyntheticIndexKey(name))
                             {
@@ -1481,10 +1744,10 @@ namespace nORM.Migration
             && string.Equals(NormalizeCheckSql(a.ExpressionSql), NormalizeCheckSql(b.ExpressionSql), StringComparison.OrdinalIgnoreCase)
             && string.Equals(NormalizeCheckSql(a.FilterSql ?? string.Empty), NormalizeCheckSql(b.FilterSql ?? string.Empty), StringComparison.OrdinalIgnoreCase);
 
-        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> GetExplicitIndexes(TableSchema table)
+        internal static IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> GetExplicitIndexes(TableSchema table)
             => BuildIndexMap(table)
                 .Where(static index => !IsSyntheticIndexKey(index.Key))
-                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.IncludedColumnNames, index.Value.FilterSql))
+                .Select(static index => (index.Key, index.Value.IsUnique, index.Value.ColumnNames, index.Value.Descending, index.Value.NullSortOrders, index.Value.IncludedColumnNames, index.Value.NullsNotDistinct, index.Value.FilterSql))
                 .ToArray();
 
         internal static IReadOnlyList<(TableSchema Table, ColumnSchema[] OldPrimaryKeyColumns, ColumnSchema[] NewPrimaryKeyColumns)> GetPrimaryKeyChanges(SchemaDiff diff)
@@ -1525,9 +1788,9 @@ namespace nORM.Migration
         /// Builds a map of index name to (IsUnique, column names[]) from the columns of a table.
         /// Only columns that carry an <see cref="ColumnSchema.IndexName"/> or are PK/Unique are included.
         /// </summary>
-        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)> BuildIndexMap(TableSchema table)
+        private static Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> BuildIndexMap(TableSchema table)
         {
-            var intermediate = new Dictionary<string, (bool IsUnique, List<(int? Order, int Sequence, string Name, bool IsDescending)> Columns, List<(int Sequence, string Name)> IncludedColumns, string? FilterSql)>(StringComparer.OrdinalIgnoreCase);
+            var intermediate = new Dictionary<string, (bool IsUnique, bool NullsNotDistinct, List<(int? Order, int Sequence, string Name, bool IsDescending, IndexNullSortOrder NullSortOrder)> Columns, List<(int Sequence, string Name)> IncludedColumns, string? FilterSql)>(StringComparer.OrdinalIgnoreCase);
             var sequence = 0;
             foreach (var col in table.Columns)
             {
@@ -1538,14 +1801,15 @@ namespace nORM.Migration
                         if (string.IsNullOrWhiteSpace(index.Name))
                             continue;
                         if (!intermediate.TryGetValue(index.Name, out var explicitEntry))
-                            explicitEntry = (index.IsUnique, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>(), null);
+                            explicitEntry = (index.IsUnique, index.NullsNotDistinct, new List<(int? Order, int Sequence, string Name, bool IsDescending, IndexNullSortOrder NullSortOrder)>(), new List<(int Sequence, string Name)>(), null);
                         explicitEntry.IsUnique = explicitEntry.IsUnique || index.IsUnique;
+                        explicitEntry.NullsNotDistinct = explicitEntry.NullsNotDistinct || index.NullsNotDistinct;
                         if (!string.IsNullOrWhiteSpace(index.FilterSql) && string.IsNullOrWhiteSpace(explicitEntry.FilterSql))
                             explicitEntry.FilterSql = index.FilterSql;
                         if (index.IsIncluded)
                             explicitEntry.IncludedColumns.Add((sequence++, col.Name));
                         else
-                            explicitEntry.Columns.Add((index.Order, sequence++, col.Name, index.IsDescending));
+                            explicitEntry.Columns.Add((index.Order, sequence++, col.Name, index.IsDescending, index.NullSortOrder));
                         intermediate[index.Name] = explicitEntry;
                     }
                 }
@@ -1563,14 +1827,14 @@ namespace nORM.Migration
                         continue;
                 }
                 if (!intermediate.TryGetValue(indexKey, out var entry))
-                    entry = (col.IsUnique || col.IsPrimaryKey, new List<(int? Order, int Sequence, string Name, bool IsDescending)>(), new List<(int Sequence, string Name)>(), null);
+                    entry = (col.IsUnique || col.IsPrimaryKey, false, new List<(int? Order, int Sequence, string Name, bool IsDescending, IndexNullSortOrder NullSortOrder)>(), new List<(int Sequence, string Name)>(), null);
                 entry.IsUnique = entry.IsUnique || col.IsUnique || col.IsPrimaryKey;
-                entry.Columns.Add((col.IndexOrder, sequence++, col.Name, false));
+                entry.Columns.Add((col.IndexOrder, sequence++, col.Name, false, IndexNullSortOrder.Default));
                 intermediate[indexKey] = entry;
             }
 
-            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, (isUnique, columns, includedColumnsRaw, filterSql)) in intermediate)
+            var map = new Dictionary<string, (bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)>(intermediate.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, (isUnique, nullsNotDistinct, columns, includedColumnsRaw, filterSql)) in intermediate)
             {
                 var orderedColumns = columns
                     .OrderBy(static column => column.Order ?? int.MaxValue)
@@ -1583,7 +1847,7 @@ namespace nORM.Migration
                     .OrderBy(static column => column.Sequence)
                     .Select(static column => column.Name)
                     .ToArray();
-                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), includedColumns, filterSql);
+                map[key] = (isUnique, orderedColumns.Select(static column => column.Name).ToArray(), orderedColumns.Select(static column => column.IsDescending).ToArray(), orderedColumns.Select(static column => column.NullSortOrder).ToArray(), includedColumns, nullsNotDistinct, filterSql);
             }
             return map;
         }

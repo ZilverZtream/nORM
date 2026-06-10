@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using nORM.Configuration;
 using nORM.Providers;
 
 #nullable enable
@@ -78,6 +79,18 @@ namespace nORM.Mapping
         /// <summary>Ordered key columns on the right entity referenced by the join table.</summary>
         public IReadOnlyList<Column> RightKeyColumns { get; }
 
+        /// <summary>Database delete action for the FK from the join table to the left entity.</summary>
+        public ReferentialAction LeftOnDelete { get; }
+
+        /// <summary>Database update action for the FK from the join table to the left entity.</summary>
+        public ReferentialAction LeftOnUpdate { get; }
+
+        /// <summary>Database delete action for the FK from the join table to the right entity.</summary>
+        public ReferentialAction RightOnDelete { get; }
+
+        /// <summary>Database update action for the FK from the join table to the right entity.</summary>
+        public ReferentialAction RightOnUpdate { get; }
+
         /// <summary>Gets the collection of related (right) entities from a left entity instance.</summary>
         public Func<object, IList?> LeftCollectionGetter { get; }
 
@@ -134,7 +147,11 @@ namespace nORM.Mapping
             IReadOnlyList<Column> rightPkColumns,
             PropertyInfo leftNavProp,
             PropertyInfo? rightNavProp,
-            DatabaseProvider provider)
+            DatabaseProvider provider,
+            ReferentialAction leftOnDelete = ReferentialAction.NoAction,
+            ReferentialAction leftOnUpdate = ReferentialAction.NoAction,
+            ReferentialAction rightOnDelete = ReferentialAction.NoAction,
+            ReferentialAction rightOnUpdate = ReferentialAction.NoAction)
         {
             TableName = tableName;
             SchemaName = schemaName;
@@ -154,6 +171,10 @@ namespace nORM.Mapping
 
             LeftKeyColumns = leftPkColumns.ToArray();
             RightKeyColumns = rightPkColumns.ToArray();
+            LeftOnDelete = leftOnDelete;
+            LeftOnUpdate = leftOnUpdate;
+            RightOnDelete = rightOnDelete;
+            RightOnUpdate = rightOnUpdate;
             LeftPkGetters = LeftKeyColumns.Select(column => column.Getter).ToArray();
             RightPkGetters = RightKeyColumns.Select(column => column.Getter).ToArray();
             LeftPkGetter = LeftPkGetters[0];

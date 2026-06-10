@@ -30,7 +30,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionMapping
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 438
+    startLine: 688
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -71,7 +71,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationProperty
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 441
+    startLine: 691
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -102,7 +102,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedType
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 444
+    startLine: 694
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -133,7 +133,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTable
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 447
+    startLine: 697
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -146,37 +146,6 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property EscTable As String
   overload: nORM.Mapping.OwnedCollectionMapping.EscTable*
-- uid: nORM.Mapping.OwnedCollectionMapping.SchemaName
-  commentId: P:nORM.Mapping.OwnedCollectionMapping.SchemaName
-  id: SchemaName
-  parent: nORM.Mapping.OwnedCollectionMapping
-  langs:
-  - csharp
-  - vb
-  name: SchemaName
-  nameWithType: OwnedCollectionMapping.SchemaName
-  fullName: nORM.Mapping.OwnedCollectionMapping.SchemaName
-  type: Property
-  source:
-    remote:
-      path: src/nORM/Mapping/TableMapping.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: SchemaName
-    path: src/nORM/Mapping/TableMapping.cs
-    startLine: 582
-  assemblies:
-  - nORM
-  namespace: nORM.Mapping
-  summary: Optional schema containing the child table.
-  example: []
-  syntax:
-    content: public string? SchemaName { get; }
-    parameters: []
-    return:
-      type: System.String
-    content.vb: Public ReadOnly Property SchemaName As String
-  overload: nORM.Mapping.OwnedCollectionMapping.SchemaName*
 - uid: nORM.Mapping.OwnedCollectionMapping.TableName
   commentId: P:nORM.Mapping.OwnedCollectionMapping.TableName
   id: TableName
@@ -195,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 450
+    startLine: 700
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -208,6 +177,37 @@ items:
       type: System.String
     content.vb: Public ReadOnly Property TableName As String
   overload: nORM.Mapping.OwnedCollectionMapping.TableName*
+- uid: nORM.Mapping.OwnedCollectionMapping.SchemaName
+  commentId: P:nORM.Mapping.OwnedCollectionMapping.SchemaName
+  id: SchemaName
+  parent: nORM.Mapping.OwnedCollectionMapping
+  langs:
+  - csharp
+  - vb
+  name: SchemaName
+  nameWithType: OwnedCollectionMapping.SchemaName
+  fullName: nORM.Mapping.OwnedCollectionMapping.SchemaName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SchemaName
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 703
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Optional schema containing the child table.
+  example: []
+  syntax:
+    content: public string? SchemaName { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property SchemaName As String
+  overload: nORM.Mapping.OwnedCollectionMapping.SchemaName*
 - uid: nORM.Mapping.OwnedCollectionMapping.ForeignKeyColumn
   commentId: P:nORM.Mapping.OwnedCollectionMapping.ForeignKeyColumn
   id: ForeignKeyColumn
@@ -226,7 +226,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeyColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 453
+    startLine: 706
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -257,7 +257,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscForeignKeyColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 456
+    startLine: 709
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -288,7 +288,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 459
+    startLine: 712
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -319,7 +319,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: KeyColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 462
+    startLine: 715
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -350,7 +350,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionGetter
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 465
+    startLine: 720
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -381,7 +381,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionSetter
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 468
+    startLine: 723
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1412,6 +1412,12 @@ references:
   name: TableName
   nameWithType: OwnedCollectionMapping.TableName
   fullName: nORM.Mapping.OwnedCollectionMapping.TableName
+- uid: nORM.Mapping.OwnedCollectionMapping.SchemaName*
+  commentId: Overload:nORM.Mapping.OwnedCollectionMapping.SchemaName
+  href: nORM.Mapping.OwnedCollectionMapping.html#nORM_Mapping_OwnedCollectionMapping_SchemaName
+  name: SchemaName
+  nameWithType: OwnedCollectionMapping.SchemaName
+  fullName: nORM.Mapping.OwnedCollectionMapping.SchemaName
 - uid: nORM.Mapping.OwnedCollectionMapping.ForeignKeyColumn*
   commentId: Overload:nORM.Mapping.OwnedCollectionMapping.ForeignKeyColumn
   href: nORM.Mapping.OwnedCollectionMapping.html#nORM_Mapping_OwnedCollectionMapping_ForeignKeyColumn

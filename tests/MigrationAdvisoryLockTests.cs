@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Reflection;
@@ -160,6 +160,7 @@ public class MigrationAdvisoryLockTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task SQLite_ConcurrentRunners_OnlyApplyMigrationsOnce()
     {
         // Two SqliteMigrationRunners pointing at the same file-backed DB.

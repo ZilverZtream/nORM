@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
@@ -78,6 +78,7 @@ public class DirectUpdateOccTenantVerifierTests
     /// With the fix, the verifier scopes its SELECT to TenantA → count=0 → throws.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task TenantBlockedUpdate_OccVerifier_ThrowsConcurrencyException()
     {
         using var cn = OpenDb();
@@ -135,6 +136,7 @@ public class DirectUpdateOccTenantVerifierTests
     // ── SP1-3: Same-tenant stale token must throw DbConcurrencyException ──
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task SameTenantStaleToken_OccVerifier_ThrowsConcurrencyException()
     {
         using var cn = OpenDb();
@@ -157,6 +159,7 @@ public class DirectUpdateOccTenantVerifierTests
     // ── SP1-4: No tenant config — verifier works as before ────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task NoTenantConfig_StaleToken_OccVerifier_ThrowsConcurrencyException()
     {
         using var cn = OpenDb();

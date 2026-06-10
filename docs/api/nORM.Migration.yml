@@ -4,8 +4,10 @@ items:
   commentId: N:nORM.Migration
   id: nORM.Migration
   children:
+  - nORM.Migration.CheckConstraintSchema
   - nORM.Migration.ColumnIndexSchema
   - nORM.Migration.ColumnSchema
+  - nORM.Migration.ExpressionIndexSchema
   - nORM.Migration.ForeignKeySchema
   - nORM.Migration.IMigrationRunner
   - nORM.Migration.IMigrationSqlGenerator
@@ -132,6 +134,18 @@ references:
   name: TableSchema
   nameWithType: TableSchema
   fullName: nORM.Migration.TableSchema
+- uid: nORM.Migration.CheckConstraintSchema
+  commentId: T:nORM.Migration.CheckConstraintSchema
+  href: nORM.Migration.CheckConstraintSchema.html
+  name: CheckConstraintSchema
+  nameWithType: CheckConstraintSchema
+  fullName: nORM.Migration.CheckConstraintSchema
+- uid: nORM.Migration.ExpressionIndexSchema
+  commentId: T:nORM.Migration.ExpressionIndexSchema
+  href: nORM.Migration.ExpressionIndexSchema.html
+  name: ExpressionIndexSchema
+  nameWithType: ExpressionIndexSchema
+  fullName: nORM.Migration.ExpressionIndexSchema
 - uid: nORM.Migration.ForeignKeySchema
   commentId: T:nORM.Migration.ForeignKeySchema
   href: nORM.Migration.ForeignKeySchema.html

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -40,6 +40,8 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class CrossProviderAdversarialTests
 {
     // ── Entities ──────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// errors on SQLite (≤ 999) and equivalent limits on other providers (X2 fix).
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.NavigationStress)]
 public class BatchedNavigationProviderCapTests
 {
     // ── Entity types ──────────────────────────────────────────────────────────
@@ -295,6 +296,7 @@ public class BatchedNavigationProviderCapTests
 /// SQL Server's 2100 limit without spawning thousands of parallel tasks.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.NavigationStress)]
 public class NavigationLoaderSqlServerCapTests
 {
     // ── Fake provider: MaxParameters=100 → chunkSize=90 ─────────────────────

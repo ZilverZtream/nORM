@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -154,6 +154,7 @@ public class OccConflictMatrixAffectedRowsTests
     // ── 1. Stale token detected via SELECT-then-verify ────────────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Update_StaleToken_AffectedRows_SelectVerify_ThrowsDbConcurrencyException()
     {
         var (cn, ctx) = CreateAffectedRowsDb();
@@ -228,6 +229,7 @@ public class OccConflictMatrixAffectedRowsTests
     // ── 4. DELETE always detects conflict regardless of affected-row semantics ─
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Delete_StaleToken_AffectedRows_AlwaysThrowsDbConcurrencyException()
     {
         var (cn, ctx) = CreateAffectedRowsDb();

@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using nORM.Internal;
 using nORM.SourceGeneration;
 using Xunit;
@@ -6,9 +6,11 @@ using Xunit;
 namespace nORM.Tests;
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.CacheMemory)]
 public class CacheMemoryBoundReleaseGateTests
 {
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void ConcurrentLruCache_AdversarialChurn_StaysBoundedAndEvicts()
     {
         using var cache = new ConcurrentLruCache<int, byte[]>(maxSize: 128);
@@ -30,6 +32,7 @@ public class CacheMemoryBoundReleaseGateTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void BoundedCache_AdversarialChurn_StaysBelowMaxSize()
     {
         var cache = new BoundedCache<int, int>(maxSize: 100);

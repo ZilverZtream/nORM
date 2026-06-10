@@ -563,6 +563,7 @@ public class SaveChangeCancellationLeakTests
 /// Proves no resource leak in navigation loading after cancellation.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.NavigationStress)]
 public class NavigationCancellationLeakTests
 {
     private static (SqliteConnection Cn, DbContext Ctx) BuildDb()

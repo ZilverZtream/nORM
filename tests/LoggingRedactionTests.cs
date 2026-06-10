@@ -72,6 +72,39 @@ public sealed class LoggingRedactionTests
     }
 
     [Fact]
+    public void Cli_connection_string_validation_treats_ef_sqlserver_provider_package_as_sqlserver()
+    {
+        var validated = nORM.Security.ConnectionStringValidator.Validate(
+            "Server=localhost;Database=norm;User ID=sa;Password=secret;Encrypt=False",
+            "Microsoft.EntityFrameworkCore.SqlServer");
+
+        Assert.Contains("Encrypt=True", validated.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", validated.RedactedConnectionString, StringComparison.Ordinal);
+        Assert.Contains("***", validated.RedactedConnectionString, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cli_connection_string_validation_preserves_explicit_sqlserver_trust_certificate_when_environment_selects_appsettings()
+    {
+        var previousEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        try
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Staging");
+
+            var validated = nORM.Security.ConnectionStringValidator.Validate(
+                "Server=localhost;Database=norm;User ID=sa;Password=secret;Encrypt=True;TrustServerCertificate=True",
+                "sqlserver");
+
+            Assert.Contains("TrustServerCertificate=True", validated.ConnectionString, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("secret", validated.RedactedConnectionString, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previousEnvironment);
+        }
+    }
+
+    [Fact]
     public void Cli_connection_string_validation_keeps_execution_string_separate_from_redacted_diagnostics()
     {
         const string secret = "cli-secret-456";

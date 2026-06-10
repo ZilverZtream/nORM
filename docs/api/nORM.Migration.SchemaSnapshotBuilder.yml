@@ -21,7 +21,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshotBuilder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 126
+    startLine: 190
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -82,7 +82,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 154
+    startLine: 218
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -136,7 +136,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 326
+    startLine: 403
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -553,46 +553,6 @@ references:
   name: TableMapping
   nameWithType: TableMapping
   fullName: nORM.Mapping.TableMapping
-- uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
-  commentId: M:nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
-  name: BuildFromMappings(IEnumerable<TableMapping>)
-  nameWithType: SchemaSnapshotBuilder.BuildFromMappings(IEnumerable<TableMapping>)
-  fullName: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable<nORM.Mapping.TableMapping>)
-  nameWithType.vb: SchemaSnapshotBuilder.BuildFromMappings(IEnumerable(Of TableMapping))
-  fullName.vb: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable(Of nORM.Mapping.TableMapping))
-  name.vb: BuildFromMappings(IEnumerable(Of TableMapping))
-  spec.csharp:
-  - uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
-    name: BuildFromMappings
-  - name: (
-  - uid: System.Collections.Generic.IEnumerable`1
-    name: IEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
-  - name: <
-  - uid: nORM.Mapping.TableMapping
-    name: TableMapping
-    href: nORM.Mapping.TableMapping.html
-  - name: '>'
-  - name: )
-  spec.vb:
-  - uid: nORM.Migration.SchemaSnapshotBuilder.BuildFromMappings(System.Collections.Generic.IEnumerable{nORM.Mapping.TableMapping})
-    name: BuildFromMappings
-  - name: (
-  - uid: System.Collections.Generic.IEnumerable`1
-    name: IEnumerable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
-  - name: (
-  - name: Of
-  - name: " "
-  - uid: nORM.Mapping.TableMapping
-    name: TableMapping
-    href: nORM.Mapping.TableMapping.html
-  - name: )
-  - name: )
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html

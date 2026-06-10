@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DynamicEntityTypeGenerator
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 23
+    startLine: 26
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -90,7 +90,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityTypeAsync
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 67
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -162,7 +162,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityType
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 99
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -234,7 +234,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputeSchemaSignature
     path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 246
+    startLine: 293
   assemblies:
   - nORM
   namespace: nORM.Scaffolding

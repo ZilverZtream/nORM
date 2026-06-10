@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlServerMigrationSqlGenerator
     path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 16
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -72,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 69
+    startLine: 173
   assemblies:
   - nORM
   namespace: nORM.Migration

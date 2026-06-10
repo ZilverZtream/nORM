@@ -31,6 +31,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.NavigationStress)]
 public class BatchedNavigationCancellationParityTests
 {
     // ── Domain model ──────────────────────────────────────────────────────────

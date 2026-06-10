@@ -36,7 +36,7 @@ already exist, the linked file is the live-parity test that backs the claim.
 
 | Feature | SQLite | SqlServer | Postgres | MySQL | Runtime | Compiled | Caveats | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `Where` predicates | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `ProviderParityMandatoryTests` |
+| `Where` predicates | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `LiveProviderShapeParityTests`, `LiveProviderStaticValuePredicateParityTests`, `LiveProviderRecentScvParityTests` |
 | `Select` (entity / scalar / DTO / anonymous / `new T { … }`, constrained client projection tail) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Custom CLR methods in projection require `ClientEvaluationPolicy.Warn` or `.Allow`; the client tail runs only after server filters/order/page operators. `UseStrictProviderMobility(ClientEvaluationPolicy.Warn)` permits explicit warning-level top projection tails; silent `Allow` remains compatibility-only and is not strict-certified. Member-initialized DTO projections are also covered through strict inner-join and query-syntax left-join live parity. | `LiveProviderIntegrationTests`, `LiveProviderShapeParityTests`, `LiveProviderDtoProjectionParityTests`, `LiveProviderClientEvaluationParityTests`, `LiveProviderJoinSelectManyParityTests` |
 | `OrderBy` / `OrderByDescending` / `ThenBy` / `ThenByDescending` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | `ProviderParityQueryPagingTests`, `LiveProviderShapeParityTests` |
 | `Skip` / `Take` (pagination) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SqlServer uses `OFFSET … FETCH NEXT … ROWS`; Postgres/MySQL use `LIMIT/OFFSET`. | `ProviderParityQueryPagingTests`, `LiveProviderSkipTakeParityTests` |

@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// on every exit path and that cancellation tokens are propagated to async DB operations.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.NavigationStress)]
 public class BatchedNavigationBatchTests
 {
     [Table("NavBatch_Item")]

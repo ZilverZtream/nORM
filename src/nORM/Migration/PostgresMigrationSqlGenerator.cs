@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using nORM.Configuration;
 
 namespace nORM.Migration
 {
@@ -78,7 +79,7 @@ namespace nORM.Migration
             return schema is null ? Esc(indexName) : $"{Esc(schema)}.{Esc(indexName)}";
         }
 
-        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, string[] IncludedColumnNames, string? FilterSql) ResolveIndex(
+        private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql) ResolveIndex(
             TableSchema table,
             string indexName,
             bool isUnique,
@@ -91,14 +92,14 @@ namespace nORM.Migration
                     return index;
             }
 
-            return (indexName, isUnique, columnNames, descending, Array.Empty<string>(), null);
+            return (indexName, isUnique, columnNames, descending, Array.Empty<IndexNullSortOrder>(), Array.Empty<string>(), false, null);
         }
 
         private static string BuildIndexSql(TableSchema table, string indexName, bool isUnique, string[] columnNames, bool[] descending)
         {
             var index = ResolveIndex(table, indexName, isUnique, columnNames, descending);
             var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-            return $"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}";
+            return $"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatNullsNotDistinct(index.NullsNotDistinct, index.IsUnique, index.IndexName)}{FormatFilter(index.FilterSql)}";
         }
 
         private static bool IsImplicitUniqueColumn(ColumnSchema column)
@@ -266,7 +267,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
+                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatNullsNotDistinct(index.NullsNotDistinct, index.IsUnique, index.IndexName)}{FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     up.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -426,7 +427,7 @@ namespace nORM.Migration
                 foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
                 {
                     var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
+                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatNullsNotDistinct(index.NullsNotDistinct, index.IsUnique, index.IndexName)}{FormatFilter(index.FilterSql)}");
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     down.Add(BuildExpressionIndexSql(table, expressionIndex));
@@ -516,8 +517,11 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
-            if (IsDecimalWithPrecision(column))
-                return $"DECIMAL({column.Precision!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)},{column.Scale!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+            if (TryGetDecimalWithPrecisionType(column, out var decimalSql))
+                return decimalSql;
+
+            if (TryGetBoundedStringType(column, out var boundedSql))
+                return boundedSql;
 
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
@@ -534,14 +538,42 @@ namespace nORM.Migration
             return sql;
         }
 
-        private static bool IsDecimalWithPrecision(ColumnSchema column)
-            => string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
-            && column.Precision is > 0
-            && column.Scale is >= 0
-            && column.Scale <= column.Precision;
+        private static bool TryGetBoundedStringType(ColumnSchema column, out string sql)
+        {
+            sql = string.Empty;
+            if (column.MaxLength is > 0
+                && string.Equals(column.ClrType, typeof(string).FullName, StringComparison.Ordinal))
+            {
+                var typeName = column.IsFixedLength ? "CHAR" : "VARCHAR";
+                sql = $"{typeName}({column.MaxLength.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetDecimalWithPrecisionType(ColumnSchema column, out string sql)
+        {
+            sql = string.Empty;
+            if (!string.Equals(column.ClrType, typeof(decimal).FullName, StringComparison.Ordinal)
+                || column.Precision is not > 0
+                || (column.Scale.HasValue && (column.Scale.Value < 0 || column.Scale.Value > column.Precision.Value)))
+            {
+                return false;
+            }
+
+            var precision = column.Precision.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            sql = column.Scale.HasValue
+                ? $"DECIMAL({precision},{column.Scale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
+                : $"DECIMAL({precision})";
+            return true;
+        }
 
         private static bool ColumnTypeChanged(ColumnSchema oldCol, ColumnSchema newCol)
             => !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
+            || oldCol.MaxLength != newCol.MaxLength
+            || oldCol.IsUnicode != newCol.IsUnicode
+            || oldCol.IsFixedLength != newCol.IsFixedLength
             || oldCol.Precision != newCol.Precision
             || oldCol.Scale != newCol.Scale
             || !string.Equals(oldCol.Collation, newCol.Collation, StringComparison.OrdinalIgnoreCase)
@@ -598,14 +630,39 @@ namespace nORM.Migration
             return action;
         }
 
-        private static string FormatIndexColumns(string[] columnNames, bool[] descending)
+        private static string FormatIndexColumns(string[] columnNames, bool[] descending, IndexNullSortOrder[] nullSortOrders)
             => string.Join(", ", columnNames.Select((name, index) =>
-                Esc(name) + (index < descending.Length && descending[index] ? " DESC" : string.Empty)));
+                Esc(name)
+                + (index < descending.Length && descending[index] ? " DESC" : string.Empty)
+                + FormatNullSortOrder(nullSortOrders, index)));
+
+        private static string FormatNullSortOrder(IndexNullSortOrder[] nullSortOrders, int index)
+        {
+            if (index >= nullSortOrders.Length)
+                return string.Empty;
+
+            return nullSortOrders[index] switch
+            {
+                IndexNullSortOrder.Default => string.Empty,
+                IndexNullSortOrder.First => " NULLS FIRST",
+                IndexNullSortOrder.Last => " NULLS LAST",
+                _ => throw new ArgumentOutOfRangeException(nameof(nullSortOrders), $"Unsupported null sort order '{nullSortOrders[index]}'.")
+            };
+        }
 
         private static string FormatIncludedColumns(string[] includedColumnNames)
             => includedColumnNames.Length == 0
                 ? string.Empty
                 : " INCLUDE (" + string.Join(", ", includedColumnNames.Select(Esc)) + ")";
+
+        private static string FormatNullsNotDistinct(bool nullsNotDistinct, bool isUnique, string indexName)
+        {
+            if (!nullsNotDistinct)
+                return string.Empty;
+            if (!isUnique)
+                throw new InvalidOperationException($"PostgreSQL index '{indexName}' cannot use NULLS NOT DISTINCT without being unique.");
+            return " NULLS NOT DISTINCT";
+        }
 
         private static string FormatFilter(string? filterSql)
             => string.IsNullOrWhiteSpace(filterSql) ? string.Empty : " WHERE " + filterSql.Trim();

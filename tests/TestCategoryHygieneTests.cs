@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Xunit;
@@ -10,7 +11,7 @@ namespace nORM.Tests;
 /// <summary>
 /// Every public test class in the nORM.Tests assembly must declare an explicit
 /// <c>[Trait("Category", ...)]</c>. The category-driven release gate (Fast / LiveProvider /
-/// Stress / PackageConsumer) cannot route work to the right step if classes opt out, so the
+/// Stress / ProviderParity / RC routing categories / PackageConsumer) cannot route work to the right step if classes opt out, so the
 /// suite refuses to grow uncategorized classes.
 ///
 /// To auto-categorize a freshly added test file, run
@@ -29,6 +30,15 @@ public class TestCategoryHygieneTests
             TestCategory.Fast,
             TestCategory.LiveProvider,
             TestCategory.Stress,
+            TestCategory.ProviderParity,
+            TestCategory.NavigationStress,
+            TestCategory.TransactionStress,
+            TestCategory.CompiledQueryStress,
+            TestCategory.ProviderSourceGenParity,
+            TestCategory.BulkProviderParity,
+            TestCategory.MigrationParity,
+            TestCategory.CacheMemory,
+            TestCategory.AdversarialConcurrency,
             TestCategory.PackageConsumer,
         };
 
@@ -83,7 +93,44 @@ public class TestCategoryHygieneTests
         Assert.True(
             invalidCategory.Count == 0,
             "The following test classes use a category name outside the v1 set " +
-            "(Fast / LiveProvider / Stress / PackageConsumer):\n" +
+            "(Fast / LiveProvider / Stress / ProviderParity / NavigationStress / TransactionStress / " +
+            "CompiledQueryStress / ProviderSourceGenParity / BulkProviderParity / MigrationParity / " +
+            "CacheMemory / AdversarialConcurrency / PackageConsumer):\n" +
             string.Join("\n", invalidCategory));
+    }
+
+    [Fact]
+    public void Runtime_live_provider_skip_policy_uses_early_return_not_runtime_exceptions()
+    {
+        var forbidden = "Skip" + "Exception";
+        var root = FindRepositoryRoot();
+        var offenders = Directory.EnumerateFiles(Path.Combine(root, "tests"), "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories))
+            .Where(path => !path.EndsWith(nameof(TestCategoryHygieneTests) + ".cs", StringComparison.Ordinal))
+            .Where(path => File.ReadAllText(path).Contains(forbidden, StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(root, path))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "Runtime skip exceptions are not part of the no-provider local test contract. " +
+            "Use the shared Skip.If early-return helper in live-provider tests and keep " +
+            "live/RC provider minimums enforced by eng/v1-release-gate.ps1:\n" +
+            string.Join("\n", offenders));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "nORM.sln")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root containing nORM.sln.");
     }
 }

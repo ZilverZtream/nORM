@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -33,6 +33,7 @@ namespace nORM.Tests;
 /// sees a stable snapshot and never races against in-place mutation.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class GlobalFilterConcurrencyTests
 {
     [Table("GfcEntity")]

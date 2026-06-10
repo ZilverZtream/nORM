@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -150,6 +150,7 @@ public class RawSqlEdgeCaseTests
     [InlineData("EXEC master..xp_cmdshell 'dir'")]
     // Unicode whitespace obfuscation — DR\u00A0OP normalizes to "drop"
     [InlineData("SEL\u00A0ECT * FROM Users; DR\u00A0OP TABLE Users")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void AdversarialSql_AllRejectedBySafetyGate(string sql)
     {
         var provider = new SqliteProvider();

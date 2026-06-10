@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -150,6 +150,7 @@ file sealed class StringTenantProvider : ITenantProvider
 // ── Test class ───────────────────────────────────────────────────────────────
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialTenantExpressionFuzzTests
 {
     // ── Helpers ──────────────────────────────────────────────────────────────

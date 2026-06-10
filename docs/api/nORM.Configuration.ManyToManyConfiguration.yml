@@ -9,10 +9,18 @@ items:
   - nORM.Configuration.ManyToManyConfiguration.JoinTableName
   - nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
   - nORM.Configuration.ManyToManyConfiguration.LeftFkColumn
+  - nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+  - nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+  - nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+  - nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
   - nORM.Configuration.ManyToManyConfiguration.NavPropertyName
   - nORM.Configuration.ManyToManyConfiguration.RelatedNavPropertyName
   - nORM.Configuration.ManyToManyConfiguration.RelatedType
   - nORM.Configuration.ManyToManyConfiguration.RightFkColumn
+  - nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+  - nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+  - nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+  - nORM.Configuration.ManyToManyConfiguration.RightOnUpdate
   langs:
   - csharp
   - vb
@@ -27,7 +35,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 112
+    startLine: 280
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -71,7 +79,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 112
+    startLine: 280
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -121,7 +129,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavPropertyName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 113
+    startLine: 281
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -152,7 +160,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelatedType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 114
+    startLine: 282
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -183,7 +191,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: JoinTableName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 115
+    startLine: 283
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -214,7 +222,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftFkColumn
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 116
+    startLine: 284
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -245,7 +253,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightFkColumn
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 117
+    startLine: 285
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -276,7 +284,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelatedNavPropertyName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 118
+    startLine: 286
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -307,7 +315,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: JoinTableSchema
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 121
+    startLine: 289
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -320,6 +328,254 @@ items:
       type: System.String
     content.vb: Public Property JoinTableSchema As String
   overload: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema*
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+  id: LeftFkColumns
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: LeftFkColumns
+  nameWithType: ManyToManyConfiguration.LeftFkColumns
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftFkColumns
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 292
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Ordered join-table columns referencing this entity's key.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> LeftFkColumns { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public Property LeftFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Configuration.ManyToManyConfiguration.LeftFkColumns*
+- uid: nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+  id: RightFkColumns
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RightFkColumns
+  nameWithType: ManyToManyConfiguration.RightFkColumns
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightFkColumns
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 295
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Ordered join-table columns referencing the related entity's key.
+  example: []
+  syntax:
+    content: public IReadOnlyList<string> RightFkColumns { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+    content.vb: Public Property RightFkColumns As IReadOnlyList(Of String)
+  overload: nORM.Configuration.ManyToManyConfiguration.RightFkColumns*
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+  id: LeftKeyProperties
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: LeftKeyProperties
+  nameWithType: ManyToManyConfiguration.LeftKeyProperties
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftKeyProperties
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 300
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Optional ordered key properties on the left entity. When omitted, the entity primary key is used.
+  example: []
+  syntax:
+    content: public IReadOnlyList<PropertyInfo>? LeftKeyProperties { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    content.vb: Public Property LeftKeyProperties As IReadOnlyList(Of PropertyInfo)
+  overload: nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties*
+- uid: nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+  id: RightKeyProperties
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RightKeyProperties
+  nameWithType: ManyToManyConfiguration.RightKeyProperties
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightKeyProperties
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 305
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Optional ordered key properties on the right entity. When omitted, the related entity primary key is used.
+  example: []
+  syntax:
+    content: public IReadOnlyList<PropertyInfo>? RightKeyProperties { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+    content.vb: Public Property RightKeyProperties As IReadOnlyList(Of PropertyInfo)
+  overload: nORM.Configuration.ManyToManyConfiguration.RightKeyProperties*
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+  id: LeftOnDelete
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: LeftOnDelete
+  nameWithType: ManyToManyConfiguration.LeftOnDelete
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftOnDelete
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 308
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database delete action for the FK from the join table to this entity.
+  example: []
+  syntax:
+    content: public ReferentialAction LeftOnDelete { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property LeftOnDelete As ReferentialAction
+  overload: nORM.Configuration.ManyToManyConfiguration.LeftOnDelete*
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
+  id: LeftOnUpdate
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: LeftOnUpdate
+  nameWithType: ManyToManyConfiguration.LeftOnUpdate
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: LeftOnUpdate
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 311
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database update action for the FK from the join table to this entity.
+  example: []
+  syntax:
+    content: public ReferentialAction LeftOnUpdate { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property LeftOnUpdate As ReferentialAction
+  overload: nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate*
+- uid: nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+  id: RightOnDelete
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RightOnDelete
+  nameWithType: ManyToManyConfiguration.RightOnDelete
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightOnDelete
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 314
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database delete action for the FK from the join table to the related entity.
+  example: []
+  syntax:
+    content: public ReferentialAction RightOnDelete { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property RightOnDelete As ReferentialAction
+  overload: nORM.Configuration.ManyToManyConfiguration.RightOnDelete*
+- uid: nORM.Configuration.ManyToManyConfiguration.RightOnUpdate
+  commentId: P:nORM.Configuration.ManyToManyConfiguration.RightOnUpdate
+  id: RightOnUpdate
+  parent: nORM.Configuration.ManyToManyConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RightOnUpdate
+  nameWithType: ManyToManyConfiguration.RightOnUpdate
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightOnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RightOnUpdate
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 317
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Database update action for the FK from the join table to the related entity.
+  example: []
+  syntax:
+    content: public ReferentialAction RightOnUpdate { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property RightOnUpdate As ReferentialAction
+  overload: nORM.Configuration.ManyToManyConfiguration.RightOnUpdate*
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1415,3 +1671,193 @@ references:
   name: JoinTableSchema
   nameWithType: ManyToManyConfiguration.JoinTableSchema
   fullName: nORM.Configuration.ManyToManyConfiguration.JoinTableSchema
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftFkColumns*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_LeftFkColumns
+  name: LeftFkColumns
+  nameWithType: ManyToManyConfiguration.LeftFkColumns
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftFkColumns
+- uid: System.Collections.Generic.IReadOnlyList{System.String}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<string>
+  nameWithType: IReadOnlyList<string>
+  fullName: System.Collections.Generic.IReadOnlyList<string>
+  nameWithType.vb: IReadOnlyList(Of String)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of String)
+  name.vb: IReadOnlyList(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Configuration.ManyToManyConfiguration.RightFkColumns*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_RightFkColumns
+  name: RightFkColumns
+  nameWithType: ManyToManyConfiguration.RightFkColumns
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightFkColumns
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_LeftKeyProperties
+  name: LeftKeyProperties
+  nameWithType: ManyToManyConfiguration.LeftKeyProperties
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftKeyProperties
+- uid: System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<PropertyInfo>
+  nameWithType: IReadOnlyList<PropertyInfo>
+  fullName: System.Collections.Generic.IReadOnlyList<System.Reflection.PropertyInfo>
+  nameWithType.vb: IReadOnlyList(Of PropertyInfo)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of System.Reflection.PropertyInfo)
+  name.vb: IReadOnlyList(Of PropertyInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: )
+- uid: nORM.Configuration.ManyToManyConfiguration.RightKeyProperties*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_RightKeyProperties
+  name: RightKeyProperties
+  nameWithType: ManyToManyConfiguration.RightKeyProperties
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightKeyProperties
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftOnDelete*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_LeftOnDelete
+  name: LeftOnDelete
+  nameWithType: ManyToManyConfiguration.LeftOnDelete
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftOnDelete
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_LeftOnUpdate
+  name: LeftOnUpdate
+  nameWithType: ManyToManyConfiguration.LeftOnUpdate
+  fullName: nORM.Configuration.ManyToManyConfiguration.LeftOnUpdate
+- uid: nORM.Configuration.ManyToManyConfiguration.RightOnDelete*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_RightOnDelete
+  name: RightOnDelete
+  nameWithType: ManyToManyConfiguration.RightOnDelete
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightOnDelete
+- uid: nORM.Configuration.ManyToManyConfiguration.RightOnUpdate*
+  commentId: Overload:nORM.Configuration.ManyToManyConfiguration.RightOnUpdate
+  href: nORM.Configuration.ManyToManyConfiguration.html#nORM_Configuration_ManyToManyConfiguration_RightOnUpdate
+  name: RightOnUpdate
+  nameWithType: ManyToManyConfiguration.RightOnUpdate
+  fullName: nORM.Configuration.ManyToManyConfiguration.RightOnUpdate

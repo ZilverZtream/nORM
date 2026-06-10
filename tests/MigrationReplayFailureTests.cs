@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// via reflection or subclass bypass) or env-gated for live provider availability.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.MigrationParity)]
 public class MigrationReplayFailureTests
 {
     // ── Dynamic assembly builder ────────────────────────────────────────────
@@ -496,6 +497,7 @@ public class MigrationReplayFailureTests
     /// SQLite runner: after applying migrations, HasPendingMigrationsAsync returns false.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task ProviderParity_SQLite_SkipsAlreadyApplied()
     {
         using var cn = OpenSqlite();
@@ -518,6 +520,7 @@ public class MigrationReplayFailureTests
     /// Uses SQLite + NoLock bypass for testing.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task ProviderParity_MySQL_SkipsAlreadyApplied()
     {
         await using var cn = OpenSqlite();
@@ -538,6 +541,7 @@ public class MigrationReplayFailureTests
     /// fail on SQLite due to pg_advisory_lock, but pending detection works.)
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task ProviderParity_Postgres_SkipsAlreadyApplied()
     {
         await using var cn = OpenSqlite();
@@ -575,6 +579,7 @@ public class MigrationReplayFailureTests
     /// (via reflection) returns empty when all migrations are applied.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task ProviderParity_SqlServer_SkipsAlreadyApplied()
     {
         await using var cn = OpenSqlite();
@@ -619,6 +624,7 @@ public class MigrationReplayFailureTests
     /// returns false. This covers the "already applied = no-op" invariant.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task ProviderParity_AllRunners_NoOpAfterApply()
     {
         // SQLite (live)

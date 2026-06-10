@@ -26,6 +26,7 @@ namespace nORM.Tests;
 /// (same pattern as SyncTransactionCleanupTests) so no live MySQL/SQL Server is needed.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.TransactionStress)]
 public class TransactionFaultInjectionTests
 {
     // ── ThrowingTransaction — injectable mock ────────────────────────────────

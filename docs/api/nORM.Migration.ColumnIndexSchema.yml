@@ -5,8 +5,13 @@ items:
   id: ColumnIndexSchema
   parent: nORM.Migration
   children:
+  - nORM.Migration.ColumnIndexSchema.FilterSql
+  - nORM.Migration.ColumnIndexSchema.IsDescending
+  - nORM.Migration.ColumnIndexSchema.IsIncluded
   - nORM.Migration.ColumnIndexSchema.IsUnique
   - nORM.Migration.ColumnIndexSchema.Name
+  - nORM.Migration.ColumnIndexSchema.NullSortOrder
+  - nORM.Migration.ColumnIndexSchema.NullsNotDistinct
   - nORM.Migration.ColumnIndexSchema.Order
   langs:
   - csharp
@@ -22,7 +27,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnIndexSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 112
+    startLine: 166
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -64,7 +69,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 115
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -95,7 +100,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 117
+    startLine: 171
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -126,7 +131,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Order
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 119
+    startLine: 173
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -139,6 +144,161 @@ items:
       type: System.Nullable{System.Int32}
     content.vb: Public Property Order As Integer?
   overload: nORM.Migration.ColumnIndexSchema.Order*
+- uid: nORM.Migration.ColumnIndexSchema.IsDescending
+  commentId: P:nORM.Migration.ColumnIndexSchema.IsDescending
+  id: IsDescending
+  parent: nORM.Migration.ColumnIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: IsDescending
+  nameWithType: ColumnIndexSchema.IsDescending
+  fullName: nORM.Migration.ColumnIndexSchema.IsDescending
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsDescending
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 175
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when this index key column is ordered descending.
+  example: []
+  syntax:
+    content: public bool IsDescending { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsDescending As Boolean
+  overload: nORM.Migration.ColumnIndexSchema.IsDescending*
+- uid: nORM.Migration.ColumnIndexSchema.IsIncluded
+  commentId: P:nORM.Migration.ColumnIndexSchema.IsIncluded
+  id: IsIncluded
+  parent: nORM.Migration.ColumnIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: IsIncluded
+  nameWithType: ColumnIndexSchema.IsIncluded
+  fullName: nORM.Migration.ColumnIndexSchema.IsIncluded
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsIncluded
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 177
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when this column is an included, non-key column.
+  example: []
+  syntax:
+    content: public bool IsIncluded { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsIncluded As Boolean
+  overload: nORM.Migration.ColumnIndexSchema.IsIncluded*
+- uid: nORM.Migration.ColumnIndexSchema.NullsNotDistinct
+  commentId: P:nORM.Migration.ColumnIndexSchema.NullsNotDistinct
+  id: NullsNotDistinct
+  parent: nORM.Migration.ColumnIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: NullsNotDistinct
+  nameWithType: ColumnIndexSchema.NullsNotDistinct
+  fullName: nORM.Migration.ColumnIndexSchema.NullsNotDistinct
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullsNotDistinct
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 179
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when a unique PostgreSQL index treats null values as equal.
+  example: []
+  syntax:
+    content: public bool NullsNotDistinct { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property NullsNotDistinct As Boolean
+  overload: nORM.Migration.ColumnIndexSchema.NullsNotDistinct*
+- uid: nORM.Migration.ColumnIndexSchema.NullSortOrder
+  commentId: P:nORM.Migration.ColumnIndexSchema.NullSortOrder
+  id: NullSortOrder
+  parent: nORM.Migration.ColumnIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: NullSortOrder
+  nameWithType: ColumnIndexSchema.NullSortOrder
+  fullName: nORM.Migration.ColumnIndexSchema.NullSortOrder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullSortOrder
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 181
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Explicit provider null ordering for this index key column.
+  example: []
+  syntax:
+    content: public IndexNullSortOrder NullSortOrder { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+    content.vb: Public Property NullSortOrder As IndexNullSortOrder
+  overload: nORM.Migration.ColumnIndexSchema.NullSortOrder*
+- uid: nORM.Migration.ColumnIndexSchema.FilterSql
+  commentId: P:nORM.Migration.ColumnIndexSchema.FilterSql
+  id: FilterSql
+  parent: nORM.Migration.ColumnIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: FilterSql
+  nameWithType: ColumnIndexSchema.FilterSql
+  fullName: nORM.Migration.ColumnIndexSchema.FilterSql
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FilterSql
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 183
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Provider-specific filter predicate for a filtered/partial index.
+  example: []
+  syntax:
+    content: public string? FilterSql { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property FilterSql As String
+  overload: nORM.Migration.ColumnIndexSchema.FilterSql*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1194,3 +1354,62 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Migration.ColumnIndexSchema.IsDescending*
+  commentId: Overload:nORM.Migration.ColumnIndexSchema.IsDescending
+  href: nORM.Migration.ColumnIndexSchema.html#nORM_Migration_ColumnIndexSchema_IsDescending
+  name: IsDescending
+  nameWithType: ColumnIndexSchema.IsDescending
+  fullName: nORM.Migration.ColumnIndexSchema.IsDescending
+- uid: nORM.Migration.ColumnIndexSchema.IsIncluded*
+  commentId: Overload:nORM.Migration.ColumnIndexSchema.IsIncluded
+  href: nORM.Migration.ColumnIndexSchema.html#nORM_Migration_ColumnIndexSchema_IsIncluded
+  name: IsIncluded
+  nameWithType: ColumnIndexSchema.IsIncluded
+  fullName: nORM.Migration.ColumnIndexSchema.IsIncluded
+- uid: nORM.Migration.ColumnIndexSchema.NullsNotDistinct*
+  commentId: Overload:nORM.Migration.ColumnIndexSchema.NullsNotDistinct
+  href: nORM.Migration.ColumnIndexSchema.html#nORM_Migration_ColumnIndexSchema_NullsNotDistinct
+  name: NullsNotDistinct
+  nameWithType: ColumnIndexSchema.NullsNotDistinct
+  fullName: nORM.Migration.ColumnIndexSchema.NullsNotDistinct
+- uid: nORM.Migration.ColumnIndexSchema.NullSortOrder*
+  commentId: Overload:nORM.Migration.ColumnIndexSchema.NullSortOrder
+  href: nORM.Migration.ColumnIndexSchema.html#nORM_Migration_ColumnIndexSchema_NullSortOrder
+  name: NullSortOrder
+  nameWithType: ColumnIndexSchema.NullSortOrder
+  fullName: nORM.Migration.ColumnIndexSchema.NullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Migration.ColumnIndexSchema.FilterSql*
+  commentId: Overload:nORM.Migration.ColumnIndexSchema.FilterSql
+  href: nORM.Migration.ColumnIndexSchema.html#nORM_Migration_ColumnIndexSchema_FilterSql
+  name: FilterSql
+  nameWithType: ColumnIndexSchema.FilterSql
+  fullName: nORM.Migration.ColumnIndexSchema.FilterSql

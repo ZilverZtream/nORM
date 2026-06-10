@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -232,6 +232,7 @@ public class CrossProviderBehaviorTests
     [InlineData("mysql")]
     [InlineData("postgres")]
     [InlineData("sqlserver")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task LockStep_OCC_StaleToken_AllProviders_ThrowsConcurrencyException(string kind)
     {
         var (cn, ctx) = CreateDb(kind, OccDdl, OccOpts(kind));
@@ -365,6 +366,7 @@ public class CrossProviderBehaviorTests
     [InlineData("mysql")]
     [InlineData("postgres")]
     [InlineData("sqlserver")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task LockStep_Adversarial_LargeInClause_AllProviders(string kind)
     {
         var (cn, ctx) = CreateDb(kind, ItemDdl);
@@ -387,6 +389,7 @@ public class CrossProviderBehaviorTests
     [InlineData("mysql")]
     [InlineData("postgres")]
     [InlineData("sqlserver")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task LockStep_Adversarial_NullParameterHandling_AllProviders(string kind)
     {
         var (cn, ctx) = CreateDb(kind, ItemDdl);

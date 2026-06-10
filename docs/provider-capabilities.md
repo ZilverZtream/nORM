@@ -112,3 +112,55 @@ of hiding dialect rewrites behind a single provider name.
 
 Unsupported database versions and missing drivers fail early with actionable
 messages instead of surfacing later as translation or command execution errors.
+
+## Floor Feature Evidence
+
+The minimum-version table is not complete release evidence by itself. A final
+v1 RC must include live target capability reports that record actual server
+versions at or above the declared floor and prove the floor-gated features below
+on those targets. Descriptor-only reports are useful for review, but they must
+not be treated as old-version proof.
+
+`eng/rc-artifact-manifest.ps1` records this declared floor-feature ledger in
+`artifacts/v1-rc/rc-artifacts.json` and `rc-artifacts.md`. The manifest does
+not open provider connections or capture actual server versions; actual version
+evidence comes from `dotnet-norm portability certify` target reports.
+Live target certification also runs representative floor-feature probes against
+each supplied target: JSON translation, `ROW_NUMBER` window translation,
+generated-value retrieval, rename-column DDL, savepoints, and idempotent
+insert/ignore semantics. A `provider-target-capability` finding means one of
+those probes failed and the target report cannot be used as floor evidence.
+
+Example live target report command:
+
+```powershell
+New-Item -ItemType Directory -Force artifacts/v1-rc/provider-target-scan | Out-Null
+Set-Content artifacts/v1-rc/provider-target-scan/ProviderTargetProbe.cs 'public sealed class ProviderTargetProbe { }'
+dotnet run --project src/dotnet-norm -c Release --no-build -- portability certify `
+  --scan-path artifacts/v1-rc/provider-target-scan `
+  --providers sqlite,sqlserver,postgres,mysql `
+  --sqlite-connection "Data Source=:memory:" `
+  --sqlserver-connection $env:NORM_TEST_SQLSERVER `
+  --postgres-connection $env:NORM_TEST_POSTGRES `
+  --mysql-connection $env:NORM_TEST_MYSQL `
+  --report artifacts/v1-rc/provider-target-capabilities.json
+```
+
+Current working-tree evidence from `2026-06-10` is
+`artifacts/v1-rc/provider-target-capabilities.json` /
+`artifacts/v1-rc/provider-target-capabilities.html`. The report passed with
+actual target versions SQLite `3.41.2`, SQL Server `16.0.1000`, PostgreSQL
+`17.5`, and MySQL `8.0.46`, all at or above the documented floors. The remaining
+warnings are provider profile decisions, not failed floor probes.
+
+| Provider | Floor | Floor-gated features that need live evidence |
+| --- | --- | --- |
+| SQL Server | 13.0 / SQL Server 2016 | `JSON_VALUE` JSON translation; `ROW_NUMBER`/window translation; `IDENTITY` plus `OUTPUT` generated-value retrieval; `sp_rename` column rename; `SAVE TRANSACTION` savepoints; `IF NOT EXISTS` idempotent join-table insert; nORM-managed temporal history/triggers; provider-native temporal DDL and `AS OF` translation; native bulk insert; native tenant session context |
+| PostgreSQL | 12.0 / PostgreSQL 12 | `jsonb` JSON translation; `ROW_NUMBER`/window translation; `GENERATED AS IDENTITY` plus `RETURNING` generated-value retrieval; `ALTER TABLE RENAME COLUMN`; `SAVEPOINT`; `ON CONFLICT DO NOTHING` idempotent join-table insert; nORM-managed temporal history/triggers; native bulk insert; native tenant session context |
+| MySQL | 8.0 / MySQL 8.0 | `JSON_EXTRACT` JSON translation; `ROW_NUMBER`/window translation; `AUTO_INCREMENT` plus `LAST_INSERT_ID` generated-value retrieval; `ALTER TABLE RENAME COLUMN`; `SAVEPOINT`; `INSERT IGNORE` idempotent join-table insert; nORM-managed temporal history/triggers; native bulk insert |
+| SQLite | 3.25 / SQLite 3.25 | JSON1 `json_extract` JSON translation; `ROW_NUMBER`/window translation; rowid/`AUTOINCREMENT` generated-value retrieval; `ALTER TABLE RENAME COLUMN`; `SAVEPOINT`; `INSERT OR IGNORE` idempotent join-table insert; nORM-managed temporal history/triggers |
+
+Feature-specific floors above the provider floor must stay visible in provider
+mobility reports. For example, SQL Server provider startup allows 13.0, but
+ordered string aggregate translation requires SQL Server 14.0+ because it uses
+`STRING_AGG`.

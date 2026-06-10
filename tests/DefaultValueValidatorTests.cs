@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using nORM.Migration;
@@ -88,16 +88,30 @@ public class DefaultValueValidatorTests
         new object[] { "INSERT INTO T VALUES(1)" },
         new object[] { "GETDATE() OR 1=1" },
         new object[] { "CURRENT_TIMESTAMP; DELETE FROM Users" },
+        new object[] { "CURRENT_TIMESTAMP(7)" },
+        new object[] { "CURRENT_TIMESTAMP(foo)" },
+        new object[] { "NOW(6); DROP TABLE Users" },
+        new object[] { "UTC_TIMESTAMP(6 /* comment */)" },
         new object[] { "'; EXEC xp_cmdshell('cmd')--" },
         new object[] { "0 UNION SELECT password FROM Users" },
         new object[] { "nextval('')" },
         new object[] { "nextval('public.orders; DROP')" },
         new object[] { "nextval('public.orders_id_seq'::text)" },
         new object[] { "nextval('public.orders_id_seq'); DROP TABLE Users" },
+        new object[] { "now() AT TIME ZONE 'utc'; DROP TABLE Users" },
+        new object[] { "now() AT TIME ZONE current_user" },
+        new object[] { "timezone('utc', unsafe())" },
+        new object[] { "timezone('utc', now()); DROP TABLE Users" },
+        new object[] { "'active'::text; DROP TABLE Users" },
+        new object[] { "'active'::text -- comment" },
+        new object[] { "0::integer /* comment */" },
+        new object[] { "now()::timestamp without time zone; DELETE FROM Users" },
+        new object[] { "'active'::\"quoted\"" },
     };
 
     [Theory]
     [MemberData(nameof(AdversarialPayloads))]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Validate_AdversarialPayload_ThrowsArgumentException(string payload)
     {
         var ex = Record.Exception(() => InvokeValidator(payload));
@@ -128,9 +142,18 @@ public class DefaultValueValidatorTests
         new object[] { "''" },
         new object[] { "CURRENT_TIMESTAMP" },
         new object[] { "current_timestamp" },
+        new object[] { "CURRENT_TIMESTAMP()" },
+        new object[] { "CURRENT_TIMESTAMP(6)" },
+        new object[] { "current_timestamp()" },
         new object[] { "CURRENT_DATE" },
+        new object[] { "CURRENT_DATE()" },
         new object[] { "CURRENT_TIME" },
+        new object[] { "CURRENT_TIME()" },
+        new object[] { "CURRENT_TIME(6)" },
+        new object[] { "LOCALTIME(6)" },
+        new object[] { "LOCALTIMESTAMP(6)" },
         new object[] { "NOW()" },
+        new object[] { "NOW(6)" },
         new object[] { "GETDATE()" },
         new object[] { "GETUTCDATE()" },
         new object[] { "NEWID()" },
@@ -139,14 +162,31 @@ public class DefaultValueValidatorTests
         new object[] { "GEN_RANDOM_UUID()" },
         new object[] { "UUID_GENERATE_V4()" },
         new object[] { "SYSDATE()" },
+        new object[] { "SYSDATE(6)" },
         new object[] { "SYSDATETIME()" },
         new object[] { "SYSUTCDATETIME()" },
         new object[] { "SYSDATETIMEOFFSET()" },
         new object[] { "UTC_TIMESTAMP()" },
+        new object[] { "UTC_TIMESTAMP(6)" },
         new object[] { "CLOCK_TIMESTAMP()" },
         new object[] { "TRANSACTION_TIMESTAMP()" },
+        new object[] { "now() AT TIME ZONE 'utc'" },
+        new object[] { "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'" },
+        new object[] { "CURRENT_TIMESTAMP(6) AT TIME ZONE 'utc'::text" },
+        new object[] { "timezone('utc', now())" },
+        new object[] { "timezone('utc'::text, CURRENT_TIMESTAMP)" },
         new object[] { "nextval('orders_id_seq')" },
         new object[] { "NEXTVAL( 'public.orders_id_seq'::regclass )" },
+        new object[] { "'active'::text" },
+        new object[] { "'draft'::character varying" },
+        new object[] { "'draft'::character varying(32)" },
+        new object[] { "'{}'::jsonb" },
+        new object[] { "'00000000-0000-0000-0000-000000000000'::uuid" },
+        new object[] { "42::integer" },
+        new object[] { "3.14::numeric(10, 2)" },
+        new object[] { "true::boolean" },
+        new object[] { "now()::timestamp without time zone" },
+        new object[] { "CURRENT_TIMESTAMP::timestamp with time zone" },
     };
 
     [Theory]
@@ -171,6 +211,7 @@ public class DefaultValueValidatorTests
     [InlineData("'; DROP TABLE Payload--")]
     [InlineData("0; DELETE FROM Migrations")]
     [InlineData("SELECT secret FROM vault")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SqliteGenerator_AddColumn_AdversarialDefault_Throws(string payload)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", payload));
@@ -181,6 +222,7 @@ public class DefaultValueValidatorTests
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
     [InlineData("0; DELETE FROM Migrations")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void PostgresGenerator_AddColumn_AdversarialDefault_Throws(string payload)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", payload));
@@ -191,6 +233,7 @@ public class DefaultValueValidatorTests
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
     [InlineData("0; DELETE FROM Migrations")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SqlServerGenerator_AddColumn_AdversarialDefault_Throws(string payload)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", payload));
@@ -201,6 +244,7 @@ public class DefaultValueValidatorTests
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
     [InlineData("0; DELETE FROM Migrations")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void MySqlGenerator_AddColumn_AdversarialDefault_Throws(string payload)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", payload));
@@ -213,6 +257,7 @@ public class DefaultValueValidatorTests
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
     [InlineData("0; SELECT * FROM secrets")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void PostgresGenerator_AlterColumn_AdversarialNewDefault_Throws(string payload)
     {
         var diff = AlterDefaultDiff("T", "Col", typeof(string).FullName!, "'old'", payload);
@@ -222,6 +267,7 @@ public class DefaultValueValidatorTests
 
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void PostgresGenerator_AlterColumn_AdversarialOldDefault_ThrowsOnDown(string payload)
     {
         // old default is adversarial — this affects the Down migration.
@@ -232,6 +278,7 @@ public class DefaultValueValidatorTests
 
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void MySqlGenerator_AlterColumn_AdversarialNewDefault_Throws(string payload)
     {
         var diff = AlterDefaultDiff("T", "Col", typeof(string).FullName!, "'old'", payload);
@@ -241,6 +288,7 @@ public class DefaultValueValidatorTests
 
     [Theory]
     [InlineData("'; DROP TABLE Payload--")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SqlServerGenerator_AlterColumn_AdversarialNewDefault_Throws(string payload)
     {
         var diff = AlterDefaultDiff("T", "Col", typeof(string).FullName!, "'old'", payload);

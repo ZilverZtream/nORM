@@ -50,6 +50,25 @@ public class IncludeContractTests
         public IctCustomer? Customer { get; set; }
     }
 
+    [Table("ICT_Account")]
+    private class IctAccount
+    {
+        [Key]
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public IctAccountProfile? Profile { get; set; }
+    }
+
+    [Table("ICT_AccountProfile")]
+    private class IctAccountProfile
+    {
+        [Key]
+        public int Id { get; set; }
+        public int AccountId { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public IctAccount Account { get; set; } = default!;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static SqliteConnection OpenDb()
@@ -126,6 +145,73 @@ public class IncludeContractTests
         // Customers are returned but their Orders collection is not populated.
         Assert.Single(customers);
         Assert.Empty(customers[0].Orders);
+    }
+
+    [Fact]
+    public async Task ReferenceInclude_WithAsSplitQuery_LoadsSingleDependent()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE ICT_Account (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL)");
+        Exec(cn, "CREATE TABLE ICT_AccountProfile (Id INTEGER PRIMARY KEY, AccountId INTEGER NOT NULL UNIQUE, DisplayName TEXT NOT NULL)");
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<IctAccount>().HasKey(a => a.Id);
+                mb.Entity<IctAccountProfile>().HasKey(p => p.Id);
+                mb.Entity<IctAccount>()
+                    .HasOne(a => a.Profile)
+                    .WithOne(p => p.Account)
+                    .HasForeignKey(p => p.AccountId, a => a.Id);
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        Exec(cn, "INSERT INTO ICT_Account VALUES(1,'Alice'),(2,'Bob')");
+        Exec(cn, "INSERT INTO ICT_AccountProfile VALUES(10,1,'Alice Profile')");
+
+        var accounts = await ((INormQueryable<IctAccount>)ctx.Query<IctAccount>())
+            .AsSplitQuery()
+            .Include(a => a.Profile)
+            .ToListAsync();
+
+        Assert.Equal(2, accounts.Count);
+        Assert.Equal("Alice Profile", accounts.Single(a => a.Id == 1).Profile?.DisplayName);
+        Assert.Null(accounts.Single(a => a.Id == 2).Profile);
+    }
+
+    [Fact]
+    public async Task ReferenceInclude_WithCompositeKey_LoadsSingleDependent()
+    {
+        using var cn = OpenDb();
+        Exec(cn, "CREATE TABLE ICT_CompositeAccount (TenantId INTEGER NOT NULL, AccountNo INTEGER NOT NULL, Name TEXT NOT NULL, PRIMARY KEY(TenantId, AccountNo))");
+        Exec(cn, "CREATE TABLE ICT_CompositeAccountProfile (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, AccountNo INTEGER NOT NULL, DisplayName TEXT NOT NULL, UNIQUE(TenantId, AccountNo))");
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<IctCompositeAccount>().HasKey(a => new { a.TenantId, a.AccountNo });
+                mb.Entity<IctCompositeAccountProfile>().HasKey(p => p.Id);
+                mb.Entity<IctCompositeAccount>()
+                    .HasOne(a => a.Profile)
+                    .WithOne(p => p.Account)
+                    .HasForeignKey(p => new { p.TenantId, p.AccountNo }, a => new { a.TenantId, a.AccountNo });
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        Exec(cn, "INSERT INTO ICT_CompositeAccount VALUES(1,100,'Alice'),(1,200,'Bob'),(2,100,'Cara')");
+        Exec(cn, "INSERT INTO ICT_CompositeAccountProfile VALUES(10,1,100,'Alice Profile'),(20,2,100,'Cara Profile')");
+
+        var accounts = await ((INormQueryable<IctCompositeAccount>)ctx.Query<IctCompositeAccount>())
+            .AsSplitQuery()
+            .Include(a => a.Profile)
+            .ToListAsync();
+
+        Assert.Equal(3, accounts.Count);
+        Assert.Equal("Alice Profile", accounts.Single(a => a.TenantId == 1 && a.AccountNo == 100).Profile?.DisplayName);
+        Assert.Null(accounts.Single(a => a.TenantId == 1 && a.AccountNo == 200).Profile);
+        Assert.Equal("Cara Profile", accounts.Single(a => a.TenantId == 2 && a.AccountNo == 100).Profile?.DisplayName);
     }
 
     // ── 3. Composite-key dependent Include loads children correctly ──────────────
@@ -246,4 +332,24 @@ file class IctCompositeLine
     public int ParentId { get; set; }
     public int Seq { get; set; }
     public string Note { get; set; } = string.Empty;
+}
+
+[Table("ICT_CompositeAccount")]
+file class IctCompositeAccount
+{
+    public int TenantId { get; set; }
+    public int AccountNo { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public IctCompositeAccountProfile? Profile { get; set; }
+}
+
+[Table("ICT_CompositeAccountProfile")]
+file class IctCompositeAccountProfile
+{
+    [Key]
+    public int Id { get; set; }
+    public int TenantId { get; set; }
+    public int AccountNo { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public IctCompositeAccount? Account { get; set; }
 }

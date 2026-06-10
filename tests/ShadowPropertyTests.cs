@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -214,6 +214,7 @@ public class ShadowPropertyTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void SP2_Store_Concurrent_SetGet_Correct()
     {
         var entity = new Article { Id = 1 };

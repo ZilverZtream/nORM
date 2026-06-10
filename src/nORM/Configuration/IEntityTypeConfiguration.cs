@@ -30,6 +30,11 @@ namespace nORM.Configuration
         IReadOnlyList<PropertyInfo> KeyProperties { get; }
 
         /// <summary>
+        /// Gets the optional database primary-key constraint name.
+        /// </summary>
+        string? PrimaryKeyConstraintName { get; }
+
+        /// <summary>
         /// Gets a value indicating whether the mapped type is query-only and
         /// should reject generated write operations.
         /// </summary>
@@ -51,6 +56,26 @@ namespace nORM.Configuration
         /// Gets provider identity seed/increment metadata configured for database-generated properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptions { get; }
+
+        /// <summary>
+        /// Gets maximum length metadata configured for string or byte array properties.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, int> MaxLengths { get; }
+
+        /// <summary>
+        /// Gets Unicode text metadata configured for string properties.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }
+
+        /// <summary>
+        /// Gets fixed-length storage metadata configured for string or byte array properties.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, bool> FixedLengthSettings { get; }
+
+        /// <summary>
+        /// Gets decimal precision/scale metadata configured for properties.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> Precisions { get; }
 
         /// <summary>
         /// Gets database collation names configured for string/comparable text properties.
@@ -140,6 +165,11 @@ namespace nORM.Configuration
     /// Describes provider identity seed/increment metadata for migration generation.
     /// </summary>
     public record IdentityOptionsConfiguration(long Seed, long Increment);
+
+    /// <summary>
+    /// Describes decimal precision/scale metadata for migration generation.
+    /// </summary>
+    public record PrecisionConfiguration(int Precision, int? Scale = null);
 
     /// <summary>
     /// Describes a provider-specific index over a SQL expression rather than a mapped property.
@@ -274,5 +304,17 @@ namespace nORM.Configuration
         /// Optional ordered key properties on the right entity. When omitted, the related entity primary key is used.
         /// </summary>
         public IReadOnlyList<PropertyInfo>? RightKeyProperties { get; init; }
+
+        /// <summary>Database delete action for the FK from the join table to this entity.</summary>
+        public ReferentialAction LeftOnDelete { get; init; } = ReferentialAction.NoAction;
+
+        /// <summary>Database update action for the FK from the join table to this entity.</summary>
+        public ReferentialAction LeftOnUpdate { get; init; } = ReferentialAction.NoAction;
+
+        /// <summary>Database delete action for the FK from the join table to the related entity.</summary>
+        public ReferentialAction RightOnDelete { get; init; } = ReferentialAction.NoAction;
+
+        /// <summary>Database update action for the FK from the join table to the related entity.</summary>
+        public ReferentialAction RightOnUpdate { get; init; } = ReferentialAction.NoAction;
     }
 }

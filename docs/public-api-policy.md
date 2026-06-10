@@ -15,6 +15,12 @@ tests/PublicApi.Shipped.txt
 surface of `nORM.dll` against that file. A normal test run fails when public
 types, members, fields, events, constructors, or method signatures change.
 
+`PublicApiClassificationTests` uses `docs/namespace-policy.md` as the support-tier
+source of truth. It verifies every non-comment entry in
+`tests/PublicApi.Shipped.txt` resolves to a shipped public type whose namespace
+has a documented tier, and it fails when the namespace policy has missing or
+stale entries.
+
 ## Updating The Baseline
 
 Only update the baseline for a reviewed public API change:
@@ -47,10 +53,22 @@ v1.0 contract:
 | Member | Status | Tested by | Documented in |
 |---|---|---|---|
 | `nORM.Mapping.RenameColumnAttribute` | Stable | `MigrationRenameTests`, `MigrationRenameDocContractTests` | `README.md` migration section |
+| `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)` / `IsFixedLength(bool)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int)` / `HasPrecision(int, int)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.EntityTypeBuilder<TEntity>.HasOne<TDependent>(...)` and nested one-to-one relationship builders | Stable | `RelationshipConfigurationTests`, `IncludeContractTests`, `ScaffoldingAndNavigationCoverageTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.IEntityTypeConfiguration.MaxLengths` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings` / `FixedLengthSettings` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.IEntityTypeConfiguration.Precisions` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Configuration.PrecisionConfiguration` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
+| `nORM.Migration.ColumnSchema.MaxLength` / `IsUnicode` / `IsFixedLength` | Stable | `SchemaSnapshotTests`, `MigrationDefaultsIdentityTests` | `docs/scaffolding.md` |
 | `nORM.Migration.ColumnSchema.PreviousName` | Stable | `MigrationRenameTests`, `SchemaSnapshotTests` | `README.md` migration section |
 | `nORM.Migration.SchemaDiff.RenamedColumns` | Stable | `MigrationRenameTests` | `README.md` migration section |
 | `nORM.Providers.SqlServerProvider(IDbParameterFactory)` | Stable - dialect-only mode | `TestBase.CreateProvider`, `ProviderCapabilitiesTests`, cross-provider parity suite | `docs/provider-packages.md`; matches the existing `PostgresProvider(IDbParameterFactory)` and `MySqlProvider(IDbParameterFactory)` constructors |
 | `nORM.SourceGeneration.CompiledMaterializerStore.AddPermanent<T>` | Stable - source-generator registration helper | `SourceGeneratorIntegrationTests`, `SourceGenMaterializerCorrectnesTests` | `docs/source-generation.md` |
+| `nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes` | Stable - scaffold output mode | `ScaffoldAsync_WithNullableReferenceTypesDisabled_EmitsNullableDisabledCode`, `Scaffold_project_nullable_disable_generates_nullable_disabled_code`, `Scaffold_project_inherits_nullable_enable_from_directory_build_props` | `docs/scaffolding.md`, `src/dotnet-norm/README.md`, `README.md` |
+| `nORM.Internal.ConcurrentLruCache<TKey, TValue>` | Stable for v1.0 compatibility; deprecated namespace closed to new public additions | `ConcurrentLruCachePublicApiTests`, `ConcurrentLruCacheStressTests`, `NamespacePolicyContractTests` | `docs/namespace-policy.md`; planned v1.x relocation to `nORM.Caching` with type forwarding |
+| `nORM.Internal.ParameterOptimizer` | Stable for v1.0 compatibility; deprecated namespace closed to new public additions | `ParameterOptimizerPublicApiTests`, `CompileTimeQueryParameterParityTests`, `NamespacePolicyContractTests` | `docs/namespace-policy.md`; planned v1.x relocation to `nORM.Diagnostics` with type forwarding |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

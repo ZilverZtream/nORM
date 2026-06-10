@@ -23,9 +23,39 @@ public class TenantTemporalProviderSwapTests
         var (connection, provider) = live!.Value;
         await using (connection)
         {
+            if (Skip.If(IsProtectedTemporalDatabase(kind, connection.Database),
+                    $"Store tenant/temporal live scenario requires an application database/schema; current {kind} database '{connection.Database}' is provider-owned and rejects temporal DDL."))
+                return;
+
             var result = await StoreScenario.RunAsync(connection, provider, ToStoreProvider(kind));
             Assert.True(result.Success, result.Summary);
         }
+    }
+
+    private static bool IsProtectedTemporalDatabase(ProviderKind kind, string? databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            return false;
+
+        var name = databaseName.Trim();
+        return kind switch
+        {
+            ProviderKind.SqlServer =>
+                name.Equals("master", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("model", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+            ProviderKind.Postgres =>
+                name.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("template0", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("template1", StringComparison.OrdinalIgnoreCase),
+            ProviderKind.MySql =>
+                name.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("sys", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
     }
 
     private static StoreProvider ToStoreProvider(ProviderKind kind) => kind switch

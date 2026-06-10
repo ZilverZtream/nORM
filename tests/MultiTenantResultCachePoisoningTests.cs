@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -215,6 +215,7 @@ public class MultiTenantResultCachePoisoningTests
     // ── RC-3: Concurrent tenants — no cross-contamination under parallel load ──
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ResultCache_ConcurrentTenants_NoCrossContamination()
     {
         // Use a named shared-cache in-memory database so concurrent tasks can each open

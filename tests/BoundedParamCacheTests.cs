@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -144,6 +144,7 @@ public class BoundedParamCacheTests
     // ── Concurrent inserts stay within bounds ─────────────────────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task BoundedCache_ConcurrentInserts_CountStaysBounded()
     {
         const int cap = 200;

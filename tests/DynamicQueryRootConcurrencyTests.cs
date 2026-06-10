@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -34,6 +34,7 @@ namespace nORM.Tests;
 /// </summary>
 [Collection(ConcurrencyStressCollection.Name)]
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class DynamicQueryRootConcurrencyTests
 {
     // ── shared SQLite helpers ─────────────────────────────────────────────────

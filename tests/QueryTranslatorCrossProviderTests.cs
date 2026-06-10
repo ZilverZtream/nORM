@@ -277,7 +277,7 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var col = provider.Escape("CategoryId");
         var paramName = provider.ParamPrefix + "p0";
         var t0 = provider.Escape("T0");
-        var expected = $"SELECT {t0}.{col} FROM {table} {t0} GROUP BY {t0}.{col} HAVING ((COUNT(*) > {paramName}))";
+        var expected = $"SELECT {t0}.{col} AS {provider.Escape("Key")} FROM {table} {t0} GROUP BY {t0}.{col} HAVING ((COUNT(*) > {paramName}))";
         Assert.Equal(expected, sql);
         Assert.Equal(10, parameters[paramName]);
         Assert.Equal(typeof(int), elementType);

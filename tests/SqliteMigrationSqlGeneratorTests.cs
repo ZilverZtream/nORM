@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -232,6 +233,56 @@ public class SqliteMigrationSqlGeneratorTests
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s.StartsWith("CREATE INDEX") && s.Contains("idx_Users_Name_Desc") && s.Contains("\"Name\" DESC"));
+    }
+
+    [Fact]
+    public void CreateTable_WithPostgresNullsNotDistinctIndex_Throws()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema
+                {
+                    Name = "Name",
+                    ClrType = typeof(string).FullName!,
+                    IsNullable = true,
+                    Indexes = { new ColumnIndexSchema { Name = "IX_Users_Name", IsUnique = true, NullsNotDistinct = true } }
+                }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => new SqliteMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("NULLS NOT DISTINCT", ex.Message);
+    }
+
+    [Fact]
+    public void CreateTable_WithExplicitNullSortOrder_Throws()
+    {
+        var table = new TableSchema
+        {
+            Name = "Users",
+            Columns =
+            {
+                new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Users" },
+                new ColumnSchema
+                {
+                    Name = "Name",
+                    ClrType = typeof(string).FullName!,
+                    IsNullable = true,
+                    Indexes = { new ColumnIndexSchema { Name = "IX_Users_Name", NullSortOrder = IndexNullSortOrder.First } }
+                }
+            }
+        };
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => new SqliteMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("NULLS FIRST/LAST", ex.Message);
     }
 
     [Fact]

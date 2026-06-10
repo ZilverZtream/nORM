@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -29,6 +29,7 @@ namespace nORM.Tests;
 /// separate contexts (the nORM-correct ownership model for concurrency).
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrencyTortureTests
 {
     [Table("TortureItem")]

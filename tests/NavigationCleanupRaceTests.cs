@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -80,6 +80,7 @@ public class NavigationCleanupRaceTests
     /// two threads could mutate _pendingLoads simultaneously.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task C1_ConcurrentCleanupAndLoad_DoNotCrash()
     {
         using var cn = OpenMemory();
@@ -210,6 +211,7 @@ public class NavigationCleanupRaceTests
     /// Verifies no exceptions, no dictionary corruption, and all tasks complete.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Fuzz_ConcurrentCleanupAndLoad_NoCorruption()
     {
         using var cn = OpenMemory();
@@ -406,6 +408,7 @@ public class NavigationCleanupRaceTests
     /// Wait() would throw ODE. After the fix, the semaphore is never explicitly disposed.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task NAV1_Dispose_ConcurrentWithRemovePending_DoesNotThrowODE()
     {
         using var cn = OpenMemory();

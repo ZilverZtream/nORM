@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -370,6 +370,7 @@ public class CacheContentionTests
     // ── LRU-4: TTL expiry + concurrent writes do not deadlock ─────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void LruCache_TtlExpiry_ConcurrentWrites_NoDeadlock()
     {
         using var cache = new ConcurrentLruCache<int, string>(
@@ -406,6 +407,7 @@ public class CacheContentionTests
     // ── LRU-5: SetMaxSize shrinks safely under concurrency ────────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void LruCache_SetMaxSize_ShrinkDuringConcurrentWrites_NoException()
     {
         using var cache = new ConcurrentLruCache<int, string>(maxSize: 100);

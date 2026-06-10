@@ -32,6 +32,8 @@ public sealed class ProviderMobilityStrictSurfaceGuardTests
             "Method:ExecuteCompiledQueryListAsync",
             "Method:ExecuteStoredProcedureAsAsyncEnumerable",
             "Method:ExecuteStoredProcedureAsync",
+            "Method:ExecuteStoredProcedureNonQueryAsync",
+            "Method:ExecuteStoredProcedureNonQueryWithOutputAsync",
             "Method:ExecuteStoredProcedureWithOutputAsync",
             "Method:FromSqlInterpolatedAsync",
             "Method:FromSqlRawAsync",

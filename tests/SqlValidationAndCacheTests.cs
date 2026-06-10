@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -217,6 +217,7 @@ public class StaleDbTypeTests
 /// context in a poisoned state.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.TransactionStress)]
 public class TransactionAtomicCompletionTests
 {
     private static SqliteConnection OpenConnection()
@@ -231,6 +232,7 @@ public class TransactionAtomicCompletionTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentDispose_NeitherThrows()
     {
         // Two concurrent Dispose() calls on the same wrapper must not throw.
@@ -254,6 +256,7 @@ public class TransactionAtomicCompletionTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentDisposeAsync_NeitherThrows()
     {
         // Two concurrent DisposeAsync() calls on the same wrapper must not throw.
@@ -269,6 +272,7 @@ public class TransactionAtomicCompletionTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentCommitAndDispose_NeitherThrows()
     {
         // Concurrent Commit() + Dispose() — only one must actually commit/dispose.

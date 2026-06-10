@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
@@ -353,6 +353,7 @@ public class LiveCrossProviderTests
     [InlineData("sqlserver")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task LiveProvider_LockStep_OCC_StaleToken_ThrowsConcurrencyException(string kind)
     {
         var (cn, provider, skip) = OpenLive(kind);

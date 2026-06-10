@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -294,6 +294,7 @@ public class MigrationFkDropOrderingTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task MFKO_9_SqliteRunner_ConcurrentApply_HistoryHasExactlyOneEntryPerMigration()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"norm_mfko9_{Guid.NewGuid():N}.db");
@@ -338,6 +339,7 @@ public class MigrationFkDropOrderingTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task MFKO_10_SqliteRunner_AfterConcurrentApply_NoPendingMigrations()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"norm_mfko10_{Guid.NewGuid():N}.db");

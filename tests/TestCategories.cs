@@ -12,6 +12,7 @@ namespace nORM.Tests;
 ///   <item><description><c>PackageConsumer</c> — smoke tests that unzip and inspect the built .nupkg.
 ///     Require a prior <c>dotnet pack</c>; run after the package step in the release gate.</description></item>
 /// </list>
+/// Additional RC routing categories are documented in docs/test-suite-ownership.md.
 /// </summary>
 public static class TestCategory
 {
@@ -23,6 +24,33 @@ public static class TestCategory
 
     /// <summary>Long-running concurrency, adversarial, or fault-injection stress loops.</summary>
     public const string Stress = "Stress";
+
+    /// <summary>Provider SQL, behavior, migration, and binding parity tests selected by release gates.</summary>
+    public const string ProviderParity = "ProviderParity";
+
+    /// <summary>Navigation stress and cancellation tests selected by the RC release gate.</summary>
+    public const string NavigationStress = "NavigationStress";
+
+    /// <summary>Transaction stress and lifecycle tests selected by the RC release gate.</summary>
+    public const string TransactionStress = "TransactionStress";
+
+    /// <summary>Compiled-query stress and SQL shape tests selected by the RC release gate.</summary>
+    public const string CompiledQueryStress = "CompiledQueryStress";
+
+    /// <summary>Provider and source-generator parity tests selected by the RC release gate.</summary>
+    public const string ProviderSourceGenParity = "ProviderSourceGenParity";
+
+    /// <summary>Bulk-operation provider parity tests selected by the RC release gate.</summary>
+    public const string BulkProviderParity = "BulkProviderParity";
+
+    /// <summary>Migration provider parity, cancellation, and replay tests selected by the RC release gate.</summary>
+    public const string MigrationParity = "MigrationParity";
+
+    /// <summary>Cache memory-bound and cache-lock tests selected by the RC release gate.</summary>
+    public const string CacheMemory = "CacheMemory";
+
+    /// <summary>Concurrency, adversarial, fault-injection, and stress tests selected by the RC release gate.</summary>
+    public const string AdversarialConcurrency = "AdversarialConcurrency";
 
     /// <summary>Tests that inspect or consume the built .nupkg / .snupkg artifacts.</summary>
     public const string PackageConsumer = "PackageConsumer";

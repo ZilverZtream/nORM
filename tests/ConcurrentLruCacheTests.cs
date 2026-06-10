@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using nORM.Internal;
 using Xunit;
@@ -6,6 +6,7 @@ using Xunit;
 namespace nORM.Tests;
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrentLruCacheTests
 {
     [Fact]

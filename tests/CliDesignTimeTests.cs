@@ -7,7 +7,7 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Tests for CLI design-time loading improvements (Blocker 28):
+/// Tests for CLI design-time loading improvements (Blocker 33):
 /// - Connection string redaction from error messages.
 /// - Clear error when --assembly points to a missing file.
 /// - Clear error when --project points to a missing file.
@@ -120,6 +120,57 @@ public class CliDesignTimeTests
     }
 
     // ─── RedactConnectionStrings helper (mirrors the logic in Program.cs) ─
+
+    [Fact]
+    public void Migrations_add_help_lists_design_time_project_options()
+    {
+        var root = FindRepositoryRoot();
+
+        var result = RunCli("migrations add --help", root);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("--project", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--startup-project", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--target-framework", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--framework", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--configuration", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--runtime", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--environment", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--deps", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--runtimeconfig", result.Stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Migrations_add_missing_deps_file_gives_clear_error()
+    {
+        var root = FindRepositoryRoot();
+        var missingAssembly = Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid() + ".dll");
+        var missingDeps = Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid() + ".deps.json");
+
+        var result = RunCli(
+            $"migrations add TestMigration --provider sqlite --assembly {Quote(missingAssembly)} --deps {Quote(missingDeps)} --output {Quote(Path.GetTempPath())}",
+            root);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Deps file", result.Stderr, StringComparison.Ordinal);
+        Assert.Contains("not found", result.Stderr, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Migrations_add_missing_runtimeconfig_file_gives_clear_error()
+    {
+        var root = FindRepositoryRoot();
+        var missingAssembly = Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid() + ".dll");
+        var missingRuntimeConfig = Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid() + ".runtimeconfig.json");
+
+        var result = RunCli(
+            $"migrations add TestMigration --provider sqlite --assembly {Quote(missingAssembly)} --runtimeconfig {Quote(missingRuntimeConfig)} --output {Quote(Path.GetTempPath())}",
+            root);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Runtime config file", result.Stderr, StringComparison.Ordinal);
+        Assert.Contains("not found", result.Stderr, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string RedactConnectionStrings(string message)
     {

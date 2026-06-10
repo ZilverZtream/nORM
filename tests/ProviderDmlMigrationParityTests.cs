@@ -50,6 +50,7 @@ public class PdmItemB
 /// SQLite live; MSSQL/MySQL/PostgreSQL env-gated.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
 public class ProviderDmlMigrationParityTests
 {
     // ── Dynamic migration assembly helpers ─────────────────────────────────

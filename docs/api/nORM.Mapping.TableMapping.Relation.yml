@@ -5,12 +5,19 @@ items:
   id: TableMapping.Relation
   parent: nORM.Mapping
   children:
+  - nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Boolean)
   - nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,nORM.Mapping.Column,nORM.Mapping.Column,System.Boolean)
   - nORM.Mapping.TableMapping.Relation.CascadeDelete
+  - nORM.Mapping.TableMapping.Relation.ConstraintName
   - nORM.Mapping.TableMapping.Relation.DependentType
   - nORM.Mapping.TableMapping.Relation.ForeignKey
+  - nORM.Mapping.TableMapping.Relation.ForeignKeys
+  - nORM.Mapping.TableMapping.Relation.IsComposite
   - nORM.Mapping.TableMapping.Relation.NavProp
+  - nORM.Mapping.TableMapping.Relation.OnDelete
+  - nORM.Mapping.TableMapping.Relation.OnUpdate
   - nORM.Mapping.TableMapping.Relation.PrincipalKey
+  - nORM.Mapping.TableMapping.Relation.PrincipalKeys
   langs:
   - csharp
   - vb
@@ -25,7 +32,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relation
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -69,7 +76,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -92,7 +99,7 @@ items:
       description: The foreign key column on the dependent entity referencing the principal key.
     - id: CascadeDelete
       type: System.Boolean
-      description: Specifies whether deletes on the principal entity cascade to dependents.
+      description: Specifies whether deletes on the principal entity cascade through the tracked object graph.
     content.vb: Public Sub New(NavProp As PropertyInfo, DependentType As Type, PrincipalKey As Column, ForeignKey As Column, CascadeDelete As Boolean = True)
   overload: nORM.Mapping.TableMapping.Relation.#ctor*
   nameWithType.vb: TableMapping.Relation.New(PropertyInfo, Type, Column, Column, Boolean)
@@ -116,7 +123,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavProp
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -147,7 +154,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentType
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -178,7 +185,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -209,7 +216,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -240,11 +247,11 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CascadeDelete
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 422
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
-  summary: Specifies whether deletes on the principal entity cascade to dependents.
+  summary: Specifies whether deletes on the principal entity cascade through the tracked object graph.
   example: []
   syntax:
     content: public bool CascadeDelete { get; init; }
@@ -253,6 +260,234 @@ items:
       type: System.Boolean
     content.vb: Public Property CascadeDelete As Boolean
   overload: nORM.Mapping.TableMapping.Relation.CascadeDelete*
+- uid: nORM.Mapping.TableMapping.Relation.PrincipalKeys
+  commentId: P:nORM.Mapping.TableMapping.Relation.PrincipalKeys
+  id: PrincipalKeys
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: PrincipalKeys
+  nameWithType: TableMapping.Relation.PrincipalKeys
+  fullName: nORM.Mapping.TableMapping.Relation.PrincipalKeys
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PrincipalKeys
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 639
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Ordered principal key columns participating in the relationship.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Column> PrincipalKeys { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    content.vb: Public Property PrincipalKeys As IReadOnlyList(Of Column)
+  overload: nORM.Mapping.TableMapping.Relation.PrincipalKeys*
+- uid: nORM.Mapping.TableMapping.Relation.ForeignKeys
+  commentId: P:nORM.Mapping.TableMapping.Relation.ForeignKeys
+  id: ForeignKeys
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: ForeignKeys
+  nameWithType: TableMapping.Relation.ForeignKeys
+  fullName: nORM.Mapping.TableMapping.Relation.ForeignKeys
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ForeignKeys
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 642
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Ordered foreign key columns participating in the relationship.
+  example: []
+  syntax:
+    content: public IReadOnlyList<Column> ForeignKeys { get; init; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    content.vb: Public Property ForeignKeys As IReadOnlyList(Of Column)
+  overload: nORM.Mapping.TableMapping.Relation.ForeignKeys*
+- uid: nORM.Mapping.TableMapping.Relation.OnDelete
+  commentId: P:nORM.Mapping.TableMapping.Relation.OnDelete
+  id: OnDelete
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: OnDelete
+  nameWithType: TableMapping.Relation.OnDelete
+  fullName: nORM.Mapping.TableMapping.Relation.OnDelete
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OnDelete
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 645
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database referential action emitted for principal deletes.
+  example: []
+  syntax:
+    content: public ReferentialAction OnDelete { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property OnDelete As ReferentialAction
+  overload: nORM.Mapping.TableMapping.Relation.OnDelete*
+- uid: nORM.Mapping.TableMapping.Relation.OnUpdate
+  commentId: P:nORM.Mapping.TableMapping.Relation.OnUpdate
+  id: OnUpdate
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: OnUpdate
+  nameWithType: TableMapping.Relation.OnUpdate
+  fullName: nORM.Mapping.TableMapping.Relation.OnUpdate
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OnUpdate
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 648
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Database referential action emitted for principal key updates.
+  example: []
+  syntax:
+    content: public ReferentialAction OnUpdate { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.ReferentialAction
+    content.vb: Public Property OnUpdate As ReferentialAction
+  overload: nORM.Mapping.TableMapping.Relation.OnUpdate*
+- uid: nORM.Mapping.TableMapping.Relation.ConstraintName
+  commentId: P:nORM.Mapping.TableMapping.Relation.ConstraintName
+  id: ConstraintName
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: ConstraintName
+  nameWithType: TableMapping.Relation.ConstraintName
+  fullName: nORM.Mapping.TableMapping.Relation.ConstraintName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ConstraintName
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 651
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Optional database foreign key constraint name to preserve in migration snapshots.
+  example: []
+  syntax:
+    content: public string? ConstraintName { get; init; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property ConstraintName As String
+  overload: nORM.Mapping.TableMapping.Relation.ConstraintName*
+- uid: nORM.Mapping.TableMapping.Relation.IsComposite
+  commentId: P:nORM.Mapping.TableMapping.Relation.IsComposite
+  id: IsComposite
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: IsComposite
+  nameWithType: TableMapping.Relation.IsComposite
+  fullName: nORM.Mapping.TableMapping.Relation.IsComposite
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsComposite
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 654
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Gets whether the relationship spans more than one key column.
+  example: []
+  syntax:
+    content: public bool IsComposite { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsComposite As Boolean
+  overload: nORM.Mapping.TableMapping.Relation.IsComposite*
+- uid: nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Boolean)
+  commentId: M:nORM.Mapping.TableMapping.Relation.#ctor(System.Reflection.PropertyInfo,System.Type,System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Boolean)
+  id: '#ctor(System.Reflection.PropertyInfo,System.Type,System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column},System.Boolean)'
+  parent: nORM.Mapping.TableMapping.Relation
+  langs:
+  - csharp
+  - vb
+  name: Relation(PropertyInfo, Type, IReadOnlyList<Column>, IReadOnlyList<Column>, bool)
+  nameWithType: TableMapping.Relation.Relation(PropertyInfo, Type, IReadOnlyList<Column>, IReadOnlyList<Column>, bool)
+  fullName: nORM.Mapping.TableMapping.Relation.Relation(System.Reflection.PropertyInfo, System.Type, System.Collections.Generic.IReadOnlyList<nORM.Mapping.Column>, System.Collections.Generic.IReadOnlyList<nORM.Mapping.Column>, bool)
+  type: Constructor
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: .ctor
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 657
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: Creates a relationship backed by multiple key columns.
+  example: []
+  syntax:
+    content: public Relation(PropertyInfo navProp, Type dependentType, IReadOnlyList<Column> principalKeys, IReadOnlyList<Column> foreignKeys, bool cascadeDelete = true)
+    parameters:
+    - id: navProp
+      type: System.Reflection.PropertyInfo
+    - id: dependentType
+      type: System.Type
+    - id: principalKeys
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    - id: foreignKeys
+      type: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+    - id: cascadeDelete
+      type: System.Boolean
+    content.vb: Public Sub New(navProp As PropertyInfo, dependentType As Type, principalKeys As IReadOnlyList(Of Column), foreignKeys As IReadOnlyList(Of Column), cascadeDelete As Boolean = True)
+  overload: nORM.Mapping.TableMapping.Relation.#ctor*
+  nameWithType.vb: TableMapping.Relation.New(PropertyInfo, Type, IReadOnlyList(Of Column), IReadOnlyList(Of Column), Boolean)
+  fullName.vb: nORM.Mapping.TableMapping.Relation.New(System.Reflection.PropertyInfo, System.Type, System.Collections.Generic.IReadOnlyList(Of nORM.Mapping.Column), System.Collections.Generic.IReadOnlyList(Of nORM.Mapping.Column), Boolean)
+  name.vb: New(PropertyInfo, Type, IReadOnlyList(Of Column), IReadOnlyList(Of Column), Boolean)
 references:
 - uid: nORM.Mapping
   commentId: N:nORM.Mapping
@@ -1386,3 +1621,177 @@ references:
   name: CascadeDelete
   nameWithType: TableMapping.Relation.CascadeDelete
   fullName: nORM.Mapping.TableMapping.Relation.CascadeDelete
+- uid: nORM.Mapping.TableMapping.Relation.PrincipalKeys*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.PrincipalKeys
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_PrincipalKeys
+  name: PrincipalKeys
+  nameWithType: TableMapping.Relation.PrincipalKeys
+  fullName: nORM.Mapping.TableMapping.Relation.PrincipalKeys
+- uid: System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+  commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Mapping.Column}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<Column>
+  nameWithType: IReadOnlyList<Column>
+  fullName: System.Collections.Generic.IReadOnlyList<nORM.Mapping.Column>
+  nameWithType.vb: IReadOnlyList(Of Column)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of nORM.Mapping.Column)
+  name.vb: IReadOnlyList(Of Column)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: nORM.Mapping.Column
+    name: Column
+    href: nORM.Mapping.Column.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Mapping.Column
+    name: Column
+    href: nORM.Mapping.Column.html
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Mapping.TableMapping.Relation.ForeignKeys*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.ForeignKeys
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_ForeignKeys
+  name: ForeignKeys
+  nameWithType: TableMapping.Relation.ForeignKeys
+  fullName: nORM.Mapping.TableMapping.Relation.ForeignKeys
+- uid: nORM.Mapping.TableMapping.Relation.OnDelete*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.OnDelete
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_OnDelete
+  name: OnDelete
+  nameWithType: TableMapping.Relation.OnDelete
+  fullName: nORM.Mapping.TableMapping.Relation.OnDelete
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Mapping.TableMapping.Relation.OnUpdate*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.OnUpdate
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_OnUpdate
+  name: OnUpdate
+  nameWithType: TableMapping.Relation.OnUpdate
+  fullName: nORM.Mapping.TableMapping.Relation.OnUpdate
+- uid: nORM.Mapping.TableMapping.Relation.ConstraintName*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.ConstraintName
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_ConstraintName
+  name: ConstraintName
+  nameWithType: TableMapping.Relation.ConstraintName
+  fullName: nORM.Mapping.TableMapping.Relation.ConstraintName
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Mapping.TableMapping.Relation.IsComposite*
+  commentId: Overload:nORM.Mapping.TableMapping.Relation.IsComposite
+  href: nORM.Mapping.TableMapping.Relation.html#nORM_Mapping_TableMapping_Relation_IsComposite
+  name: IsComposite
+  nameWithType: TableMapping.Relation.IsComposite
+  fullName: nORM.Mapping.TableMapping.Relation.IsComposite

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -145,6 +145,7 @@ INSERT INTO MtpcChild  VALUES (12, 2, 'child-B', 'B');";
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task HighContention_50ConcurrentTenantContexts_NoDataLeakage()
     {
         // 50 concurrent tasks each with an independent tenant context querying their
@@ -177,6 +178,7 @@ INSERT INTO MtpcChild  VALUES (12, 2, 'child-B', 'B');";
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task AdversarialTenantId_SqlMetaCharacters_NoInjectionInInclude()
     {
         // SQL meta-characters injected as a tenant ID must be parameterized safely and

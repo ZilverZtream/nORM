@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -332,6 +332,7 @@ INSERT INTO TiGrandchild VALUES (101, 10, 'gcB', 'B');";
     /// any data disclosure via Include.
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Include_AdversarialFkCollision_NoDisclosure()
     {
         var cn = new SqliteConnection("Data Source=:memory:");

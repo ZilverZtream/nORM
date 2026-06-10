@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -213,6 +214,38 @@ public class MigrationIndexOrderTests
     }
 
     [Fact]
+    public void SchemaDiffer_DetectsNullsNotDistinctIndexChanges()
+    {
+        var oldSnapshot = new SchemaSnapshot();
+        oldSnapshot.Tables.Add(BuildTableWithNullsNotDistinctIndex("Orders", "IX_Orders_Code", nullsNotDistinct: false));
+        var newSnapshot = new SchemaSnapshot();
+        newSnapshot.Tables.Add(BuildTableWithNullsNotDistinctIndex("Orders", "IX_Orders_Code", nullsNotDistinct: true));
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+
+        Assert.Contains(diff.DroppedIndexes, index => index.IndexName == "IX_Orders_Code");
+        Assert.Contains(diff.AddedIndexes, index => index.IndexName == "IX_Orders_Code");
+        var postgresUp = string.Join(" ", new PostgresMigrationSqlGenerator().GenerateSql(diff).Up);
+        Assert.Contains("CREATE UNIQUE INDEX \"IX_Orders_Code\" ON \"Orders\" (\"Code\") NULLS NOT DISTINCT", postgresUp);
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsNullSortOrderIndexChanges()
+    {
+        var oldSnapshot = new SchemaSnapshot();
+        oldSnapshot.Tables.Add(BuildTableWithNullSortOrderIndex("Orders", "IX_Orders_Code", IndexNullSortOrder.Default));
+        var newSnapshot = new SchemaSnapshot();
+        newSnapshot.Tables.Add(BuildTableWithNullSortOrderIndex("Orders", "IX_Orders_Code", IndexNullSortOrder.First));
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+
+        Assert.Contains(diff.DroppedIndexes, index => index.IndexName == "IX_Orders_Code");
+        Assert.Contains(diff.AddedIndexes, index => index.IndexName == "IX_Orders_Code");
+        var postgresUp = string.Join(" ", new PostgresMigrationSqlGenerator().GenerateSql(diff).Up);
+        Assert.Contains("CREATE INDEX \"IX_Orders_Code\" ON \"Orders\" (\"Code\" NULLS FIRST)", postgresUp);
+    }
+
+    [Fact]
     public void Providers_AddedAlternateKeyIndex_IsCreatedBeforeForeignKey()
     {
         foreach (var generator in RelationalIndexFkOrderGenerators())
@@ -267,6 +300,26 @@ public class MigrationIndexOrderTests
         description.Indexes.Add(new ColumnIndexSchema { Name = indexName, IsIncluded = true });
         table.Columns.Add(description);
 
+        return table;
+    }
+
+    private static TableSchema BuildTableWithNullsNotDistinctIndex(string tableName, string indexName, bool nullsNotDistinct)
+    {
+        var table = new TableSchema { Name = tableName };
+        table.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+        var code = new ColumnSchema { Name = "Code", ClrType = "System.String", IsNullable = true };
+        code.Indexes.Add(new ColumnIndexSchema { Name = indexName, IsUnique = true, NullsNotDistinct = nullsNotDistinct });
+        table.Columns.Add(code);
+        return table;
+    }
+
+    private static TableSchema BuildTableWithNullSortOrderIndex(string tableName, string indexName, IndexNullSortOrder nullSortOrder)
+    {
+        var table = new TableSchema { Name = tableName };
+        table.Columns.Add(new ColumnSchema { Name = "Id", ClrType = "System.Int32", IsPrimaryKey = true });
+        var code = new ColumnSchema { Name = "Code", ClrType = "System.String", IsNullable = true };
+        code.Indexes.Add(new ColumnIndexSchema { Name = indexName, NullSortOrder = nullSortOrder });
+        table.Columns.Add(code);
         return table;
     }
 

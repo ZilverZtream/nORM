@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MySqlMigrationSqlGenerator
     path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 17
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -75,7 +75,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 60
+    startLine: 148
   assemblies:
   - nORM
   namespace: nORM.Migration

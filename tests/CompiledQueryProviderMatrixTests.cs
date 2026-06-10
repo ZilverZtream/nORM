@@ -10,6 +10,7 @@ namespace nORM.Tests;
 
 /// <summary>Translation-only cross-provider tests for compiled queries and SQL generation.</summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class CompiledQueryProviderMatrixTests : TestBase
 {
     private class Product

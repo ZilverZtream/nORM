@@ -54,6 +54,7 @@ public class CTQ_Event
 /// to what a source-generated query method would emit.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class CompileTimeQueryParameterParityTests
 {
     private static SqliteConnection OpenMemory()

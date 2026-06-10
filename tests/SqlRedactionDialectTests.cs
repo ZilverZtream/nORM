@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using Xunit;
 
@@ -281,6 +281,7 @@ public class SqlRedactionDialectTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Redact_TaggedDollarQuotedAdversarial_DifferentTagsDoNotCross()
     {
         // $a$...$b$ should NOT be redacted — mismatched tags mean this is not a valid

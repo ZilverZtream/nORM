@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
@@ -14,6 +14,7 @@ namespace nORM.Tests;
 //concurrency checks are skipped for providers reporting affected (not matched) rows.
 //</summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrencyRowcountSemanticsTests
 {
  // ─── Provider property assertions ─────────────────────────────────────

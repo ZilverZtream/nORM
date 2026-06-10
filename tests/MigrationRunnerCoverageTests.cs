@@ -39,6 +39,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.MigrationParity)]
 public class MigrationRunnerCoverageTests
 {
     // ── Shared dynamic-assembly builder ──────────────────────────────────────

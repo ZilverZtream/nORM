@@ -5,7 +5,15 @@ items:
   id: EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
   langs:
   - csharp
@@ -21,7 +29,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 550
+    startLine: 1197
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -66,7 +74,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsingTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 574
+    startLine: 1221
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -99,6 +107,50 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String)
   name.vb: UsingTable(String, String, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1231
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a join table with ordered composite FK columns for this entity and the related entity.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's key.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String)) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String))
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String))
 - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.String)
   id: UsingTable(System.String,System.String,System.String,System.String)
@@ -117,7 +169,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsingTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 589
+    startLine: 1246
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -153,6 +205,389 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, String)
   name.vb: UsingTable(String, String, String, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  id: UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, string, string, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, System.Linq.Expressions.Expression<System.Func<TEntity, object>>, System.Linq.Expressions.Expression<System.Func<TDependent, object>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1285
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a join table whose columns reference alternate keys instead of primary keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk, Expression<Func<TEntity, object>> leftKey, Expression<Func<TDependent, object>> rightKey)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFk
+      type: System.String
+      description: Column referencing this entity's selected key.
+    - id: rightFk
+      type: System.String
+      description: Column referencing the related entity's selected key.
+    - id: leftKey
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Property on this entity referenced by <code class="paramref">leftFk</code>.
+    - id: rightKey
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+      description: Property on the related entity referenced by <code class="paramref">rightFk</code>.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFk As String, rightFk As String, leftKey As Expression(Of Func(Of TEntity, Object)), rightKey As Expression(Of Func(Of TDependent, Object))) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)))
+  name.vb: UsingTable(String, String, String, Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)))
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  id: UsingTable(System.String,System.String,System.String,System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, string, string, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, string, string, System.Linq.Expressions.Expression<System.Func<TEntity, object>>, System.Linq.Expressions.Expression<System.Func<TDependent, object>>, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1303
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a schema-qualified join table whose columns reference alternate keys instead of primary keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, string leftFk, string rightFk, Expression<Func<TEntity, object>> leftKey, Expression<Func<TDependent, object>> rightKey, string? schema)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFk
+      type: System.String
+      description: Column referencing this entity's selected key.
+    - id: rightFk
+      type: System.String
+      description: Column referencing the related entity's selected key.
+    - id: leftKey
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Property on this entity referenced by <code class="paramref">leftFk</code>.
+    - id: rightKey
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+      description: Property on the related entity referenced by <code class="paramref">rightFk</code>.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFk As String, rightFk As String, leftKey As Expression(Of Func(Of TEntity, Object)), rightKey As Expression(Of Func(Of TDependent, Object)), schema As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, String, String, System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)), String)
+  name.vb: UsingTable(String, String, String, Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.String)
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1330
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a schema-qualified join table with ordered composite FK columns for both sides.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, string? schema)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's key.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String), schema As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String), String)
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1354
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Specifies a schema-qualified join table with ordered composite FK columns and explicit
+
+    database referential actions for both join-table foreign keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, ReferentialAction leftOnDelete, ReferentialAction leftOnUpdate, ReferentialAction rightOnDelete, ReferentialAction rightOnUpdate, string? schema = null)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's key.
+    - id: leftOnDelete
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for deletes of this entity.
+    - id: leftOnUpdate
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for key updates of this entity.
+    - id: rightOnDelete
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for deletes of the related entity.
+    - id: rightOnUpdate
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for key updates of the related entity.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String), leftOnDelete As ReferentialAction, leftOnUpdate As ReferentialAction, rightOnDelete As ReferentialAction, rightOnUpdate As ReferentialAction, schema As String = Nothing) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String), nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, String)
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}})
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>, System.Linq.Expressions.Expression<System.Func<TEntity, object>>, System.Linq.Expressions.Expression<System.Func<TDependent, object>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1398
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a join table with ordered FK columns that reference selected single or composite keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, Expression<Func<TEntity, object>> leftKey, Expression<Func<TDependent, object>> rightKey)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's selected key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's selected key.
+    - id: leftKey
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Property or anonymous-object property list on this entity referenced by <code class="paramref">leftFkColumns</code>.
+    - id: rightKey
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+      description: Property or anonymous-object property list on the related entity referenced by <code class="paramref">rightFkColumns</code>.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String), leftKey As Expression(Of Func(Of TEntity, Object)), rightKey As Expression(Of Func(Of TDependent, Object))) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)))
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)))
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>, System.Linq.Expressions.Expression<System.Func<TEntity, object>>, System.Linq.Expressions.Expression<System.Func<TDependent, object>>, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1416
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Specifies a schema-qualified join table with ordered FK columns that reference selected single or composite keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, Expression<Func<TEntity, object>> leftKey, Expression<Func<TDependent, object>> rightKey, string? schema)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's selected key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's selected key.
+    - id: leftKey
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Property or anonymous-object property list on this entity referenced by <code class="paramref">leftFkColumns</code>.
+    - id: rightKey
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+      description: Property or anonymous-object property list on the related entity referenced by <code class="paramref">rightFkColumns</code>.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String), leftKey As Expression(Of Func(Of TEntity, Object)), rightKey As Expression(Of Func(Of TDependent, Object)), schema As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)), String)
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  id: UsingTable(System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String},System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.Linq.Expressions.Expression{System.Func{`1,System.Object}},nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,nORM.Configuration.ReferentialAction,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder
+  langs:
+  - csharp
+  - vb
+  name: UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, IReadOnlyList<string>, IReadOnlyList<string>, Expression<Func<TEntity, object>>, Expression<Func<TDependent, object>>, ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.CollectionNavigationBuilder<TDependent>.ManyToManyBuilder.UsingTable(string, System.Collections.Generic.IReadOnlyList<string>, System.Collections.Generic.IReadOnlyList<string>, System.Linq.Expressions.Expression<System.Func<TEntity, object>>, System.Linq.Expressions.Expression<System.Func<TDependent, object>>, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UsingTable
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 1450
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Specifies a schema-qualified join table with ordered FK columns that reference selected
+
+    keys and explicit database referential actions for both join-table foreign keys.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, Expression<Func<TEntity, object>> leftKey, Expression<Func<TDependent, object>> rightKey, ReferentialAction leftOnDelete, ReferentialAction leftOnUpdate, ReferentialAction rightOnDelete, ReferentialAction rightOnUpdate, string? schema = null)
+    parameters:
+    - id: joinTable
+      type: System.String
+      description: Name of the join table without schema qualification.
+    - id: leftFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing this entity's selected key.
+    - id: rightFkColumns
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Ordered columns referencing the related entity's selected key.
+    - id: leftKey
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Property or anonymous-object property list on this entity referenced by <code class="paramref">leftFkColumns</code>.
+    - id: rightKey
+      type: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+      description: Property or anonymous-object property list on the related entity referenced by <code class="paramref">rightFkColumns</code>.
+    - id: leftOnDelete
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for deletes of this entity.
+    - id: leftOnUpdate
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for key updates of this entity.
+    - id: rightOnDelete
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for deletes of the related entity.
+    - id: rightOnUpdate
+      type: nORM.Configuration.ReferentialAction
+      description: Database action for key updates of the related entity.
+    - id: schema
+      type: System.String
+      description: Optional schema containing the join table.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The parent <xref href="nORM.Configuration.EntityTypeBuilder%601" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function UsingTable(joinTable As String, leftFkColumns As IReadOnlyList(Of String), rightFkColumns As IReadOnlyList(Of String), leftKey As Expression(Of Func(Of TEntity, Object)), rightKey As Expression(Of Func(Of TDependent, Object)), leftOnDelete As ReferentialAction, leftOnUpdate As ReferentialAction, rightOnDelete As ReferentialAction, rightOnUpdate As ReferentialAction, schema As String = Nothing) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ManyToManyBuilder.UsingTable*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).CollectionNavigationBuilder(Of TDependent).ManyToManyBuilder.UsingTable(String, System.Collections.Generic.IReadOnlyList(Of String), System.Collections.Generic.IReadOnlyList(Of String), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object)), nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, nORM.Configuration.ReferentialAction, String)
+  name.vb: UsingTable(String, IReadOnlyList(Of String), IReadOnlyList(Of String), Expression(Of Func(Of TEntity, Object)), Expression(Of Func(Of TDependent, Object)), ReferentialAction, ReferentialAction, ReferentialAction, ReferentialAction, String)
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1169,3 +1604,285 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: System.Collections.Generic.IReadOnlyList{System.String}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<string>
+  nameWithType: IReadOnlyList<string>
+  fullName: System.Collections.Generic.IReadOnlyList<string>
+  nameWithType.vb: IReadOnlyList(Of String)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of String)
+  name.vb: IReadOnlyList(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`0,System.Object}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TEntity, object>>
+  nameWithType: Expression<Func<TEntity, object>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TEntity, object>>
+  nameWithType.vb: Expression(Of Func(Of TEntity, Object))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object))
+  name.vb: Expression(Of Func(Of TEntity, Object))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{{TDependent},System.Object}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`1,System.Object}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TDependent, object>>
+  nameWithType: Expression<Func<TDependent, object>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TDependent, object>>
+  nameWithType.vb: Expression(Of Func(Of TDependent, Object))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TDependent, Object))
+  name.vb: Expression(Of Func(Of TDependent, Object))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TDependent
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction

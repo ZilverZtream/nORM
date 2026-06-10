@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// already had try/finally with DisposeAsync.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.TransactionStress)]
 public class SyncTransactionCleanupTests
 {
     // ── Fake transaction that throws on Commit/Rollback ──────────────────────

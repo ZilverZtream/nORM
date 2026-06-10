@@ -5,8 +5,13 @@ items:
   id: EntityTypeBuilder`1
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
+  - nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String)
   - nORM.Configuration.EntityTypeBuilder`1.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})
+  - nORM.Configuration.EntityTypeBuilder`1.HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  - nORM.Configuration.EntityTypeBuilder`1.IsReadOnly
   - nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
   - nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
   - nORM.Configuration.EntityTypeBuilder`1.OwnsOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
@@ -30,7 +35,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityTypeBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 16
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -81,7 +86,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 303
+    startLine: 383
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -123,7 +128,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 316
+    startLine: 396
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -168,7 +173,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SharesTableWith
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 204
+    startLine: 407
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -205,7 +210,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasKey
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 219
+    startLine: 422
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -232,6 +237,186 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).HasKey(Expression(Of Func(Of TEntity, Object)))
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasKey(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)))
   name.vb: HasKey(Expression(Of Func(Of TEntity, Object)))
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String)
+  id: HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasKey(Expression<Func<TEntity, object>>, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.HasKey(Expression<Func<TEntity, object>>, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasKey(System.Linq.Expressions.Expression<System.Func<TEntity, object>>, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasKey
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 436
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures one or more properties to constitute the entity's primary key
+
+    and preserves the database primary-key constraint name for migration snapshots.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression, string? constraintName)
+    parameters:
+    - id: keyExpression
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Object}}
+      description: Expression selecting the key property or properties.
+    - id: constraintName
+      type: System.String
+      description: Database primary-key constraint name.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The same builder instance for fluent chaining.
+    content.vb: Public Function HasKey(keyExpression As Expression(Of Func(Of TEntity, Object)), constraintName As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasKey*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">keyExpression</code> is null.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the expression selects no properties, or contains a non-property argument.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasKey(Expression(Of Func(Of TEntity, Object)), String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasKey(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Object)), String)
+  name.vb: HasKey(Expression(Of Func(Of TEntity, Object)), String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.IsReadOnly
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.IsReadOnly
+  id: IsReadOnly
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: IsReadOnly()
+  nameWithType: EntityTypeBuilder<TEntity>.IsReadOnly()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.IsReadOnly()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsReadOnly
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 473
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Marks this entity as query-only. nORM can materialize it from queries,
+
+    but insert, update, delete, and tracked SaveChanges writes are rejected.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> IsReadOnly()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Public Function IsReadOnly() As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.IsReadOnly*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).IsReadOnly()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).IsReadOnly()
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
+  id: HasCheckConstraint(System.String,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasCheckConstraint(string, string)
+  nameWithType: EntityTypeBuilder<TEntity>.HasCheckConstraint(string, string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasCheckConstraint(string, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasCheckConstraint
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 487
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures a table-level CHECK constraint for migration snapshot generation.
+
+    The SQL predicate is provider SQL and should not include the outer CHECK keyword.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasCheckConstraint(string name, string sql)
+    parameters:
+    - id: name
+      type: System.String
+      description: Database constraint name.
+    - id: sql
+      type: System.String
+      description: Provider SQL predicate inside the CHECK clause.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+      description: The same builder instance for chaining.
+    content.vb: Public Function HasCheckConstraint(name As String, sql As String) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when either argument is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasCheckConstraint(String, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasCheckConstraint(String, String)
+  name.vb: HasCheckConstraint(String, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String)
+  id: HasExpressionIndex(System.String,System.String,System.Boolean,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasExpressionIndex(string, string, bool, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.HasExpressionIndex(string, string, bool, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasExpressionIndex(string, string, bool, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasExpressionIndex
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 500
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures a provider-specific index over a SQL expression rather than a mapped property.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasExpressionIndex(string name, string expressionSql, bool isUnique = false, string? filterSql = null)
+    parameters:
+    - id: name
+      type: System.String
+      description: Database index name.
+    - id: expressionSql
+      type: System.String
+      description: Provider SQL expression used as the index key.
+    - id: isUnique
+      type: System.Boolean
+      description: Whether the index enforces uniqueness.
+    - id: filterSql
+      type: System.String
+      description: Optional provider SQL predicate for a filtered/partial expression index.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Public Function HasExpressionIndex(name As String, expressionSql As String, isUnique As Boolean = False, filterSql As String = Nothing) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String)
+  name.vb: HasExpressionIndex(String, String, Boolean, String)
 - uid: nORM.Configuration.EntityTypeBuilder`1.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   id: Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
@@ -250,7 +435,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 256
+    startLine: 512
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -292,7 +477,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 270
+    startLine: 526
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -337,7 +522,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 284
+    startLine: 540
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -382,7 +567,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsOne
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 300
+    startLine: 556
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -433,7 +618,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 330
+    startLine: 586
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -499,7 +684,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 519
+    startLine: 615
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -570,7 +755,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 365
+    startLine: 657
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -597,6 +782,51 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).HasMany(Of TProperty)(Expression(Of Func(Of TEntity, IEnumerable(Of TProperty))))
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasMany(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, System.Collections.Generic.IEnumerable(Of TProperty))))
   name.vb: HasMany(Of TProperty)(Expression(Of Func(Of TEntity, IEnumerable(Of TProperty))))
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  id: HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasOne<TDependent>(Expression<Func<TEntity, TDependent?>>)
+  nameWithType: EntityTypeBuilder<TEntity>.HasOne<TDependent>(Expression<Func<TEntity, TDependent?>>)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasOne<TDependent>(System.Linq.Expressions.Expression<System.Func<TEntity, TDependent?>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasOne
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 671
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Begins configuration of a reference navigation property to a dependent entity.
+  example: []
+  syntax:
+    content: 'public EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent> HasOne<TDependent>(Expression<Func<TEntity, TDependent?>> navigation) where TDependent : class'
+    parameters:
+    - id: navigation
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},{TDependent}}}
+      description: Expression selecting the reference navigation on the principal entity.
+    typeParameters:
+    - id: TDependent
+      description: The dependent entity type.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder{{TDependent}}
+      description: A <xref href="nORM.Configuration.EntityTypeBuilder%601.ReferenceNavigationBuilder%601" data-throw-if-not-resolved="false"></xref> for relationship configuration.
+    content.vb: Public Function HasOne(Of TDependent As Class)(navigation As Expression(Of Func(Of TEntity, TDependent))) As EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasOne*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">navigation</code> is null.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasOne(Of TDependent)(Expression(Of Func(Of TEntity, TDependent)))
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasOne(Of TDependent)(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, TDependent)))
+  name.vb: HasOne(Of TDependent)(Expression(Of Func(Of TEntity, TDependent)))
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1844,6 +2074,41 @@ references:
     name: Expressions
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Configuration.EntityTypeBuilder`1.IsReadOnly*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.IsReadOnly
+  href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_IsReadOnly
+  name: IsReadOnly
+  nameWithType: EntityTypeBuilder<TEntity>.IsReadOnly
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.IsReadOnly
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).IsReadOnly
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).IsReadOnly
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint
+  href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_HasCheckConstraint_System_String_System_String_
+  name: HasCheckConstraint
+  nameWithType: EntityTypeBuilder<TEntity>.HasCheckConstraint
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasCheckConstraint
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasCheckConstraint
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasCheckConstraint
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex
+  href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_HasExpressionIndex_System_String_System_String_System_Boolean_System_String_
+  name: HasExpressionIndex
+  nameWithType: EntityTypeBuilder<TEntity>.HasExpressionIndex
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasExpressionIndex
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasExpressionIndex
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasExpressionIndex
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
   commentId: T:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
   parent: nORM.Configuration
@@ -2404,4 +2669,145 @@ references:
   - name: Of
   - name: " "
   - name: TProperty
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  name.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasOne*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.HasOne
+  href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_HasOne__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  name: HasOne
+  nameWithType: EntityTypeBuilder<TEntity>.HasOne
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasOne
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasOne
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasOne
+- uid: System.Linq.Expressions.Expression{System.Func{{TEntity},{TDependent}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`0,``0}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TEntity, TDependent>>
+  nameWithType: Expression<Func<TEntity, TDependent>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TEntity, TDependent>>
+  nameWithType.vb: Expression(Of Func(Of TEntity, TDependent))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TEntity, TDependent))
+  name.vb: Expression(Of Func(Of TEntity, TDependent))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TDependent
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TDependent
+  - name: )
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder{{TDependent}}
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder{``0}
+  parent: nORM.Configuration
+  definition: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  name.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
   - name: )

@@ -54,14 +54,20 @@ public class MigrationDefaultsIdentityTests
         };
 
     private static ColumnSchema Col(string name, bool nullable = true, string? clrType = null,
-        string? defaultValue = null, bool identity = false) =>
+        string? defaultValue = null, bool identity = false, int? maxLength = null,
+        int? precision = null, int? scale = null, bool? isUnicode = null, bool isFixedLength = false) =>
         new()
         {
             Name = name,
             ClrType = clrType ?? typeof(string).FullName!,
             IsNullable = nullable,
             DefaultValue = defaultValue,
-            IsIdentity = identity
+            IsIdentity = identity,
+            MaxLength = maxLength,
+            IsUnicode = isUnicode,
+            IsFixedLength = isFixedLength,
+            Precision = precision,
+            Scale = scale
         };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -130,6 +136,22 @@ public class MigrationDefaultsIdentityTests
         Assert.Contains("DEFAULT 'default'", createSql);
     }
 
+    [Fact]
+    public void MySql_CreateTable_SupportsPrecisionTemporalDefault()
+    {
+        var table = MakeTable("TemporalDefaults",
+            PkCol("Id"),
+            Col("CreatedAt", nullable: false, clrType: typeof(DateTime).FullName!, defaultValue: "UTC_TIMESTAMP(6)")
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new MySqlMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("DEFAULT UTC_TIMESTAMP(6)", createSql);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // 4. PostgreSQL CREATE TABLE includes DEFAULT
     // ═══════════════════════════════════════════════════════════════════════
@@ -152,9 +174,176 @@ public class MigrationDefaultsIdentityTests
         Assert.Contains("DEFAULT 'N/A'", createSql);
     }
 
+    [Fact]
+    public void SqlServer_CreateTable_UsesBoundedStringAndBinaryLength()
+    {
+        var table = MakeTable("BoundedValues",
+            PkCol("Id"),
+            Col("Name", nullable: false, clrType: typeof(string).FullName!, maxLength: 80),
+            Col("Payload", nullable: true, clrType: typeof(byte[]).FullName!, maxLength: 32)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("NVARCHAR(80)", createSql);
+        Assert.Contains("VARBINARY(32)", createSql);
+    }
+
+    [Fact]
+    public void SqlServer_CreateTable_UsesUnicodeAndFixedLengthFacets()
+    {
+        var table = MakeTable("FacetValues",
+            PkCol("Id"),
+            Col("Code", nullable: false, clrType: typeof(string).FullName!, maxLength: 40, isUnicode: false, isFixedLength: true),
+            Col("Notes", nullable: true, clrType: typeof(string).FullName!, isUnicode: false),
+            Col("Token", nullable: false, clrType: typeof(byte[]).FullName!, maxLength: 16, isFixedLength: true)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("CHAR(40)", createSql);
+        Assert.Contains("VARCHAR(MAX)", createSql);
+        Assert.Contains("BINARY(16)", createSql);
+        Assert.DoesNotContain("NVARCHAR(40)", createSql);
+        Assert.DoesNotContain("VARBINARY(16)", createSql);
+    }
+
+    [Fact]
+    public void Postgres_CreateTable_UsesBoundedStringLength()
+    {
+        var table = MakeTable("BoundedValues",
+            PkCol("Id"),
+            Col("Name", nullable: false, clrType: typeof(string).FullName!, maxLength: 80),
+            Col("Payload", nullable: true, clrType: typeof(byte[]).FullName!, maxLength: 32)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new PostgresMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("VARCHAR(80)", createSql);
+        Assert.Contains("BYTEA", createSql);
+    }
+
+    [Fact]
+    public void Postgres_CreateTable_UsesFixedLengthStringFacet()
+    {
+        var table = MakeTable("FacetValues",
+            PkCol("Id"),
+            Col("Code", nullable: false, clrType: typeof(string).FullName!, maxLength: 12, isFixedLength: true)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new PostgresMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("CHAR(12)", createSql);
+        Assert.DoesNotContain("VARCHAR(12)", createSql);
+    }
+
+    [Fact]
+    public void MySql_CreateTable_UsesBoundedStringAndBinaryLength()
+    {
+        var table = MakeTable("BoundedValues",
+            PkCol("Id"),
+            Col("Name", nullable: false, clrType: typeof(string).FullName!, maxLength: 80),
+            Col("Payload", nullable: true, clrType: typeof(byte[]).FullName!, maxLength: 32)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new MySqlMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("VARCHAR(80)", createSql);
+        Assert.Contains("VARBINARY(32)", createSql);
+    }
+
+    [Fact]
+    public void MySql_CreateTable_UsesFixedLengthStringAndBinaryFacets()
+    {
+        var table = MakeTable("FacetValues",
+            PkCol("Id"),
+            Col("Code", nullable: false, clrType: typeof(string).FullName!, maxLength: 12, isFixedLength: true),
+            Col("Token", nullable: false, clrType: typeof(byte[]).FullName!, maxLength: 16, isFixedLength: true)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new MySqlMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("CHAR(12)", createSql);
+        Assert.Contains("BINARY(16)", createSql);
+        Assert.DoesNotContain("VARCHAR(12)", createSql);
+        Assert.DoesNotContain("VARBINARY(16)", createSql);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // 5. SQLite CREATE TABLE includes AUTOINCREMENT for identity PK
     // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void SqlServer_CreateTable_UsesDecimalPrecisionAndScale()
+    {
+        var table = MakeTable("MoneyValues",
+            PkCol("Id"),
+            Col("Amount", nullable: false, clrType: typeof(decimal).FullName!, precision: 18, scale: 2),
+            Col("Rounded", nullable: false, clrType: typeof(decimal).FullName!, precision: 10)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("DECIMAL(18,2)", createSql);
+        Assert.Contains("DECIMAL(10)", createSql);
+    }
+
+    [Fact]
+    public void Postgres_CreateTable_UsesDecimalPrecisionAndScale()
+    {
+        var table = MakeTable("MoneyValues",
+            PkCol("Id"),
+            Col("Amount", nullable: false, clrType: typeof(decimal).FullName!, precision: 18, scale: 2),
+            Col("Rounded", nullable: false, clrType: typeof(decimal).FullName!, precision: 10)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new PostgresMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("DECIMAL(18,2)", createSql);
+        Assert.Contains("DECIMAL(10)", createSql);
+    }
+
+    [Fact]
+    public void MySql_CreateTable_UsesDecimalPrecisionAndScale()
+    {
+        var table = MakeTable("MoneyValues",
+            PkCol("Id"),
+            Col("Amount", nullable: false, clrType: typeof(decimal).FullName!, precision: 18, scale: 2),
+            Col("Rounded", nullable: false, clrType: typeof(decimal).FullName!, precision: 10)
+        );
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var result = new MySqlMigrationSqlGenerator().GenerateSql(diff);
+
+        var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
+        Assert.Contains("DECIMAL(18,2)", createSql);
+        Assert.Contains("DECIMAL(10)", createSql);
+    }
 
     [Fact]
     public void Sqlite_CreateTable_IncludesAutoincrement()

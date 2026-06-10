@@ -24,6 +24,7 @@ namespace nORM.Tests;
 /// Shape tests document the fix; live tests are env-gated.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class BulkTempTableLeakTests
 {
     [Table("BttItem")]
@@ -169,6 +170,7 @@ public class BulkTempTableLeakTests
         => LiveProviderEnvironment.GetConnectionString("sqlserver");
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task SqlServer_RepeatedBulkUpdate_NoTempTableAccumulation_Live()
     {
         if (string.IsNullOrEmpty(GetSqlServerCs())) return;
@@ -177,6 +179,7 @@ public class BulkTempTableLeakTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.ProviderParity)]
     public async Task SqlServer_RepeatedBulkDelete_NoTempTableAccumulation_Live()
     {
         if (string.IsNullOrEmpty(GetSqlServerCs())) return;

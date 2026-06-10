@@ -26,6 +26,9 @@ public class ProviderCapabilityContractTests
         return docPath;
     }
 
+    private static string RepoRoot()
+        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(DocPath())!, ".."));
+
     [Theory]
     [InlineData("SQL Server", typeof(SqlServerProvider), 13, 0)]
     [InlineData("PostgreSQL", typeof(PostgresProvider), 12, 0)]
@@ -58,5 +61,137 @@ public class ProviderCapabilityContractTests
         Assert.True(
             minVersionCell.Contains($"{major}.{minor}", StringComparison.Ordinal),
             $"Expected '{major}.{minor}' in Minimum Version cell for {label}, got: {minVersionCell}");
+    }
+
+    [Fact]
+    public void Provider_floor_feature_evidence_is_documented_for_release_review()
+    {
+        var docContent = File.ReadAllText(DocPath());
+        var releaseGates = File.ReadAllText(Path.Combine(Path.GetDirectoryName(DocPath())!, "release-gates.md"));
+
+        Assert.Contains("## Floor Feature Evidence", docContent, StringComparison.Ordinal);
+        Assert.Contains("dotnet-norm portability certify", docContent, StringComparison.Ordinal);
+        Assert.Contains("actual server versions", docContent, StringComparison.Ordinal);
+        Assert.Contains("Descriptor-only reports", docContent, StringComparison.Ordinal);
+        Assert.Contains("not be treated as old-version proof", docContent, StringComparison.Ordinal);
+        Assert.Contains("provider-target-capabilities.json", docContent, StringComparison.Ordinal);
+
+        foreach (var required in new[]
+        {
+            "SQL Server 2016",
+            "PostgreSQL 12",
+            "MySQL 8.0",
+            "SQLite 3.25",
+            "JSON_VALUE",
+            "jsonb",
+            "JSON_EXTRACT",
+            "json_extract",
+            "ROW_NUMBER",
+            "OUTPUT",
+            "RETURNING",
+            "LAST_INSERT_ID",
+            "AUTOINCREMENT",
+            "sp_rename",
+            "ALTER TABLE RENAME COLUMN",
+            "SAVE TRANSACTION",
+            "SAVEPOINT",
+            "IF NOT EXISTS",
+            "ON CONFLICT DO NOTHING",
+            "INSERT IGNORE",
+            "INSERT OR IGNORE",
+            "nORM-managed temporal history/triggers",
+            "native bulk insert",
+            "native tenant session context"
+        })
+        {
+            Assert.Contains(required, docContent, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("declared provider floor-feature ledger", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("not actual version proof", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("actual server-version decisions", releaseGates, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rc_artifact_manifest_records_declared_floor_features_without_fake_actual_versions()
+    {
+        var root = RepoRoot();
+        var manifestScript = File.ReadAllText(Path.Combine(root, "eng", "rc-artifact-manifest.ps1"));
+
+        Assert.Contains("New-ProviderFloorEvidence", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("RequiredFloorFeatures", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("ActualServerVersion = $null", manifestScript, StringComparison.Ordinal);
+        Assert.Contains("use dotnet-norm portability certify target reports", manifestScript, StringComparison.Ordinal);
+
+        foreach (var required in new[]
+        {
+            "MinimumVersion '13.0'",
+            "MinimumVersion '12.0'",
+            "MinimumVersion '8.0'",
+            "MinimumVersion '3.25'",
+            "SQL Server 2016",
+            "PostgreSQL 12",
+            "MySQL 8.0",
+            "SQLite 3.25",
+            "JSON_VALUE JSON translation",
+            "jsonb JSON translation",
+            "JSON_EXTRACT JSON translation",
+            "JSON1 json_extract JSON translation",
+            "ROW_NUMBER/window translation",
+            "OUTPUT generated-value retrieval",
+            "RETURNING generated-value retrieval",
+            "LAST_INSERT_ID generated-value retrieval",
+            "AUTOINCREMENT generated-value retrieval",
+            "sp_rename column rename",
+            "ALTER TABLE RENAME COLUMN",
+            "SAVE TRANSACTION savepoints",
+            "SAVEPOINT savepoints",
+            "IF NOT EXISTS idempotent join-table insert",
+            "ON CONFLICT DO NOTHING idempotent join-table insert",
+            "INSERT IGNORE idempotent join-table insert",
+            "INSERT OR IGNORE idempotent join-table insert",
+            "nORM-managed temporal history/triggers",
+            "native bulk insert",
+            "native tenant session context"
+        })
+        {
+            Assert.Contains(required, manifestScript, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Portability_certify_target_probe_exercises_representative_floor_features()
+    {
+        var program = File.ReadAllText(Path.Combine(RepoRoot(), "src", "dotnet-norm", "Program.cs"));
+
+        foreach (var required in new[]
+        {
+            "JSON translation",
+            "window function",
+            "generated-value retrieval",
+            "rename column DDL",
+            "savepoint",
+            "idempotent insert/ignore",
+            "ROW_NUMBER() OVER",
+            "JSON_VALUE",
+            "json_extract",
+            "JSON_EXTRACT",
+            "jsonb",
+            "OUTPUT INSERTED",
+            "RETURNING",
+            "LAST_INSERT_ID",
+            "last_insert_rowid",
+            "RENAME COLUMN",
+            "SAVE TRANSACTION",
+            "SAVEPOINT",
+            "IF NOT EXISTS",
+            "ON CONFLICT DO NOTHING",
+            "INSERT IGNORE",
+            "INSERT OR IGNORE",
+            "provider-target-capability"
+        })
+        {
+            Assert.Contains(required, program, StringComparison.Ordinal);
+        }
     }
 }

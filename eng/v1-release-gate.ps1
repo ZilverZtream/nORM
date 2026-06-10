@@ -6,7 +6,10 @@ param(
     [int]$MinLiveProviders = $(if ($env:NORM_MIN_LIVE_PROVIDERS) { [int]$env:NORM_MIN_LIVE_PROVIDERS } else { 0 }),
     [switch]$SkipBenchmark,
     [switch]$SkipProviderMatrixBenchmark,
-    [string]$ProviderMatrixBenchmarkFilter = '*ProviderMatrixBenchmarks*'
+    [string]$ProviderMatrixBenchmarkFilter = '*ProviderMatrixBenchmarks*',
+    [int]$ProviderMatrixSliceTimeoutMinutes = $(if ($env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES) { [int]$env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES } else { 90 }),
+    [int]$BenchmarkStepTimeoutMinutes = $(if ($env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES } else { 45 }),
+    [int]$TestStepTimeoutMinutes = $(if ($env:NORM_TEST_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_TIMEOUT_MINUTES } else { 45 })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +26,18 @@ $runtimeProjectPath = Join-Path (Join-Path $root 'src') 'nORM.csproj'
 $toolProjectPath = Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') 'dotnet-norm.csproj'
 $testResultsPath = Join-Path (Join-Path (Join-Path $root 'tests') 'TestResults') 'v1-release-gate'
 New-Item -ItemType Directory -Force -Path $testResultsPath | Out-Null
+
+if ($ProviderMatrixSliceTimeoutMinutes -le 0) {
+    throw "ProviderMatrixSliceTimeoutMinutes must be greater than zero."
+}
+
+if ($BenchmarkStepTimeoutMinutes -le 0) {
+    throw "BenchmarkStepTimeoutMinutes must be greater than zero."
+}
+
+if ($TestStepTimeoutMinutes -le 0) {
+    throw "TestStepTimeoutMinutes must be greater than zero."
+}
 
 function Stop-OrphanedTestHosts {
     # A timed-out or interrupted prior gate run can leave testhost.exe holding
@@ -68,6 +83,53 @@ function Get-DuplicateBenchmarkProjects {
         Where-Object { [System.IO.Path]::GetFullPath($_.FullName) -ne $expectedProject })
 }
 
+function Copy-CurrentWorkspaceForBenchmarkIsolation {
+    param([string]$Destination)
+
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+
+    $excludedDirectories = @(
+        '.git',
+        '.claude',
+        '.dotnet-home',
+        '.vs',
+        'BenchmarkDotNet.Artifacts',
+        'artifacts',
+        'bin',
+        'obj',
+        'TestResults'
+    )
+
+    $robocopy = Get-Command robocopy -ErrorAction SilentlyContinue
+    if ($robocopy) {
+        $arguments = @(
+            $root,
+            $Destination,
+            '/MIR',
+            '/XD'
+        ) + $excludedDirectories + @(
+            '/XF',
+            '*.nupkg',
+            '*.snupkg',
+            '/NFL',
+            '/NDL',
+            '/NP'
+        )
+
+        & $robocopy @arguments | Write-Host
+        if ($LASTEXITCODE -gt 7) {
+            throw "Failed to copy isolated benchmark workspace to $Destination (robocopy exit code $LASTEXITCODE)."
+        }
+
+        $global:LASTEXITCODE = 0
+        return
+    }
+
+    Get-ChildItem -LiteralPath $root -Force |
+        Where-Object { $excludedDirectories -notcontains $_.Name } |
+        Copy-Item -Destination $Destination -Recurse -Force
+}
+
 function Invoke-TestStep {
     param(
         [string]$Name,
@@ -99,7 +161,91 @@ function Invoke-TestStep {
             $arguments += @('--filter', 'Category!=LiveProvider')
         }
 
-        dotnet @arguments
+        $logDirectory = Join-Path $testResultsPath 'logs'
+        New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+        $safeName = $Name -replace '[^A-Za-z0-9_.-]', '_'
+        $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $stdoutPath = Join-Path $logDirectory "$safeName-$timestamp.out.log"
+        $stderrPath = Join-Path $logDirectory "$safeName-$timestamp.err.log"
+        $exitCodePath = Join-Path $logDirectory "$safeName-$timestamp.exitcode"
+        $argumentsPath = Join-Path $logDirectory "$safeName-$timestamp.args.json"
+        $runnerPath = Join-Path $logDirectory "$safeName-$timestamp.runner.ps1"
+        $arguments | ConvertTo-Json | Set-Content -LiteralPath $argumentsPath -Encoding UTF8
+
+        @'
+param(
+    [string]$RepoRoot,
+    [string]$ExitCodePath,
+    [string]$ArgumentsPath
+)
+
+$exitCode = 1
+try {
+    Set-Location -LiteralPath $RepoRoot
+    $dotnetArguments = @(Get-Content -LiteralPath $ArgumentsPath -Raw | ConvertFrom-Json)
+    & dotnet @dotnetArguments
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+}
+catch {
+    Write-Error $_
+    $exitCode = 1
+}
+finally {
+    Set-Content -LiteralPath $ExitCodePath -Value $exitCode -Encoding ASCII
+}
+
+exit $exitCode
+'@ | Set-Content -LiteralPath $runnerPath -Encoding UTF8
+
+        Write-Host "Test step timeout: $TestStepTimeoutMinutes minute(s)"
+        $startProcessArgs = @{
+            FilePath = 'powershell'
+            ArgumentList = @(
+                '-NoProfile',
+                '-ExecutionPolicy', 'Bypass',
+                '-File', $runnerPath,
+                '-RepoRoot', $root,
+                '-ExitCodePath', $exitCodePath,
+                '-ArgumentsPath', $argumentsPath
+            )
+            WorkingDirectory = $root
+            RedirectStandardOutput = $stdoutPath
+            RedirectStandardError = $stderrPath
+            PassThru = $true
+        }
+
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+            $startProcessArgs.WindowStyle = 'Hidden'
+        }
+
+        $process = Start-Process @startProcessArgs
+        $timeoutMs = [int][TimeSpan]::FromMinutes($TestStepTimeoutMinutes).TotalMilliseconds
+        if (-not $process.WaitForExit($timeoutMs)) {
+            Stop-ProcessTreeById $process.Id
+            $terminated = $process.WaitForExit(30000)
+            $terminationNote = if ($terminated) { '' } else { ' Process tree did not terminate within 30 seconds.' }
+            throw "Test step '$Name' exceeded $TestStepTimeoutMinutes minute(s).$terminationNote`nStdout log: $stdoutPath`nStderr log: $stderrPath`nRecent stdout:`n$(Get-LogTail $stdoutPath)`nRecent stderr:`n$(Get-LogTail $stderrPath)"
+        }
+
+        $process.WaitForExit()
+        if (Test-Path -LiteralPath $stdoutPath) {
+            Get-Content -LiteralPath $stdoutPath | ForEach-Object { Write-Host $_ }
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            Get-Content -LiteralPath $stderrPath | ForEach-Object { Write-Host $_ }
+        }
+
+        if (-not (Test-Path -LiteralPath $exitCodePath)) {
+            throw "Test step '$Name' finished but did not report an exit code.`nStdout log: $stdoutPath`nStderr log: $stderrPath`nRecent stdout:`n$(Get-LogTail $stdoutPath)`nRecent stderr:`n$(Get-LogTail $stderrPath)"
+        }
+
+        $exitCodeText = (Get-Content -LiteralPath $exitCodePath -Raw).Trim()
+        $exitCode = [int]$exitCodeText
+        if ($exitCode -ne 0) {
+            throw "Test step '$Name' failed with exit code $exitCode.`nStdout log: $stdoutPath`nStderr log: $stderrPath`nRecent stdout:`n$(Get-LogTail $stdoutPath)`nRecent stderr:`n$(Get-LogTail $stderrPath)"
+        }
+
+        $global:LASTEXITCODE = 0
     }
 }
 
@@ -129,6 +275,143 @@ function Clear-PackageOutput {
     Get-ChildItem -LiteralPath $Directory -File -Filter "$PackageId.*.snupkg" | Remove-Item -Force
 }
 
+function Get-LogTail {
+    param(
+        [string]$Path,
+        [int]$Count = 40
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return '<log file not found>'
+    }
+
+    return (Get-Content -LiteralPath $Path -Tail $Count) -join [Environment]::NewLine
+}
+
+function Stop-ProcessTreeById {
+    param([int]$ProcessId)
+
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        & taskkill.exe /PID $ProcessId /T /F *> $null
+        return
+    }
+
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Invoke-TimedBenchmarkProcess {
+    param(
+        [string]$WorkingDirectory,
+        [string[]]$Arguments,
+        [int]$TimeoutMinutes
+    )
+
+    $logDirectory = Join-Path $root 'BenchmarkDotNet.Artifacts/v1-release-gate-logs'
+    New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stdoutPath = Join-Path $logDirectory "benchmark-$timestamp.out.log"
+    $stderrPath = Join-Path $logDirectory "benchmark-$timestamp.err.log"
+    $exitCodePath = Join-Path $logDirectory "benchmark-$timestamp.exitcode"
+    $argumentsPath = Join-Path $logDirectory "benchmark-$timestamp.args.json"
+    $runnerPath = Join-Path $logDirectory "benchmark-$timestamp.runner.ps1"
+    $dotnetArguments = @('run', '-c', $Configuration, '--') + $Arguments
+    $dotnetArguments | ConvertTo-Json | Set-Content -LiteralPath $argumentsPath -Encoding UTF8
+
+    @'
+param(
+    [string]$BenchmarkWorkingDirectory,
+    [string]$ExitCodePath,
+    [string]$ArgumentsPath
+)
+
+$exitCode = 1
+try {
+    Set-Location -LiteralPath $BenchmarkWorkingDirectory
+    $DotnetArguments = @(Get-Content -LiteralPath $ArgumentsPath -Raw | ConvertFrom-Json)
+    & dotnet @DotnetArguments
+    $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+}
+catch {
+    Write-Error $_
+    $exitCode = 1
+}
+finally {
+    Set-Content -LiteralPath $ExitCodePath -Value $exitCode -Encoding ASCII
+}
+
+exit $exitCode
+'@ | Set-Content -LiteralPath $runnerPath -Encoding UTF8
+
+    Write-Host "Benchmark command: dotnet $($dotnetArguments -join ' ')"
+    Write-Host "Benchmark timeout: $TimeoutMinutes minute(s)"
+    Write-Host "Benchmark stdout log: $stdoutPath"
+    Write-Host "Benchmark stderr log: $stderrPath"
+
+    $startProcessArgs = @{
+        FilePath = 'powershell'
+        ArgumentList = @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $runnerPath,
+            '-BenchmarkWorkingDirectory', $WorkingDirectory,
+            '-ExitCodePath', $exitCodePath,
+            '-ArgumentsPath', $argumentsPath
+        )
+        WorkingDirectory = $WorkingDirectory
+        PassThru = $true
+        RedirectStandardOutput = $stdoutPath
+        RedirectStandardError = $stderrPath
+    }
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        $startProcessArgs.WindowStyle = 'Hidden'
+    }
+
+    $process = Start-Process @startProcessArgs
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $timeoutMs = [int][TimeSpan]::FromMinutes($TimeoutMinutes).TotalMilliseconds
+
+    while (-not $process.WaitForExit([Math]::Min(30000, [Math]::Max(1000, $timeoutMs - [int]$stopwatch.ElapsedMilliseconds)))) {
+        Write-Host "Benchmark still running after $([Math]::Round($stopwatch.Elapsed.TotalMinutes, 1)) minute(s)."
+        if ($stopwatch.ElapsedMilliseconds -ge $timeoutMs) {
+            Stop-ProcessTreeById $process.Id
+            $terminated = $process.WaitForExit(30000)
+            $terminationNote = if ($terminated) { '' } else { "`nThe benchmark process did not exit within 30 seconds after the kill request; check for leftover child processes." }
+            throw "Benchmark command exceeded $TimeoutMinutes minute(s).$terminationNote`nStdout log: $stdoutPath`nStderr log: $stderrPath`nRecent stdout:`n$(Get-LogTail $stdoutPath)`nRecent stderr:`n$(Get-LogTail $stderrPath)"
+        }
+    }
+
+    $process.WaitForExit()
+    try { $process.Refresh() } catch { }
+
+    $exitCode = $null
+    if (Test-Path -LiteralPath $exitCodePath) {
+        $rawExitCode = (Get-Content -LiteralPath $exitCodePath -First 1 -ErrorAction SilentlyContinue)
+        $parsedExitCode = 0
+        if ([int]::TryParse([string]$rawExitCode, [ref]$parsedExitCode)) {
+            $exitCode = $parsedExitCode
+        }
+    }
+
+    if ($null -eq $exitCode) {
+        try {
+            $processExitCode = $process.ExitCode
+            if ($null -ne $processExitCode -and "$processExitCode" -ne '') {
+                $exitCode = [int]$processExitCode
+            }
+        } catch { }
+    }
+
+    if ($null -eq $exitCode) {
+        throw "Benchmark command finished but did not report an exit code.`nStdout log: $stdoutPath`nStderr log: $stderrPath`nRecent stdout:`n$(Get-LogTail $stdoutPath)`nRecent stderr:`n$(Get-LogTail $stderrPath)"
+    }
+
+    if ($exitCode -eq 0) {
+        Remove-Item -LiteralPath $runnerPath, $exitCodePath, $argumentsPath -Force -ErrorAction SilentlyContinue
+    }
+
+    return $exitCode
+}
+
 function Invoke-BenchmarkStep {
     param(
         [string[]]$Arguments
@@ -141,24 +424,17 @@ function Invoke-BenchmarkStep {
     $duplicateBenchmarkProjects = Get-DuplicateBenchmarkProjects
     if ($duplicateBenchmarkProjects.Count -gt 0) {
         $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('norm-bench-gate-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-        Write-Host "Duplicate benchmark projects detected under repo; running isolated benchmark worktree at $tempRoot"
-        git -C $root worktree add --detach $tempRoot HEAD | Write-Host
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create isolated benchmark worktree at $tempRoot."
-        }
+        Write-Host "Duplicate benchmark projects detected under repo; running isolated benchmark workspace at $tempRoot"
+        Copy-CurrentWorkspaceForBenchmarkIsolation $tempRoot
 
         $workingBenchmarkProjectDir = Join-Path $tempRoot 'benchmarks'
     }
 
     try {
-        Push-Location $workingBenchmarkProjectDir
-        try {
-            dotnet run -c $Configuration -- @Arguments
-            $benchmarkExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-        }
-        finally {
-            Pop-Location
-        }
+        $benchmarkExitCode = Invoke-TimedBenchmarkProcess `
+            -WorkingDirectory $workingBenchmarkProjectDir `
+            -Arguments $Arguments `
+            -TimeoutMinutes $BenchmarkStepTimeoutMinutes
 
         if ($tempRoot) {
             $tempArtifacts = Join-Path $workingBenchmarkProjectDir 'BenchmarkDotNet.Artifacts'
@@ -171,7 +447,7 @@ function Invoke-BenchmarkStep {
     }
     finally {
         if ($tempRoot) {
-            git -C $root worktree remove --force $tempRoot | Write-Host
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tempRoot
         }
     }
 
@@ -231,15 +507,16 @@ if (-not $env:NORM_MIN_LIVE_PROVIDERS) {
 
 $normVersion = Get-NormVersion
 
-$liveFilter = 'FullyQualifiedName~LiveProvider|FullyQualifiedName~LiveCrossProviderTests|FullyQualifiedName~ProviderSwapSmokeTests|FullyQualifiedName~ProviderParity|FullyQualifiedName~ProviderBehaviorEquivalenceTests|FullyQualifiedName~ProviderBindingParityTests|FullyQualifiedName~BulkProviderParityTests|FullyQualifiedName~CrossProviderAdversarialTests|FullyQualifiedName~ProviderDmlMigrationParityTests|FullyQualifiedName~SqlServerMigrationRunnerTests|FullyQualifiedName~PostgresMigrationRunnerTests|FullyQualifiedName~BulkTransactionAtomicityTests.Postgres_BulkUpdate_BatchFailure_RollsBackEarlierBatches_Live|FullyQualifiedName~BulkTempTableLeakTests.SqlServer|FullyQualifiedName~PostgresBulkDuplicateTests'
-$navigationFilter = 'FullyQualifiedName~BatchedNavigationBatchTests|FullyQualifiedName~BatchedNavigationCancellationParityTests|FullyQualifiedName~NavigationCancellationLeakTests|FullyQualifiedName~BatchedNavigationProviderCapTests|FullyQualifiedName~NavigationLoaderSqlServerCapTests'
-$transactionFilter = 'FullyQualifiedName~TransactionAtomicCompletionTests|FullyQualifiedName~TransactionRaceTests|FullyQualifiedName~TransactionLifecycleTests|FullyQualifiedName~SyncTransactionCleanupTests|FullyQualifiedName~TransactionFaultInjectionTests'
-$compiledFilter = 'FullyQualifiedName~CompiledQueryTests.Compiled_query_multi_param_object|FullyQualifiedName~CompiledQueryFastPathTests|FullyQualifiedName~CompiledQuerySqlShapeParityTests'
-$parityFilter = 'FullyQualifiedName~ProviderBindingParityTests|FullyQualifiedName~CompileTimeQueryParameterParityTests|FullyQualifiedName~CompiledQueryProviderMatrixTests|FullyQualifiedName~SourceGenBasicEquivalenceTests|FullyQualifiedName~SourceGenRuntimeParityTests|FullyQualifiedName~CompileTimeQueryLifecycleTests'
-$bulkFilter = 'FullyQualifiedName~BulkProviderParityTests|FullyQualifiedName~BulkTransactionAtomicityTests|FullyQualifiedName~BulkTempTableLeakTests|FullyQualifiedName~PostgresBulkDuplicateTests|FullyQualifiedName~ProviderBehaviorEquivalenceTests|FullyQualifiedName~ProviderParityDepthTests|FullyQualifiedName~ProviderParityQueryPagingTests'
-$migrationFilter = 'FullyQualifiedName~LiveProviderSavepointMigrationTests|FullyQualifiedName~SqlServerMigrationRunnerTests|FullyQualifiedName~PostgresMigrationRunnerTests|FullyQualifiedName~MigrationCommitCancellationTests|FullyQualifiedName~MigrationCancellationTests|FullyQualifiedName~MigrationReplayFailureTests|FullyQualifiedName~MigrationRunnerCoverageTests'
-$cacheMemoryFilter = 'FullyQualifiedName~CacheMemoryBoundReleaseGateTests|FullyQualifiedName~CacheFaultInjectionStressTests.BoundedCacheEvictionUnderContention_30Tasks_SizeBounded_ValuesCorrect|FullyQualifiedName~ConcurrentLruCacheStressTests|FullyQualifiedName~CacheLockConcurrencyTests'
-$adversarialFilter = 'FullyQualifiedName~Concurrency|FullyQualifiedName~Concurrent|FullyQualifiedName~Adversarial|FullyQualifiedName~FaultInjected|FullyQualifiedName~Stress'
+$liveSupplementalFilter = 'Category=ProviderParity'
+$liveFilter = "Category=LiveProvider|$liveSupplementalFilter"
+$navigationFilter = 'Category=NavigationStress'
+$transactionFilter = 'Category=TransactionStress'
+$compiledFilter = 'Category=CompiledQueryStress'
+$parityFilter = 'Category=ProviderSourceGenParity'
+$bulkFilter = 'Category=BulkProviderParity'
+$migrationFilter = 'Category=MigrationParity'
+$cacheMemoryFilter = 'Category=CacheMemory'
+$adversarialFilter = 'Category=AdversarialConcurrency'
 
 Write-Host "nORM v1 release gate"
 Write-Host "  Mode:                $Mode"
@@ -249,6 +526,8 @@ Write-Host "  Live providers:      $($liveProviders -join ', ')"
 Write-Host "  Min live providers:  $MinLiveProviders"
 Write-Host "  Benchmark:           $(if ($SkipBenchmark) { 'skipped' } else { 'enabled' })"
 Write-Host "  Provider matrix:     $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'skipped' } else { 'enabled' })"
+Write-Host "  Matrix slice timeout: $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'n/a' } else { "$ProviderMatrixSliceTimeoutMinutes min" })"
+Write-Host "  Test step timeout:   $TestStepTimeoutMinutes min"
 Write-Host "  Package version:     $normVersion"
 
 Invoke-Step 'clean orphaned test hosts' { Stop-OrphanedTestHosts }
@@ -316,7 +595,7 @@ Invoke-Step 'AOT publish warning scan' {
     $global:LASTEXITCODE = 0
 }
 Invoke-TestStep 'public API snapshot' 'FullyQualifiedName~PublicApiSnapshotTests'
-Invoke-TestStep 'package consumer smoke tests' 'FullyQualifiedName~PackageConsumerIntegrationTests'
+Invoke-TestStep 'package consumer smoke tests' 'Category=PackageConsumer'
 Invoke-TestStep 'CLI smoke tests' 'FullyQualifiedName~CliIntegrationTests'
 
 if ($Mode -in @('live', 'full', 'rc')) {
@@ -368,7 +647,8 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
             -Providers 'Sqlite,SqlServer,Postgres,MySql' `
             -Filters $ProviderMatrixBenchmarkFilter `
             -Configuration $Configuration `
-            -OutputRoot $sliceRoot
+            -OutputRoot $sliceRoot `
+            -SliceTimeoutMinutes $ProviderMatrixSliceTimeoutMinutes
 
         $latestSlice = Get-ChildItem -LiteralPath $sliceRoot -Directory |
             Sort-Object LastWriteTimeUtc -Descending |
@@ -383,11 +663,13 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
 
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     Invoke-Step 'benchmark evidence manifest' {
+        $benchmarkEvidenceMode = if ($Mode -eq 'full') { 'smoke' } else { $Mode }
+        $benchmarkEvidenceFilter = if ($Mode -eq 'full') { '--fast Query_Complex' } else { $ProviderMatrixBenchmarkFilter }
         & (Join-Path $root 'eng/benchmark-evidence.ps1') `
             -ResultsDirectory $benchmarkResultsPath `
             -OutputDirectory $benchmarkEvidencePath `
-            -BenchmarkFilter $ProviderMatrixBenchmarkFilter `
-            -Mode $Mode
+            -BenchmarkFilter $benchmarkEvidenceFilter `
+            -Mode $benchmarkEvidenceMode
     }
 
     Invoke-Step 'benchmark threshold gate' {

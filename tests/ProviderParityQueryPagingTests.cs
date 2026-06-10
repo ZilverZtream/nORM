@@ -37,6 +37,8 @@ namespace nORM.Tests;
 /// </list>
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class ProviderParityQueryPagingTests
 {
     // ── Provider factory ─────────────────────────────────────────────────────

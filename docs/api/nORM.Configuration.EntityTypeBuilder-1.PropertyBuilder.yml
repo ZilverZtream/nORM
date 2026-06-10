@@ -6,8 +6,17 @@ items:
   parent: nORM.Configuration
   children:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
   langs:
@@ -24,7 +33,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 413
+    startLine: 748
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -71,7 +80,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: _parent
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 416
+    startLine: 751
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -102,7 +111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: _property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 418
+    startLine: 753
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -133,7 +142,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 432
+    startLine: 767
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -157,6 +166,418 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnName(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnName(String)
   name.vb: HasColumnName(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  id: HasDefaultValueSql(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasDefaultValueSql(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasDefaultValueSql
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 782
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures SQL default metadata for this property for migration snapshot
+
+    generation. This does not mark the property as database-generated and does
+
+    not cause nORM to omit the column from INSERT statements.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasDefaultValueSql(string sql)
+    parameters:
+    - id: sql
+      type: System.String
+      description: A SQL literal or no-argument function accepted by migration default validation.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasDefaultValueSql(sql As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">sql</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  name.vb: HasDefaultValueSql(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  id: HasIdentityOptions(System.Int64,System.Int64)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasIdentityOptions(long, long)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions(long, long)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions(long, long)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasIdentityOptions
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 793
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures provider identity seed/increment metadata for migration
+
+    generation. Providers without matching identity DDL may ignore or reject
+
+    the metadata during migration SQL generation.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasIdentityOptions(long seed, long increment)
+    parameters:
+    - id: seed
+      type: System.Int64
+    - id: increment
+      type: System.Int64
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+    content.vb: Public Function HasIdentityOptions(seed As Long, increment As Long) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions(Long, Long)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions(Long, Long)
+  name.vb: HasIdentityOptions(Long, Long)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  id: HasMaxLength(System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasMaxLength(int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasMaxLength
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 807
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures maximum length metadata for string or byte array columns in
+
+    migration snapshots.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasMaxLength(int length)
+    parameters:
+    - id: length
+      type: System.Int32
+      description: Maximum length to use in provider DDL when supported.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasMaxLength(length As Integer) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength*
+  exceptions:
+  - type: System.ArgumentOutOfRangeException
+    commentId: T:System.ArgumentOutOfRangeException
+    description: Thrown when <code class="paramref">length</code> is less than one.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the property is not a string or byte array.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
+  name.vb: HasMaxLength(Integer)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  id: IsUnicode(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: IsUnicode(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsUnicode
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 819
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures whether this string property uses Unicode-capable storage.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder IsUnicode(bool unicode = true)
+    parameters:
+    - id: unicode
+      type: System.Boolean
+      description: True for Unicode text storage; false for non-Unicode text storage.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function IsUnicode(unicode As Boolean = True) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the property is not a string.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode(Boolean)
+  name.vb: IsUnicode(Boolean)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  id: IsFixedLength(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: IsFixedLength(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength(bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsFixedLength
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 831
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures whether this string or byte array property uses fixed-length storage.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder IsFixedLength(bool fixedLength = true)
+    parameters:
+    - id: fixedLength
+      type: System.Boolean
+      description: True for fixed-length storage; false for variable-length storage.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function IsFixedLength(fixedLength As Boolean = True) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the property is not a string or byte array.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength(Boolean)
+  name.vb: IsFixedLength(Boolean)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  id: HasPrecision(System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasPrecision(int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasPrecision
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 844
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures decimal precision metadata for migration snapshots.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasPrecision(int precision)
+    parameters:
+    - id: precision
+      type: System.Int32
+      description: Total number of decimal digits.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasPrecision(precision As Integer) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision*
+  exceptions:
+  - type: System.ArgumentOutOfRangeException
+    commentId: T:System.ArgumentOutOfRangeException
+    description: Thrown when <code class="paramref">precision</code> is less than one.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the property is not decimal.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer)
+  name.vb: HasPrecision(Integer)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  id: HasPrecision(System.Int32,System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasPrecision(int, int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int, int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasPrecision
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 858
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures decimal precision and scale metadata for migration snapshots.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasPrecision(int precision, int scale)
+    parameters:
+    - id: precision
+      type: System.Int32
+      description: Total number of decimal digits.
+    - id: scale
+      type: System.Int32
+      description: Number of digits after the decimal point.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasPrecision(precision As Integer, scale As Integer) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision*
+  exceptions:
+  - type: System.ArgumentOutOfRangeException
+    commentId: T:System.ArgumentOutOfRangeException
+    description: Thrown when precision or scale is invalid.
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the property is not decimal.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer, Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer, Integer)
+  name.vb: HasPrecision(Integer, Integer)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+  id: HasCollation(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasCollation(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasCollation
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 872
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the database collation for this property in migration snapshots.
+
+    The value is a provider collation identifier such as <code>NOCASE</code>,
+
+    <code>Latin1_General_100_CI_AS</code>, or <code>utf8mb4_0900_ai_ci</code>.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasCollation(string collation)
+    parameters:
+    - id: collation
+      type: System.String
+      description: Provider collation identifier.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasCollation(collation As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">collation</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation(String)
+  name.vb: HasCollation(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+  id: HasComputedColumnSql(System.String,System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasComputedColumnSql(string, bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql(string, bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql(string, bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasComputedColumnSql
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 887
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures this property as a database-computed/generated column for
+
+    migration snapshot generation. The SQL expression is provider SQL and
+
+    should not include the outer generated-column syntax.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasComputedColumnSql(string sql, bool stored = false)
+    parameters:
+    - id: sql
+      type: System.String
+      description: Provider SQL expression used to compute the column.
+    - id: stored
+      type: System.Boolean
+      description: Whether the generated value should be physically stored when the provider supports that choice.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasComputedColumnSql(sql As String, stored As Boolean = False) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">sql</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql(String, Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql(String, Boolean)
+  name.vb: HasComputedColumnSql(String, Boolean)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   id: HasConversion(nORM.Mapping.IValueConverter)
@@ -175,7 +596,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 445
+    startLine: 899
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -216,7 +637,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 455
+    startLine: 909
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1316,6 +1737,110 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  name: HasDefaultValueSql
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasIdentityOptions_System_Int64_System_Int64_
+  name: HasIdentityOptions
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions
+- uid: System.Int64
+  commentId: T:System.Int64
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int64
+  name: long
+  nameWithType: long
+  fullName: long
+  nameWithType.vb: Long
+  fullName.vb: Long
+  name.vb: Long
+- uid: System.ArgumentOutOfRangeException
+  commentId: T:System.ArgumentOutOfRangeException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception
+  name: ArgumentOutOfRangeException
+  nameWithType: ArgumentOutOfRangeException
+  fullName: System.ArgumentOutOfRangeException
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasMaxLength_System_Int32_
+  name: HasMaxLength
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
+  name: IsUnicode
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsFixedLength_System_Boolean_
+  name: IsFixedLength
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_
+  name: HasPrecision
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasCollation_System_String_
+  name: HasCollation
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasComputedColumnSql_System_String_System_Boolean_
+  name: HasComputedColumnSql
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql
 - uid: System.ArgumentNullException
   commentId: T:System.ArgumentNullException
   isExternal: true

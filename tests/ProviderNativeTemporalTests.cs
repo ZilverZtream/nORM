@@ -233,6 +233,10 @@ public class LiveProviderNativeTemporalTests
         }
 
         await using var cn = OpenReflected("Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient", cs);
+        if (Skip.If(IsProtectedSqlServerDatabase(cn.Database),
+                $"SQL Server native temporal live test requires an application database/schema; current database '{cn.Database}' is provider-owned and rejects temporal DDL."))
+            return;
+
         var provider = new SqlServerProvider();
         await TeardownAsync(cn, provider);
         await ExecuteAsync(cn,
@@ -278,6 +282,18 @@ public class LiveProviderNativeTemporalTests
         {
             await TeardownAsync(cn, provider);
         }
+    }
+
+    private static bool IsProtectedSqlServerDatabase(string? databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            return false;
+
+        var name = databaseName.Trim();
+        return name.Equals("master", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("model", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("tempdb", StringComparison.OrdinalIgnoreCase);
     }
 
     private static DbConnection OpenReflected(string typeName, string connectionString)

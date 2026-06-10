@@ -15,6 +15,7 @@ namespace nORM.Tests;
 /// connection for non-SQLite providers.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
 public class AsyncCancellationProviderParityTests
 {
     // ── Test entity ───────────────────────────────────────────────────────────

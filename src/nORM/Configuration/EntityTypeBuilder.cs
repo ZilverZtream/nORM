@@ -23,9 +23,14 @@ namespace nORM.Configuration
             public string? SchemaName { get; private set; }
             public bool IsReadOnly { get; private set; }
             public List<PropertyInfo> KeyProperties { get; } = new();
+            public string? PrimaryKeyConstraintName { get; private set; }
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
             public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
+            public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
+            public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
+            public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
+            public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
             public Dictionary<PropertyInfo, string> CollationValues { get; } = new();
             public List<CheckConstraintConfiguration> CheckConstraintList { get; } = new();
             public Dictionary<PropertyInfo, ComputedColumnConfiguration> ComputedColumns { get; } = new();
@@ -38,10 +43,15 @@ namespace nORM.Configuration
 
             // Explicit interface implementations for read-only surface of IEntityTypeConfiguration.
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
+            string? IEntityTypeConfiguration.PrimaryKeyConstraintName => PrimaryKeyConstraintName;
             bool IEntityTypeConfiguration.IsReadOnly => IsReadOnly;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
+            IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
+            IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
+            IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
+            IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.Collations => CollationValues;
             IReadOnlyList<CheckConstraintConfiguration> IEntityTypeConfiguration.CheckConstraints => CheckConstraintList;
             IReadOnlyDictionary<PropertyInfo, ComputedColumnConfiguration> IEntityTypeConfiguration.ComputedColumnSql => ComputedColumns;
@@ -84,6 +94,15 @@ namespace nORM.Configuration
                 ArgumentNullException.ThrowIfNull(prop);
                 if (!KeyProperties.Contains(prop))
                     KeyProperties.Add(prop);
+            }
+
+            /// <summary>
+            /// Sets the database primary-key constraint name.
+            /// </summary>
+            /// <param name="constraintName">The primary-key constraint name.</param>
+            public void SetPrimaryKeyConstraintName(string? constraintName)
+            {
+                PrimaryKeyConstraintName = NormalizeConstraintName(constraintName);
             }
 
             /// <summary>
@@ -136,6 +155,68 @@ namespace nORM.Configuration
                 if (increment == 0)
                     throw new ArgumentException("Identity increment cannot be zero.", nameof(increment));
                 IdentityOptionValues[prop] = new IdentityOptionsConfiguration(seed, increment);
+            }
+
+            /// <summary>
+            /// Sets maximum length metadata for string or byte array columns in migration snapshots.
+            /// </summary>
+            public void SetMaxLength(PropertyInfo prop, int length)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (length <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(length), "Max length must be greater than zero.");
+
+                var clrType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                if (clrType != typeof(string) && clrType != typeof(byte[]))
+                    throw new ArgumentException("Max length can only be configured for string or byte[] properties.", nameof(prop));
+
+                MaxLengthValues[prop] = length;
+            }
+
+            /// <summary>
+            /// Sets Unicode storage metadata for the specified string column in migration snapshots.
+            /// </summary>
+            public void SetUnicode(PropertyInfo prop, bool unicode)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                var clrType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                if (clrType != typeof(string))
+                    throw new ArgumentException("Unicode can only be configured for string properties.", nameof(prop));
+
+                UnicodeValues[prop] = unicode;
+            }
+
+            /// <summary>
+            /// Sets fixed-length storage metadata for string or byte array columns in migration snapshots.
+            /// </summary>
+            public void SetFixedLength(PropertyInfo prop, bool fixedLength)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                var clrType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                if (clrType != typeof(string) && clrType != typeof(byte[]))
+                    throw new ArgumentException("Fixed length can only be configured for string or byte[] properties.", nameof(prop));
+
+                FixedLengthValues[prop] = fixedLength;
+            }
+
+            /// <summary>
+            /// Sets precision/scale metadata for decimal columns in migration snapshots.
+            /// </summary>
+            public void SetPrecision(PropertyInfo prop, int precision, int? scale)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (precision <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(precision), "Precision must be greater than zero.");
+                if (scale is < 0)
+                    throw new ArgumentOutOfRangeException(nameof(scale), "Scale cannot be negative.");
+                if (scale > precision)
+                    throw new ArgumentOutOfRangeException(nameof(scale), "Scale cannot be greater than precision.");
+
+                var clrType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                if (clrType != typeof(decimal))
+                    throw new ArgumentException("Precision can only be configured for decimal properties.", nameof(prop));
+
+                PrecisionValues[prop] = new PrecisionConfiguration(precision, scale);
             }
 
             /// <summary>
@@ -340,6 +421,20 @@ namespace nORM.Configuration
         /// Thrown when the expression selects no properties, or contains a non-property argument.
         /// </exception>
         public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression)
+            => HasKey(keyExpression, constraintName: null);
+
+        /// <summary>
+        /// Configures one or more properties to constitute the entity's primary key
+        /// and preserves the database primary-key constraint name for migration snapshots.
+        /// </summary>
+        /// <param name="keyExpression">Expression selecting the key property or properties.</param>
+        /// <param name="constraintName">Database primary-key constraint name.</param>
+        /// <returns>The same builder instance for fluent chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="keyExpression"/> is null.</exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when the expression selects no properties, or contains a non-property argument.
+        /// </exception>
+        public EntityTypeBuilder<TEntity> HasKey(Expression<Func<TEntity, object>> keyExpression, string? constraintName)
         {
             ArgumentNullException.ThrowIfNull(keyExpression);
             if (keyExpression.Body is NewExpression ne)
@@ -367,6 +462,8 @@ namespace nORM.Configuration
                 var prop = GetProperty(keyExpression.Body);
                 _config.AddKey(prop);
             }
+
+            _config.SetPrimaryKeyConstraintName(constraintName);
             return this;
         }
 
@@ -565,6 +662,20 @@ namespace nORM.Configuration
             return new CollectionNavigationBuilder<TProperty>(this, prop);
         }
 
+        /// <summary>
+        /// Begins configuration of a reference navigation property to a dependent entity.
+        /// </summary>
+        /// <typeparam name="TDependent">The dependent entity type.</typeparam>
+        /// <param name="navigation">Expression selecting the reference navigation on the principal entity.</param>
+        /// <returns>A <see cref="ReferenceNavigationBuilder{TDependent}"/> for relationship configuration.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="navigation"/> is null.</exception>
+        public ReferenceNavigationBuilder<TDependent> HasOne<TDependent>(Expression<Func<TEntity, TDependent?>> navigation) where TDependent : class
+        {
+            ArgumentNullException.ThrowIfNull(navigation);
+            var prop = GetProperty(navigation);
+            return new ReferenceNavigationBuilder<TDependent>(this, prop);
+        }
+
         private PropertyInfo GetProperty(Expression expression)
         {
             if (expression is MemberExpression me && me.Member is PropertyInfo meProp)
@@ -629,6 +740,9 @@ namespace nORM.Configuration
             return new[] { GetProperty(body) };
         }
 
+        private static string? NormalizeConstraintName(string? constraintName)
+            => string.IsNullOrWhiteSpace(constraintName) ? null : constraintName;
+
         /// <summary>
         /// Provides configuration options for a specific property on the entity type.
         /// </summary>
@@ -680,6 +794,71 @@ namespace nORM.Configuration
             public PropertyBuilder HasIdentityOptions(long seed, long increment)
             {
                 _parent._config.SetIdentityOptions(_property, seed, increment);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures maximum length metadata for string or byte array columns in
+            /// migration snapshots.
+            /// </summary>
+            /// <param name="length">Maximum length to use in provider DDL when supported.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="length"/> is less than one.</exception>
+            /// <exception cref="ArgumentException">Thrown when the property is not a string or byte array.</exception>
+            public PropertyBuilder HasMaxLength(int length)
+            {
+                _parent._config.SetMaxLength(_property, length);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures whether this string property uses Unicode-capable storage.
+            /// </summary>
+            /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when the property is not a string.</exception>
+            public PropertyBuilder IsUnicode(bool unicode = true)
+            {
+                _parent._config.SetUnicode(_property, unicode);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures whether this string or byte array property uses fixed-length storage.
+            /// </summary>
+            /// <param name="fixedLength">True for fixed-length storage; false for variable-length storage.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when the property is not a string or byte array.</exception>
+            public PropertyBuilder IsFixedLength(bool fixedLength = true)
+            {
+                _parent._config.SetFixedLength(_property, fixedLength);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures decimal precision metadata for migration snapshots.
+            /// </summary>
+            /// <param name="precision">Total number of decimal digits.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="precision"/> is less than one.</exception>
+            /// <exception cref="ArgumentException">Thrown when the property is not decimal.</exception>
+            public PropertyBuilder HasPrecision(int precision)
+            {
+                _parent._config.SetPrecision(_property, precision, scale: null);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures decimal precision and scale metadata for migration snapshots.
+            /// </summary>
+            /// <param name="precision">Total number of decimal digits.</param>
+            /// <param name="scale">Number of digits after the decimal point.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown when precision or scale is invalid.</exception>
+            /// <exception cref="ArgumentException">Thrown when the property is not decimal.</exception>
+            public PropertyBuilder HasPrecision(int precision, int scale)
+            {
+                _parent._config.SetPrecision(_property, precision, scale);
                 return this;
             }
 
@@ -775,6 +954,199 @@ namespace nORM.Configuration
                 // Validation delegated to SetShadowColumnName
                 _parent._config.SetShadowColumnName(_name, columnName);
                 return _parent;
+            }
+        }
+
+        /// <summary>
+        /// Supports configuration of reference navigations to dependent entity types.
+        /// </summary>
+        /// <typeparam name="TDependent">The CLR type of the dependent entity.</typeparam>
+        public class ReferenceNavigationBuilder<TDependent> where TDependent : class
+        {
+            private readonly EntityTypeBuilder<TEntity> _parent;
+            private readonly PropertyInfo _principalNavigation;
+
+            internal ReferenceNavigationBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation)
+            {
+                _parent = parent;
+                _principalNavigation = principalNavigation;
+            }
+
+            /// <summary>
+            /// Configures the relationship to include an optional reference navigation
+            /// from the dependent entity back to the principal.
+            /// </summary>
+            /// <param name="navigation">Expression selecting the dependent's navigation property, if any.</param>
+            /// <returns>A builder for configuring the relationship further.</returns>
+            public ReferenceReferenceBuilder WithOne(Expression<Func<TDependent, TEntity?>>? navigation = null)
+            {
+                PropertyInfo? dependentNav = null;
+                if (navigation != null)
+                    dependentNav = _parent.GetProperty(navigation);
+                return new ReferenceReferenceBuilder(_parent, _principalNavigation, dependentNav);
+            }
+
+            /// <summary>
+            /// Enables configuration of relationship details between the principal
+            /// and dependent types for a reference navigation.
+            /// </summary>
+            public class ReferenceReferenceBuilder
+            {
+                private readonly EntityTypeBuilder<TEntity> _parent;
+                private readonly PropertyInfo _principalNavigation;
+                private readonly PropertyInfo? _dependentNavigation;
+
+                internal ReferenceReferenceBuilder(EntityTypeBuilder<TEntity> parent, PropertyInfo principalNavigation, PropertyInfo? dependentNavigation)
+                {
+                    _parent = parent;
+                    _principalNavigation = principalNavigation;
+                    _dependentNavigation = dependentNavigation;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity in this one-to-one relationship.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="cascadeDelete">Whether nORM should cascade deletes through the tracked object graph.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression = null,
+                    bool cascadeDelete = true)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        cascadeDelete));
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity and preserves an explicit database constraint name.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="constraintName">Database foreign key constraint name to preserve in migration snapshots.</param>
+                /// <param name="cascadeDelete">Whether nORM should cascade deletes through the tracked object graph.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    string? constraintName,
+                    bool cascadeDelete = true)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        cascadeDelete)
+                    {
+                        ConstraintName = NormalizeConstraintName(constraintName)
+                    });
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity and the database
+                /// referential actions emitted for migration snapshots and provider DDL.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="onDelete">Database action for principal deletes.</param>
+                /// <param name="onUpdate">Database action for principal key updates.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    ReferentialAction onDelete,
+                    ReferentialAction onUpdate)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        onDelete,
+                        onUpdate));
+                    return _parent;
+                }
+
+                /// <summary>
+                /// Defines the foreign key used by the dependent entity, explicit database referential actions,
+                /// and an explicit database constraint name.
+                /// </summary>
+                /// <param name="foreignKeyExpression">Expression selecting the foreign key property on the dependent.</param>
+                /// <param name="principalKeyExpression">Optional expression selecting the referenced principal key property.</param>
+                /// <param name="onDelete">Database action for principal deletes.</param>
+                /// <param name="onUpdate">Database action for principal key updates.</param>
+                /// <param name="constraintName">Database foreign key constraint name to preserve in migration snapshots.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for further configuration.</returns>
+                /// <exception cref="ArgumentNullException">Thrown when <paramref name="foreignKeyExpression"/> is null.</exception>
+                /// <exception cref="NormConfigurationException">Thrown when the principal key cannot be inferred.</exception>
+                public EntityTypeBuilder<TEntity> HasForeignKey(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression,
+                    ReferentialAction onDelete,
+                    ReferentialAction onUpdate,
+                    string? constraintName)
+                {
+                    var (principalKeys, fkProps) = ResolveForeignKeyProperties(foreignKeyExpression, principalKeyExpression);
+                    _parent._config.AddRelationship(new RelationshipConfiguration(
+                        _principalNavigation,
+                        typeof(TDependent),
+                        _dependentNavigation,
+                        principalKeys,
+                        fkProps,
+                        onDelete,
+                        onUpdate)
+                    {
+                        ConstraintName = NormalizeConstraintName(constraintName)
+                    });
+                    return _parent;
+                }
+
+                private (IReadOnlyList<PropertyInfo> PrincipalKeys, IReadOnlyList<PropertyInfo> ForeignKeys) ResolveForeignKeyProperties(
+                    Expression<Func<TDependent, object>> foreignKeyExpression,
+                    Expression<Func<TEntity, object>>? principalKeyExpression)
+                {
+                    ArgumentNullException.ThrowIfNull(foreignKeyExpression);
+                    var fkProps = _parent.GetProperties(foreignKeyExpression);
+                    var principalKeys = principalKeyExpression is not null
+                        ? _parent.GetProperties(principalKeyExpression)
+                        : _parent._config.KeyProperties;
+
+                    if (principalKeys.Count == 0)
+                    {
+                        throw new NormConfigurationException(
+                            $"Relationship '{_principalNavigation.Name}' on entity {typeof(TEntity).Name} cannot infer a principal key. " +
+                            "Configure HasKey(...) first or pass the principal key expression to HasForeignKey(...).");
+                    }
+
+                    if (principalKeys.Count != fkProps.Count)
+                    {
+                        throw new ArgumentException(
+                            $"Relationship '{_principalNavigation.Name}' has {principalKeys.Count} principal key property/properties but {fkProps.Count} foreign key property/properties.",
+                            nameof(foreignKeyExpression));
+                    }
+
+                    return (principalKeys, fkProps);
+                }
             }
         }
 
@@ -957,6 +1329,38 @@ namespace nORM.Configuration
                 /// <param name="schema">Optional schema containing the join table.</param>
                 /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
                 public EntityTypeBuilder<TEntity> UsingTable(string joinTable, IReadOnlyList<string> leftFkColumns, IReadOnlyList<string> rightFkColumns, string? schema)
+                    => UsingTable(
+                        joinTable,
+                        leftFkColumns,
+                        rightFkColumns,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        schema);
+
+                /// <summary>
+                /// Specifies a schema-qualified join table with ordered composite FK columns and explicit
+                /// database referential actions for both join-table foreign keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's key.</param>
+                /// <param name="leftOnDelete">Database action for deletes of this entity.</param>
+                /// <param name="leftOnUpdate">Database action for key updates of this entity.</param>
+                /// <param name="rightOnDelete">Database action for deletes of the related entity.</param>
+                /// <param name="rightOnUpdate">Database action for key updates of the related entity.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    IReadOnlyList<string> leftFkColumns,
+                    IReadOnlyList<string> rightFkColumns,
+                    ReferentialAction leftOnDelete,
+                    ReferentialAction leftOnUpdate,
+                    ReferentialAction rightOnDelete,
+                    ReferentialAction rightOnUpdate,
+                    string? schema = null)
                 {
                     if (string.IsNullOrWhiteSpace(joinTable))
                         throw new ArgumentException("Join table name cannot be null or whitespace.", nameof(joinTable));
@@ -974,7 +1378,11 @@ namespace nORM.Configuration
                     {
                         JoinTableSchema = schema,
                         LeftFkColumns = leftFkColumns.ToArray(),
-                        RightFkColumns = rightFkColumns.ToArray()
+                        RightFkColumns = rightFkColumns.ToArray(),
+                        LeftOnDelete = leftOnDelete,
+                        LeftOnUpdate = leftOnUpdate,
+                        RightOnDelete = rightOnDelete,
+                        RightOnUpdate = rightOnUpdate
                     });
                     return _parent;
                 }
@@ -1013,6 +1421,44 @@ namespace nORM.Configuration
                     Expression<Func<TEntity, object>> leftKey,
                     Expression<Func<TDependent, object>> rightKey,
                     string? schema)
+                    => UsingTable(
+                        joinTable,
+                        leftFkColumns,
+                        rightFkColumns,
+                        leftKey,
+                        rightKey,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        schema);
+
+                /// <summary>
+                /// Specifies a schema-qualified join table with ordered FK columns that reference selected
+                /// keys and explicit database referential actions for both join-table foreign keys.
+                /// </summary>
+                /// <param name="joinTable">Name of the join table without schema qualification.</param>
+                /// <param name="leftFkColumns">Ordered columns referencing this entity's selected key.</param>
+                /// <param name="rightFkColumns">Ordered columns referencing the related entity's selected key.</param>
+                /// <param name="leftKey">Property or anonymous-object property list on this entity referenced by <paramref name="leftFkColumns"/>.</param>
+                /// <param name="rightKey">Property or anonymous-object property list on the related entity referenced by <paramref name="rightFkColumns"/>.</param>
+                /// <param name="leftOnDelete">Database action for deletes of this entity.</param>
+                /// <param name="leftOnUpdate">Database action for key updates of this entity.</param>
+                /// <param name="rightOnDelete">Database action for deletes of the related entity.</param>
+                /// <param name="rightOnUpdate">Database action for key updates of the related entity.</param>
+                /// <param name="schema">Optional schema containing the join table.</param>
+                /// <returns>The parent <see cref="EntityTypeBuilder{TEntity}"/> for chaining.</returns>
+                public EntityTypeBuilder<TEntity> UsingTable(
+                    string joinTable,
+                    IReadOnlyList<string> leftFkColumns,
+                    IReadOnlyList<string> rightFkColumns,
+                    Expression<Func<TEntity, object>> leftKey,
+                    Expression<Func<TDependent, object>> rightKey,
+                    ReferentialAction leftOnDelete,
+                    ReferentialAction leftOnUpdate,
+                    ReferentialAction rightOnDelete,
+                    ReferentialAction rightOnUpdate,
+                    string? schema = null)
                 {
                     ArgumentNullException.ThrowIfNull(leftKey);
                     ArgumentNullException.ThrowIfNull(rightKey);
@@ -1041,7 +1487,11 @@ namespace nORM.Configuration
                         LeftFkColumns = leftFkColumns.ToArray(),
                         RightFkColumns = rightFkColumns.ToArray(),
                         LeftKeyProperties = leftKeyProperties.ToArray(),
-                        RightKeyProperties = rightKeyProperties.ToArray()
+                        RightKeyProperties = rightKeyProperties.ToArray(),
+                        LeftOnDelete = leftOnDelete,
+                        LeftOnUpdate = leftOnUpdate,
+                        RightOnDelete = rightOnDelete,
+                        RightOnUpdate = rightOnUpdate
                     });
                     return _parent;
                 }
@@ -1219,8 +1669,6 @@ namespace nORM.Configuration
                     return (principalKeys, fkProps);
                 }
 
-                private static string? NormalizeConstraintName(string? constraintName)
-                    => string.IsNullOrWhiteSpace(constraintName) ? null : constraintName;
             }
         }
     }

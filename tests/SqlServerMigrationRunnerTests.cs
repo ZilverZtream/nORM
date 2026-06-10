@@ -28,6 +28,8 @@ namespace nORM.Tests;
 /// </para>
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.MigrationParity)]
 public class SqlServerMigrationRunnerTests
 {
     // ── Dynamic assembly helpers ─────────────────────────────────────────────

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -136,6 +137,57 @@ public class PostgresMigrationSqlGeneratorTests
         var sql = Gen.GenerateSql(diff);
 
         Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\") INCLUDE (\"Name\") WHERE \"Code\" IS NOT NULL");
+    }
+
+    [Fact]
+    public void CreateTable_WithNullsNotDistinctUniqueIndex_EmitsClause()
+    {
+        var code = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = true };
+        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", IsUnique = true, NullsNotDistinct = true });
+        var table = BuildTable("Product",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Product" },
+            code);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s == "CREATE UNIQUE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\") NULLS NOT DISTINCT");
+    }
+
+    [Fact]
+    public void CreateTable_WithExplicitNullSortOrder_EmitsPerKeyClauses()
+    {
+        var code = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = true };
+        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", NullSortOrder = IndexNullSortOrder.First });
+        var created = new ColumnSchema { Name = "Created", ClrType = typeof(DateTime).FullName!, IsNullable = true };
+        created.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Created", IsDescending = true, NullSortOrder = IndexNullSortOrder.Last });
+        var table = BuildTable("Product",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Product" },
+            code,
+            created);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var sql = Gen.GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Code\" ON \"Product\" (\"Code\" NULLS FIRST)");
+        Assert.Contains(sql.Up, s => s == "CREATE INDEX \"IX_Product_Created\" ON \"Product\" (\"Created\" DESC NULLS LAST)");
+    }
+
+    [Fact]
+    public void CreateTable_WithNullsNotDistinctNonUniqueIndex_Throws()
+    {
+        var code = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = true };
+        code.Indexes.Add(new ColumnIndexSchema { Name = "IX_Product_Code", NullsNotDistinct = true });
+        var table = BuildTable("Product",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_Product" },
+            code);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Gen.GenerateSql(diff));
+        Assert.Contains("cannot use NULLS NOT DISTINCT without being unique", ex.Message);
     }
 
     [Fact]

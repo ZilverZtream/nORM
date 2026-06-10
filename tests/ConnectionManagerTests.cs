@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.IO;
@@ -110,6 +110,7 @@ public class ConnectionManagerTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task HealthCheck_ChurnStress_ConcurrentAccessors_DoNotThrowUnexpectedException()
     {
         // 1 primary + 2 replicas; all pointing to valid SQLite databases so OpenAsync always succeeds
@@ -200,6 +201,7 @@ public class ConnectionManagerTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Concurrent_read_requests_and_dispose_do_not_throw_unexpected_exceptions()
     {
         var topology = new DatabaseTopology();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -282,6 +282,7 @@ INSERT INTO GfItem (IsActive, Name) VALUES (0, 'inactive');";
     /// must not corrupt the filter collection (copy-on-write invariant preserved).
     /// </summary>
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task X1_GlobalFilters_ConcurrentAddAndRead_DoesNotCorrupt()
     {
         var opts = new DbContextOptions();

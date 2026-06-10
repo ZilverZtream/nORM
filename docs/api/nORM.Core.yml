@@ -41,6 +41,7 @@ items:
   - nORM.Core.PreparedOperation`1
   - nORM.Core.QueryTrackingBehavior
   - nORM.Core.SetPropertyCalls`1
+  - nORM.Core.StoredProcedureNonQueryResult
   - nORM.Core.StoredProcedureResult`1
   - nORM.Core.TemporalDiffEntry`1
   - nORM.Core.TemporalExtensions
@@ -434,6 +435,12 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Core.StoredProcedureNonQueryResult
+  commentId: T:nORM.Core.StoredProcedureNonQueryResult
+  href: nORM.Core.StoredProcedureNonQueryResult.html
+  name: StoredProcedureNonQueryResult
+  nameWithType: StoredProcedureNonQueryResult
+  fullName: nORM.Core.StoredProcedureNonQueryResult
 - uid: nORM.Core.TemporalHistoryEntry`1
   commentId: T:nORM.Core.TemporalHistoryEntry`1
   href: nORM.Core.TemporalHistoryEntry-1.html

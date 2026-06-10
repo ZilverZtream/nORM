@@ -21,7 +21,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionNavigationBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 509
+    startLine: 1156
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -69,7 +69,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithOne
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 526
+    startLine: 1173
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -110,7 +110,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 539
+    startLine: 1186
   assemblies:
   - nORM
   namespace: nORM.Configuration

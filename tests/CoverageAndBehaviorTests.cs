@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -507,6 +507,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     // ── ConcurrentLruCache.GetOrAdd factory called at most once per key ───
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentLruCache_GetOrAdd_FactoryCalledOncePerKey()
     {
         var cache = new ConcurrentLruCache<int, string>(maxSize: 100);
@@ -529,6 +530,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentLruCache_GetOrAdd_DifferentKeys_EachFactoryCalledOnce()
     {
         var cache = new ConcurrentLruCache<int, int>(maxSize: 1000);
@@ -551,6 +553,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void ConcurrentLruCache_GetOrAdd_FactoryException_CacheRemainsFunctional()
     {
         var cache = new ConcurrentLruCache<int, string>(maxSize: 10);
@@ -759,6 +762,7 @@ public class CompiledQueryTimeoutAndSecurityTests
     // ── High-contention race suite: same compiled delegate, concurrent different contexts ────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task CompiledQuery_HighContention_ConcurrentDifferentContexts_CorrectResults()
     {
         // With shared pooledState, a command bound to ctx_A's connection could be dequeued
@@ -1244,6 +1248,7 @@ public class CacheAndMultiTenantIsolationTests
     // ── Adversarial: SQL injection via expression API must not reach DB unescaped ─
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Adversarial_SqlInjection_ViaStringEquals_IsParameterized()
     {
         // 4.5→5.0 adversarial: injected string must be emitted as a parameter, not
@@ -1263,6 +1268,7 @@ public class CacheAndMultiTenantIsolationTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void Adversarial_SqlInjection_ViaContains_IsParameterized()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -1339,6 +1345,7 @@ file class Gate38CQ
 /// via semaphore, with the semaphore count returning to capacity after each compile.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class CompiledQueryConcurrencyLimitTests
 {
     // ── Caller receives TimeoutException; compile semaphore returns to capacity ──
@@ -1788,6 +1795,7 @@ public class TenantContextChurnTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrentChurn_AllQueriesCorrect()
     {
         // 50 concurrent contexts with distinct tenant IDs stress the LRU under concurrent
@@ -1835,6 +1843,7 @@ public class ClosureCaptureFilterKeyTests
     // ── Adversarial: rapid cycling of closure values → always-distinct keys ──────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public void ClosureCapture_Adversarial_RapidCycling_TenValues_AllDistinctKeys()
     {
         // Adversarial: rapidly cycle through 10 closure-captured filter values.

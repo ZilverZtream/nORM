@@ -5,7 +5,9 @@ items:
   id: nORM.Configuration
   children:
   - nORM.Configuration.AmbientTransactionEnlistmentPolicy
+  - nORM.Configuration.CheckConstraintConfiguration
   - nORM.Configuration.ClientEvaluationPolicy
+  - nORM.Configuration.ComputedColumnConfiguration
   - nORM.Configuration.ConverterConfiguration
   - nORM.Configuration.DbContextOptions
   - nORM.Configuration.EntityTypeBuilder`1
@@ -14,14 +16,20 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1.ReferenceCollectionBuilder
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder`1
+  - nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  - nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
   - nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
+  - nORM.Configuration.ExpressionIndexConfiguration
   - nORM.Configuration.IEntityTypeConfiguration
+  - nORM.Configuration.IdentityOptionsConfiguration
   - nORM.Configuration.IndexAttribute
+  - nORM.Configuration.IndexNullSortOrder
   - nORM.Configuration.ManyToManyConfiguration
   - nORM.Configuration.ModelBuilder
   - nORM.Configuration.NativeTenantSecurityMode
   - nORM.Configuration.OwnedCollectionNavigation
   - nORM.Configuration.OwnedNavigation
+  - nORM.Configuration.PrecisionConfiguration
   - nORM.Configuration.ProviderMobilityFeature
   - nORM.Configuration.ProviderMobilityMode
   - nORM.Configuration.ProviderMobilityProviderDecision
@@ -29,6 +37,8 @@ items:
   - nORM.Configuration.ProviderMobilitySupport
   - nORM.Configuration.ProviderMobilityTranslationDecision
   - nORM.Configuration.ProviderMobilityTranslator
+  - nORM.Configuration.ReadOnlyEntityAttribute
+  - nORM.Configuration.ReferentialAction
   - nORM.Configuration.RelationshipConfiguration
   - nORM.Configuration.ShadowPropertyConfiguration
   - nORM.Configuration.TemporalStorageMode
@@ -205,6 +215,97 @@ references:
   - uid: nORM.Configuration.EntityTypeBuilder`1.ShadowPropertyBuilder
     name: ShadowPropertyBuilder
     href: nORM.Configuration.EntityTypeBuilder-1.ShadowPropertyBuilder.html
+- uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  name.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
+  commentId: T:nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.EntityTypeBuilder-1.html
+  name: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>.ReferenceReferenceBuilder
+  nameWithType: EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>.ReferenceReferenceBuilder
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.ReferenceNavigationBuilder<TDependent>.ReferenceReferenceBuilder
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent).ReferenceReferenceBuilder
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent).ReferenceReferenceBuilder
+  name.vb: EntityTypeBuilder(Of TEntity).ReferenceNavigationBuilder(Of TDependent).ReferenceReferenceBuilder
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: <
+  - name: TDependent
+  - name: '>'
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
+    name: ReferenceReferenceBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.ReferenceReferenceBuilder.html
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1
+    name: ReferenceNavigationBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDependent
+  - name: )
+  - name: .
+  - uid: nORM.Configuration.EntityTypeBuilder`1.ReferenceNavigationBuilder`1.ReferenceReferenceBuilder
+    name: ReferenceReferenceBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.ReferenceNavigationBuilder-1.ReferenceReferenceBuilder.html
 - uid: nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
   commentId: T:nORM.Configuration.EntityTypeBuilder`1.CollectionNavigationBuilder`1
   href: nORM.Configuration.EntityTypeBuilder-1.html
@@ -365,6 +466,36 @@ references:
   name: ShadowPropertyConfiguration
   nameWithType: ShadowPropertyConfiguration
   fullName: nORM.Configuration.ShadowPropertyConfiguration
+- uid: nORM.Configuration.CheckConstraintConfiguration
+  commentId: T:nORM.Configuration.CheckConstraintConfiguration
+  href: nORM.Configuration.CheckConstraintConfiguration.html
+  name: CheckConstraintConfiguration
+  nameWithType: CheckConstraintConfiguration
+  fullName: nORM.Configuration.CheckConstraintConfiguration
+- uid: nORM.Configuration.ComputedColumnConfiguration
+  commentId: T:nORM.Configuration.ComputedColumnConfiguration
+  href: nORM.Configuration.ComputedColumnConfiguration.html
+  name: ComputedColumnConfiguration
+  nameWithType: ComputedColumnConfiguration
+  fullName: nORM.Configuration.ComputedColumnConfiguration
+- uid: nORM.Configuration.IdentityOptionsConfiguration
+  commentId: T:nORM.Configuration.IdentityOptionsConfiguration
+  href: nORM.Configuration.IdentityOptionsConfiguration.html
+  name: IdentityOptionsConfiguration
+  nameWithType: IdentityOptionsConfiguration
+  fullName: nORM.Configuration.IdentityOptionsConfiguration
+- uid: nORM.Configuration.PrecisionConfiguration
+  commentId: T:nORM.Configuration.PrecisionConfiguration
+  href: nORM.Configuration.PrecisionConfiguration.html
+  name: PrecisionConfiguration
+  nameWithType: PrecisionConfiguration
+  fullName: nORM.Configuration.PrecisionConfiguration
+- uid: nORM.Configuration.ExpressionIndexConfiguration
+  commentId: T:nORM.Configuration.ExpressionIndexConfiguration
+  href: nORM.Configuration.ExpressionIndexConfiguration.html
+  name: ExpressionIndexConfiguration
+  nameWithType: ExpressionIndexConfiguration
+  fullName: nORM.Configuration.ExpressionIndexConfiguration
 - uid: nORM.Configuration.RelationshipConfiguration
   commentId: T:nORM.Configuration.RelationshipConfiguration
   href: nORM.Configuration.RelationshipConfiguration.html
@@ -389,6 +520,13 @@ references:
   name: ManyToManyConfiguration
   nameWithType: ManyToManyConfiguration
   fullName: nORM.Configuration.ManyToManyConfiguration
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
 - uid: nORM.Configuration.IndexAttribute
   commentId: T:nORM.Configuration.IndexAttribute
   href: nORM.Configuration.IndexAttribute.html
@@ -449,6 +587,19 @@ references:
   name: ProviderMobilityTranslator
   nameWithType: ProviderMobilityTranslator
   fullName: nORM.Configuration.ProviderMobilityTranslator
+- uid: nORM.Configuration.ReadOnlyEntityAttribute
+  commentId: T:nORM.Configuration.ReadOnlyEntityAttribute
+  href: nORM.Configuration.ReadOnlyEntityAttribute.html
+  name: ReadOnlyEntityAttribute
+  nameWithType: ReadOnlyEntityAttribute
+  fullName: nORM.Configuration.ReadOnlyEntityAttribute
+- uid: nORM.Configuration.ReferentialAction
+  commentId: T:nORM.Configuration.ReferentialAction
+  parent: nORM.Configuration
+  href: nORM.Configuration.ReferentialAction.html
+  name: ReferentialAction
+  nameWithType: ReferentialAction
+  fullName: nORM.Configuration.ReferentialAction
 - uid: nORM.Configuration.TemporalStorageMode
   commentId: T:nORM.Configuration.TemporalStorageMode
   parent: nORM.Configuration

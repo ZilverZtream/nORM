@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data;
 using Microsoft.Data.Sqlite;
 using nORM.Internal;
@@ -16,6 +16,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrentLruCachePublicApiTests
 {
     // ── GetOrAdd ──────────────────────────────────────────────────────────────

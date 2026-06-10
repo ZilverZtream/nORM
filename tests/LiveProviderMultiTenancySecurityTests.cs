@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
@@ -250,6 +250,7 @@ public class LiveProviderMultiTenancySecurityTests
     [InlineData(ProviderKind.MySql,     "tenant'; DROP TABLE LivTenRow; --")]
     [InlineData(ProviderKind.Sqlite,    "' OR '1'='1")]
     [InlineData(ProviderKind.Sqlite,    "tenant'; DROP TABLE LivTenRow; --")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task AdversarialTenantId_IsParameterized_NoDataLeakage(ProviderKind kind, string adversarialId)
     {
         var live = LiveProviderFactory.OpenLive(kind);

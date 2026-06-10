@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -176,6 +176,7 @@ public class MigrationProviderMatrixTests
     // ── Concurrency stress ────────────────────────────────────────────────────
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyStress_SqliteGenerator_200ConcurrentCalls_ProduceSameOutput()
     {
         var fk    = Fk("FK_Post_Blog", "BlogId", "Blog", onDelete: "CASCADE");
@@ -208,6 +209,7 @@ public class MigrationProviderMatrixTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task ConcurrencyStress_AllFourGenerators_200ConcurrentCallsEach_NoExceptions()
     {
         var fk    = Fk("FK_Post_Blog", "BlogId", "Blog", onDelete: "CASCADE");
@@ -494,6 +496,7 @@ public class SqlServerMigrationSqlGeneratorFaultTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task SqlServer_ConcurrentGeneration_NoContamination()
     {
         var gen = new SqlServerMigrationSqlGenerator();
@@ -597,6 +600,7 @@ public class MySqlMigrationSqlGeneratorFaultTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task MySql_ConcurrentGeneration_NoContamination()
     {
         var gen = new MySqlMigrationSqlGenerator();
@@ -705,6 +709,7 @@ public class PostgresMigrationSqlGeneratorFaultTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task Postgres_ConcurrentGeneration_NoContamination()
     {
         var gen = new PostgresMigrationSqlGenerator();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
@@ -17,6 +17,7 @@ namespace nORM.Tests;
 /// matching the parity of the batched SaveChangesAsync path.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class ConcurrencyTokenSnapshotTests
 {
     [Table("CtsItem")]

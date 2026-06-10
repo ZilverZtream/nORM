@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 462
+    startLine: 916
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -39,6 +39,15 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
   - System.Object.Equals(System.Object)
@@ -74,7 +83,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 473
+    startLine: 927
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -213,6 +222,321 @@ references:
     name: String
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  name: HasDefaultValueSql(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  name.vb: HasDefaultValueSql(String)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+    name: HasDefaultValueSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+    name: HasDefaultValueSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasIdentityOptions_System_Int64_System_Int64_
+  name: HasIdentityOptions(long, long)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions(long, long)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasIdentityOptions(long, long)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions(Long, Long)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasIdentityOptions(Long, Long)
+  name.vb: HasIdentityOptions(Long, Long)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+    name: HasIdentityOptions
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasIdentityOptions_System_Int64_System_Int64_
+  - name: (
+  - uid: System.Int64
+    name: long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: ','
+  - name: " "
+  - uid: System.Int64
+    name: long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
+    name: HasIdentityOptions
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasIdentityOptions_System_Int64_System_Int64_
+  - name: (
+  - uid: System.Int64
+    name: Long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: ','
+  - name: " "
+  - uid: System.Int64
+    name: Long
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int64
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasMaxLength_System_Int32_
+  name: HasMaxLength(int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
+  name.vb: HasMaxLength(Integer)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+    name: HasMaxLength
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasMaxLength_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+    name: HasMaxLength
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasMaxLength_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
+  name: IsUnicode(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode(Boolean)
+  name.vb: IsUnicode(Boolean)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+    name: IsUnicode
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+    name: IsUnicode
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsFixedLength_System_Boolean_
+  name: IsFixedLength(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsFixedLength(bool)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsFixedLength(Boolean)
+  name.vb: IsFixedLength(Boolean)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+    name: IsFixedLength
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsFixedLength_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+    name: IsFixedLength
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsFixedLength_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_
+  name: HasPrecision(int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer)
+  name.vb: HasPrecision(Integer)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+    name: HasPrecision
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
+    name: HasPrecision
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_System_Int32_
+  name: HasPrecision(int, int)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int, int)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasPrecision(int, int)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer, Integer)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasPrecision(Integer, Integer)
+  name.vb: HasPrecision(Integer, Integer)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+    name: HasPrecision
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
+    name: HasPrecision
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasPrecision_System_Int32_System_Int32_
+  - name: (
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasCollation_System_String_
+  name: HasCollation(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasCollation(string)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasCollation(String)
+  name.vb: HasCollation(String)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+    name: HasCollation
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasCollation_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
+    name: HasCollation
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasCollation_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasComputedColumnSql_System_String_System_Boolean_
+  name: HasComputedColumnSql(string, bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql(string, bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasComputedColumnSql(string, bool)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql(String, Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComputedColumnSql(String, Boolean)
+  name.vb: HasComputedColumnSql(String, Boolean)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+    name: HasComputedColumnSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasComputedColumnSql_System_String_System_Boolean_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
+    name: HasComputedColumnSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasComputedColumnSql_System_String_System_Boolean_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: )
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)

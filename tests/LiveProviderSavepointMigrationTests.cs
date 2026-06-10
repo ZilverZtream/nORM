@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -33,6 +33,7 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Trait("Category", TestCategory.LiveProvider)]
+[Trait("Category", TestCategory.MigrationParity)]
 [Collection(ConcurrencyStressCollection.Name)]
 public class LiveProviderSavepointMigrationTests
 {
@@ -630,6 +631,7 @@ public class LiveProviderSavepointMigrationTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task CacheContention_20ConcurrentContexts_AllReturnCorrectData()
     {
         // Shared file-backed database so contexts running in parallel can share the table.

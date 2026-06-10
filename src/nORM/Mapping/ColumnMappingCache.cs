@@ -46,6 +46,7 @@ namespace nORM.Mapping
                 {
                     OwnedNavigation? ownedNav = null;
                     config?.OwnedNavigations.TryGetValue(propInfo.Property, out ownedNav);
+                    var converter = FindConverter(config, propInfo.Property);
                     if (ownedNav != null || propInfo.OwnedTypeInfo != null)
                     {
                         var ownedTypeInfo = ownedNav != null ? GetCachedTypeInfo(ownedNav.OwnedType) : propInfo.OwnedTypeInfo!;
@@ -58,25 +59,44 @@ namespace nORM.Mapping
                     }
                     else
                     {
+                        if (ShouldSkipReferenceNavigationProperty(propInfo.Property, converter))
+                            continue;
+
                         var column = new Column(propInfo, provider, config);
-                        // Wire converter if configured
-                        if (config?.Converters != null)
-                        {
-                            foreach (var cc in config.Converters)
-                            {
-                                if (cc.Property == propInfo.Property)
-                                {
-                                    column.Converter = cc.Converter;
-                                    break;
-                                }
-                            }
-                        }
+                        column.Converter = converter;
                         columns.Add(column);
                     }
                 }
 
                 return columns.ToArray();
             });
+        }
+
+        private static IValueConverter? FindConverter(IEntityTypeConfiguration? config, PropertyInfo property)
+        {
+            if (config?.Converters == null)
+                return null;
+
+            foreach (var converter in config.Converters)
+            {
+                if (converter.Property == property)
+                    return converter.Converter;
+            }
+
+            return null;
+        }
+
+        private static bool ShouldSkipReferenceNavigationProperty(PropertyInfo property, IValueConverter? converter)
+        {
+            if (converter != null)
+                return false;
+
+            var propType = property.PropertyType;
+            return !propType.IsValueType
+                && propType != typeof(string)
+                && propType != typeof(byte[])
+                && property.GetCustomAttribute<OwnedAttribute>() == null
+                && propType.GetCustomAttribute<OwnedAttribute>() == null;
         }
 
         /// <summary>

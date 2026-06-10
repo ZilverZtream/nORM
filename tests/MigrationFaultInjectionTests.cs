@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -223,6 +223,7 @@ public class MigrationFaultInjectionTests
     // ── FI-7: Concurrent add-FK and add-column on same table — generator is pure
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task FaultInjection_ConcurrentDifferentDiffs_NoCrossContamination()
     {
         var gen = new SqliteMigrationSqlGenerator();

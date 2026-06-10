@@ -378,23 +378,3 @@ public class LiveProviderShapeParityTests
         public object GetCurrentTenantId() => _id;
     }
 }
-
-// When a live provider isn't configured, the parity test methods early-return so the xUnit
-// test reports as a pass. The release gate enforces minimum configured providers separately
-// via NORM_MIN_LIVE_PROVIDERS, so a "passed" outcome here for an unconfigured provider does
-// not hide a coverage gap. xUnit does not natively support runtime skip without an extra
-// NuGet (Xunit.SkippableFact), so this returns a bool and the call site early-returns.
-internal static class Skip
-{
-    public static bool If(bool condition, string reason)
-    {
-        if (condition)
-        {
-            Console.WriteLine($"[live-provider parity] skipped: {reason}");
-            return true;
-        }
-        return false;
-    }
-
-    public static bool If(object? value, string reason) => If(value is null, reason);
-}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
@@ -43,6 +43,7 @@ namespace nORM.Tests;
 /// rowcount approaches and requires application-level versioning to close.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class OptimisticConcurrencyProviderMatrixTests
 {
     // ── Test entity ────────────────────────────────────────────────────────────

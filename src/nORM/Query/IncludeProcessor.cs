@@ -366,7 +366,7 @@ namespace nORM.Query
                 var key = GetPrincipalKeyValue(firstRelation, p);
                 if (key == null)
                 {
-                    AssignEmptyList(p, firstRelation);
+                    AssignEmptyNavigation(p, firstRelation);
                     continue;
                 }
 
@@ -454,7 +454,7 @@ namespace nORM.Query
                 var key = GetPrincipalKeyValue(firstRelation, p);
                 if (key == null)
                 {
-                    AssignEmptyList(p, firstRelation);
+                    AssignEmptyNavigation(p, firstRelation);
                     continue;
                 }
 
@@ -552,24 +552,48 @@ namespace nORM.Query
             foreach (var p in parents.Cast<object>())
             {
                 var pk = GetPrincipalKeyValue(relation, p);
-                var childList = QueryExecutor.CreateList(relation.DependentType, 0);
-
-                if (pk != null && childGroups.TryGetValue(pk, out var c))
+                if (IsCollectionNavigation(relation))
                 {
-                    foreach (var item in c)
-                        childList.Add(item);
-                }
+                    var childList = QueryExecutor.CreateList(relation.DependentType, 0);
+                    if (pk != null && childGroups.TryGetValue(pk, out var c))
+                    {
+                        foreach (var item in c)
+                            childList.Add(item);
+                    }
 
-                relation.NavProp.SetValue(p, childList);
+                    relation.NavProp.SetValue(p, childList);
+                }
+                else
+                {
+                    var child = pk != null && childGroups.TryGetValue(pk, out var c)
+                        ? c.FirstOrDefault()
+                        : null;
+                    relation.NavProp.SetValue(p, child);
+                }
             }
 
             return resultChildren;
         }
 
-        private static void AssignEmptyList(object parent, TableMapping.Relation relation)
+        private static void AssignEmptyNavigation(object parent, TableMapping.Relation relation)
         {
-            var childList = QueryExecutor.CreateList(relation.DependentType, 0);
-            relation.NavProp.SetValue(parent, childList);
+            if (IsCollectionNavigation(relation))
+            {
+                var childList = QueryExecutor.CreateList(relation.DependentType, 0);
+                relation.NavProp.SetValue(parent, childList);
+            }
+            else
+            {
+                relation.NavProp.SetValue(parent, null);
+            }
+        }
+
+        private static bool IsCollectionNavigation(TableMapping.Relation relation)
+        {
+            var propertyType = relation.NavProp.PropertyType;
+            return propertyType != typeof(string)
+                   && propertyType.IsGenericType
+                   && typeof(IEnumerable).IsAssignableFrom(propertyType);
         }
 
         private static object? GetPrincipalKeyValue(TableMapping.Relation relation, object entity)
@@ -870,15 +894,24 @@ namespace nORM.Query
             {
                 ct.ThrowIfCancellationRequested();
                 var pk = GetPrincipalKeyValue(relation, p);
-                var childList = QueryExecutor.CreateList(relation.DependentType, 0);
-
-                if (pk != null && childGroups.TryGetValue(pk, out var c))
+                if (IsCollectionNavigation(relation))
                 {
-                    foreach (var item in c)
-                        childList.Add(item);
-                }
+                    var childList = QueryExecutor.CreateList(relation.DependentType, 0);
+                    if (pk != null && childGroups.TryGetValue(pk, out var c))
+                    {
+                        foreach (var item in c)
+                            childList.Add(item);
+                    }
 
-                relation.NavProp.SetValue(p, childList);
+                    relation.NavProp.SetValue(p, childList);
+                }
+                else
+                {
+                    var child = pk != null && childGroups.TryGetValue(pk, out var c)
+                        ? c.FirstOrDefault()
+                        : null;
+                    relation.NavProp.SetValue(p, child);
+                }
             }
 
             return resultChildren;

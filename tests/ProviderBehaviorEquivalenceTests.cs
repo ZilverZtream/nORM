@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -49,6 +49,8 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.BulkProviderParity)]
 public class ProviderBehaviorEquivalenceTests
 {
     // ── Entities (explicit keys — no auto-increment for provider parity) ───────
@@ -1167,6 +1169,7 @@ public class ProviderBehaviorEquivalenceTests
     [InlineData("sqlserver")]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task SP_OCC_StaleToken_ThrowsDbConcurrencyException(string kind)
     {
         var (cn, provider, skip) = OpenLive(kind);

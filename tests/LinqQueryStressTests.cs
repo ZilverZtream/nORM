@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -19,6 +19,7 @@ namespace nORM.Tests;
 /// null handling, multi-column ordering, pagination, and grouping.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class LinqQueryStressTests
 {
     // ── Domain models ──────────────────────────────────────────────────────

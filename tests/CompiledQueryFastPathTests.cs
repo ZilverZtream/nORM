@@ -23,6 +23,7 @@ namespace nORM.Tests;
 /// between compiled and runtime LINQ queries.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.CompiledQueryStress)]
 public class CompiledQueryFastPathTests
 {
     // ─── shared entity ────────────────────────────────────────────────────────

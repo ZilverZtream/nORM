@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
@@ -177,6 +177,7 @@ public class MySqlOccSemanticEnforcementTests
     }
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task AffectedRowSemantics_DefaultMode_GenuineConflict_ThrowsConcurrencyException()
     {
         // Concurrent write via raw SQL with a DIFFERENT token → conflict detected via

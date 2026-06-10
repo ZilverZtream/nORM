@@ -63,6 +63,14 @@ public class SchemaSnapshotTests
         public string DisplayName { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotNullsNotDistinctIndexedEntity")]
+    private class SnapshotNullsNotDistinctIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("IX_SnapshotNullsNotDistinctIndexedEntity_Code", IsUnique = true, NullsNotDistinct = true, NullSortOrder = IndexNullSortOrder.First)]
+        public string? Code { get; set; }
+    }
+
     [Table("SnapshotCompositeIndexedEntity")]
     private class SnapshotCompositeIndexedEntity
     {
@@ -87,6 +95,33 @@ public class SchemaSnapshotTests
         [Key] public int Id { get; set; }
         [Column(TypeName = "decimal(28,6)")]
         public decimal Amount { get; set; }
+    }
+
+    [Table("SnapshotPrecisionProviderTextEntity")]
+    private class SnapshotPrecisionProviderTextEntity
+    {
+        [Key] public int Id { get; set; }
+        [Column(TypeName = "numeric ( 19 , 4 )")]
+        public decimal SpacedAmount { get; set; }
+        [Column(TypeName = "numeric(10)")]
+        public decimal PrecisionOnlyAmount { get; set; }
+        [Column(TypeName = "DOMAIN (public.price_amount -> numeric(12, 3))")]
+        public decimal DomainAmount { get; set; }
+        [Column(TypeName = "mydecimal(18,2)")]
+        public decimal NotDecimal { get; set; }
+    }
+
+    [Table("SnapshotLengthEntity")]
+    private class SnapshotLengthEntity
+    {
+        [Key] public int Id { get; set; }
+        [MaxLength(80)]
+        public string Name { get; set; } = string.Empty;
+        [StringLength(40)]
+        public string Code { get; set; } = string.Empty;
+        [MaxLength(32)]
+        public byte[] Payload { get; set; } = Array.Empty<byte>();
+        public string Notes { get; set; } = string.Empty;
     }
 
     [Table("SnapshotDefaultEntity")]
@@ -255,6 +290,26 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_PreservesFluentPrimaryKeyConstraintName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotBlog>()
+                    .HasKey(e => e.Id, "PK_Custom_SnapshotBlog")
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotBlog");
+        var id = table.Columns.Single(c => c.Name == "Id");
+        Assert.True(id.IsPrimaryKey);
+        Assert.Equal("PK_Custom_SnapshotBlog", id.IndexName);
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesFluentDefaultValueSql()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -337,6 +392,133 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_IncludesFluentMaxLength()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotLengthEntity>()
+                    .Property(e => e.Name)
+                    .HasMaxLength(120)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotLengthEntity");
+        var name = table.Columns.Single(c => c.Name == nameof(SnapshotLengthEntity.Name));
+        Assert.Equal(120, name.MaxLength);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesFluentUnicodeAndFixedLengthFacets()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<SnapshotLengthEntity>()
+                    .Property(e => e.Code)
+                    .HasMaxLength(40)
+                    .IsUnicode(false)
+                    .IsFixedLength();
+                mb.Entity<SnapshotLengthEntity>()
+                    .Property(e => e.Payload)
+                    .HasMaxLength(16)
+                    .IsFixedLength();
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotLengthEntity");
+        var code = table.Columns.Single(c => c.Name == nameof(SnapshotLengthEntity.Code));
+        var payload = table.Columns.Single(c => c.Name == nameof(SnapshotLengthEntity.Payload));
+        Assert.Equal(40, code.MaxLength);
+        Assert.False(code.IsUnicode);
+        Assert.True(code.IsFixedLength);
+        Assert.Equal(16, payload.MaxLength);
+        Assert.Null(payload.IsUnicode);
+        Assert.True(payload.IsFixedLength);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesFluentPrecision()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotPrecisionEntity>()
+                    .Property(e => e.Amount)
+                    .HasPrecision(18, 2)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotPrecisionEntity");
+        var amount = table.Columns.Single(c => c.Name == nameof(SnapshotPrecisionEntity.Amount));
+        Assert.Equal(18, amount.Precision);
+        Assert.Equal(2, amount.Scale);
+    }
+
+    [Fact]
+    public void BuildFromContext_IncludesFluentPrecisionWithoutScale()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotPrecisionEntity>()
+                    .Property(e => e.Amount)
+                    .HasPrecision(10)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotPrecisionEntity");
+        var amount = table.Columns.Single(c => c.Name == nameof(SnapshotPrecisionEntity.Amount));
+        Assert.Equal(10, amount.Precision);
+        Assert.Null(amount.Scale);
+    }
+
+    [Fact]
+    public void FluentHasMaxLength_ValidatesSupportedShape()
+    {
+        var builder = new ModelBuilder().Entity<SnapshotLengthEntity>();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Property(e => e.Name).HasMaxLength(0));
+        Assert.Throws<ArgumentException>(() => builder.Property(e => e.Id).HasMaxLength(16));
+    }
+
+    [Fact]
+    public void FluentStringBinaryFacets_ValidateSupportedShape()
+    {
+        var builder = new ModelBuilder().Entity<SnapshotLengthEntity>();
+
+        Assert.Throws<ArgumentException>(() => builder.Property(e => e.Id).IsUnicode(false));
+        Assert.Throws<ArgumentException>(() => builder.Property(e => e.Id).IsFixedLength());
+        builder.Property(e => e.Name).IsUnicode(false).IsFixedLength();
+        builder.Property(e => e.Payload).IsFixedLength();
+    }
+
+    [Fact]
+    public void FluentHasPrecision_ValidatesSupportedShape()
+    {
+        var builder = new ModelBuilder().Entity<SnapshotPrecisionEntity>();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Property(e => e.Amount).HasPrecision(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Property(e => e.Amount).HasPrecision(4, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Property(e => e.Amount).HasPrecision(4, -1));
+        Assert.Throws<ArgumentException>(() => builder.Property(e => e.Id).HasPrecision(4, 2));
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesOwnsOneFluentMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -407,6 +589,7 @@ public class SchemaSnapshotTests
                 mb.Entity<SnapshotIndexedEntity>();
                 mb.Entity<SnapshotDescendingIndexedEntity>();
                 mb.Entity<SnapshotIncludedIndexedEntity>();
+                mb.Entity<SnapshotNullsNotDistinctIndexedEntity>();
                 mb.Entity<SnapshotCompositeIndexedEntity>();
             }
         };
@@ -428,6 +611,13 @@ public class SchemaSnapshotTests
         var includedDisplayName = included.Columns.Single(c => c.Name == "DisplayName");
         Assert.False(Assert.Single(includedCode.Indexes).IsIncluded);
         Assert.True(Assert.Single(includedDisplayName.Indexes).IsIncluded);
+
+        var nullsNotDistinct = snapshot.Tables.Single(t => t.Name == "SnapshotNullsNotDistinctIndexedEntity");
+        var nullsNotDistinctCode = nullsNotDistinct.Columns.Single(c => c.Name == "Code");
+        var nullsNotDistinctIndex = Assert.Single(nullsNotDistinctCode.Indexes);
+        Assert.True(nullsNotDistinctIndex.IsUnique);
+        Assert.True(nullsNotDistinctIndex.NullsNotDistinct);
+        Assert.Equal(IndexNullSortOrder.First, nullsNotDistinctIndex.NullSortOrder);
 
         var composite = snapshot.Tables.Single(t => t.Name == "SnapshotCompositeIndexedEntity");
         var tenant = composite.Columns.Single(c => c.Name == "TenantId");
@@ -675,6 +865,42 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_ManyToManyJoinTable_IncludesReferentialActions()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotM2MPost>()
+                    .HasMany<SnapshotM2MLabel>(p => p.Labels)
+                    .WithMany(l => l.Posts)
+                    .UsingTable(
+                        "SnapshotPostLabel",
+                        new[] { "PostId" },
+                        new[] { "LabelId" },
+                        ReferentialAction.Cascade,
+                        ReferentialAction.Cascade,
+                        ReferentialAction.Restrict,
+                        ReferentialAction.NoAction)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var join = snapshot.Tables.Single(t => t.Name == "SnapshotPostLabel");
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.PrincipalTable == "SnapshotM2MPost" &&
+            fk.DependentColumns.SequenceEqual(new[] { "PostId" }) &&
+            fk.OnDelete == "CASCADE" &&
+            fk.OnUpdate == "CASCADE");
+        Assert.Contains(join.ForeignKeys, fk =>
+            fk.PrincipalTable == "SnapshotM2MLabel" &&
+            fk.DependentColumns.SequenceEqual(new[] { "LabelId" }) &&
+            fk.OnDelete == "RESTRICT" &&
+            fk.OnUpdate == "NO ACTION");
+    }
+
+    [Fact]
     public void BuildFromContext_ManyToManyJoinTable_DeduplicatesSharedTenantColumn()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -741,6 +967,19 @@ public class SchemaSnapshotTests
 
         Assert.False(Assert.Single(code.Indexes).IsIncluded);
         Assert.True(Assert.Single(displayName.Indexes).IsIncluded);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsNullsNotDistinctIndexAttribute()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotNullsNotDistinctIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotNullsNotDistinctIndexedEntity");
+        var code = table.Columns.Single(c => c.Name == "Code");
+        var index = Assert.Single(code.Indexes);
+
+        Assert.True(index.IsUnique);
+        Assert.True(index.NullsNotDistinct);
+        Assert.Equal(IndexNullSortOrder.First, index.NullSortOrder);
     }
 
     [Fact]
@@ -1217,7 +1456,8 @@ public class SchemaSnapshotTests
                 if (prop == null) continue;
                 var colType = prop.PropertyType;
                 var isCollection = typeof(System.Collections.IEnumerable).IsAssignableFrom(colType)
-                                   && colType != typeof(string);
+                                   && colType != typeof(string)
+                                   && colType != typeof(byte[]);
                 Assert.False(isCollection,
                     $"Column '{col.Name}' in table '{table.Name}' (entity {entityType.FullName}) is a collection type and should have been excluded.");
             }
@@ -1460,6 +1700,44 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void SchemaSnapshotBuilder_ReadsDecimalPrecisionFromProviderStyleColumnTypeName()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotPrecisionProviderTextEntity).Assembly);
+        var table = Assert.Single(snapshot.Tables.Where(t => t.Name == "SnapshotPrecisionProviderTextEntity"));
+
+        var spaced = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotPrecisionProviderTextEntity.SpacedAmount)));
+        var precisionOnly = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotPrecisionProviderTextEntity.PrecisionOnlyAmount)));
+        var domain = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotPrecisionProviderTextEntity.DomainAmount)));
+        var falsePositive = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotPrecisionProviderTextEntity.NotDecimal)));
+
+        Assert.Equal(19, spaced.Precision);
+        Assert.Equal(4, spaced.Scale);
+        Assert.Equal(10, precisionOnly.Precision);
+        Assert.Null(precisionOnly.Scale);
+        Assert.Equal(12, domain.Precision);
+        Assert.Equal(3, domain.Scale);
+        Assert.Null(falsePositive.Precision);
+        Assert.Null(falsePositive.Scale);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_ReadsMaxLengthFromLengthAttributes()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotLengthEntity).Assembly);
+        var table = Assert.Single(snapshot.Tables.Where(t => t.Name == "SnapshotLengthEntity"));
+
+        var name = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotLengthEntity.Name)));
+        var code = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotLengthEntity.Code)));
+        var payload = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotLengthEntity.Payload)));
+        var notes = Assert.Single(table.Columns.Where(c => c.Name == nameof(SnapshotLengthEntity.Notes)));
+
+        Assert.Equal(80, name.MaxLength);
+        Assert.Equal(40, code.MaxLength);
+        Assert.Equal(32, payload.MaxLength);
+        Assert.Null(notes.MaxLength);
+    }
+
+    [Fact]
     public void SchemaDiffer_DetectsDecimalPrecisionChange()
     {
         var oldSnapshot = new SchemaSnapshot
@@ -1494,6 +1772,46 @@ public class SchemaSnapshotTests
         var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
         var altered = Assert.Single(diff.AlteredColumns);
         Assert.Equal("Amount", altered.NewColumn.Name);
+    }
+
+    [Fact]
+    public void SchemaDiffer_DetectsAndWarnsForMaxLengthNarrowing()
+    {
+        var oldSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = "Customer",
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, MaxLength = 80, IsNullable = false }
+                    }
+                }
+            }
+        };
+        var newSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = "Customer",
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Name", ClrType = typeof(string).FullName!, MaxLength = 40, IsNullable = false }
+                    }
+                }
+            }
+        };
+
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
+        var altered = Assert.Single(diff.AlteredColumns);
+
+        Assert.Equal("Name", altered.NewColumn.Name);
+        Assert.Contains(diff.GetDestructiveChangeWarnings(), warning =>
+            warning.Contains("narrows max length from '80' to '40'", StringComparison.Ordinal));
     }
 
  // ── Read-only / init-only / computed property mapping ──────────────

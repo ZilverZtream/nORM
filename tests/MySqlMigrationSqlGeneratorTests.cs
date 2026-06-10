@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using nORM.Configuration;
 using nORM.Migration;
 using Xunit;
 
@@ -64,6 +65,36 @@ public class MySqlMigrationSqlGeneratorTests
     }
 
  // ─── NOT NULL + DefaultValue ──────────────────────────────────────
+
+    [Fact]
+    public void CreateTable_WithPostgresNullsNotDistinctIndex_Throws()
+    {
+        var value = new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true };
+        value.Indexes.Add(new ColumnIndexSchema { Name = "IX_T_Val", IsUnique = true, NullsNotDistinct = true });
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_T" },
+            value);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => Gen.GenerateSql(diff));
+        Assert.Contains("NULLS NOT DISTINCT", ex.Message);
+    }
+
+    [Fact]
+    public void CreateTable_WithExplicitNullSortOrder_Throws()
+    {
+        var value = new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true };
+        value.Indexes.Add(new ColumnIndexSchema { Name = "IX_T_Val", NullSortOrder = IndexNullSortOrder.First });
+        var table = BuildTable("T",
+            new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_T" },
+            value);
+        var diff = new SchemaDiff();
+        diff.AddedTables.Add(table);
+
+        var ex = Assert.Throws<NotSupportedException>(() => Gen.GenerateSql(diff));
+        Assert.Contains("NULLS FIRST/LAST", ex.Message);
+    }
 
     [Fact]
     public void AddColumn_NotNull_WithDefaultValue_EmitsDefault()

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -32,6 +32,7 @@ namespace nORM.Tests;
 /// AQ-6  MaxGroupJoinSize boundary: positive valid; 0 throws.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialQueryComplexityTests
 {
     [Table("AqEntity")]

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -286,6 +286,7 @@ public class GroupJoinCompiledMaterializerTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task GJC_8_ConcurrentAsyncGroupJoin_AllProduceCorrectResults()
     {
         const int concurrency = 8;
@@ -315,6 +316,7 @@ public class GroupJoinCompiledMaterializerTests
     // ══════════════════════════════════════════════════════════════════════════
 
     [Fact]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task GJC_9_ConcurrentStoreAccess_NeverReturnsPartialEntry()
     {
         const int threads = 16;

@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqliteMigrationSqlGenerator
     path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
-    startLine: 18
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -76,7 +76,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
-    startLine: 62
+    startLine: 343
   assemblies:
   - nORM
   namespace: nORM.Migration

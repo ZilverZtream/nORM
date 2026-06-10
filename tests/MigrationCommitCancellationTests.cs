@@ -22,6 +22,7 @@ namespace nORM.Tests;
 //to satisfy SQLite's internal cast of DbTransaction → SqliteTransaction.
 //</summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.MigrationParity)]
 public class MigrationCommitCancellationTests
 {
  // ── Token-observing connection + transaction + command wrappers ───────────

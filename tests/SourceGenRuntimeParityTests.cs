@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// results for the same input data, using SQLite in-memory databases.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class SourceGenRuntimeParityTests
 {
     // ── Entity ────────────────────────────────────────────────────────────────
@@ -555,6 +556,7 @@ internal static class SgEqHelpers
 /// all lock-step providers (SQLite, MySQL lock-step, PostgreSQL lock-step).
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
+[Xunit.Trait("Category", TestCategory.ProviderSourceGenParity)]
 public class SourceGenBasicEquivalenceTests
 {
     private const string Ddl =

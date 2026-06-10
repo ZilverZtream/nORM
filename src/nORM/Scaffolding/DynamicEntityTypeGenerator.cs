@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -14,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Migration;
 
 namespace nORM.Scaffolding
 {
@@ -26,10 +28,11 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, ScaffoldDecimalPrecision? DecimalPrecision);
+        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, bool? IsUnicode, bool IsFixedLength, ScaffoldDecimalPrecision? DecimalPrecision);
 
         private readonly record struct ScaffoldComputedColumn(string Sql, bool Stored);
-        private readonly record struct ScaffoldDecimalPrecision(int Precision, int Scale);
+        private readonly record struct ScaffoldDecimalPrecision(int Precision, int? Scale);
+        private readonly record struct ScaffoldColumnFacet(int? MaxLength, bool? IsUnicode, bool IsFixedLength);
 
         /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
         private const string DynamicTypeNamespace = "nORM.Dynamic";
@@ -45,6 +48,8 @@ namespace nORM.Scaffolding
         /// 16 bytes yields a 32-character hex string with negligible collision probability.
         /// </summary>
         private const int SchemaSignatureTruncationBytes = 16;
+
+        private const int MaxScaffoldedMySqlSetValueCount = 8;
 
         // Shared static AssemblyBuilder and ModuleBuilder for all generated types,
         // preventing unloadable assembly accumulation when types are evicted from cache.
@@ -81,9 +86,9 @@ namespace nORM.Scaffolding
 
             try
             {
-                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
+                var (schemaName, bareTable, columns, isReadOnlyEntity) = ResolveTableSchema(connection, tableName);
                 // Materialize columns eagerly so the reader is closed before type building begins.
-                return BuildDynamicType(schemaName, bareTable, columns);
+                return BuildDynamicType(schemaName, bareTable, columns, isReadOnlyEntity);
             }
             finally
             {
@@ -113,9 +118,9 @@ namespace nORM.Scaffolding
 
             try
             {
-                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
+                var (schemaName, bareTable, columns, isReadOnlyEntity) = ResolveTableSchema(connection, tableName);
                 // Materialize columns eagerly so the reader is closed before type building begins.
-                return BuildDynamicType(schemaName, bareTable, columns);
+                return BuildDynamicType(schemaName, bareTable, columns, isReadOnlyEntity);
             }
             finally
             {
@@ -129,7 +134,7 @@ namespace nORM.Scaffolding
         /// Each invocation generates a uniquely-named type to prevent conflicts when the same table
         /// is regenerated after a schema change.
         /// </summary>
-        private static Type BuildDynamicType(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns)
+        private static Type BuildDynamicType(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns, bool isReadOnlyEntity)
         {
             lock (_moduleBuilderLock)
             {
@@ -166,7 +171,7 @@ namespace nORM.Scaffolding
 
                 var orderedColumns = OrderDynamicColumns(columns);
 
-                if (!orderedColumns.Any(static column => column.IsKey))
+                if (isReadOnlyEntity || !orderedColumns.Any(static column => column.IsKey))
                 {
                     var readOnlyAttrCtor = typeof(ReadOnlyEntityAttribute).GetConstructor(Type.EmptyTypes)!;
                     typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(readOnlyAttrCtor, Array.Empty<object>()));
@@ -188,7 +193,7 @@ namespace nORM.Scaffolding
                             new[] { typeof(ColumnAttribute).GetProperty(nameof(ColumnAttribute.TypeName))! },
                             new object[]
                             {
-                                $"decimal({decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
+                                FormatDecimalTypeName(decimalPrecision)
                             })
                         : new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
                     propertyBuilder.SetCustomAttribute(columnAttr);
@@ -295,10 +300,10 @@ namespace nORM.Scaffolding
                 connection.Open();
             try
             {
-                var (schemaName, bareTable, columns) = ResolveTableSchema(connection, tableName);
+                var (schemaName, bareTable, columns, isReadOnlyEntity) = ResolveTableSchema(connection, tableName);
                 // Include every metadata field that changes the emitted CLR surface. Omitting one can return
                 // a stale dynamic type after a schema change even though the generated C# would differ.
-                var descriptor = BuildSchemaDescriptor(schemaName, bareTable, columns);
+                var descriptor = BuildSchemaDescriptor(schemaName, bareTable, columns, isReadOnlyEntity);
                 var hash = SHA256.HashData(Encoding.UTF8.GetBytes(descriptor));
                 return Convert.ToHexString(hash[..SchemaSignatureTruncationBytes]);
             }
@@ -309,11 +314,12 @@ namespace nORM.Scaffolding
             }
         }
 
-        private static string BuildSchemaDescriptor(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns)
+        private static string BuildSchemaDescriptor(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns, bool isReadOnlyEntity)
         {
             var sb = new StringBuilder();
             AppendDescriptorPart(sb, schemaName ?? string.Empty);
             AppendDescriptorPart(sb, tableName);
+            AppendDescriptorPart(sb, isReadOnlyEntity ? "RO" : "RW");
             foreach (var column in columns)
             {
                 AppendDescriptorPart(sb, column.ColumnName);
@@ -327,10 +333,12 @@ namespace nORM.Scaffolding
                 AppendDescriptorPart(sb, column.ComputedColumn is { } computedColumn ? computedColumn.Stored ? "STORED" : "VIRTUAL" : "-");
                 AppendDescriptorPart(sb, column.IsRowVersion ? "RV" : "NRV");
                 AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
+                AppendDescriptorPart(sb, column.IsUnicode.HasValue ? column.IsUnicode.Value ? "U" : "NU" : "-");
+                AppendDescriptorPart(sb, column.IsFixedLength ? "FIX" : "VAR");
                 AppendDescriptorPart(
                     sb,
                     column.DecimalPrecision is { } decimalPrecision
-                        ? $"{decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{decimalPrecision.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+                        ? FormatDecimalTypeName(decimalPrecision)
                         : "-");
             }
 
@@ -365,8 +373,10 @@ namespace nORM.Scaffolding
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
+            var sqlServerAliasBaseTypes = GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
             var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
             var decimalPrecisions = GetDecimalPrecisions(connection, schemaName, tableName);
+            var columnFacets = GetStringBinaryFacets(connection, schemaName, tableName);
             var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
             var columns = new List<ColumnInfo>(schema.Rows.Count);
             var sourceOrdinal = 0;
@@ -394,6 +404,7 @@ namespace nORM.Scaffolding
                 var isRowVersion = rowVersionColumns.Contains(colName);
                 var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                 sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
+                sqlServerAliasBaseTypes.TryGetValue(colName, out var sqlServerAliasBaseType);
                 var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType);
                 if (IsPostgresConnection(connection.GetType().Name)
                     && normalizedClrType == typeof(Array)
@@ -401,6 +412,11 @@ namespace nORM.Scaffolding
                     && TryMapPostgresArrayCastType(domainCastType, out var arrayClrType))
                 {
                     normalizedClrType = arrayClrType;
+                }
+                else if (IsSqlServerConnection(connection.GetType().Name)
+                         && TryMapSqlServerAliasBaseClrType(sqlServerAliasBaseType, out var aliasClrType))
+                {
+                    normalizedClrType = aliasClrType;
                 }
                 else if (IsMySqlConnection(connection.GetType().Name)
                          && mySqlUnsignedColumnTypes.TryGetValue(colName, out var unsignedColumnType)
@@ -411,13 +427,17 @@ namespace nORM.Scaffolding
 
                 var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
 
-                var maxLength = GetScaffoldMaxLength(normalizedClrType, row);
+                columnFacets.TryGetValue(colName, out var columnFacet);
+                var maxLength = GetScaffoldMaxLength(normalizedClrType, row)
+                    ?? GetSqlServerAliasBaseMaxLengthFromTypeText(sqlServerAliasBaseType);
+                if (!maxLength.HasValue && columnFacet.MaxLength.HasValue)
+                    maxLength = columnFacet.MaxLength;
                 var decimalPrecision = normalizedClrType == typeof(decimal)
                     && decimalPrecisions.TryGetValue(colName, out var precision)
                     ? precision
                     : (ScaffoldDecimalPrecision?)null;
 
-                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, computedColumn, isRowVersion, maxLength, decimalPrecision));
+                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, computedColumn, isRowVersion, maxLength, columnFacet.IsUnicode, columnFacet.IsFixedLength, decimalPrecision));
             }
 
             return columns;
@@ -456,96 +476,35 @@ namespace nORM.Scaffolding
             if (!row.Table.Columns.Contains("ColumnSize") || row["ColumnSize"] == DBNull.Value)
                 return null;
 
-            return int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0 && size < int.MaxValue
+            return int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0 && !IsUnboundedScaffoldMaxLength(size)
                 ? size
                 : null;
         }
 
+        private static bool IsUnboundedScaffoldMaxLength(int size)
+            => size == int.MaxValue
+               || size == 1073741823;
+
+        private static IReadOnlyDictionary<string, ScaffoldColumnFacet> GetStringBinaryFacets(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntitySchemaMetadataReader.GetStringBinaryFacets(connection, schemaName, tableName)
+                .ToDictionary(
+                    static pair => pair.Key,
+                    static pair => new ScaffoldColumnFacet(pair.Value.MaxLength, pair.Value.IsUnicode, pair.Value.IsFixedLength),
+                    StringComparer.OrdinalIgnoreCase);
+
         private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> GetDecimalPrecisions(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntitySchemaMetadataReader.GetDecimalPrecisions(connection, schemaName, tableName)
+                .ToDictionary(
+                    static pair => pair.Key,
+                    static pair => new ScaffoldDecimalPrecision(pair.Value.Precision, pair.Value.Scale),
+                    StringComparer.OrdinalIgnoreCase);
+
+        private static string FormatDecimalTypeName(ScaffoldDecimalPrecision decimalPrecision)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqlServerConnection(connectionName))
-            {
-                return QueryDecimalPrecisionMap(connection, """
-                    SELECT c.name AS ColumnName,
-                           CONVERT(int, c.precision) AS DecimalPrecision,
-                           CONVERT(int, c.scale) AS DecimalScale
-                    FROM sys.columns c
-                    INNER JOIN sys.tables t ON t.object_id = c.object_id
-                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
-                    INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-                    WHERE t.name = @tableName
-                      AND (@schemaName IS NULL OR s.name = @schemaName)
-                      AND ty.name IN ('decimal', 'numeric')
-                    """, schemaName, tableName);
-            }
-
-            if (IsPostgresConnection(connectionName))
-            {
-                return QueryDecimalPrecisionMap(connection, """
-                    SELECT column_name AS ColumnName,
-                           numeric_precision AS DecimalPrecision,
-                           numeric_scale AS DecimalScale
-                    FROM information_schema.columns
-                    WHERE table_name = @tableName
-                      AND (@schemaName IS NULL OR table_schema = @schemaName)
-                      AND data_type = 'numeric'
-                      AND numeric_precision IS NOT NULL
-                      AND numeric_scale IS NOT NULL
-                    """, schemaName, tableName);
-            }
-
-            if (IsMySqlConnection(connectionName))
-            {
-                return QueryDecimalPrecisionMap(connection, """
-                    SELECT column_name AS ColumnName,
-                           numeric_precision AS DecimalPrecision,
-                           numeric_scale AS DecimalScale
-                    FROM information_schema.columns
-                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
-                      AND table_name = @tableName
-                      AND data_type IN ('decimal', 'numeric')
-                      AND numeric_precision IS NOT NULL
-                      AND numeric_scale IS NOT NULL
-                    """, schemaName, tableName);
-            }
-
-            return new Dictionary<string, ScaffoldDecimalPrecision>(0, StringComparer.OrdinalIgnoreCase);
-        }
-
-        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> QueryDecimalPrecisionMap(DbConnection connection, string sql, string? schemaName, string tableName)
-        {
-            var result = new Dictionary<string, ScaffoldDecimalPrecision>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName)
-                    || reader["DecimalPrecision"] == DBNull.Value
-                    || reader["DecimalScale"] == DBNull.Value)
-                {
-                    continue;
-                }
-
-                var precision = Convert.ToInt32(reader["DecimalPrecision"], System.Globalization.CultureInfo.InvariantCulture);
-                var scale = Convert.ToInt32(reader["DecimalScale"], System.Globalization.CultureInfo.InvariantCulture);
-                if (precision > 0 && scale >= 0 && scale <= precision)
-                    result[columnName] = new ScaffoldDecimalPrecision(precision, scale);
-            }
-
-            return result;
+            var precision = decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return decimalPrecision.Scale.HasValue
+                ? $"decimal({precision},{decimalPrecision.Scale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
+                : $"decimal({precision})";
         }
 
         private static IReadOnlyDictionary<string, ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
@@ -633,525 +592,60 @@ namespace nORM.Scaffolding
         }
 
         private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
-        {
-            if (!IsSqliteConnection(connection.GetType().Name))
-                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
-
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
-                ? string.Empty
-                : EscapeIdentifier(connection, schemaName!) + ".";
-            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                if (!ReaderHasColumn(reader, "name") || !ReaderHasColumn(reader, "type"))
-                    continue;
-
-                var name = Convert.ToString(reader["name"]);
-                var type = Convert.ToString(reader["type"]);
-                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type))
-                    result[name] = type;
-            }
-
-            return result;
-        }
+            => DynamicEntitySchemaMetadataReader.GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
 
         private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
-        {
-            var connectionName = connection.GetType().Name;
-
-            if (IsSqliteConnection(connectionName))
-            {
-                var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
-                using var cmd = connection.CreateCommand();
-                var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
-                    ? string.Empty
-                    : EscapeIdentifier(connection, schemaName!) + ".";
-                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    rows.Add((
-                        Convert.ToString(reader["name"]) ?? string.Empty,
-                        Convert.ToString(reader["type"]) ?? string.Empty,
-                        ReaderHasColumn(reader, "pk")
-                            ? Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture)
-                            : 0));
-                }
-
-                var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
-                if (primaryKeyColumns.Length == 1
-                    && primaryKeyColumns[0].Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
-                {
-                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryKeyColumns[0].Name };
-                }
-
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            if (IsSqlServerConnection(connectionName))
-            {
-                return QueryColumnNameSet(connection, """
-                    SELECT c.name AS ColumnName
-                    FROM sys.identity_columns ic
-                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-                    INNER JOIN sys.tables t ON t.object_id = ic.object_id
-                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
-                    WHERE t.name = @tableName
-                      AND (@schemaName IS NULL OR s.name = @schemaName)
-                    """, schemaName, tableName);
-            }
-
-            if (IsPostgresConnection(connectionName))
-            {
-                return QueryColumnNameSet(connection, """
-                    SELECT column_name AS ColumnName
-                    FROM information_schema.columns
-                    WHERE table_name = @tableName
-                      AND (@schemaName IS NULL OR table_schema = @schemaName)
-                      AND (
-                          is_identity = 'YES'
-                          OR column_default LIKE 'nextval(%'
-                      )
-                    """, schemaName, tableName);
-            }
-
-            if (IsMySqlConnection(connectionName))
-            {
-                return QueryColumnNameSet(connection, """
-                    SELECT column_name AS ColumnName
-                    FROM information_schema.columns
-                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
-                      AND table_name = @tableName
-                      AND LOWER(extra) LIKE '%auto_increment%'
-                    """, schemaName, tableName);
-            }
-
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        }
+            => DynamicEntitySchemaMetadataReader.GetIdentityColumns(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, int> GetPrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)
-        {
-            var connectionName = connection.GetType().Name;
-
-            if (IsSqliteConnection(connectionName))
-            {
-                var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                using var cmd = connection.CreateCommand();
-                var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
-                    ? string.Empty
-                    : EscapeIdentifier(connection, schemaName!) + ".";
-                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    if (!ReaderHasColumn(reader, "name") || !ReaderHasColumn(reader, "pk"))
-                        continue;
-
-                    var ordinal = Convert.ToInt32(reader["pk"], System.Globalization.CultureInfo.InvariantCulture);
-                    var name = Convert.ToString(reader["name"]);
-                    if (ordinal > 0 && !string.IsNullOrWhiteSpace(name))
-                        result[name] = ordinal;
-                }
-
-                return result;
-            }
-
-            if (IsSqlServerConnection(connectionName))
-            {
-                return QueryColumnOrdinalMap(connection, """
-                    SELECT c.name AS ColumnName, ic.key_ordinal AS Ordinal
-                    FROM sys.tables t
-                    INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
-                    INNER JOIN sys.indexes i ON i.object_id = t.object_id AND i.is_primary_key = 1
-                    INNER JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-                    INNER JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-                    WHERE t.name = @tableName
-                      AND (@schemaName IS NULL OR s.name = @schemaName)
-                    """, schemaName, tableName);
-            }
-
-            if (IsPostgresConnection(connectionName))
-            {
-                return QueryColumnOrdinalMap(connection, """
-                    SELECT att.attname AS ColumnName, keys.ordinality AS Ordinal
-                    FROM pg_constraint con
-                    INNER JOIN pg_class cls ON cls.oid = con.conrelid
-                    INNER JOIN pg_namespace ns ON ns.oid = cls.relnamespace
-                    CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS keys(attnum, ordinality)
-                    INNER JOIN pg_attribute att ON att.attrelid = cls.oid AND att.attnum = keys.attnum
-                    WHERE con.contype = 'p'
-                      AND cls.relname = @tableName
-                      AND (@schemaName IS NULL OR ns.nspname = @schemaName)
-                    """, schemaName, tableName);
-            }
-
-            if (IsMySqlConnection(connectionName))
-            {
-                return QueryColumnOrdinalMap(connection, """
-                    SELECT column_name AS ColumnName, ordinal_position AS Ordinal
-                    FROM information_schema.key_column_usage
-                    WHERE table_schema = COALESCE(@schemaName, DATABASE())
-                      AND table_name = @tableName
-                      AND constraint_name = 'PRIMARY'
-                    """, schemaName, tableName);
-            }
-
-            return new Dictionary<string, int>(0, StringComparer.OrdinalIgnoreCase);
-        }
+            => DynamicEntitySchemaMetadataReader.GetPrimaryKeyOrdinals(connection, schemaName, tableName);
 
         private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
-        {
-            var connectionName = connection.GetType().Name;
-            if (!IsSqlServerConnection(connectionName))
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            return QueryColumnNameSet(connection, """
-                SELECT c.name AS ColumnName
-                FROM sys.columns c
-                INNER JOIN sys.tables t ON t.object_id = c.object_id
-                INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
-                INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-                WHERE t.name = @tableName
-                  AND (@schemaName IS NULL OR s.name = @schemaName)
-                  AND ty.name IN ('timestamp', 'rowversion')
-                """, schemaName, tableName);
-        }
+            => DynamicEntitySchemaMetadataReader.GetRowVersionColumns(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetPostgresDomainColumnCastTypes(DbConnection connection, string? schemaName, string tableName)
-        {
-            if (!IsPostgresConnection(connection.GetType().Name))
-                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
-
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT column_name AS ColumnName,
-                       CASE
-                           WHEN data_type = 'USER-DEFINED'
-                                AND EXISTS (
-                                    SELECT 1
-                                    FROM pg_type enum_type
-                                    INNER JOIN pg_namespace enum_ns ON enum_ns.oid = enum_type.typnamespace
-                                    WHERE enum_ns.nspname = COALESCE(udt_schema, table_schema)
-                                      AND enum_type.typname = udt_name
-                                      AND enum_type.typtype = 'e'
-                                )
-                           THEN 'text'
-                           WHEN data_type IN ('ARRAY', 'USER-DEFINED')
-                                AND udt_name IS NOT NULL
-                                AND udt_name <> ''
-                           THEN data_type || ' (' || udt_name || ')'
-                           ELSE data_type
-                       END AS DataType
-                FROM information_schema.columns
-                WHERE table_name = @tableName
-                  AND (@schemaName IS NULL OR table_schema = @schemaName)
-                  AND (
-                      domain_name IS NOT NULL
-                      OR data_type = 'USER-DEFINED'
-                  )
-                """;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName))
-                    continue;
-
-                var dataType = Convert.ToString(reader["DataType"]) ?? string.Empty;
-                result[columnName] = NormalizePostgresDomainProbeCastType(dataType);
-            }
-
-            return result;
-        }
+            => DynamicEntitySchemaMetadataReader.GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetMySqlUnsignedColumnTypes(DbConnection connection, string? schemaName, string tableName)
-        {
-            if (!IsMySqlConnection(connection.GetType().Name))
-                return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
+            => DynamicEntitySchemaMetadataReader.GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
 
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT column_name AS ColumnName, column_type AS ColumnType
-                FROM information_schema.columns
-                WHERE table_schema = COALESCE(@schemaName, DATABASE())
-                  AND table_name = @tableName
-                  AND LOWER(COALESCE(column_type, '')) LIKE '%unsigned%'
-                """;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName))
-                    continue;
+        private static IReadOnlyDictionary<string, string> GetSqlServerAliasColumnBaseTypes(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntitySchemaMetadataReader.GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
 
-                result[columnName] = Convert.ToString(reader["ColumnType"]) ?? string.Empty;
-            }
+        private static bool TryMapSqlServerAliasBaseClrType(string? typeText, out Type type)
+            => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(typeText, out type);
 
-            return result;
-        }
+        private static string NormalizeSqlServerAliasBaseTypeName(string typeText)
+            => ScaffoldProviderSpecificTypeClassifier.NormalizeSqlServerAliasBaseTypeName(typeText);
+
+        private static int? GetSqlServerAliasBaseMaxLengthFromTypeText(string? typeText)
+            => string.IsNullOrWhiteSpace(typeText)
+                ? null
+                : ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLengthFromTypeText(typeText);
 
         private static bool TryMapMySqlUnsignedType(string? detail, out Type type)
-        {
-            type = typeof(object);
-            if (string.IsNullOrWhiteSpace(detail))
-                return false;
-
-            var normalized = NormalizeMySqlUnsignedTypeDetail(detail);
-            if (!normalized.Contains("unsigned", StringComparison.Ordinal))
-                return false;
-
-            type = normalized switch
-            {
-                "tinyint unsigned" => typeof(byte),
-                "smallint unsigned" => typeof(ushort),
-                "mediumint unsigned" or "int unsigned" or "integer unsigned" => typeof(uint),
-                "bigint unsigned" => typeof(ulong),
-                _ => typeof(object)
-            };
-
-            return type != typeof(object);
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(detail, out type);
 
         private static string NormalizeMySqlUnsignedTypeDetail(string detail)
-        {
-            var normalized = detail.Trim().ToLowerInvariant();
-            var unsignedIndex = normalized.IndexOf("unsigned", StringComparison.Ordinal);
-            if (unsignedIndex < 0)
-                return normalized;
-
-            var baseType = normalized[..unsignedIndex].Trim();
-            var paren = baseType.IndexOf('(');
-            if (paren >= 0)
-                baseType = baseType[..paren].Trim();
-
-            return baseType.Length == 0 ? normalized : baseType + " unsigned";
-        }
+            => ScaffoldProviderSpecificTypeClassifier.NormalizeMySqlUnsignedTypeDetail(detail);
 
         private static string NormalizePostgresDomainProbeCastType(string typeText)
-        {
-            var normalized = typeText.Trim().ToLowerInvariant();
-            if (TryMapPostgresArrayProbeCastType(normalized, out var arrayCastType))
-                return arrayCastType;
+            => ScaffoldProviderSpecificTypeClassifier.NormalizePostgresDomainProbeCastType(typeText);
 
-            return normalized switch
-            {
-                "integer" or "int" or "int4" => "integer",
-                "bigint" or "int8" => "bigint",
-                "smallint" or "int2" => "smallint",
-                "boolean" or "bool" => "boolean",
-                "uuid" => "uuid",
-                "date" => "date",
-                "text" => "text",
-                "citext" => "citext",
-                "json" => "json",
-                "jsonb" => "jsonb",
-                "xml" => "xml",
-                "character varying" or "varchar" => "character varying",
-                "character" or "char" => "character",
-                "numeric" or "decimal" => "numeric",
-                "real" or "float4" => "real",
-                "double precision" or "float8" => "double precision",
-                "bytea" => "bytea",
-                "timestamp without time zone" or "timestamp" => "timestamp without time zone",
-                "timestamp with time zone" or "timestamptz" => "timestamp with time zone",
-                "time without time zone" or "time" => "time without time zone",
-                "time with time zone" or "timetz" => "time with time zone",
-                "interval" => "interval",
-                _ => "text"
-            };
-        }
+        private static bool TryNormalizePostgresParameterizedProbeCastType(string normalized, out string castType)
+            => ScaffoldProviderSpecificTypeClassifier.TryNormalizePostgresParameterizedProbeCastType(normalized, out castType);
+
+        private static bool TryParsePostgresTypeArguments(string normalized, string typeName, out string[] args)
+            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresTypeArguments(normalized, typeName, out args);
 
         private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
-        {
-            castType = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            if (open < 0)
-                return false;
-
-            var close = normalized.IndexOf(')', open + 1);
-            var element = (close > open
-                    ? normalized.Substring(open + 1, close - open - 1)
-                    : normalized[(open + 1)..])
-                .Trim()
-                .TrimStart('_');
-
-            castType = element switch
-            {
-                "int2" or "smallint" => "smallint[]",
-                "int4" or "integer" => "integer[]",
-                "int8" or "bigint" => "bigint[]",
-                "float4" or "real" => "real[]",
-                "float8" or "double precision" => "double precision[]",
-                "numeric" or "decimal" => "numeric[]",
-                "bool" or "boolean" => "boolean[]",
-                "uuid" => "uuid[]",
-                "text" => "text[]",
-                "varchar" or "character varying" => "character varying[]",
-                "bpchar" or "char" or "character" => "character[]",
-                "citext" => "citext[]",
-                "bytea" => "bytea[]",
-                "date" => "date[]",
-                "time" or "time without time zone" => "time without time zone[]",
-                "timetz" or "time with time zone" => "time with time zone[]",
-                "interval" => "interval[]",
-                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
-                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
-                _ => string.Empty
-            };
-
-            return castType.Length > 0;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out castType);
 
         private static bool TryMapPostgresArrayCastType(string castType, out Type arrayType)
-        {
-            arrayType = typeof(object[]);
-            var normalized = castType.Trim().ToLowerInvariant();
-            if (!normalized.EndsWith("[]", StringComparison.Ordinal))
-                return false;
-
-            var element = normalized[..^2].Trim();
-            var elementType = element switch
-            {
-                "smallint" => typeof(short),
-                "integer" => typeof(int),
-                "bigint" => typeof(long),
-                "real" => typeof(float),
-                "double precision" => typeof(double),
-                "numeric" => typeof(decimal),
-                "boolean" => typeof(bool),
-                "uuid" => typeof(Guid),
-                "text" or "character varying" or "character" or "citext" => typeof(string),
-                "bytea" => typeof(byte[]),
-                "date" => typeof(DateOnly),
-                "time without time zone" or "time with time zone" => typeof(TimeOnly),
-                "interval" => typeof(TimeSpan),
-                "timestamp without time zone" => typeof(DateTime),
-                "timestamp with time zone" => typeof(DateTimeOffset),
-                _ => null
-            };
-
-            if (elementType is null)
-                return false;
-
-            arrayType = elementType.MakeArrayType();
-            return true;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(castType.Trim().ToLowerInvariant(), out arrayType);
 
         private static IReadOnlyList<string> GetPostgresColumnNames(DbConnection connection, string? schemaName, string tableName)
-        {
-            var result = new List<string>();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                SELECT column_name AS ColumnName
-                FROM information_schema.columns
-                WHERE table_name = @tableName
-                  AND (@schemaName IS NULL OR table_schema = @schemaName)
-                ORDER BY ordinal_position
-                """;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (!string.IsNullOrWhiteSpace(columnName))
-                    result.Add(columnName);
-            }
-
-            return result;
-        }
-
-        private static IReadOnlySet<string> QueryColumnNameSet(DbConnection connection, string sql, string? schemaName, string tableName)
-        {
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (!string.IsNullOrWhiteSpace(columnName))
-                    result.Add(columnName);
-            }
-
-            return result;
-        }
-
-        private static IReadOnlyDictionary<string, int> QueryColumnOrdinalMap(DbConnection connection, string sql, string? schemaName, string tableName)
-        {
-            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            var tableParameter = cmd.CreateParameter();
-            tableParameter.ParameterName = "@tableName";
-            tableParameter.DbType = DbType.String;
-            tableParameter.Value = tableName;
-            cmd.Parameters.Add(tableParameter);
-            var schemaParameter = cmd.CreateParameter();
-            schemaParameter.ParameterName = "@schemaName";
-            schemaParameter.DbType = DbType.String;
-            schemaParameter.Value = string.IsNullOrWhiteSpace(schemaName) ? DBNull.Value : schemaName;
-            cmd.Parameters.Add(schemaParameter);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName))
-                    continue;
-
-                var ordinal = Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture);
-                if (ordinal > 0)
-                    result[columnName] = ordinal;
-            }
-
-            return result;
-        }
+            => DynamicEntitySchemaMetadataReader.GetPostgresColumnNames(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, ScaffoldComputedColumn> QueryComputedColumnMap(DbConnection connection, string sql, string? schemaName, string tableName)
         {
@@ -1534,7 +1028,7 @@ namespace nORM.Scaffolding
             return (null, identifier);
         }
 
-        private static (string? schema, string table, List<ColumnInfo> columns) ResolveTableSchema(DbConnection connection, string tableName)
+        private static (string? schema, string table, List<ColumnInfo> columns, bool isReadOnlyEntity) ResolveTableSchema(DbConnection connection, string tableName)
         {
             if (tableName.Contains('.', StringComparison.Ordinal))
             {
@@ -1550,10 +1044,10 @@ namespace nORM.Scaffolding
                 }
 
                 if (exactFound)
-                    return (null, tableName, exactColumns);
+                    return (null, tableName, exactColumns, IsReadOnlyDynamicObject(connection, null, tableName));
 
                 if (schemaFound)
-                    return (schemaName, bareTable, schemaColumns);
+                    return (schemaName, bareTable, schemaColumns, IsReadOnlyDynamicObject(connection, schemaName, bareTable));
             }
 
             var (fallbackSchemaName, fallbackBareTable) = SplitSchema(tableName);
@@ -1561,7 +1055,62 @@ namespace nORM.Scaffolding
                 fallbackSchemaName = ResolveUniqueUnqualifiedSchema(connection, fallbackBareTable);
 
             var columns = GetTableSchema(connection, fallbackSchemaName, fallbackBareTable).ToList();
-            return (fallbackSchemaName, fallbackBareTable, columns);
+            return (fallbackSchemaName, fallbackBareTable, columns, IsReadOnlyDynamicObject(connection, fallbackSchemaName, fallbackBareTable));
+        }
+
+        private static bool IsReadOnlyDynamicObject(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.IsReadOnlyDynamicObject(connection, schemaName, tableName);
+
+        private static bool IsDynamicQueryObject(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.IsDynamicQueryObject(connection, schemaName, tableName);
+
+        private static bool IsProviderOwnedSynonym(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.IsProviderOwnedSynonym(connection, schemaName, tableName);
+
+        private static bool IsProviderNativeTemporalTable(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.IsProviderNativeTemporalTable(connection, schemaName, tableName);
+
+        private static bool HasProviderOwnedTriggers(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.HasProviderOwnedTriggers(connection, schemaName, tableName);
+
+        private static bool HasUnmodeledDefaults(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.HasUnmodeledDefaults(connection, schemaName, tableName);
+
+        private static bool HasUnmodeledDefaultSql(string? raw)
+            => !string.IsNullOrWhiteSpace(raw)
+               && !TryNormalizeDynamicDefaultSql(raw, out _);
+
+        private static bool TryNormalizeDynamicDefaultSql(string? raw, out string defaultValueSql)
+            => DynamicEntityReadOnlyClassifier.TryNormalizeDynamicDefaultSql(raw, out defaultValueSql);
+
+        private static bool HasWriteBlockingProviderSpecificColumns(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.HasWriteBlockingProviderSpecificColumns(connection, schemaName, tableName);
+
+        private static bool HasWriteBlockingMySqlSetColumns(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntityReadOnlyClassifier.HasWriteBlockingMySqlSetColumns(connection, schemaName, tableName);
+
+        private static bool TryParseBoundedMySqlSetValues(string? detail, out string[] values)
+            => ScaffoldProviderSpecificTypeClassifier.TryParseBoundedMySqlSetValues(detail, out values);
+
+        private static bool TryParseMySqlQuotedTypeValues(string? detail, string typeName, out string[] values)
+            => ScaffoldProviderSpecificTypeClassifier.TryParseMySqlQuotedTypeValues(detail, typeName, out values);
+
+        private static bool IsWriteBlockingSqliteDeclaredType(string? declaredType)
+            => DynamicEntityReadOnlyClassifier.IsWriteBlockingSqliteDeclaredType(declaredType);
+
+        private static bool IsUnsafeSqliteProviderSpecificDeclaredType(string normalizedDeclaredType)
+            => DynamicEntityReadOnlyClassifier.IsUnsafeSqliteProviderSpecificDeclaredType(normalizedDeclaredType);
+
+        private static bool ContainsSqliteDeclaredTypeToken(string normalizedDeclaredType, string token)
+            => DynamicEntityReadOnlyClassifier.ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, token);
+
+        private static void AddStringParameter(DbCommand command, string name, string? value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = DbType.String;
+            parameter.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
+            command.Parameters.Add(parameter);
         }
 
         private static string? ResolveUniqueUnqualifiedSchema(DbConnection connection, string tableName)
@@ -1781,27 +1330,17 @@ namespace nORM.Scaffolding
                && !IsSqliteConnection(connectionName);
 
         private static bool IsSqliteUuidDeclaredType(string? declaredType)
-            => !string.IsNullOrWhiteSpace(declaredType)
-               && declaredType.Trim().ToUpperInvariant().Contains("UUID", StringComparison.Ordinal);
+        {
+            if (string.IsNullOrWhiteSpace(declaredType))
+                return false;
+
+            var normalized = declaredType.Trim().ToUpperInvariant();
+            return !IsUnsafeSqliteProviderSpecificDeclaredType(normalized)
+                   && ContainsSqliteDeclaredTypeToken(normalized, "UUID");
+        }
 
         private static string ToPascalCase(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return name;
-
-            var sb = new StringBuilder(name.Length);
-            var segmentStart = 0;
-            for (var i = 0; i <= name.Length; i++)
-            {
-                if (i < name.Length && char.IsLetterOrDigit(name[i]))
-                    continue;
-
-                AppendPascalSegment(sb, name.AsSpan(segmentStart, i - segmentStart));
-                segmentStart = i + 1;
-            }
-
-            return sb.ToString();
-        }
+            => ScaffoldNameHelper.ToPascalCase(name);
 
         private static string MakeUnique(string baseName, HashSet<string> existingNames)
         {
@@ -1824,99 +1363,7 @@ namespace nORM.Scaffolding
                 .Select(member => member.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        private static void AppendPascalSegment(StringBuilder sb, ReadOnlySpan<char> segment)
-        {
-            if (segment.IsEmpty)
-                return;
-
-            var hasLower = false;
-            for (var i = 0; i < segment.Length; i++)
-            {
-                if (char.IsLower(segment[i]))
-                {
-                    hasLower = true;
-                    break;
-                }
-            }
-
-            sb.Append(char.ToUpperInvariant(segment[0]));
-            for (var i = 1; i < segment.Length; i++)
-            {
-                sb.Append(hasLower ? segment[i] : char.ToLowerInvariant(segment[i]));
-            }
-        }
-
-        /// <summary>
-        /// Escapes a candidate C# identifier so it is valid syntax. Reserved keywords and common
-        /// contextual keywords are prefixed with <c>@</c>; other invalid characters are replaced
-        /// with underscores.
-        /// </summary>
         private static string EscapeCSharpIdentifier(string identifier)
-        {
-            if (string.IsNullOrWhiteSpace(identifier)) return "_";
-
-            if (identifier[0] == '@' && IsValidEscapedCSharpIdentifier(identifier))
-                return identifier;
-
-            var sb = new StringBuilder(identifier.Length + 1);
-            for (var i = 0; i < identifier.Length; i++)
-            {
-                var ch = identifier[i];
-                var valid = i == 0
-                    ? char.IsLetter(ch) || ch == '_'
-                    : char.IsLetterOrDigit(ch) || ch == '_';
-
-                if (valid)
-                    sb.Append(ch);
-                else if (i == 0 && char.IsDigit(ch))
-                    sb.Append('_').Append(ch);
-                else
-                    sb.Append('_');
-            }
-
-            if (sb.Length == 0)
-                sb.Append('_');
-
-            var escaped = sb.ToString();
-            return _csharpKeywords.Contains(escaped) ? "@" + escaped : escaped;
-        }
-
-        private static bool IsValidEscapedCSharpIdentifier(string identifier)
-        {
-            if (identifier.Length == 1)
-                return false;
-
-            var first = identifier[1];
-            if (!(char.IsLetter(first) || first == '_'))
-                return false;
-
-            for (var i = 2; i < identifier.Length; i++)
-            {
-                var ch = identifier[i];
-                if (!(char.IsLetterOrDigit(ch) || ch == '_'))
-                    return false;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Set of C# reserved keywords and common contextual keywords that require escaping
-        /// with the <c>@</c> verbatim prefix when used as identifiers.
-        /// </summary>
-        private static readonly HashSet<string> _csharpKeywords = new(StringComparer.Ordinal)
-        {
-            // Reserved keywords
-            "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const",
-            "continue","decimal","default","delegate","do","double","else","enum","event","explicit","extern",
-            "false","finally","fixed","float","for","foreach","goto","if","implicit","in","int","interface",
-            "internal","is","lock","long","namespace","new","null","object","operator","out","override","params",
-            "private","protected","public","readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc",
-            "static","string","struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked",
-            "unsafe","ushort","using","virtual","void","volatile","while",
-            // Contextual keywords commonly used as identifiers in database column names
-            "record","partial","var","dynamic","async","await","nameof","when","and","or","not","with",
-            "init","required","file","scoped","global","managed","unmanaged","nint","nuint","value","yield"
-        };
+            => ScaffoldNameHelper.EscapeCSharpIdentifier(identifier);
     }
 }

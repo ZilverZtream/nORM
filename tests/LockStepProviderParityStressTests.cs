@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -38,6 +38,8 @@ namespace nORM.Tests;
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.ProviderParity)]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class LockStepProviderParityStressTests
 {
     // ── Entities ─────────────────────────────────────────────────────────────
@@ -1322,6 +1324,7 @@ public class ProviderFuzzTranslationTests
 /// and compiled query tenant isolation.
 /// </summary>
 [Xunit.Trait("Category", "Stress")]
+[Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
 public class AdversarialMultiTenantTests
 {
     private const string TenantDdl =
