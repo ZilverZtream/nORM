@@ -91,6 +91,7 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityReadOnlyClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityWriteBlockingClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityProviderTypeMetadataReader.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataQuery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"));
