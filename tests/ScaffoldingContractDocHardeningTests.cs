@@ -338,7 +338,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("nullable and non-null alternate-key FK relationships", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK delete/update referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("RESTRICT and SET DEFAULT referential actions where providers expose them", doc, StringComparison.Ordinal);
-        Assert.Contains("safe defaults, table CHECK constraints", doc, StringComparison.Ordinal);
+        Assert.Contains("safe string/binary defaults, table CHECK constraints", doc, StringComparison.Ordinal);
         Assert.Contains("computed/generated columns", doc, StringComparison.Ordinal);
         Assert.Contains("provider-native table/column comments", doc, StringComparison.Ordinal);
         Assert.Contains("explicit SQL Server/PostgreSQL primary-key constraint names", doc, StringComparison.Ordinal);

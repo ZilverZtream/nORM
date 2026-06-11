@@ -56,10 +56,12 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             var warningJsonPath = Path.Combine(output, "nORM.ScaffoldWarnings.json");
 
             Assert.Contains("public string Name { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+            Assert.Contains("public byte[] Payload { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode, StringComparison.Ordinal);
             Assert.Contains("NameLength { get; set; }", entityCode, StringComparison.Ordinal);
             Assert.DoesNotContain("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
             Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+            Assert.Contains($".Entity<{tableName}>().Property(e => e.Payload).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
             if (kind == ProviderKind.Postgres)
                 Assert.Contains($".Entity<{tableName}>().Property(e => e.CreatedAt).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
             Assert.Contains($".Entity<{tableName}>().HasCheckConstraint(\"{checkName}", contextCode, StringComparison.Ordinal);

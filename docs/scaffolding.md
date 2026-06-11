@@ -862,7 +862,7 @@ must be reviewed and edited like handwritten model code.
   unique index, navigation attributes, and generated fluent FK mapping, and
   preserves non-default FK delete/update referential actions, including
   RESTRICT and SET DEFAULT referential actions where providers expose them. It also
-  proves safe defaults, table CHECK constraints, computed/generated columns,
+  proves safe string/binary defaults, table CHECK constraints, computed/generated columns,
   column collations, provider-native table/column comments,
   explicit SQL Server/PostgreSQL primary-key constraint names,
   SQL Server/PostgreSQL/MySQL routine comments,
