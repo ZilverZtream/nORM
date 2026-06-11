@@ -60,6 +60,9 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldProviderSpecificTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Arrays.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Domains.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Enums.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerAliasTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlStringLiteralParser.cs"));

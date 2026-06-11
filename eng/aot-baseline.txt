@@ -302,5 +302,5 @@ src/nORM/Scaffolding/DynamicEntityTypeBuilder.cs:36:IL3050
 src/nORM/Scaffolding/ScaffoldContextWriter.Shell.cs:109:IL2026
 src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:55:IL2026
 src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:55:IL3050
-src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.cs:347:IL3050
-src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.cs:384:IL3050
+src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:105:IL3050
+src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:142:IL3050
