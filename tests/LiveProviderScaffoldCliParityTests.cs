@@ -7397,6 +7397,7 @@ public sealed class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.Sqlite)]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
     public void Dotnet_norm_scaffold_emits_provider_query_artifacts_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
@@ -10494,8 +10495,13 @@ public sealed class LiveProviderScaffoldCliParityTests
                     $"COMMENT ON COLUMN {matView}.{name} IS {SqlLiteral("Name <view> & details")}");
                 break;
             }
+            case ProviderKind.MySql:
+                Execute(connection,
+                    $"CREATE TABLE {provider.Escape(baseName)} ({id} int NOT NULL PRIMARY KEY, {name} varchar(80) NOT NULL)",
+                    $"CREATE VIEW {provider.Escape(artifactName)} AS SELECT {id}, {name} FROM {provider.Escape(baseName)}");
+                break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Provider query artifact CLI test targets SQLite, SQL Server, and PostgreSQL.");
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Provider query artifact CLI test targets SQLite, SQL Server, PostgreSQL, and MySQL.");
         }
     }
 
@@ -10521,8 +10527,13 @@ public sealed class LiveProviderScaffoldCliParityTests
                     $"DROP MATERIALIZED VIEW IF EXISTS {Qualified(provider, "public", artifactName)}",
                     DropTable(kind, "public." + baseName, Qualified(provider, "public", baseName)));
                 break;
+            case ProviderKind.MySql:
+                Execute(connection,
+                    DropView(kind, artifactName, provider.Escape(artifactName)),
+                    DropTable(kind, baseName, provider.Escape(baseName)));
+                break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Provider query artifact CLI test targets SQLite, SQL Server, and PostgreSQL.");
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Provider query artifact CLI test targets SQLite, SQL Server, PostgreSQL, and MySQL.");
         }
     }
 

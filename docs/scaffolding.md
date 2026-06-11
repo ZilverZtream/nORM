@@ -856,8 +856,8 @@ must be reviewed and edited like handwritten model code.
   verifies ordinary views are emitted with discovered tables as read-only query
   artifacts across all four live providers. Provider query-artifact opt-in is
   also verified through the real CLI with `--emit-query-artifacts` for SQLite
-  virtual tables, SQL Server local table synonyms, and PostgreSQL materialized
-  views. The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
+  virtual tables, SQL Server local table synonyms, PostgreSQL materialized
+  views, and MySQL views. The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
   unique index, navigation attributes, and generated fluent FK mapping, and
   preserves non-default FK delete/update referential actions, including
   RESTRICT and SET DEFAULT referential actions where providers expose them. It also
