@@ -296,7 +296,7 @@ src/nORM/Query/SelectClauseVisitor.cs:784:IL3050
 src/nORM/Query/SelectClauseVisitor.cs:810:IL2026
 src/nORM/Query/SelectClauseVisitor.cs:810:IL3050
 src/nORM/Scaffolding/DatabaseScaffolder.SchemaMaps.cs:58:IL2026
-src/nORM/Scaffolding/DynamicEntityTableSchemaReader.cs:194:IL3050
+src/nORM/Scaffolding/DynamicEntityTableSchemaReader.ProviderTypes.cs:16:IL3050
 src/nORM/Scaffolding/DynamicEntityTypeBuilder.cs:147:IL2026
 src/nORM/Scaffolding/DynamicEntityTypeBuilder.cs:36:IL3050
 src/nORM/Scaffolding/ScaffoldContextWriter.Shell.cs:109:IL2026
