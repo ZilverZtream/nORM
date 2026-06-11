@@ -1,21 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
-using System.Globalization;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using nORM.Configuration;
-using nORM.Core;
-using nORM.Migration;
 
 namespace nORM.Scaffolding
 {
@@ -28,20 +21,11 @@ namespace nORM.Scaffolding
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
     public class DynamicEntityTypeGenerator
     {
-        private sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, bool? IsUnicode, bool IsFixedLength, ScaffoldDecimalPrecision? DecimalPrecision);
+        internal sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, bool? IsUnicode, bool IsFixedLength, ScaffoldDecimalPrecision? DecimalPrecision);
 
-        private readonly record struct ScaffoldComputedColumn(string Sql, bool Stored);
-        private readonly record struct ScaffoldDecimalPrecision(int Precision, int? Scale);
-        private readonly record struct ScaffoldColumnFacet(int? MaxLength, bool? IsUnicode, bool IsFixedLength);
-
-        /// <summary>Namespace prefix used for all dynamically generated entity types.</summary>
-        private const string DynamicTypeNamespace = "nORM.Dynamic";
-
-        /// <summary>Name of the shared dynamic assembly that hosts all generated entity types.</summary>
-        private const string DynamicAssemblyName = "nORM.Dynamic.Entities";
-
-        /// <summary>Name of the dynamic module within the shared assembly.</summary>
-        private const string DynamicModuleName = "MainModule";
+        internal readonly record struct ScaffoldComputedColumn(string Sql, bool Stored);
+        internal readonly record struct ScaffoldDecimalPrecision(int Precision, int? Scale);
+        internal readonly record struct ScaffoldColumnFacet(int? MaxLength, bool? IsUnicode, bool IsFixedLength);
 
         /// <summary>
         /// Number of leading bytes from the SHA-256 hash used as the schema signature.
@@ -50,20 +34,6 @@ namespace nORM.Scaffolding
         private const int SchemaSignatureTruncationBytes = 16;
 
         private const int MaxScaffoldedMySqlSetValueCount = 8;
-
-        // Shared static AssemblyBuilder and ModuleBuilder for all generated types,
-        // preventing unloadable assembly accumulation when types are evicted from cache.
-        private static readonly AssemblyBuilder _sharedAssembly;
-        private static readonly ModuleBuilder _sharedModule;
-        private static readonly object _moduleBuilderLock = new();
-        private static long _typeCounter;
-
-        static DynamicEntityTypeGenerator()
-        {
-            var assemblyName = new AssemblyName(DynamicAssemblyName);
-            _sharedAssembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-            _sharedModule = _sharedAssembly.DefineDynamicModule(DynamicModuleName);
-        }
 
         /// <summary>
         /// Generates a CLR type representing the specified table asynchronously.
@@ -135,147 +105,7 @@ namespace nORM.Scaffolding
         /// is regenerated after a schema change.
         /// </summary>
         private static Type BuildDynamicType(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns, bool isReadOnlyEntity)
-        {
-            lock (_moduleBuilderLock)
-            {
-                var className = EscapeCSharpIdentifier(ToPascalCase(tableName));
-
-                // Generate unique type name to avoid conflicts when same table is regenerated
-                var typeId = Interlocked.Increment(ref _typeCounter);
-                var uniqueTypeName = $"{DynamicTypeNamespace}.{className}_{typeId}";
-
-                // Create type using shared module
-                var typeBuilder = _sharedModule.DefineType(
-                    uniqueTypeName,
-                    TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
-                    typeof(object));
-
-                // Add parameterless constructor
-                typeBuilder.DefineDefaultConstructor(
-                    MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
-
-                var tableAttrCtor = typeof(TableAttribute).GetConstructor(new[] { typeof(string) })!;
-                if (schemaName is null)
-                {
-                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(tableAttrCtor, new object[] { tableName }));
-                }
-                else
-                {
-                    var schemaProperty = typeof(TableAttribute).GetProperty(nameof(TableAttribute.Schema))!;
-                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(
-                        tableAttrCtor,
-                        new object[] { tableName },
-                        new[] { schemaProperty },
-                        new object[] { schemaName }));
-                }
-
-                var orderedColumns = OrderDynamicColumns(columns);
-
-                if (isReadOnlyEntity || !orderedColumns.Any(static column => column.IsKey))
-                {
-                    var readOnlyAttrCtor = typeof(ReadOnlyEntityAttribute).GetConstructor(Type.EmptyTypes)!;
-                    typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(readOnlyAttrCtor, Array.Empty<object>()));
-                }
-
-                // Add properties for each column
-                foreach (var col in orderedColumns)
-                {
-                    var propertyType = col.PropertyType;
-                    var fieldBuilder = typeBuilder.DefineField($"_{col.PropertyName}", propertyType, FieldAttributes.Private);
-                    var propertyBuilder = typeBuilder.DefineProperty(col.PropertyName, PropertyAttributes.HasDefault, propertyType, null);
-
-                    // Add [Column] attribute mapping to the original database column name
-                    var columnAttrCtor = typeof(ColumnAttribute).GetConstructor(new[] { typeof(string) })!;
-                    var columnAttr = col.DecimalPrecision is { } decimalPrecision
-                        ? new CustomAttributeBuilder(
-                            columnAttrCtor,
-                            new object[] { col.ColumnName },
-                            new[] { typeof(ColumnAttribute).GetProperty(nameof(ColumnAttribute.TypeName))! },
-                            new object[]
-                            {
-                                FormatDecimalTypeName(decimalPrecision)
-                            })
-                        : new CustomAttributeBuilder(columnAttrCtor, new object[] { col.ColumnName });
-                    propertyBuilder.SetCustomAttribute(columnAttr);
-
-                    // Add [Key] attribute for primary key columns
-                    if (col.IsKey)
-                    {
-                        var keyAttrCtor = typeof(KeyAttribute).GetConstructor(Type.EmptyTypes)!;
-                        var keyAttr = new CustomAttributeBuilder(keyAttrCtor, Array.Empty<object>());
-                        propertyBuilder.SetCustomAttribute(keyAttr);
-                    }
-
-                    if (col.IsRowVersion)
-                    {
-                        var timestampAttrCtor = typeof(TimestampAttribute).GetConstructor(Type.EmptyTypes)!;
-                        var timestampAttr = new CustomAttributeBuilder(timestampAttrCtor, Array.Empty<object>());
-                        propertyBuilder.SetCustomAttribute(timestampAttr);
-                    }
-
-                    // Add database-generated attribute for identity/computed/rowversion columns.
-                    if (col.IsAuto || col.IsComputed || col.IsRowVersion)
-                    {
-                        var dbGenAttrCtor = typeof(DatabaseGeneratedAttribute).GetConstructor(new[] { typeof(DatabaseGeneratedOption) })!;
-                        var option = col.IsAuto ? DatabaseGeneratedOption.Identity : DatabaseGeneratedOption.Computed;
-                        var dbGenAttr = new CustomAttributeBuilder(dbGenAttrCtor, new object[] { option });
-                        propertyBuilder.SetCustomAttribute(dbGenAttr);
-                    }
-
-                    // Add [MaxLength] attribute for string columns with a known size
-                    if (col.MaxLength.HasValue)
-                    {
-                        var maxLenAttrCtor = typeof(MaxLengthAttribute).GetConstructor(new[] { typeof(int) })!;
-                        var maxLenAttr = new CustomAttributeBuilder(maxLenAttrCtor, new object[] { col.MaxLength.Value });
-                        propertyBuilder.SetCustomAttribute(maxLenAttr);
-                    }
-
-                    if (!propertyType.IsValueType && !col.AllowsNull)
-                    {
-                        var requiredAttrCtor = typeof(RequiredAttribute).GetConstructor(Type.EmptyTypes)!;
-                        var requiredAttr = new CustomAttributeBuilder(requiredAttrCtor, Array.Empty<object>());
-                        propertyBuilder.SetCustomAttribute(requiredAttr);
-                    }
-
-                    // Define getter
-                    var getMethod = typeBuilder.DefineMethod(
-                        $"get_{col.PropertyName}",
-                        MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
-                        propertyType,
-                        Type.EmptyTypes);
-
-                    var getIl = getMethod.GetILGenerator();
-                    getIl.Emit(OpCodes.Ldarg_0);
-                    getIl.Emit(OpCodes.Ldfld, fieldBuilder);
-                    getIl.Emit(OpCodes.Ret);
-
-                    // Define setter
-                    var setMethod = typeBuilder.DefineMethod(
-                        $"set_{col.PropertyName}",
-                        MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
-                        null,
-                        new[] { propertyType });
-
-                    var setIl = setMethod.GetILGenerator();
-                    setIl.Emit(OpCodes.Ldarg_0);
-                    setIl.Emit(OpCodes.Ldarg_1);
-                    setIl.Emit(OpCodes.Stfld, fieldBuilder);
-                    setIl.Emit(OpCodes.Ret);
-
-                    propertyBuilder.SetGetMethod(getMethod);
-                    propertyBuilder.SetSetMethod(setMethod);
-                }
-
-                return typeBuilder.CreateType()!;
-            }
-        }
-
-        private static IReadOnlyList<ColumnInfo> OrderDynamicColumns(IReadOnlyList<ColumnInfo> columns)
-            => columns
-                .OrderBy(static column => column.IsKey ? 0 : 1)
-                .ThenBy(static column => column.IsKey ? column.KeyOrdinal : int.MaxValue)
-                .ThenBy(static column => column.SourceOrdinal)
-                .ToArray();
+            => DynamicEntityTypeBuilder.BuildType(schemaName, tableName, columns, isReadOnlyEntity);
 
         /// <summary>
         /// Computes a stable hash string that represents the schema of the specified table.
