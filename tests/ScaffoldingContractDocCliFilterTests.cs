@@ -25,7 +25,10 @@ public partial class ScaffoldingContractDocTests
         var scaffolderSource = string.Concat(
             ReadDatabaseScaffolderSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
-        var tableFilterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs");
+        var tableFilterSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"));
         var contextWriterSource = ReadContextWriterSource();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
