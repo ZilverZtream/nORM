@@ -74,7 +74,8 @@ public class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityReadOnlyClassifier.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"));
 
     [Fact]
     public void Doc_describes_bounded_v1_contract()
