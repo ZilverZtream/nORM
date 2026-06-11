@@ -67,6 +67,13 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerAliasTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlStringLiteralParser.cs"));
 
+    private static string ReadSqlMetadataParserSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Indexes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Expressions.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Types.cs"));
+
     private static string ReadPostgresUnsupportedFeatureSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs"),
@@ -308,7 +315,7 @@ public partial class ScaffoldingContractDocTests
         var columnDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.cs");
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
         var parserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.cs");
-        var sqlMetadataParserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.cs");
+        var sqlMetadataParserSource = ReadSqlMetadataParserSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
         Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
