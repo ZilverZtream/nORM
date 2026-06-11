@@ -288,9 +288,10 @@ comparison/order semantics survive the scaffold into migration snapshots.
 SQL Server `IDENTITY(seed, increment)` metadata is emitted with
 `HasIdentityOptions(...)` and preserved in SQL Server migration create/rebuild
 DDL.
-SQLite/PostgreSQL expression indexes are emitted with `HasExpressionIndex`;
-SQL Server/MySQL expression-index shapes are kept on the safer generated-column
-path.
+SQLite expression indexes, ordinary PostgreSQL B-tree expression indexes, and
+MySQL expression indexes exposed by `SHOW INDEX` are emitted with
+`HasExpressionIndex`; SQL Server expression-index shapes stay on the safer
+generated-column path.
 Opt-in routine stubs include SQL Server scalar/table-valued functions plus
 PostgreSQL and MySQL functions as provider-bound `SELECT` wrappers instead of
 stored-procedure calls. Stored-procedure stubs include buffered and streaming

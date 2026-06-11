@@ -238,8 +238,9 @@ Computed/generated column expressions are emitted as provider-bound fluent
 migration metadata with `HasComputedColumnSql`.
 Column collations are emitted as provider-bound fluent migration metadata with
 `HasCollation`.
-SQLite/PostgreSQL expression indexes are emitted as provider-bound fluent
-migration metadata with `HasExpressionIndex`.
+SQLite expression indexes, ordinary PostgreSQL B-tree expression indexes, and
+MySQL expression indexes exposed by `SHOW INDEX` are emitted as provider-bound
+fluent migration metadata with `HasExpressionIndex`.
 SQLite `UUID` declared columns scaffold as `Guid`; declared `JSON` and `XML`
 columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `citext`/`json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as

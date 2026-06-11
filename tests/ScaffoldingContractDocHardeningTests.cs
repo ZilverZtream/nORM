@@ -57,6 +57,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL domains over safe scalar/array/enum base types remain diagnostics", cliReadme, StringComparison.Ordinal);
         Assert.Contains("SQL Server alias types over scaffoldable scalar/binary bases remain diagnostics", rootReadme, StringComparison.Ordinal);
         Assert.Contains("SQL Server alias types over scaffoldable scalar/binary bases remain diagnostics", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("MySQL expression indexes exposed by `SHOW INDEX` are emitted", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("MySQL expression indexes exposed by `SHOW INDEX` are emitted", cliReadme, StringComparison.Ordinal);
+        Assert.DoesNotContain("SQL Server/MySQL expression-index shapes are kept", rootReadme, StringComparison.Ordinal);
         Assert.Contains("TryMapSqlServerAliasBaseClrType", providerTypeClassifierSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeSqlServerAliasBaseTypeName", providerTypeClassifierSource, StringComparison.Ordinal);
         Assert.Contains("GetSqlServerAliasBaseMaxLength", providerTypeClassifierSource, StringComparison.Ordinal);
