@@ -1021,6 +1021,7 @@ public sealed class LiveProviderScaffoldingParityTests
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -4781,14 +4782,33 @@ public sealed class LiveProviderScaffoldingParityTests
     {
         await TeardownSchemaQualifiedManyToManyAsync(connection, provider, kind);
 
-        if (kind == ProviderKind.SqlServer)
+        if (kind == ProviderKind.Sqlite)
+        {
+            try
+            {
+                await ExecuteAsync(connection, $"DETACH DATABASE {provider.Escape(SchemaName)}");
+            }
+            catch
+            {
+                // Attachment may not exist before setup.
+            }
+
+            await ExecuteAsync(connection, $"ATTACH DATABASE ':memory:' AS {provider.Escape(SchemaName)}");
+        }
+        else if (kind == ProviderKind.SqlServer)
+        {
             await ExecuteAsync(connection, $"IF SCHEMA_ID(N'{SchemaName}') IS NULL EXEC(N'CREATE SCHEMA {provider.Escape(SchemaName)}')");
+        }
         else
+        {
             await ExecuteAsync(connection, $"CREATE SCHEMA IF NOT EXISTS {provider.Escape(SchemaName)}");
+        }
 
         var author = Qualified(provider, SchemaName, SchemaAuthorTable);
         var book = Qualified(provider, SchemaName, SchemaBookTable);
         var join = Qualified(provider, SchemaName, SchemaAuthorBookTable);
+        var fkAuthor = kind == ProviderKind.Sqlite ? provider.Escape(SchemaAuthorTable) : author;
+        var fkBook = kind == ProviderKind.Sqlite ? provider.Escape(SchemaBookTable) : book;
         var id = provider.Escape("Id");
         var name = provider.Escape("Name");
         var title = provider.Escape("Title");
@@ -4801,8 +4821,8 @@ public sealed class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
         await ExecuteAsync(connection,
             $"CREATE TABLE {join} ({authorId} {IntType(kind)} NOT NULL, {bookId} {IntType(kind)} NOT NULL, PRIMARY KEY ({authorId}, {bookId}), " +
-            $"CONSTRAINT {provider.Escape(SchemaAuthorBookAuthorFkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}), " +
-            $"CONSTRAINT {provider.Escape(SchemaAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
+            $"CONSTRAINT {provider.Escape(SchemaAuthorBookAuthorFkName)} FOREIGN KEY ({authorId}) REFERENCES {fkAuthor} ({id}), " +
+            $"CONSTRAINT {provider.Escape(SchemaAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {fkBook} ({id}))");
     }
 
     private static async Task SetupCompositeUniqueAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
@@ -5906,7 +5926,9 @@ public sealed class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaAuthorBookTable, Qualified(provider, SchemaName, SchemaAuthorBookTable)));
             await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaBookTable, Qualified(provider, SchemaName, SchemaBookTable)));
             await ExecuteAsync(connection, DropTable(kind, SchemaName + "." + SchemaAuthorTable, Qualified(provider, SchemaName, SchemaAuthorTable)));
-            if (kind == ProviderKind.SqlServer)
+            if (kind == ProviderKind.Sqlite)
+                await ExecuteAsync(connection, $"DETACH DATABASE {provider.Escape(SchemaName)}");
+            else if (kind == ProviderKind.SqlServer)
                 await ExecuteAsync(connection, $"IF SCHEMA_ID(N'{SchemaName}') IS NOT NULL DROP SCHEMA {provider.Escape(SchemaName)}");
             else
                 await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS {provider.Escape(SchemaName)}");
