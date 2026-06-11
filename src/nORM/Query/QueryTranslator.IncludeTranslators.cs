@@ -1,0 +1,217 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using nORM.Configuration;
+using nORM.Core;
+using nORM.Mapping;
+
+namespace nORM.Query
+{
+    internal sealed partial class QueryTranslator
+    {
+        private sealed class IncludeTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Processes an <c>Include</c> call, registering the requested navigation path for eager loading.
+            /// </summary>
+            /// <param name="t">The current translator.</param>
+            /// <param name="node">The method call expression for <c>Include</c>.</param>
+            /// <returns>The translated source expression.</returns>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                // Support both instance calls (source.Include(lambda)) and
+                // static/extension calls (Include(source, lambda)).
+                Expression source;
+                Expression? rawLambda;
+                if (node.Object != null)
+                {
+                    source = node.Object;
+                    rawLambda = node.Arguments.Count > 0 ? node.Arguments[0] : null;
+                }
+                else
+                {
+                    source = node.Arguments[0];
+                    rawLambda = node.Arguments.Count > 1 ? node.Arguments[1] : null;
+                }
+
+                // Visit source FIRST to establish _mapping before the Relations lookup.
+                var visited = t.Visit(source);
+
+                if (rawLambda != null)
+                {
+                    var includeLambda = rawLambda is UnaryExpression qu ? qu.Operand as LambdaExpression : rawLambda as LambdaExpression;
+                    if (includeLambda != null)
+                    {
+                        var member = includeLambda.Body is UnaryExpression unary ?
+                                     (MemberExpression)unary.Operand :
+                                     (MemberExpression)includeLambda.Body;
+                        var propName = member.Member.Name;
+                        if (t._mapping != null && t._mapping.Relations.TryGetValue(propName, out var relation))
+                        {
+                            t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
+                            t.TrackMapping(relation.DependentType);
+                        }
+                        else if (t._mapping != null)
+                        {
+                            // Check if this is a many-to-many navigation property
+                            var jtm = t._mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == propName);
+                            if (jtm != null)
+                            {
+                                t._m2mIncludes.Add(new M2MIncludePlan(jtm));
+                                t.TrackMapping(jtm.RightType);
+                            }
+                        }
+                    }
+                }
+                return visited;
+            }
+        }
+
+        private sealed class ThenIncludeTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Extends the most recently registered include path with an additional navigation property.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>ThenInclude</c>.</param>
+            /// <returns>The translated expression representing the parent include.</returns>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var parentExpression = t.Visit(node.Arguments[0]);
+                if (node.Arguments.Count > 1)
+                {
+                    // Arguments[1] is typically a quoted lambda (UnaryExpression{Quote}); strip quotes.
+                    var thenLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                    if (thenLambda != null)
+                    {
+                        var member = thenLambda.Body is UnaryExpression unary2 ?
+                                     (MemberExpression)unary2.Operand :
+                                     (MemberExpression)thenLambda.Body;
+                        var propName = member.Member.Name;
+                        if (t._includes.Count > 0)
+                        {
+                            var lastInclude = t._includes[^1];
+                            var lastRelation = lastInclude.Path.Last();
+                            var parentMap = t.TrackMapping(lastRelation.DependentType);
+                            if (parentMap.Relations.TryGetValue(propName, out var relation))
+                            {
+                                lastInclude.Path.Add(relation);
+                                t.TrackMapping(relation.DependentType);
+                            }
+                        }
+                    }
+                }
+                return parentExpression;
+            }
+        }
+
+        private sealed class AsNoTrackingTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Marks the query so that returned entities are not tracked by the context.
+            /// </summary>
+            /// <param name="t">The translator applying the option.</param>
+            /// <param name="node">The method call expression for <c>AsNoTracking</c>.</param>
+            /// <returns>The translated source expression.</returns>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                t._noTracking = true;
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
+            }
+        }
+
+        private sealed class CastOrOfTypeTranslator : IMethodCallTranslator
+        {
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var source = node.Arguments[0];
+                var sourceElement = GetElementType(source);
+                var targetElement = node.Method.GetGenericArguments().FirstOrDefault();
+                if (targetElement == null)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} requires a generic type argument.");
+                }
+                // Cast / OfType collapse to an identity pass-through at the SQL layer when
+                // the target type matches the source element type (or is a reference-type
+                // base that the runtime cast will satisfy on materialization).
+                if (targetElement == sourceElement ||
+                    (!targetElement.IsValueType && targetElement.IsAssignableFrom(sourceElement)))
+                {
+                    return t.Visit(source);
+                }
+                // OfType<DerivedType>() on a TPH hierarchy: TranslationBuilder.Setup() already
+                // injected the discriminator WHERE predicate and set _rootType to the derived
+                // type. VisitConstant will reset _rootType back to the base type when it sees the
+                // inner IQueryable<BaseType> constant — restore it so the materializer targets Dog,
+                // not Animal.
+                if (targetElement.IsSubclassOf(sourceElement) &&
+                    targetElement.GetCustomAttribute<DiscriminatorValueAttribute>() != null &&
+                    t._mapping.DiscriminatorColumn != null)
+                {
+                    var derivedRoot = t._rootType;
+                    t.Visit(source);
+                    t._rootType = derivedRoot;
+                    return source;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> cannot be translated to SQL: " +
+                    $"{targetElement.Name} is not a subtype of {sourceElement.Name} with a [DiscriminatorValue] attribute, " +
+                    "or the base type has no [DiscriminatorColumn]. Project explicitly with Select(...) instead.");
+            }
+        }
+
+        private sealed class AsSplitQueryTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Indicates that related data should be loaded using multiple queries instead of a single join.
+            /// </summary>
+            /// <param name="t">The active translator.</param>
+            /// <param name="node">The method call expression for <c>AsSplitQuery</c>.</param>
+            /// <returns>The translated source expression.</returns>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                t._splitQuery = true;
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
+            }
+        }
+
+        private sealed class AsOfTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Applies temporal querying by translating the <c>AsOf</c> operation into a timestamp filter.
+            /// </summary>
+            /// <param name="t">The translator managing the temporal context.</param>
+            /// <param name="node">The method call expression for <c>AsOf</c>.</param>
+            /// <returns>The translated source expression.</returns>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                // Temporal snapshots represent historical state, not the current
+                // live row. Tracking them by primary key can alias the snapshot to
+                // an already-tracked current entity and silently return current state.
+                t._noTracking = true;
+                var timeTravelArg = node.Arguments[1];
+                if (QueryTranslator.TryGetConstantValue(timeTravelArg, out var value))
+                {
+                    if (value is DateTime dt)
+                    {
+                        t._asOfTimestamp = DateTime.SpecifyKind(dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt, DateTimeKind.Unspecified);
+                    }
+                    else if (value is string tagName)
+                    {
+                        t._asOfTimestamp = t.GetTimestampForTagAsync(tagName).GetAwaiter().GetResult();
+                    }
+                }
+                else
+                {
+                    throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, ".AsOf() requires a constant DateTime or string tag."));
+                }
+                return t.Visit(node.Arguments[0]);
+            }
+        }
+    }
+}
