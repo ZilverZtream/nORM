@@ -776,12 +776,12 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
-            => ScaffoldDiagnosticReportBuilder.WriteMarkdown(
-                ConvertForeignKeyInfos(foreignKeys),
-                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                ConvertSkippedObjectInfos(skippedObjects),
+            => ScaffoldDiagnosticsAdapter.ScaffoldDiagnostics(
+                foreignKeys,
+                unsupportedFeatures,
+                skippedObjects,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
@@ -795,10 +795,10 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-            => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
-                ConvertForeignKeyInfos(foreignKeys),
+            => ScaffoldDiagnosticsAdapter.BuildCompositeForeignKeyDiagnostics(
+                foreignKeys,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 nonNullableColumnsByTable);
 
         private static ScaffoldPossibleJoinTableDiagnosticInfo[] BuildPossibleJoinTableDiagnostics(
@@ -811,14 +811,14 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
-            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
-                ConvertForeignKeyInfos(foreignKeys),
+            => ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableDiagnostics(
+                foreignKeys,
                 primaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 providerOwnedWriteBlockedTableKeys,
                 emittedManyToManyJoinTableKeys);
 
@@ -832,15 +832,15 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
-            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableMetadata(
+            => ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableMetadata(
                 tableKey,
-                ConvertForeignKeyInfos(foreignKeys),
+                foreignKeys,
                 primaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 providerOwnedWriteBlockedTableKeys);
 
         private static IReadOnlyDictionary<string, object?> BuildCompositeForeignKeyMetadata(
@@ -848,10 +848,10 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
-            => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyMetadata(
-                ConvertForeignKeyInfos(rows),
+            => ScaffoldDiagnosticsAdapter.BuildCompositeForeignKeyMetadata(
+                rows,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 nonNullableColumnsByTable);
 
         private static string[] BuildPossibleJoinTableReasons(
@@ -864,15 +864,15 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
-            => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableReasons(
+            => ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableReasons(
                 tableKey,
-                ConvertForeignKeyInfos(foreignKeys),
+                foreignKeys,
                 primaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 providerOwnedWriteBlockedTableKeys);
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
@@ -882,14 +882,10 @@ namespace nORM.Scaffolding
             => ScaffoldSchemaDiscoveryAdapter.BuildSkippedObjectMetadata(obj);
 
         private static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(ScaffoldUnsupportedFeature feature)
-            => ScaffoldUnsupportedFeatureMetadataBuilder.BuildMetadata(
-                new ScaffoldUnsupportedFeatureInfo(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
-                {
-                    Metadata = feature.Metadata
-                });
+            => ScaffoldDiagnosticsAdapter.BuildUnsupportedFeatureMetadata(feature);
 
         private static bool TryParseMetadataBoolean(string value, out bool parsed)
-            => ScaffoldUnsupportedFeatureMetadataBuilder.TryParseMetadataBoolean(value, out parsed);
+            => ScaffoldDiagnosticsAdapter.TryParseMetadataBoolean(value, out parsed);
 
         private static string ScaffoldDiagnosticsJson(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -903,12 +899,12 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
-            => ScaffoldDiagnosticReportBuilder.WriteJson(
-                ConvertForeignKeyInfos(foreignKeys),
-                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                ConvertSkippedObjectInfos(skippedObjects),
+            => ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
+                foreignKeys,
+                unsupportedFeatures,
+                skippedObjects,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
@@ -946,23 +942,7 @@ namespace nORM.Scaffolding
 
         private static IReadOnlyList<ScaffoldUnsupportedFeatureInfo> ConvertUnsupportedFeatureInfos(
             IReadOnlyList<ScaffoldUnsupportedFeature> features)
-        {
-            var converted = new ScaffoldUnsupportedFeatureInfo[features.Count];
-            for (var i = 0; i < features.Count; i++)
-            {
-                var feature = features[i];
-                converted[i] = new ScaffoldUnsupportedFeatureInfo(
-                    feature.TableKey,
-                    feature.Kind,
-                    feature.Name,
-                    feature.Detail)
-                {
-                    Metadata = BuildUnsupportedFeatureMetadata(feature)
-                };
-            }
-
-            return converted;
-        }
+            => ScaffoldDiagnosticsAdapter.ConvertUnsupportedFeatureInfos(features);
 
         private static IReadOnlyList<ScaffoldIndexInfo> ConvertIndexInfos(IReadOnlyList<ScaffoldIndex> indexes)
             => ScaffoldRelationshipAdapter.ConvertIndexInfos(indexes);
