@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Data.Common;
-using nORM.Migration;
 using static nORM.Scaffolding.DynamicEntitySchemaMetadataQuery;
 using static nORM.Scaffolding.DynamicEntitySchemaResolver;
 
@@ -87,29 +86,7 @@ namespace nORM.Scaffolding
         }
 
         public static bool TryNormalizeDynamicDefaultSql(string? raw, out string defaultValueSql)
-        {
-            defaultValueSql = string.Empty;
-            if (string.IsNullOrWhiteSpace(raw))
-                return false;
-
-            var candidate = raw.Trim();
-            while (candidate.Length >= 2 && candidate[0] == '(' && candidate[^1] == ')' && HasBalancedOuterParentheses(candidate))
-                candidate = candidate[1..^1].Trim();
-
-            try
-            {
-                var validated = DefaultValueValidator.Validate(candidate);
-                if (string.IsNullOrWhiteSpace(validated))
-                    return false;
-
-                defaultValueSql = validated;
-                return true;
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-        }
+            => ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(raw, out defaultValueSql);
 
         private static bool QueryHasUnmodeledDefault(DbConnection connection, string sql, string? schemaName, string tableName)
         {
@@ -130,37 +107,5 @@ namespace nORM.Scaffolding
         private static bool HasUnmodeledDefaultSql(string? raw)
             => !string.IsNullOrWhiteSpace(raw)
                && !TryNormalizeDynamicDefaultSql(raw, out _);
-
-        private static bool HasBalancedOuterParentheses(string value)
-        {
-            var depth = 0;
-            var inString = false;
-            for (var i = 0; i < value.Length; i++)
-            {
-                var ch = value[i];
-                if (ch == '\'')
-                {
-                    inString = !inString;
-                    if (inString && i + 1 < value.Length && value[i + 1] == '\'')
-                        i++;
-                    continue;
-                }
-
-                if (inString)
-                    continue;
-
-                if (ch == '(')
-                    depth++;
-                else if (ch == ')')
-                    depth--;
-
-                if (depth == 0 && i < value.Length - 1)
-                    return false;
-                if (depth < 0)
-                    return false;
-            }
-
-            return depth == 0;
-        }
     }
 }

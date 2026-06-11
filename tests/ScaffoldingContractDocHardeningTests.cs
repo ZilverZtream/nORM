@@ -517,6 +517,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("HasProviderOwnedTriggers", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("HasUnmodeledDefaults", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("TryNormalizeDynamicDefaultSql", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(raw, out defaultValueSql)", dynamicSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DefaultValueValidator.Validate(candidate)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("AND is_identity <> 'YES'", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("HasWriteBlockingProviderSpecificColumns", dynamicSource, StringComparison.Ordinal);
