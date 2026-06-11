@@ -9,7 +9,8 @@ param(
     [string]$ProviderMatrixBenchmarkFilter = '*ProviderMatrixBenchmarks*',
     [int]$ProviderMatrixSliceTimeoutMinutes = $(if ($env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES) { [int]$env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES } else { 90 }),
     [int]$BenchmarkStepTimeoutMinutes = $(if ($env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES } else { 45 }),
-    [int]$TestStepTimeoutMinutes = $(if ($env:NORM_TEST_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_TIMEOUT_MINUTES } else { 45 })
+    [int]$TestStepTimeoutMinutes = $(if ($env:NORM_TEST_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_TIMEOUT_MINUTES } else { 45 }),
+    [int]$TestStepHangTimeoutMinutes = $(if ($env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES } else { 5 })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +38,14 @@ if ($BenchmarkStepTimeoutMinutes -le 0) {
 
 if ($TestStepTimeoutMinutes -le 0) {
     throw "TestStepTimeoutMinutes must be greater than zero."
+}
+
+if ($TestStepHangTimeoutMinutes -le 0) {
+    throw "TestStepHangTimeoutMinutes must be greater than zero."
+}
+
+if ($TestStepHangTimeoutMinutes -gt $TestStepTimeoutMinutes) {
+    throw "TestStepHangTimeoutMinutes must not exceed TestStepTimeoutMinutes."
 }
 
 function Stop-OrphanedTestHosts {
@@ -149,7 +158,10 @@ function Invoke-TestStep {
             '--logger',
             "trx;LogFileName=$(Get-TrxLogFileName $Name)",
             '--results-directory',
-            $testResultsPath
+            $testResultsPath,
+            '--blame-hang',
+            '--blame-hang-timeout',
+            "$($TestStepHangTimeoutMinutes)m"
         )
 
         # In quick mode, exclude live-provider tests when no explicit filter is given.
@@ -198,6 +210,7 @@ exit $exitCode
 '@ | Set-Content -LiteralPath $runnerPath -Encoding UTF8
 
         Write-Host "Test step timeout: $TestStepTimeoutMinutes minute(s)"
+        Write-Host "Test hang timeout: $TestStepHangTimeoutMinutes minute(s)"
         $startProcessArgs = @{
             FilePath = 'powershell'
             ArgumentList = @(
@@ -528,6 +541,7 @@ Write-Host "  Benchmark:           $(if ($SkipBenchmark) { 'skipped' } else { 'e
 Write-Host "  Provider matrix:     $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'skipped' } else { 'enabled' })"
 Write-Host "  Matrix slice timeout: $(if ($SkipBenchmark -or $SkipProviderMatrixBenchmark -or $Mode -ne 'rc') { 'n/a' } else { "$ProviderMatrixSliceTimeoutMinutes min" })"
 Write-Host "  Test step timeout:   $TestStepTimeoutMinutes min"
+Write-Host "  Test hang timeout:   $TestStepHangTimeoutMinutes min"
 Write-Host "  Package version:     $normVersion"
 
 Invoke-Step 'clean orphaned test hosts' { Stop-OrphanedTestHosts }
