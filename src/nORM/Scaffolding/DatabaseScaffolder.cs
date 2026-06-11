@@ -93,9 +93,7 @@ namespace nORM.Scaffolding
                 var queryArtifactTableKeys = discovery.QueryArtifactTableKeys;
                 var entityByTable = discovery.EntityByTable;
                 var columnPropertiesByTable = discovery.ColumnPropertiesByTable;
-                var memberNamesByTable = discovery.MemberNamesByTable;
                 var primaryKeyColumnsByTable = discovery.PrimaryKeyColumnsByTable;
-                var primaryKeyConstraintNamesByTable = discovery.PrimaryKeyConstraintNamesByTable;
                 var nonNullableColumnsByTable = discovery.NonNullableColumnsByTable;
                 var sqliteDeclaredTypesByTable = discovery.SqliteDeclaredTypesByTable;
                 var stringBinaryFacetsByTable = discovery.StringBinaryFacetsByTable;
@@ -107,44 +105,19 @@ namespace nORM.Scaffolding
                 var featureConfigurations = discovery.FeatureConfigurations;
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
                 var computedColumnsByTable = featureConfigurations.ComputedColumnsByTable;
-                var rowVersionColumnsByTable = featureConfigurations.RowVersionColumnsByTable;
-                var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, computedColumnsByTable, indexes, nonNullableColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, memberNamesByTable);
-                var manyToManyJoinTableKeys = manyToManyJoins.Select(j => j.JoinTableKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var relationships = BuildRelationships(
-                    foreignKeys.Where(fk => !manyToManyJoinTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))).ToArray(),
-                    entityByTable,
-                    columnPropertiesByTable,
-                    primaryKeyColumnsByTable,
-                    indexes,
-                    nonNullableColumnsByTable,
-                    memberNamesByTable);
-                var compositePrimaryKeys = BuildPrimaryKeyConfigurations(entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, primaryKeyConstraintNamesByTable, manyToManyJoinTableKeys);
-                var defaultValueConfigurations = BuildDefaultValueConfigurations(entityByTable, columnPropertiesByTable, featureConfigurations.DefaultValuesByTable);
-                RestoreGeneratedManyToManyUnsupportedFeatures(unsupportedFeatures, featureConfigurations.GeneratedModelFeatureDiagnostics, manyToManyJoinTableKeys);
-                defaultValueConfigurations = defaultValueConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var checkConstraints = featureConfigurations.CheckConstraints
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var computedColumnConfigurations = featureConfigurations.ComputedColumnConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var expressionIndexConfigurations = featureConfigurations.ExpressionIndexConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var collationConfigurations = featureConfigurations.CollationConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var identityOptionConfigurations = featureConfigurations.IdentityOptionConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var precisionConfigurations = featureConfigurations.PrecisionConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
-                var columnFacetConfigurations = featureConfigurations.ColumnFacetConfigurations
-                    .Where(config => !manyToManyJoinTableKeys.Contains(config.TableKey))
-                    .ToArray();
+                var composition = ScaffoldModelCompositionBuilder.Build(discovery);
+                var manyToManyJoins = composition.ManyToManyJoins;
+                var manyToManyJoinTableKeys = composition.ManyToManyJoinTableKeys;
+                var relationships = composition.Relationships;
+                var compositePrimaryKeys = composition.CompositePrimaryKeys;
+                var defaultValueConfigurations = composition.DefaultValueConfigurations;
+                var checkConstraints = composition.CheckConstraints;
+                var computedColumnConfigurations = composition.ComputedColumnConfigurations;
+                var expressionIndexConfigurations = composition.ExpressionIndexConfigurations;
+                var collationConfigurations = composition.CollationConfigurations;
+                var identityOptionConfigurations = composition.IdentityOptionConfigurations;
+                var precisionConfigurations = composition.PrecisionConfigurations;
+                var columnFacetConfigurations = composition.ColumnFacetConfigurations;
                 var entityFiles = await BuildScaffoldEntityFilesAsync(
                     connection,
                     provider,
@@ -652,22 +625,13 @@ namespace nORM.Scaffolding
             List<ScaffoldUnsupportedFeature> unsupportedFeatures,
             IEnumerable<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
             IReadOnlySet<string> manyToManyJoinTableKeys)
-        {
-            foreach (var feature in generatedModelFeatureDiagnostics)
-            {
-                if (!ShouldRestoreGeneratedManyToManyUnsupportedFeature(feature.Kind)
-                    || !manyToManyJoinTableKeys.Contains(feature.TableKey)
-                    || unsupportedFeatures.Contains(feature))
-                {
-                    continue;
-                }
-
-                unsupportedFeatures.Add(feature);
-            }
-        }
+            => ScaffoldModelCompositionBuilder.RestoreGeneratedManyToManyUnsupportedFeatures(
+                unsupportedFeatures,
+                generatedModelFeatureDiagnostics,
+                manyToManyJoinTableKeys);
 
         private static bool ShouldRestoreGeneratedManyToManyUnsupportedFeature(string kind)
-            => !string.Equals(kind, "Computed", StringComparison.OrdinalIgnoreCase);
+            => ScaffoldModelCompositionBuilder.ShouldRestoreGeneratedManyToManyUnsupportedFeature(kind);
 
         private static bool IsScaffoldableProviderSpecificColumnType(string? detail)
             => ScaffoldProviderSpecificTypeClassifier.IsScaffoldableProviderSpecificColumnType(detail);
