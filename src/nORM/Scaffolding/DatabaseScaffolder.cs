@@ -982,47 +982,21 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             Dictionary<string, HashSet<string>> memberNamesByTable)
-        {
-            var foreignKeyInfos = ConvertForeignKeyInfos(foreignKeys);
-            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
-            var indexInfos = ConvertIndexInfos(indexes);
-            var joins = ScaffoldManyToManyJoinDiscovery.BuildManyToManyJoins(
-                foreignKeyInfos,
-                tableInfos,
+            => ScaffoldRelationshipAdapter.BuildManyToManyJoins(
+                foreignKeys,
+                tables,
                 entityByTable,
                 columnPropertiesByTable,
                 primaryKeyColumnsByTable,
                 identityColumnsByTable,
                 databaseGeneratedColumnsByTable,
-                indexInfos,
+                indexes,
                 nonNullableColumnsByTable,
                 providerOwnedWriteBlockedTableKeys,
                 memberNamesByTable);
-            return ConvertManyToManyJoins(joins);
-        }
 
         private static IReadOnlyList<ScaffoldForeignKeyInfo> ConvertForeignKeyInfos(IReadOnlyList<ScaffoldForeignKey> foreignKeys)
-        {
-            var converted = new ScaffoldForeignKeyInfo[foreignKeys.Count];
-            for (var i = 0; i < foreignKeys.Count; i++)
-            {
-                var foreignKey = foreignKeys[i];
-                converted[i] = new ScaffoldForeignKeyInfo(
-                    foreignKey.DependentSchema,
-                    foreignKey.DependentTable,
-                    foreignKey.DependentColumn,
-                    foreignKey.PrincipalSchema,
-                    foreignKey.PrincipalTable,
-                    foreignKey.PrincipalColumn,
-                    foreignKey.ConstraintName,
-                    foreignKey.ColumnCount,
-                    foreignKey.OnDelete,
-                    foreignKey.OnUpdate,
-                    foreignKey.IsSyntheticConstraintName);
-            }
-
-            return converted;
-        }
+            => ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(foreignKeys);
 
         private static IReadOnlyList<ScaffoldUnsupportedFeatureInfo> ConvertUnsupportedFeatureInfos(
             IReadOnlyList<ScaffoldUnsupportedFeature> features)
@@ -1045,166 +1019,70 @@ namespace nORM.Scaffolding
         }
 
         private static IReadOnlyList<ScaffoldIndexInfo> ConvertIndexInfos(IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var converted = new ScaffoldIndexInfo[indexes.Count];
-            for (var i = 0; i < indexes.Count; i++)
-            {
-                var index = indexes[i];
-                converted[i] = new ScaffoldIndexInfo(
-                    index.TableKey,
-                    index.ColumnName,
-                    index.IndexName,
-                    index.IsUnique,
-                    index.ColumnCount,
-                    index.Ordinal,
-                    index.IsDescending,
-                    index.IsIncluded,
-                    index.NullSortOrder,
-                    index.NullsNotDistinct,
-                    index.FilterSql,
-                    index.IsSyntheticName);
-            }
-
-            return converted;
-        }
+            => ScaffoldRelationshipAdapter.ConvertIndexInfos(indexes);
 
         private static IReadOnlyList<ScaffoldManyToManyJoin> ConvertManyToManyJoins(IReadOnlyList<ScaffoldManyToManyJoinInfo> joins)
-        {
-            var converted = new ScaffoldManyToManyJoin[joins.Count];
-            for (var i = 0; i < joins.Count; i++)
-            {
-                var join = joins[i];
-                converted[i] = new ScaffoldManyToManyJoin(
-                    join.JoinTableKey,
-                    join.LeftTableKey,
-                    join.RightTableKey,
-                    join.JoinTableName,
-                    join.JoinTableSchema,
-                    join.LeftEntityName,
-                    join.RightEntityName,
-                    join.LeftForeignKeyColumns,
-                    join.RightForeignKeyColumns,
-                    join.LeftPrincipalKeyProperties,
-                    join.RightPrincipalKeyProperties,
-                    join.LeftOnDelete,
-                    join.LeftOnUpdate,
-                    join.RightOnDelete,
-                    join.RightOnUpdate,
-                    join.UsesPrimaryKeys,
-                    join.LeftCollectionNavigationName,
-                    join.RightCollectionNavigationName);
-            }
-
-            return converted;
-        }
+            => ScaffoldRelationshipAdapter.ConvertManyToManyJoins(joins);
 
         private static IReadOnlyList<ScaffoldRelationship> ConvertRelationships(IReadOnlyList<ScaffoldRelationshipInfo> relationships)
-        {
-            var converted = new ScaffoldRelationship[relationships.Count];
-            for (var i = 0; i < relationships.Count; i++)
-            {
-                var relationship = relationships[i];
-                converted[i] = new ScaffoldRelationship(
-                    relationship.DependentTableKey,
-                    relationship.PrincipalTableKey,
-                    relationship.DependentEntityName,
-                    relationship.PrincipalEntityName,
-                    relationship.ForeignKeyPropertyName,
-                    relationship.PrincipalKeyPropertyName,
-                    relationship.ReferenceNavigationName,
-                    relationship.CollectionNavigationName,
-                    relationship.IsUniqueDependentKey,
-                    relationship.CascadeDelete,
-                    relationship.OnDelete,
-                    relationship.OnUpdate,
-                    relationship.ConstraintName)
-                {
-                    IsRequired = relationship.IsRequired,
-                    ForeignKeyPropertyNames = relationship.ForeignKeyPropertyNames,
-                    PrincipalKeyPropertyNames = relationship.PrincipalKeyPropertyNames
-                };
-            }
-
-            return converted;
-        }
+            => ScaffoldRelationshipAdapter.ConvertRelationships(relationships);
 
         private static IReadOnlyList<ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
             IReadOnlyList<ScaffoldManyToManyJoin> joins,
             string tableKey)
-        {
-            var navigations = new List<ScaffoldManyToManyNavigation>();
-            foreach (var join in joins)
-            {
-                if (string.Equals(join.LeftTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    navigations.Add(new ScaffoldManyToManyNavigation(
-                        join.RightEntityName,
-                        join.LeftCollectionNavigationName));
-                }
-
-                if (string.Equals(join.RightTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    navigations.Add(new ScaffoldManyToManyNavigation(
-                        join.LeftEntityName,
-                        join.RightCollectionNavigationName));
-                }
-            }
-
-            return navigations;
-        }
+            => ScaffoldRelationshipAdapter.BuildManyToManyNavigations(joins, tableKey);
 
         private static bool HasSinglePrimaryKeyColumn(
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             string tableKey,
             string columnName)
-            => ScaffoldForeignKeyShape.HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, tableKey, columnName);
+            => ScaffoldRelationshipAdapter.HasSinglePrimaryKeyColumn(primaryKeyColumnsByTable, tableKey, columnName);
 
         private static bool HasPrimaryKeyColumns(
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             string tableKey,
             IReadOnlyList<string> columnNames)
-            => ScaffoldForeignKeyShape.HasPrimaryKeyColumns(primaryKeyColumnsByTable, tableKey, columnNames);
+            => ScaffoldRelationshipAdapter.HasPrimaryKeyColumns(primaryKeyColumnsByTable, tableKey, columnNames);
 
         private static bool HasOnlyScaffoldableReferentialActions(IEnumerable<ScaffoldForeignKey> foreignKeys)
-            => ScaffoldForeignKeyShape.HasOnlyScaffoldableReferentialActions(ConvertForeignKeyInfos(foreignKeys.ToArray()));
+            => ScaffoldRelationshipAdapter.HasOnlyScaffoldableReferentialActions(foreignKeys);
 
         private static bool HasExactUniqueIndex(
             IReadOnlyList<ScaffoldIndex> indexes,
             string tableKey,
             IReadOnlySet<string> columnNames)
-            => ScaffoldForeignKeyShape.HasExactUniqueIndex(ConvertIndexInfos(indexes), tableKey, columnNames);
+            => ScaffoldRelationshipAdapter.HasExactUniqueIndex(indexes, tableKey, columnNames);
 
         private static bool AllForeignKeyGroupsAreUniqueDependentKeys(
             string dependentTableKey,
             IEnumerable<IReadOnlyList<ScaffoldForeignKey>> foreignKeyGroups,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
-            => ScaffoldForeignKeyShape.AllForeignKeyGroupsAreUniqueDependentKeys(
+            => ScaffoldRelationshipAdapter.AllForeignKeyGroupsAreUniqueDependentKeys(
                 dependentTableKey,
-                foreignKeyGroups.Select(ConvertForeignKeyInfos).ToArray(),
+                foreignKeyGroups,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes));
+                indexes);
 
         private static bool HasNonNullableColumns(
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             string tableKey,
             IReadOnlyList<string> columnNames)
-            => nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns)
-               && columnNames.All(nonNullableColumns.Contains);
+            => ScaffoldRelationshipAdapter.HasNonNullableColumns(nonNullableColumnsByTable, tableKey, columnNames);
 
         private static bool ReferencesPrimaryKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
-            => ScaffoldForeignKeyShape.ReferencesPrimaryKey(ConvertForeignKeyInfos(foreignKeyGroup.ToArray()), primaryKeyColumnsByTable);
+            => ScaffoldRelationshipAdapter.ReferencesPrimaryKey(foreignKeyGroup, primaryKeyColumnsByTable);
 
         private static bool ReferencesScaffoldablePrincipalKey(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
-            => ScaffoldForeignKeyShape.ReferencesScaffoldablePrincipalKey(
-                ConvertForeignKeyInfos(foreignKeyGroup.ToArray()),
+            => ScaffoldRelationshipAdapter.ReferencesScaffoldablePrincipalKey(
+                foreignKeyGroup,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes));
+                indexes);
 
         private static IReadOnlyList<ScaffoldPrimaryKey> BuildPrimaryKeyConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
@@ -1212,36 +1090,31 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, string> primaryKeyConstraintNamesByTable,
             IReadOnlySet<string> skippedTableKeys)
-            => ConvertPrimaryKeyConfigurations(ScaffoldPrimaryKeyConfigurationBuilder.BuildPrimaryKeyConfigurations(
+            => ScaffoldRelationshipAdapter.BuildPrimaryKeyConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
                 primaryKeyColumnsByTable,
                 primaryKeyConstraintNamesByTable,
-                skippedTableKeys));
+                skippedTableKeys);
 
         private static IReadOnlyList<ScaffoldPrimaryKey> ConvertPrimaryKeyConfigurations(
             IReadOnlyList<ScaffoldPrimaryKeyConfigurationInfo> primaryKeys)
-            => primaryKeys
-                .Select(static key => new ScaffoldPrimaryKey(key.EntityName, key.PropertyNames.ToArray(), key.ConstraintName))
-                .ToArray();
+            => ScaffoldRelationshipAdapter.ConvertPrimaryKeyConfigurations(primaryKeys);
 
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
-            => ReferencesUniqueIndex(foreignKeyGroup.ToArray(), primaryKeyColumnsByTable, indexes);
+            => ScaffoldRelationshipAdapter.ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes);
 
         private static bool ReferencesUniqueIndex(
             IReadOnlyList<ScaffoldForeignKey> rows,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
-            => ScaffoldForeignKeyShape.ReferencesUniqueIndex(
-                ConvertForeignKeyInfos(rows),
-                primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes));
+            => ScaffoldRelationshipAdapter.ReferencesUniqueIndex(rows, primaryKeyColumnsByTable, indexes);
 
         private static bool IsUnfilteredUniqueKeyIndex(ScaffoldIndex index)
-            => ScaffoldForeignKeyShape.IsUnfilteredUniqueKeyIndex(ConvertIndexInfos(new[] { index })[0]);
+            => ScaffoldRelationshipAdapter.IsUnfilteredUniqueKeyIndex(index);
 
         private static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -1251,14 +1124,14 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
-            => ConvertRelationships(ScaffoldRelationshipDiscovery.BuildRelationships(
-                ConvertForeignKeyInfos(foreignKeys),
+            => ScaffoldRelationshipAdapter.BuildRelationships(
+                foreignKeys,
                 entityByTable,
                 columnPropertiesByTable,
                 primaryKeyColumnsByTable,
-                ConvertIndexInfos(indexes),
+                indexes,
                 nonNullableColumnsByTable,
-                memberNamesByTable));
+                memberNamesByTable);
 
         private static IReadOnlyDictionary<string, string> BuildEntityNameMap(IReadOnlyList<ScaffoldTable> tables, bool useDatabaseNames)
             => ScaffoldEntityNameBuilder.BuildEntityNameMap(
@@ -1944,7 +1817,7 @@ namespace nORM.Scaffolding
             public bool IsComposite => LeftForeignKeyColumns.Length > 1 || RightForeignKeyColumns.Length > 1;
         }
 
-        private readonly record struct ScaffoldManyToManyNavigation(
+        internal readonly record struct ScaffoldManyToManyNavigation(
             string TargetEntityName,
             string CollectionNavigationName);
 
