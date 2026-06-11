@@ -57,6 +57,11 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerAliasTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlStringLiteralParser.cs"));
 
+    private static string ReadPostgresUnsupportedFeatureSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificIndexFeatureDiscovery.cs"));
+
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -197,7 +202,7 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var source = ReadStaticEntityScaffoldSource();
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
-        var postgresUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs");
+        var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var skippedDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs");
@@ -1001,7 +1006,7 @@ public class ScaffoldingContractDocTests
         var featureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs");
         var expressionIndexConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs");
         var indexDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs");
-        var postgresUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs");
+        var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
 
@@ -1252,7 +1257,7 @@ public class ScaffoldingContractDocTests
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
         var diagnosticsWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs");
         var manyToManyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.cs");
-        var postgresUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs");
+        var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var dynamicSource = ReadDynamicEntitySource();
