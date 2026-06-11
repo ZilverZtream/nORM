@@ -281,8 +281,12 @@ norm portability certify --scan-path src/MyApp --assembly bin/Release/net8.0/MyA
 ```
 
 Use `--providers sqlite,postgres,mysql` to narrow the provider target capability
-profile in the report. Aliases such as `mssql` and `postgresql` are
-canonicalized to the nORM provider targets before reporting. `mariadb` currently
+profile in the report. The same EF Core provider package aliases accepted by
+scaffolding, such as `Microsoft.EntityFrameworkCore.SqlServer`,
+`Microsoft.EntityFrameworkCore.Sqlite`, `Npgsql.EntityFrameworkCore.PostgreSQL`,
+`Pomelo.EntityFrameworkCore.MySql`, and `MySql.EntityFrameworkCore`, are
+canonicalized to the nORM provider targets before reporting. Shorthand aliases
+such as `mssql` and `postgresql` are also accepted. `mariadb` currently
 canonicalizes to the MySQL-compatible target profile; it is compatibility
 inventory, not a separate MariaDB-certified provider claim. When omitted,
 `--profile all-four` emits SQLite, SQL Server, PostgreSQL, and MySQL target

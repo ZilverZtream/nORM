@@ -287,13 +287,7 @@ public static class ProviderMobilityCertificationRunner
         };
 
     private static string NormalizeProviderName(string providerName)
-        => providerName.Trim().ToLowerInvariant() switch
-        {
-            "mssql" => "sqlserver",
-            "postgresql" => "postgres",
-            "mariadb" => "mysql",
-            var normalized => normalized
-        };
+        => ProviderNameNormalizer.Normalize(providerName);
 
     private static void WriteJson(string reportPath, ProviderMobilityCertificationReport report)
     {

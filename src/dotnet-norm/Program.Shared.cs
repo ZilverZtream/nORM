@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using nORM.Cli;
 
 partial class Program
 {
@@ -11,14 +12,7 @@ partial class Program
         => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
     static string NormalizeProviderName(string providerName)
-        => providerName.Trim().ToLowerInvariant() switch
-        {
-            "microsoft.entityframeworkcore.sqlserver" or "sqlserver" or "mssql" => "sqlserver",
-            "microsoft.entityframeworkcore.sqlite" or "sqlite" => "sqlite",
-            "npgsql.entityframeworkcore.postgresql" or "npgsql" or "postgres" or "postgresql" => "postgres",
-            "pomelo.entityframeworkcore.mysql" or "mysql.entityframeworkcore" or "mysql" or "mariadb" => "mysql",
-            var normalized => normalized
-        };
+        => ProviderNameNormalizer.Normalize(providerName);
 
     /// <summary>
     /// Replaces any recognizable connection string segments containing sensitive key=value pairs

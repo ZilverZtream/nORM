@@ -17,7 +17,7 @@ partial class Program
         var portabilityReportOpt = new Option<string?>("--report") { Description = "Path to write the JSON certification report." };
         var portabilityHtmlOpt = new Option<string?>("--html") { Description = "Path to write an HTML certification dashboard." };
         var portabilityProfileOpt = new Option<string>("--profile") { Description = "Certification profile label, e.g. all-four, sqlite-postgres, sqlserver-postgres.", DefaultValueFactory = _ => "all-four" };
-        var portabilityProvidersOpt = new Option<string?>("--providers") { Description = "Comma-separated provider target list for capability profiling, e.g. sqlite,postgres,mysql." };
+        var portabilityProvidersOpt = new Option<string?>("--providers") { Description = "Comma-separated provider target list for capability profiling, e.g. sqlite,postgres,mysql. EF Core provider package names are accepted as aliases." };
         var portabilitySqliteConnectionOpt = new Option<string?>("--sqlite-connection") { Description = "Optional SQLite target connection string to open and validate for actual provider mobility evidence." };
         var portabilitySqlServerConnectionOpt = new Option<string?>("--sqlserver-connection") { Description = "Optional SQL Server target connection string to open and validate for actual provider mobility evidence." };
         var portabilityPostgresConnectionOpt = new Option<string?>("--postgres-connection") { Description = "Optional PostgreSQL target connection string to open and validate for actual provider mobility evidence." };

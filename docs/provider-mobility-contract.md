@@ -100,10 +100,14 @@ target list; `all-four` emits SQLite, SQL Server, PostgreSQL, and MySQL
 capability decisions. Unknown provider targets are error-level findings rather
 than silently skipped. Error-level provider capability decisions are also
 promoted to certification findings instead of being buried in the report.
-Provider aliases are normalized for convenience (`mssql` to `sqlserver`,
-`postgresql` to `postgres`). `mariadb` currently maps to the MySQL-compatible
-profile and must not be described as separate MariaDB certification until nORM
-ships a MariaDB-specific provider target profile and live gate.
+Provider aliases are normalized for convenience, including EF Core provider
+package names such as `Microsoft.EntityFrameworkCore.SqlServer`,
+`Microsoft.EntityFrameworkCore.Sqlite`, `Npgsql.EntityFrameworkCore.PostgreSQL`,
+`Pomelo.EntityFrameworkCore.MySql`, and `MySql.EntityFrameworkCore`, plus
+shorthand aliases (`mssql` to `sqlserver`, `postgresql` to `postgres`).
+`mariadb` currently maps to the MySQL-compatible profile and must not be
+described as separate MariaDB certification until nORM ships a MariaDB-specific
+provider target profile and live gate.
 Add `--sqlite-connection`, `--sqlserver-connection`, `--postgres-connection`,
 or `--mysql-connection` to open and validate real targets. The CLI records the
 actual server version exposed by the driver and fails certification when the

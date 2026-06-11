@@ -658,22 +658,39 @@ public sealed class ProviderMobilityCertificationRunnerTests
             var report = ProviderMobilityCertificationRunner.Run(new ProviderMobilityCertificationOptions
             {
                 ScanPath = root,
-                TargetProviders = new[] { "mssql", "sqlserver", "postgresql", "postgres", "mariadb", "mysql" },
+                TargetProviders = new[]
+                {
+                    "mssql",
+                    "Microsoft.EntityFrameworkCore.SqlServer",
+                    "sqlserver",
+                    "Microsoft.EntityFrameworkCore.Sqlite",
+                    "Npgsql.EntityFrameworkCore.PostgreSQL",
+                    "postgres",
+                    "Pomelo.EntityFrameworkCore.MySql",
+                    "MySql.EntityFrameworkCore",
+                    "mariadb"
+                },
                 TargetProviderVersions = new Dictionary<string, Version?>
                 {
-                    ["mssql"] = new Version(16, 0),
-                    ["postgresql"] = new Version(17, 0),
-                    ["mariadb"] = new Version(8, 0)
+                    ["Microsoft.EntityFrameworkCore.SqlServer"] = new Version(16, 0),
+                    ["Microsoft.EntityFrameworkCore.Sqlite"] = new Version(3, 46, 1),
+                    ["Npgsql.EntityFrameworkCore.PostgreSQL"] = new Version(17, 0),
+                    ["Pomelo.EntityFrameworkCore.MySql"] = new Version(8, 0)
                 }
             });
 
             Assert.Equal("PASS", report.Status);
             Assert.Equal(
-                new[] { "MySQL", "PostgreSQL", "SQL Server" },
+                new[] { "MySQL", "PostgreSQL", "SQL Server", "SQLite" },
                 report.ProviderTargets
                     .Select(static target => target.Provider)
                     .OrderBy(static provider => provider, StringComparer.Ordinal)
                     .ToArray());
+            Assert.Contains(report.ProviderTargets, target =>
+                target.Provider == "SQLite" &&
+                target.Decisions.Any(decision =>
+                    decision.Feature == ProviderMobilityProviderFeature.ServerVersion &&
+                    decision.ActualServerVersion == new Version(3, 46, 1)));
             Assert.Contains(report.ProviderTargets, target =>
                 target.Provider == "SQL Server" &&
                 target.Decisions.Any(decision =>

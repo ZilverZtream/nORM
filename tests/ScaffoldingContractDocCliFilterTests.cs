@@ -25,6 +25,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.ProjectMetadata.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Configuration.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.FiltersAndResults.cs"),
+            ReadRepoFile("src", "dotnet-norm", "ProviderNameNormalizer.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Shared.cs"));
         var scaffolderSource = string.Concat(
             ReadDatabaseScaffolderSource(),
