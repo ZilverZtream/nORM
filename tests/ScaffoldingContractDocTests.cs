@@ -84,6 +84,11 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlSkippedObjectDiscovery.cs"));
 
+    private static string ReadUnsupportedFeatureMetadataSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexFeatureMetadataBuilder.cs"));
+
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -240,7 +245,7 @@ public class ScaffoldingContractDocTests
         var diagnosticsWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs");
         var parserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.cs");
         var sqlMetadataParserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.cs");
-        var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
+        var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
         Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
         Assert.Contains("views", doc, StringComparison.Ordinal);
@@ -447,7 +452,7 @@ public class ScaffoldingContractDocTests
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var diagnosticsWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs");
         var routineWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs");
-        var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
+        var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         Assert.Contains("code =", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("severity =", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("category =", diagnosticsWriterSource, StringComparison.Ordinal);
@@ -1035,7 +1040,7 @@ public class ScaffoldingContractDocTests
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
-        var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
+        var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
 
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
         Assert.Contains("filtered/partial predicates for the same", doc, StringComparison.Ordinal);
@@ -1289,7 +1294,7 @@ public class ScaffoldingContractDocTests
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var dynamicSource = ReadDynamicEntitySource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
-        var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
+        var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var defaultValidator = ReadRepoFile("src", "nORM", "Migration", "DefaultValueValidator.cs");
         var liveScaffoldTests = ReadRepoFile("tests", "LiveProviderScaffoldingParityTests.cs");
         var liveScaffoldCliTests = ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs");
