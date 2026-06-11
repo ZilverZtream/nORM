@@ -236,50 +236,27 @@ namespace nORM.Scaffolding
             IReadOnlySet<string> queryArtifactTableKeys,
             ScaffoldFeatureConfigurations featureConfigurations,
             ScaffoldOptions options)
-        {
-            var entityNames = new List<string>();
-            var generatedFiles = new List<(string Path, string Content)>();
-            foreach (var table in tables)
-            {
-                var tableName = table.Name;
-                var schemaName = table.Schema;
-
-                var tableKey = TableKey(schemaName, tableName);
-                if (manyToManyJoinTableKeys.Contains(tableKey))
-                    continue;
-
-                var entityName = entityByTable[tableKey];
-                entityNames.Add(entityName);
-
-                var references = relationships.Where(r => string.Equals(r.DependentTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
-                var collections = relationships.Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
-                var manyToManyCollections = BuildManyToManyNavigations(manyToManyJoins, tableKey);
-                var tableIndexes = indexes.Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase)).ToArray();
-                columnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
-                featureConfigurations.ComputedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
-                featureConfigurations.RowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
-                identityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
-                nonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns);
-                featureConfigurations.DecimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
-                stringBinaryFacetsByTable.TryGetValue(tableKey, out var columnFacets);
-                commentsByTable.TryGetValue(tableKey, out var comments);
-                sqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
-                featureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
-                var isReadOnlyEntity = ShouldMarkScaffoldedEntityReadOnly(
-                    tableKey,
-                    queryArtifactTableKeys,
-                    featureConfigurations.ProviderNativeTemporalTableKeys,
-                    featureConfigurations.ProviderOwnedTriggerTableKeys,
-                    featureConfigurations.ProviderSpecificIdentityStrategyTableKeys,
-                    featureConfigurations.ProviderSpecificDefaultTableKeys,
-                    providerSpecificColumnTypes,
-                    primaryKeyColumnsByTable);
-                var entityCode = await ScaffoldEntityAsync(connection, provider, schemaName, tableName, entityName, namespaceName, columnPropertyNames, tableIndexes, references, collections, manyToManyCollections, computedColumns, rowVersionColumns, identityColumns, decimalPrecisions, columnFacets, comments, isReadOnlyEntity, options.UseNullableReferenceTypes, nonNullableColumns, sqliteDeclaredTypes, providerSpecificColumnTypes).ConfigureAwait(false);
-                generatedFiles.Add((Path.Combine(outputDirectory, entityName + ".cs"), entityCode));
-            }
-
-            return new ScaffoldEntityFileSet(generatedFiles, entityNames);
-        }
+            => await ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(
+                connection,
+                provider,
+                outputDirectory,
+                namespaceName,
+                tables,
+                entityByTable,
+                columnPropertiesByTable,
+                primaryKeyColumnsByTable,
+                nonNullableColumnsByTable,
+                sqliteDeclaredTypesByTable,
+                stringBinaryFacetsByTable,
+                commentsByTable,
+                identityColumnsByTable,
+                indexes,
+                relationships,
+                manyToManyJoins,
+                manyToManyJoinTableKeys,
+                queryArtifactTableKeys,
+                featureConfigurations,
+                options).ConfigureAwait(false);
 
         private static async Task EmitScaffoldOutputAsync(
             string outputDirectory,
@@ -317,7 +294,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? nonNullableColumns = null,
             IReadOnlyDictionary<string, string>? sqliteDeclaredTypes = null,
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes = null)
-            => ScaffoldEntitySourceBuilder.BuildAsync(new ScaffoldEntitySourceInfo(
+            => ScaffoldEntityFileAdapter.ScaffoldEntityAsync(
                 connection,
                 provider,
                 schemaName,
@@ -325,69 +302,37 @@ namespace nORM.Scaffolding
                 entityName,
                 namespaceName,
                 columnPropertyNames,
-                ConvertEntityIndexInfos(indexes),
-                ConvertEntityReferenceInfos(references),
-                ConvertEntityCollectionInfos(collections),
-                ConvertEntityManyToManyNavigationInfos(manyToManyCollections),
+                indexes,
+                references,
+                collections,
+                manyToManyCollections,
                 computedColumns,
                 rowVersionColumns,
                 identityColumns,
-                ConvertEntityDecimalPrecisionInfos(decimalPrecisions),
+                decimalPrecisions,
                 columnFacets,
                 comments,
                 isReadOnlyEntity,
                 useNullableReferenceTypes,
                 nonNullableColumns,
                 sqliteDeclaredTypes,
-                providerSpecificColumnTypes));
+                providerSpecificColumnTypes);
 
         private static ScaffoldEntityIndexSourceInfo[] ConvertEntityIndexInfos(IReadOnlyList<ScaffoldIndex>? indexes)
-            => (indexes ?? Array.Empty<ScaffoldIndex>())
-                .Select(index => new ScaffoldEntityIndexSourceInfo(
-                    index.ColumnName,
-                    index.IndexName,
-                    index.IsUnique,
-                    index.ColumnCount,
-                    index.Ordinal,
-                    index.IsDescending,
-                    index.IsIncluded,
-                    index.NullSortOrder,
-                    index.NullsNotDistinct,
-                    index.FilterSql))
-                .ToArray();
+            => ScaffoldEntityFileAdapter.ConvertEntityIndexInfos(indexes);
 
         private static ScaffoldEntityReferenceInfo[] ConvertEntityReferenceInfos(IReadOnlyList<ScaffoldRelationship>? references)
-            => (references ?? Array.Empty<ScaffoldRelationship>())
-                .Select(reference => new ScaffoldEntityReferenceInfo(
-                    reference.PrincipalEntityName,
-                    reference.ReferenceNavigationName,
-                    reference.ForeignKeyPropertyName,
-                    reference.IsComposite,
-                    reference.IsRequired))
-                .ToArray();
+            => ScaffoldEntityFileAdapter.ConvertEntityReferenceInfos(references);
 
         private static ScaffoldEntityCollectionInfo[] ConvertEntityCollectionInfos(IReadOnlyList<ScaffoldRelationship>? collections)
-            => (collections ?? Array.Empty<ScaffoldRelationship>())
-                .Select(collection => new ScaffoldEntityCollectionInfo(
-                    collection.DependentEntityName,
-                    collection.CollectionNavigationName,
-                    collection.ForeignKeyPropertyName,
-                    collection.IsUniqueDependentKey))
-                .ToArray();
+            => ScaffoldEntityFileAdapter.ConvertEntityCollectionInfos(collections);
 
         private static ScaffoldEntityManyToManyNavigationInfo[] ConvertEntityManyToManyNavigationInfos(IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections)
-            => (manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
-                .Select(collection => new ScaffoldEntityManyToManyNavigationInfo(
-                    collection.TargetEntityName,
-                    collection.CollectionNavigationName))
-                .ToArray();
+            => ScaffoldEntityFileAdapter.ConvertEntityManyToManyNavigationInfos(manyToManyCollections);
 
         private static IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>? ConvertEntityDecimalPrecisionInfos(
             IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions)
-            => decimalPrecisions?.ToDictionary(
-                pair => pair.Key,
-                pair => new ScaffoldDecimalPrecisionInfo(pair.Value.Precision, pair.Value.Scale),
-                StringComparer.OrdinalIgnoreCase);
+            => ScaffoldEntityFileAdapter.ConvertEntityDecimalPrecisionInfos(decimalPrecisions);
 
         private static string BuildSchemaProbeSql(
             DatabaseProvider provider,
@@ -791,14 +736,15 @@ namespace nORM.Scaffolding
             IReadOnlySet<string> providerSpecificDefaultTableKeys,
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
-            => queryArtifactTableKeys.Contains(tableKey)
-               || providerNativeTemporalTableKeys.Contains(tableKey)
-               || providerOwnedTriggerTableKeys.Contains(tableKey)
-               || providerSpecificIdentityStrategyTableKeys.Contains(tableKey)
-               || providerSpecificDefaultTableKeys.Contains(tableKey)
-               || HasWriteBlockingProviderSpecificColumnTypes(providerSpecificColumnTypes)
-               || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
-               || primaryKeyColumns.Count == 0;
+            => ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
+                tableKey,
+                queryArtifactTableKeys,
+                providerNativeTemporalTableKeys,
+                providerOwnedTriggerTableKeys,
+                providerSpecificIdentityStrategyTableKeys,
+                providerSpecificDefaultTableKeys,
+                providerSpecificColumnTypes,
+                primaryKeyColumnsByTable);
 
         private static bool IsWriteBlockingProviderSpecificColumnType(string? detail)
             => ScaffoldProviderSpecificTypeClassifier.IsWriteBlockingProviderSpecificColumnType(detail);
@@ -1660,7 +1606,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string> ProviderSpecificIdentityStrategyTableKeys,
             IReadOnlySet<string> ProviderOwnedWriteBlockedTableKeys);
 
-        private sealed record ScaffoldEntityFileSet(
+        internal sealed record ScaffoldEntityFileSet(
             IReadOnlyList<(string Path, string Content)> GeneratedFiles,
             IReadOnlyList<string> EntityNames);
 
