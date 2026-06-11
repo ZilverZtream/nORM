@@ -90,29 +90,12 @@ namespace nORM.Scaffolding
                 var filterCatalog = GetScaffoldFilterCatalog(connection, provider);
                 var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
                 var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-                var candidateQueryArtifacts = discoveredSkippedObjects
-                    .Where(obj => ShouldEmitQueryArtifactObject(obj, options, provider, filterCatalog))
-                    .ToArray();
-                var discoveredTablesAndViews = discoveredTables
-                    .Concat(candidateQueryArtifacts.Select(obj => new ScaffoldTable(obj.Name, obj.Schema)))
-                    .ToArray();
-                var tables = FilterTables(discoveredTablesAndViews, discoveredSkippedObjects, options, provider, filterCatalog);
-                var selectedTableKeys = tables
-                    .Select(table => TableKey(table.Schema, table.Name))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var emittedQueryArtifacts = candidateQueryArtifacts
-                    .Where(obj => selectedTableKeys.Contains(TableKey(obj.Schema, obj.Name)))
-                    .ToArray();
-                var queryArtifactTableKeys = emittedQueryArtifacts
-                    .Select(obj => TableKey(obj.Schema, obj.Name))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                EnsureNoTableKeyCollisions(tables);
-                var skippedObjects = FilterSkippedObjects(
-                    discoveredSkippedObjects.Where(obj => !emittedQueryArtifacts.Contains(obj)).ToArray(),
+                var (tables, skippedObjects, queryArtifactTableKeys) = BuildScaffoldObjectSelection(
+                    discoveredTables,
+                    discoveredSkippedObjects,
                     options,
                     provider,
-                    filterCatalog,
-                    emittedQueryArtifacts);
+                    filterCatalog);
                 var entityNames = new List<string>();
                 var entityByTable = BuildEntityNameMap(tables, options.UseDatabaseNames);
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
@@ -522,6 +505,25 @@ namespace nORM.Scaffolding
 
         private static ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
             => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
+
+        private static (IReadOnlyList<ScaffoldTable> Tables, IReadOnlyList<ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys) BuildScaffoldObjectSelection(
+            IReadOnlyList<ScaffoldTable> discoveredTables,
+            IReadOnlyList<ScaffoldSkippedObject> discoveredSkippedObjects,
+            ScaffoldOptions options,
+            DatabaseProvider provider,
+            string? filterCatalog)
+        {
+            var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+                discoveredTables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray(),
+                ConvertSkippedObjectInfos(discoveredSkippedObjects),
+                options,
+                provider,
+                filterCatalog);
+            return (
+                selection.Tables.Select(ToScaffoldTable).ToArray(),
+                selection.SkippedObjects.Select(ToScaffoldSkippedObject).ToArray(),
+                selection.QueryArtifactTableKeys);
+        }
 
         private static IReadOnlyList<ScaffoldTable> FilterTables(
             IReadOnlyList<ScaffoldTable> tables,
@@ -1182,43 +1184,19 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
-        {
-            var compositeForeignKeys = BuildCompositeForeignKeyDiagnostics(
-                foreignKeys,
+            => ScaffoldDiagnosticReportBuilder.WriteMarkdown(
+                ConvertForeignKeyInfos(foreignKeys),
+                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
+                ConvertSkippedObjectInfos(skippedObjects),
                 primaryKeyColumnsByTable,
-                indexes,
-                nonNullableColumnsByTable);
-            var possibleJoinTables = BuildPossibleJoinTableDiagnostics(
-                foreignKeys,
-                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes),
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
-                indexes,
                 providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys);
-
-            if (compositeForeignKeys.Length == 0 && possibleJoinTables.Length == 0 && unsupportedFeatures.Count == 0 && skippedObjects.Count == 0)
-                return string.Empty;
-
-            var sb = _stringBuilderPool.Get();
-            try
-            {
-                ScaffoldDiagnosticsWriter.AppendMarkdown(
-                    sb,
-                    compositeForeignKeys,
-                    possibleJoinTables,
-                    ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                    ConvertSkippedObjectInfos(skippedObjects));
-                return sb.ToString();
-            }
-            finally
-            {
-                sb.Clear();
-                _stringBuilderPool.Return(sb);
-            }
-        }
+                emittedManyToManyJoinTableKeys,
+                _stringBuilderPool);
 
         private static ScaffoldCompositeForeignKeyDiagnosticInfo[] BuildCompositeForeignKeyDiagnostics(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -1342,28 +1320,18 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
-        {
-            var compositeForeignKeys = BuildCompositeForeignKeyDiagnostics(
-                foreignKeys,
+            => ScaffoldDiagnosticReportBuilder.WriteJson(
+                ConvertForeignKeyInfos(foreignKeys),
+                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
+                ConvertSkippedObjectInfos(skippedObjects),
                 primaryKeyColumnsByTable,
-                indexes,
-                nonNullableColumnsByTable);
-            var possibleJoinTables = BuildPossibleJoinTableDiagnostics(
-                foreignKeys,
-                primaryKeyColumnsByTable,
+                ConvertIndexInfos(indexes),
                 columnPropertiesByTable,
                 nonNullableColumnsByTable,
                 databaseGeneratedColumnsByTable,
                 identityColumnsByTable,
-                indexes,
                 providerOwnedWriteBlockedTableKeys,
                 emittedManyToManyJoinTableKeys);
-            return ScaffoldDiagnosticsWriter.WriteJson(
-                compositeForeignKeys,
-                possibleJoinTables,
-                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                ConvertSkippedObjectInfos(skippedObjects));
-        }
 
         private static IReadOnlyList<ScaffoldManyToManyJoin> BuildManyToManyJoins(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -1607,29 +1575,18 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, string> primaryKeyConstraintNamesByTable,
             IReadOnlySet<string> skippedTableKeys)
-        {
-            var keys = new List<ScaffoldPrimaryKey>();
-            foreach (var (tableKey, keyColumns) in primaryKeyColumnsByTable.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                primaryKeyConstraintNamesByTable.TryGetValue(tableKey, out var constraintName);
-                if ((keyColumns.Count <= 1 && string.IsNullOrWhiteSpace(constraintName))
-                    || skippedTableKeys.Contains(tableKey)
-                    || !entityByTable.TryGetValue(tableKey, out var entityName)
-                    || !columnPropertiesByTable.TryGetValue(tableKey, out var propertyNames))
-                {
-                    continue;
-                }
+            => ConvertPrimaryKeyConfigurations(ScaffoldPrimaryKeyConfigurationBuilder.BuildPrimaryKeyConfigurations(
+                entityByTable,
+                columnPropertiesByTable,
+                primaryKeyColumnsByTable,
+                primaryKeyConstraintNamesByTable,
+                skippedTableKeys));
 
-                var keyProperties = keyColumns
-                    .Where(propertyNames.ContainsKey)
-                    .Select(column => propertyNames[column])
-                    .ToArray();
-                if (keyProperties.Length == keyColumns.Count)
-                    keys.Add(new ScaffoldPrimaryKey(entityName, keyProperties, NullIfWhiteSpace(constraintName)));
-            }
-
-            return keys;
-        }
+        private static IReadOnlyList<ScaffoldPrimaryKey> ConvertPrimaryKeyConfigurations(
+            IReadOnlyList<ScaffoldPrimaryKeyConfigurationInfo> primaryKeys)
+            => primaryKeys
+                .Select(static key => new ScaffoldPrimaryKey(key.EntityName, key.PropertyNames.ToArray(), key.ConstraintName))
+                .ToArray();
 
         private static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
@@ -1667,28 +1624,9 @@ namespace nORM.Scaffolding
                 memberNamesByTable));
 
         private static IReadOnlyDictionary<string, string> BuildEntityNameMap(IReadOnlyList<ScaffoldTable> tables, bool useDatabaseNames)
-        {
-            var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var duplicateTableNames = tables
-                .GroupBy(table => table.Name, StringComparer.OrdinalIgnoreCase)
-                .Where(group => group.Count() > 1)
-                .Select(group => group.Key)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var table in tables)
-            {
-                var sourceName = duplicateTableNames.Contains(table.Name)
-                    ? string.IsNullOrWhiteSpace(table.Schema)
-                        ? "Default_" + table.Name
-                        : table.Schema + "_" + table.Name
-                    : table.Name;
-                var baseName = ToScaffoldClrName(sourceName, useDatabaseNames);
-                names[TableKey(table.Schema, table.Name)] = MakeUnique(baseName, existingNames);
-            }
-
-            return names;
-        }
+            => ScaffoldEntityNameBuilder.BuildEntityNameMap(
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray(),
+                useDatabaseNames);
 
         private static Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetNonNullableColumnNamesAsync(
             DbConnection connection,
@@ -1705,37 +1643,12 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, string> entityByTable,
             bool useDatabaseNames)
-        {
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-            {
-                var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var orderedColumns = await QueryOrderedColumnNameMapAsync(connection, tableKeys, """
-                    SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName, ordinal_position AS Ordinal
-                    FROM information_schema.columns
-                    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                    """).ConfigureAwait(false);
-                return BuildColumnPropertyNameMap(orderedColumns, entityByTable, useDatabaseNames);
-            }
-
-            var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var table in tables)
-            {
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
-                await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
-                var schema = reader.GetSchemaTable()!;
-                var tableKey = TableKey(table.Schema, table.Name);
-                var existingNames = CreateReservedMemberNameSet();
-                if (entityByTable.TryGetValue(tableKey, out var entityName))
-                    existingNames.Add(entityName);
-                result[tableKey] = ScaffoldColumnPropertyNameBuilder.BuildColumnPropertyNames(
-                    schema.Rows.Cast<DataRow>().Select(row => row["ColumnName"]!.ToString()!),
-                    existingNames,
-                    useDatabaseNames);
-            }
-
-            return result;
-        }
+            => await ScaffoldColumnPropertyDiscovery.GetColumnPropertyNamesAsync(
+                connection,
+                provider,
+                tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray(),
+                entityByTable,
+                useDatabaseNames).ConfigureAwait(false);
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildColumnPropertyNameMap(
             IReadOnlyDictionary<string, IReadOnlyList<string>> orderedColumns,
@@ -1987,48 +1900,6 @@ namespace nORM.Scaffolding
                 connection,
                 provider,
                 tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
-
-        private static async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> QueryOrderedColumnNameMapAsync(
-            DbConnection connection,
-            HashSet<string> tableKeys,
-            string sql)
-        {
-            var result = tableKeys.ToDictionary(
-                key => key,
-                _ => new List<(int Ordinal, string Column)>(),
-                StringComparer.OrdinalIgnoreCase);
-
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
-                if (!tableKeys.Contains(tableKey))
-                    continue;
-
-                var columnName = Convert.ToString(reader["ColumnName"]);
-                if (string.IsNullOrWhiteSpace(columnName))
-                    continue;
-
-                var ordinal = ReaderHasColumn(reader, "Ordinal")
-                    ? Convert.ToInt32(reader["Ordinal"], System.Globalization.CultureInfo.InvariantCulture)
-                    : result[tableKey].Count + 1;
-                result[tableKey].Add((ordinal, columnName));
-            }
-
-            return ToOrderedColumnDictionary(result);
-        }
-
-        private static IReadOnlyDictionary<string, IReadOnlyList<string>> ToOrderedColumnDictionary(
-            Dictionary<string, List<(int Ordinal, string Column)>> source)
-            => source.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyList<string>)pair.Value
-                    .OrderBy(item => item.Ordinal)
-                    .Select(item => item.Column)
-                    .ToArray(),
-                StringComparer.OrdinalIgnoreCase);
 
         private static Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetIdentityColumnNamesAsync(
             DbConnection connection,
