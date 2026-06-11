@@ -103,6 +103,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.CheckConstraints.cs"));
 
+    private static string ReadMySqlUnsupportedFeatureSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.ExpressionIndexes.cs"));
+
     private static string ReadIndexDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
@@ -395,7 +401,7 @@ public partial class ScaffoldingContractDocTests
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
-        var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
+        var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var skippedMetadataSource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.cs"),
@@ -734,7 +740,7 @@ public partial class ScaffoldingContractDocTests
         var expressionIndexConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs");
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
-        var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
+        var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
 
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);

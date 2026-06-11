@@ -26,7 +26,7 @@ public partial class ScaffoldingContractDocTests
         var manyToManyDiscoverySource = ReadManyToManyDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
-        var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
+        var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var dynamicSource = ReadDynamicEntitySource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
