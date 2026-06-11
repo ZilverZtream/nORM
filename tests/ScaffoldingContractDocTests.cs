@@ -60,6 +60,7 @@ public class ScaffoldingContractDocTests
     private static string ReadPostgresUnsupportedFeatureSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificColumnFeatureDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificIndexFeatureDiscovery.cs"));
 
     private static string ReadIndexDiscoverySource()
