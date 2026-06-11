@@ -47,6 +47,53 @@ partial class Program
             _ => throw new ArgumentException($"Unsupported provider '{provider}'.")
         };
 
+    static bool IsSystemSchema(string provider, string? schemaName)
+    {
+        if (string.IsNullOrWhiteSpace(schemaName))
+            return false;
+
+        var s = schemaName.Trim();
+        // Universal system schemas present in multiple providers.
+        if (s.Equals("sys", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("information_schema", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return provider.ToLowerInvariant() switch
+        {
+            // PostgreSQL system schemas: pg_catalog, pg_toast, pg_temp_*, pg_toast_temp_*, pg_*.
+            "postgres" or "postgresql" =>
+                s.StartsWith("pg_", StringComparison.OrdinalIgnoreCase),
+            // MySQL: the mysql system database tables appear under the "mysql" schema.
+            "mysql" =>
+                s.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
+    static bool IsProtectedDatabaseName(string provider, string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            return false;
+
+        var normalized = databaseName.Trim();
+        return provider.ToLowerInvariant() switch
+        {
+            "sqlserver" => normalized.Equals("master", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("model", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+            "postgres" or "postgresql" => normalized.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("template0", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("template1", StringComparison.OrdinalIgnoreCase),
+            "mysql" => normalized.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("sys", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
     static int Fail(Exception ex, int exitCode = 1)
     {
         Console.Error.WriteLine($"Error: {RedactConnectionStrings(ex.Message)}");
