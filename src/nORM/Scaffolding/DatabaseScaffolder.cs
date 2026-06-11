@@ -445,41 +445,14 @@ namespace nORM.Scaffolding
             => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
 
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)
-            => (await ScaffoldTableDiscovery.GetTablesAsync(connection, provider).ConfigureAwait(false))
-                .Select(ToScaffoldTable)
-                .ToArray();
+            => await ScaffoldSchemaDiscoveryAdapter.GetTablesAsync(connection, provider).ConfigureAwait(false);
 
         private static async Task<IReadOnlyList<ScaffoldSkippedObject>> GetSkippedObjectsAsync(DbConnection connection, DatabaseProvider provider)
-        {
-            var discoveredObjects = await ScaffoldSkippedObjectDiscovery.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-            if (discoveredObjects.Count == 0)
-                return Array.Empty<ScaffoldSkippedObject>();
-
-            var objects = new ScaffoldSkippedObject[discoveredObjects.Count];
-            for (var i = 0; i < discoveredObjects.Count; i++)
-            {
-                var obj = discoveredObjects[i];
-                objects[i] = new ScaffoldSkippedObject(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
-            }
-
-            return objects;
-        }
+            => await ScaffoldSchemaDiscoveryAdapter.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
 
         private static IReadOnlyList<ScaffoldSkippedObjectInfo> ConvertSkippedObjectInfos(
             IReadOnlyList<ScaffoldSkippedObject> objects)
-        {
-            var converted = new ScaffoldSkippedObjectInfo[objects.Count];
-            for (var i = 0; i < objects.Count; i++)
-            {
-                var obj = objects[i];
-                converted[i] = new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment)
-                {
-                    Metadata = BuildSkippedObjectMetadata(obj)
-                };
-            }
-
-            return converted;
-        }
+            => ScaffoldSchemaDiscoveryAdapter.ConvertSkippedObjectInfos(objects);
 
         private static Task<IReadOnlyList<string>> GetSqliteSchemasAsync(DbConnection connection)
             => ScaffoldSkippedObjectDiscovery.GetSqliteSchemasAsync(connection);
@@ -539,19 +512,19 @@ namespace nORM.Scaffolding
                 tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray());
 
         private static ScaffoldTableInfo[] ToScaffoldTableInfos(IEnumerable<ScaffoldTable> tables)
-            => tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
+            => ScaffoldSchemaDiscoveryAdapter.ToScaffoldTableInfos(tables);
 
         private static ScaffoldTable ToScaffoldTable(ScaffoldTableInfo table)
-            => new(table.Name, table.Schema);
+            => ScaffoldSchemaDiscoveryAdapter.ToScaffoldTable(table);
 
         private static ScaffoldSkippedObjectInfo[] ToSkippedObjectInfos(IEnumerable<ScaffoldSkippedObject> objects)
-            => objects.Select(ToSkippedObjectInfo).ToArray();
+            => ScaffoldSchemaDiscoveryAdapter.ToSkippedObjectInfos(objects);
 
         private static ScaffoldSkippedObjectInfo ToSkippedObjectInfo(ScaffoldSkippedObject obj)
-            => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
+            => ScaffoldSchemaDiscoveryAdapter.ToSkippedObjectInfo(obj);
 
         private static ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
-            => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
+            => ScaffoldSchemaDiscoveryAdapter.ToScaffoldSkippedObject(obj);
 
         private static (IReadOnlyList<ScaffoldTable> Tables, IReadOnlyList<ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys) BuildScaffoldObjectSelection(
             IReadOnlyList<ScaffoldTable> discoveredTables,
@@ -639,35 +612,10 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
-            var indexes = await ScaffoldIndexDiscovery.GetIndexesAsync(connection, provider, tableInfos).ConfigureAwait(false);
-            return ConvertIndexes(indexes);
-        }
+            => await ScaffoldSchemaDiscoveryAdapter.GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
 
         private static IReadOnlyList<ScaffoldIndex> ConvertIndexes(IReadOnlyList<ScaffoldIndexInfo> indexes)
-        {
-            var converted = new ScaffoldIndex[indexes.Count];
-            for (var i = 0; i < indexes.Count; i++)
-            {
-                var index = indexes[i];
-                converted[i] = new ScaffoldIndex(
-                    index.TableKey,
-                    index.ColumnName,
-                    index.IndexName,
-                    index.IsUnique,
-                    index.ColumnCount,
-                    index.Ordinal,
-                    index.IsDescending,
-                    index.IsIncluded,
-                    index.NullSortOrder,
-                    index.NullsNotDistinct,
-                    index.FilterSql,
-                    index.IsSyntheticName);
-            }
-
-            return converted;
-        }
+            => ScaffoldSchemaDiscoveryAdapter.ConvertIndexes(indexes);
 
         private static IReadOnlyList<ScaffoldIndex> FilterIndexesToScaffoldedTables(
             IReadOnlyList<ScaffoldIndex> indexes,
@@ -680,34 +628,10 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
-            var foreignKeys = await ScaffoldForeignKeyDiscovery.GetForeignKeysAsync(connection, provider, tableInfos).ConfigureAwait(false);
-            return ConvertForeignKeys(foreignKeys);
-        }
+            => await ScaffoldSchemaDiscoveryAdapter.GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
 
         private static IReadOnlyList<ScaffoldForeignKey> ConvertForeignKeys(IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys)
-        {
-            var converted = new ScaffoldForeignKey[foreignKeys.Count];
-            for (var i = 0; i < foreignKeys.Count; i++)
-            {
-                var foreignKey = foreignKeys[i];
-                converted[i] = new ScaffoldForeignKey(
-                    foreignKey.DependentSchema,
-                    foreignKey.DependentTable,
-                    foreignKey.DependentColumn,
-                    foreignKey.PrincipalSchema,
-                    foreignKey.PrincipalTable,
-                    foreignKey.PrincipalColumn,
-                    foreignKey.ConstraintName,
-                    foreignKey.ColumnCount,
-                    foreignKey.OnDelete,
-                    foreignKey.OnUpdate,
-                    foreignKey.IsSyntheticConstraintName);
-            }
-
-            return converted;
-        }
+            => ScaffoldSchemaDiscoveryAdapter.ConvertForeignKeys(foreignKeys);
 
         private static IReadOnlyList<ScaffoldForeignKey> FilterForeignKeysToScaffoldedTables(
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
@@ -754,82 +678,11 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var providerName = provider.GetType().Name;
-
-            if (provider is SqliteProvider)
-                return await GetSqliteUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
-
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-                return await GetSqlServerUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
-
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-                return await GetPostgresUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
-
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-                return await GetMySqlUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
-
-            return Array.Empty<ScaffoldUnsupportedFeature>();
-        }
+            => await ScaffoldSchemaDiscoveryAdapter.GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false);
 
         private static IReadOnlyList<ScaffoldUnsupportedFeature> ConvertUnsupportedFeatures(
             IReadOnlyList<ScaffoldUnsupportedFeatureInfo> features)
-        {
-            var converted = new ScaffoldUnsupportedFeature[features.Count];
-            for (var i = 0; i < features.Count; i++)
-            {
-                var feature = features[i];
-                converted[i] = new ScaffoldUnsupportedFeature(
-                    feature.TableKey,
-                    feature.Kind,
-                    feature.Name,
-                    feature.Detail)
-                {
-                    Metadata = feature.Metadata
-                };
-            }
-
-            return converted;
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqliteUnsupportedSchemaFeaturesAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            IReadOnlyList<ScaffoldTable> tables,
-            HashSet<string> tableKeys)
-        {
-            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
-            var features = await ScaffoldSqliteUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, tableInfos, tableKeys).ConfigureAwait(false);
-            return ConvertUnsupportedFeatures(features);
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqlServerUnsupportedSchemaFeaturesAsync(
-            DbConnection connection,
-            HashSet<string> tableKeys)
-        {
-            var features = await ScaffoldSqlServerUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
-            return ConvertUnsupportedFeatures(features);
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresUnsupportedSchemaFeaturesAsync(
-            DbConnection connection,
-            HashSet<string> tableKeys)
-        {
-            var features = await ScaffoldPostgresUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
-            return ConvertUnsupportedFeatures(features);
-        }
-
-        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetMySqlUnsupportedSchemaFeaturesAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            IReadOnlyList<ScaffoldTable> tables,
-            HashSet<string> tableKeys)
-        {
-            var tableInfos = tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
-            var features = await ScaffoldMySqlUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, tableInfos, tableKeys).ConfigureAwait(false);
-            return ConvertUnsupportedFeatures(features);
-        }
+            => ScaffoldSchemaDiscoveryAdapter.ConvertUnsupportedFeatures(features);
 
 
 
@@ -837,14 +690,7 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
-                return Array.Empty<ScaffoldUnsupportedFeature>();
-
-            var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var features = await ScaffoldPostgresUnsupportedFeatureDiscovery.GetEnumColumnFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
-            return ConvertUnsupportedFeatures(features);
-        }
+            => await ScaffoldSchemaDiscoveryAdapter.GetPostgresEnumColumnFeaturesAsync(connection, provider, tables).ConfigureAwait(false);
 
         private static void AddMissingPrimaryKeyDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
@@ -1198,8 +1044,7 @@ namespace nORM.Scaffolding
             => ScaffoldDataReaderHelper.HasColumn(reader, name);
 
         private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(ScaffoldSkippedObject obj)
-            => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(
-                new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment));
+            => ScaffoldSchemaDiscoveryAdapter.BuildSkippedObjectMetadata(obj);
 
         private static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(ScaffoldUnsupportedFeature feature)
             => ScaffoldUnsupportedFeatureMetadataBuilder.BuildMetadata(
@@ -2057,7 +1902,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<(string Path, string Content)> GeneratedFiles,
             IReadOnlyList<string> EntityNames);
 
-        private readonly record struct ScaffoldTable(string Name, string? Schema);
+        internal readonly record struct ScaffoldTable(string Name, string? Schema);
 
         internal readonly record struct ScaffoldSkippedObject(
             string? Schema,
@@ -2132,7 +1977,7 @@ namespace nORM.Scaffolding
             string PropertyName,
             string Collation);
 
-        private readonly record struct ScaffoldForeignKey(
+        internal readonly record struct ScaffoldForeignKey(
             string? DependentSchema,
             string DependentTable,
             string DependentColumn,
@@ -2145,7 +1990,7 @@ namespace nORM.Scaffolding
             string OnUpdate = "NO ACTION",
             bool IsSyntheticConstraintName = false);
 
-        private readonly record struct ScaffoldIndex(
+        internal readonly record struct ScaffoldIndex(
             string TableKey,
             string ColumnName,
             string IndexName,
