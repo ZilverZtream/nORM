@@ -232,6 +232,24 @@ public class DatabaseScaffolderPrivateMethodTests
         return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
     }
 
+    private static IReadOnlyDictionary<string, (string Sql, bool Stored)> InvokeDynamicExtractSqliteGeneratedColumns(string createTableSql)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("ExtractSqliteGeneratedColumns", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "ExtractSqliteGeneratedColumns");
+        var result = (System.Collections.IDictionary)m.Invoke(null, new object?[] { createTableSql })!;
+        var columns = new Dictionary<string, (string Sql, bool Stored)>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Collections.DictionaryEntry entry in result)
+        {
+            var value = entry.Value!;
+            columns[(string)entry.Key] = (
+                (string)value.GetType().GetProperty("Sql")!.GetValue(value)!,
+                (bool)value.GetType().GetProperty("Stored")!.GetValue(value)!);
+        }
+
+        return columns;
+    }
+
     private static Array CreateDynamicDecimalColumnInfoArray(int precision, int? scale)
     {
         var generatorType = typeof(DynamicEntityTypeGenerator);
@@ -1042,6 +1060,24 @@ public class DatabaseScaffolderPrivateMethodTests
         var (sql, _) = InvokeNormalizeScaffoldComputedSql(raw);
 
         Assert.Equal(expectedSql, sql);
+    }
+
+    [Fact]
+    public void DynamicExtractSqliteGeneratedColumns_UsesSharedQuoteAwareParser()
+    {
+        var columns = InvokeDynamicExtractSqliteGeneratedColumns("""
+            CREATE TABLE "Metrics" (
+                "Note" TEXT DEFAULT 'GENERATED ALWAYS AS (ignored) STORED',
+                "Total" INTEGER GENERATED ALWAYS AS (([Quantity] * [Price])) PERSISTED,
+                "Virtual" TEXT GENERATED ALWAYS AS ('PERSISTED') VIRTUAL
+            )
+            """);
+
+        Assert.False(columns.ContainsKey("Note"));
+        Assert.Equal("[Quantity] * [Price]", columns["Total"].Sql);
+        Assert.True(columns["Total"].Stored);
+        Assert.Equal("'PERSISTED'", columns["Virtual"].Sql);
+        Assert.False(columns["Virtual"].Stored);
     }
 
     [Theory]

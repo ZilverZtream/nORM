@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -60,13 +59,10 @@ namespace nORM.Scaffolding
                 if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
                     continue;
 
-                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out var nextIndex))
                     continue;
 
-                var generatedIndex = CultureInfo.InvariantCulture.CompareInfo.IndexOf(
-                    trimmed,
-                    "GENERATED",
-                    CompareOptions.IgnoreCase);
+                var generatedIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "GENERATED", nextIndex);
                 if (generatedIndex < 0)
                     continue;
 
@@ -78,11 +74,13 @@ namespace nORM.Scaffolding
                 if (closeIndex <= openIndex)
                     continue;
 
-                var suffix = trimmed.Substring(closeIndex + 1);
-                var stored = suffix.Contains("STORED", StringComparison.OrdinalIgnoreCase);
-                var sql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
-                if (!string.IsNullOrWhiteSpace(sql))
-                    result[columnName] = (sql, stored);
+                var suffix = trimmed[(closeIndex + 1)..];
+                var stored = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
+                             || ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(suffix, "PERSISTED", 0) >= 0;
+                var rawSql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                var (computedSql, normalizedStored) = ScaffoldSqlMetadataParser.NormalizeScaffoldComputedSql(rawSql + (stored ? " STORED" : string.Empty));
+                if (!string.IsNullOrWhiteSpace(computedSql))
+                    result[columnName] = (computedSql, normalizedStored);
             }
 
             return result;
