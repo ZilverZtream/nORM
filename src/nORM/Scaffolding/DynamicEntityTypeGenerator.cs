@@ -148,94 +148,7 @@ namespace nORM.Scaffolding
             => DynamicEntitySchemaDescriptorBuilder.BuildDescriptor(schemaName, tableName, columns, isReadOnlyEntity);
 
         private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
-        {
-            var qualified = EscapeQualified(connection, schemaName, tableName);
-            var postgresDomainColumnCastTypes = GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
-            DataTable? schema;
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumnCastTypes);
-                using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
-                schema = reader.GetSchemaTable();
-            }
-
-            if (schema is null)
-                return Array.Empty<ColumnInfo>();
-            var existingPropertyNames = CreateReservedMemberNameSet();
-            existingPropertyNames.Add(EscapeCSharpIdentifier(ToPascalCase(tableName)));
-            var computedColumns = GetComputedColumns(connection, schemaName, tableName);
-            var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
-            var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
-            var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
-            var sqlServerAliasBaseTypes = GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
-            var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
-            var decimalPrecisions = GetDecimalPrecisions(connection, schemaName, tableName);
-            var columnFacets = GetStringBinaryFacets(connection, schemaName, tableName);
-            var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
-            var columns = new List<ColumnInfo>(schema.Rows.Count);
-            var sourceOrdinal = 0;
-            foreach (DataRow row in schema.Rows)
-            {
-                var colName = row["ColumnName"]?.ToString();
-                if (string.IsNullOrEmpty(colName))
-                    continue;
-                var currentSourceOrdinal = sourceOrdinal++;
-                var propName = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(colName)), existingPropertyNames);
-                if (row["DataType"] is not Type clrType)
-                    continue;
-                var allowNull = row["AllowDBNull"] is bool b && b;
-                var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                var keyOrdinal = primaryKeyOrdinals.TryGetValue(colName, out var ordinal)
-                    ? ordinal
-                    : isKey ? currentSourceOrdinal + 1 : 0;
-                var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
-                    || identityColumns.Contains(colName);
-                var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
-                    || computedColumns.ContainsKey(colName);
-                var computedColumn = computedColumns.TryGetValue(colName, out var computed)
-                    ? computed
-                    : (ScaffoldComputedColumn?)null;
-                var isRowVersion = rowVersionColumns.Contains(colName);
-                var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
-                sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
-                sqlServerAliasBaseTypes.TryGetValue(colName, out var sqlServerAliasBaseType);
-                var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType);
-                if (IsPostgresConnection(connection.GetType().Name)
-                    && normalizedClrType == typeof(Array)
-                    && postgresDomainColumnCastTypes.TryGetValue(colName, out var domainCastType)
-                    && TryMapPostgresArrayCastType(domainCastType, out var arrayClrType))
-                {
-                    normalizedClrType = arrayClrType;
-                }
-                else if (IsSqlServerConnection(connection.GetType().Name)
-                         && TryMapSqlServerAliasBaseClrType(sqlServerAliasBaseType, out var aliasClrType))
-                {
-                    normalizedClrType = aliasClrType;
-                }
-                else if (IsMySqlConnection(connection.GetType().Name)
-                         && mySqlUnsignedColumnTypes.TryGetValue(colName, out var unsignedColumnType)
-                         && TryMapMySqlUnsignedType(unsignedColumnType, out var unsignedClrType))
-                {
-                    normalizedClrType = unsignedClrType;
-                }
-
-                var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
-
-                columnFacets.TryGetValue(colName, out var columnFacet);
-                var maxLength = GetScaffoldMaxLength(normalizedClrType, row)
-                    ?? GetSqlServerAliasBaseMaxLengthFromTypeText(sqlServerAliasBaseType);
-                if (!maxLength.HasValue && columnFacet.MaxLength.HasValue)
-                    maxLength = columnFacet.MaxLength;
-                var decimalPrecision = normalizedClrType == typeof(decimal)
-                    && decimalPrecisions.TryGetValue(colName, out var precision)
-                    ? precision
-                    : (ScaffoldDecimalPrecision?)null;
-
-                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, computedColumn, isRowVersion, maxLength, columnFacet.IsUnicode, columnFacet.IsFixedLength, decimalPrecision));
-            }
-
-            return columns;
-        }
+            => DynamicEntityTableSchemaReader.GetTableSchema(connection, schemaName, tableName);
 
         private static string BuildSchemaProbeSql(
             DbConnection connection,
@@ -243,79 +156,48 @@ namespace nORM.Scaffolding
             string tableName,
             string qualified,
             IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
-        {
-            if (!IsPostgresConnection(connection.GetType().Name) || postgresDomainColumnCastTypes.Count == 0)
-                return $"SELECT * FROM {qualified} WHERE 1=0";
-
-            var columnNames = GetPostgresColumnNames(connection, schemaName, tableName);
-            if (columnNames.Count == 0)
-                return $"SELECT * FROM {qualified} WHERE 1=0";
-
-            var projection = columnNames.Select(column =>
-            {
-                var escaped = EscapeIdentifier(connection, column);
-                return postgresDomainColumnCastTypes.TryGetValue(column, out var castType)
-                    ? $"{escaped}::{castType} AS {escaped}"
-                    : escaped;
-            });
-
-            return $"SELECT {string.Join(", ", projection)} FROM {qualified} WHERE 1=0";
-        }
+            => DynamicEntityTableSchemaReader.BuildSchemaProbeSql(
+                connection,
+                schemaName,
+                tableName,
+                qualified,
+                postgresDomainColumnCastTypes);
 
         private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
-        {
-            if (clrType != typeof(string) && clrType != typeof(byte[]))
-                return null;
-
-            if (!row.Table.Columns.Contains("ColumnSize") || row["ColumnSize"] == DBNull.Value)
-                return null;
-
-            return int.TryParse(row["ColumnSize"]?.ToString(), out var size) && size > 0 && !IsUnboundedScaffoldMaxLength(size)
-                ? size
-                : null;
-        }
+            => DynamicEntityTableSchemaReader.GetScaffoldMaxLength(clrType, row);
 
         private static bool IsUnboundedScaffoldMaxLength(int size)
-            => size == int.MaxValue
-               || size == 1073741823;
+            => DynamicEntityTableSchemaReader.IsUnboundedScaffoldMaxLength(size);
 
         private static IReadOnlyDictionary<string, ScaffoldColumnFacet> GetStringBinaryFacets(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetStringBinaryFacets(connection, schemaName, tableName)
-                .ToDictionary(
-                    static pair => pair.Key,
-                    static pair => new ScaffoldColumnFacet(pair.Value.MaxLength, pair.Value.IsUnicode, pair.Value.IsFixedLength),
-                    StringComparer.OrdinalIgnoreCase);
+            => DynamicEntityTableSchemaReader.GetStringBinaryFacets(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> GetDecimalPrecisions(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetDecimalPrecisions(connection, schemaName, tableName)
-                .ToDictionary(
-                    static pair => pair.Key,
-                    static pair => new ScaffoldDecimalPrecision(pair.Value.Precision, pair.Value.Scale),
-                    StringComparer.OrdinalIgnoreCase);
+            => DynamicEntityTableSchemaReader.GetDecimalPrecisions(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityComputedColumnReader.GetComputedColumns(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetComputedColumns(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
 
         private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetIdentityColumns(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetIdentityColumns(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, int> GetPrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetPrimaryKeyOrdinals(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetPrimaryKeyOrdinals(connection, schemaName, tableName);
 
         private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetRowVersionColumns(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetRowVersionColumns(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetPostgresDomainColumnCastTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetMySqlUnsignedColumnTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
 
         private static IReadOnlyDictionary<string, string> GetSqlServerAliasColumnBaseTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
+            => DynamicEntityTableSchemaReader.GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
 
         private static bool TryMapSqlServerAliasBaseClrType(string? typeText, out Type type)
             => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(typeText, out type);
@@ -481,37 +363,10 @@ namespace nORM.Scaffolding
         /// are returned as-is since nullability is implicit.
         /// </summary>
         private static Type GetPropertyType(Type type, bool allowNull)
-        {
-            if (!type.IsValueType)
-                return type;
-
-            if (allowNull)
-                return typeof(Nullable<>).MakeGenericType(type);
-
-            return type;
-        }
+            => DynamicEntityTableSchemaReader.GetPropertyType(type, allowNull);
 
         private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
-        {
-            if (IsSqliteConnection(connection.GetType().Name)
-                && IsSqliteUuidDeclaredType(declaredType))
-            {
-                return typeof(Guid);
-            }
-
-            if (IsSqliteConnection(connection.GetType().Name)
-                && isKey
-                && isAuto
-                && !allowNull
-                && clrType == typeof(int))
-            {
-                // SQLite INTEGER PRIMARY KEY aliases the 64-bit rowid even when
-                // provider schema metadata reports Int32 for small test values.
-                return typeof(long);
-            }
-
-            return clrType;
-        }
+            => DynamicEntityTableSchemaReader.NormalizeScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType);
 
         private static bool IsSqliteConnection(string connectionName)
             => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
@@ -529,38 +384,10 @@ namespace nORM.Scaffolding
                && !IsSqliteConnection(connectionName);
 
         private static bool IsSqliteUuidDeclaredType(string? declaredType)
-        {
-            if (string.IsNullOrWhiteSpace(declaredType))
-                return false;
-
-            var normalized = declaredType.Trim().ToUpperInvariant();
-            return !IsUnsafeSqliteProviderSpecificDeclaredType(normalized)
-                   && ContainsSqliteDeclaredTypeToken(normalized, "UUID");
-        }
+            => DynamicEntityTableSchemaReader.IsSqliteUuidDeclaredType(declaredType);
 
         private static string ToPascalCase(string name)
             => ScaffoldNameHelper.ToPascalCase(name);
-
-        private static string MakeUnique(string baseName, HashSet<string> existingNames)
-        {
-            var candidate = string.IsNullOrWhiteSpace(baseName) ? "_" : baseName;
-            var unique = candidate;
-            var suffix = 2;
-            while (existingNames.Contains(unique))
-            {
-                unique = candidate + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                suffix++;
-            }
-
-            existingNames.Add(unique);
-            return unique;
-        }
-
-        private static HashSet<string> CreateReservedMemberNameSet()
-            => typeof(object)
-                .GetMembers(BindingFlags.Instance | BindingFlags.Public)
-                .Select(member => member.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         private static string EscapeCSharpIdentifier(string identifier)
             => ScaffoldNameHelper.EscapeCSharpIdentifier(identifier);
