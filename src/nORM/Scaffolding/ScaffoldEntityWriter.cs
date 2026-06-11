@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using nORM.Configuration;
+using static nORM.Scaffolding.ScaffoldCodeText;
 
 namespace nORM.Scaffolding
 {
@@ -169,28 +170,6 @@ namespace nORM.Scaffolding
 
             AppendXmlSummary(sb, "    ", comment!);
             sb.AppendLine($"    /// <remarks>Maps to column {EscapeXmlDocumentation(columnName)}</remarks>");
-        }
-
-        private static string EscapeStringLiteral(string value)
-            => value
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n");
-
-        private static string EscapeXmlDocumentation(string value)
-            => value
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n");
-
-        private static void AppendXmlSummary(StringBuilder sb, string indent, string value)
-        {
-            sb.AppendLine(indent + "/// <summary>");
-            sb.AppendLine(indent + "/// " + EscapeXmlDocumentation(value));
-            sb.AppendLine(indent + "/// </summary>");
         }
     }
 }
