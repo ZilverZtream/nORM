@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Linq;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using System.Reflection.Emit;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,7 +17,7 @@ namespace nORM.Scaffolding
     /// </summary>
     [RequiresDynamicCode("Dynamic scaffolding emits CLR types at runtime and is not supported under NativeAOT or runtimes where dynamic code is disabled.")]
     [RequiresUnreferencedCode("Dynamic scaffolding reflects database schema into runtime-generated entity types and is not trim-safe.")]
-    public class DynamicEntityTypeGenerator
+    public partial class DynamicEntityTypeGenerator
     {
         internal sealed record ColumnInfo(string ColumnName, string PropertyName, Type PropertyType, bool AllowsNull, bool IsKey, int KeyOrdinal, int SourceOrdinal, bool IsAuto, bool IsComputed, ScaffoldComputedColumn? ComputedColumn, bool IsRowVersion, int? MaxLength, bool? IsUnicode, bool IsFixedLength, ScaffoldDecimalPrecision? DecimalPrecision);
 
@@ -32,8 +30,6 @@ namespace nORM.Scaffolding
         /// 16 bytes yields a 32-character hex string with negligible collision probability.
         /// </summary>
         private const int SchemaSignatureTruncationBytes = 16;
-
-        private const int MaxScaffoldedMySqlSetValueCount = 8;
 
         /// <summary>
         /// Generates a CLR type representing the specified table asynchronously.
@@ -146,250 +142,5 @@ namespace nORM.Scaffolding
 
         private static string BuildSchemaDescriptor(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns, bool isReadOnlyEntity)
             => DynamicEntitySchemaDescriptorBuilder.BuildDescriptor(schemaName, tableName, columns, isReadOnlyEntity);
-
-        private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetTableSchema(connection, schemaName, tableName);
-
-        private static string BuildSchemaProbeSql(
-            DbConnection connection,
-            string? schemaName,
-            string tableName,
-            string qualified,
-            IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
-            => DynamicEntityTableSchemaReader.BuildSchemaProbeSql(
-                connection,
-                schemaName,
-                tableName,
-                qualified,
-                postgresDomainColumnCastTypes);
-
-        private static int? GetScaffoldMaxLength(Type clrType, DataRow row)
-            => DynamicEntityTableSchemaReader.GetScaffoldMaxLength(clrType, row);
-
-        private static bool IsUnboundedScaffoldMaxLength(int size)
-            => DynamicEntityTableSchemaReader.IsUnboundedScaffoldMaxLength(size);
-
-        private static IReadOnlyDictionary<string, ScaffoldColumnFacet> GetStringBinaryFacets(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetStringBinaryFacets(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecision> GetDecimalPrecisions(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetDecimalPrecisions(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetComputedColumns(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
-
-        private static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetIdentityColumns(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, int> GetPrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetPrimaryKeyOrdinals(connection, schemaName, tableName);
-
-        private static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetRowVersionColumns(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, string> GetPostgresDomainColumnCastTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, string> GetMySqlUnsignedColumnTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, string> GetSqlServerAliasColumnBaseTypes(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityTableSchemaReader.GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
-
-        private static bool TryMapSqlServerAliasBaseClrType(string? typeText, out Type type)
-            => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(typeText, out type);
-
-        private static string NormalizeSqlServerAliasBaseTypeName(string typeText)
-            => ScaffoldProviderSpecificTypeClassifier.NormalizeSqlServerAliasBaseTypeName(typeText);
-
-        private static int? GetSqlServerAliasBaseMaxLengthFromTypeText(string? typeText)
-            => string.IsNullOrWhiteSpace(typeText)
-                ? null
-                : ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLengthFromTypeText(typeText);
-
-        private static bool TryMapMySqlUnsignedType(string? detail, out Type type)
-            => ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(detail, out type);
-
-        private static string NormalizeMySqlUnsignedTypeDetail(string detail)
-            => ScaffoldProviderSpecificTypeClassifier.NormalizeMySqlUnsignedTypeDetail(detail);
-
-        private static string NormalizePostgresDomainProbeCastType(string typeText)
-            => ScaffoldProviderSpecificTypeClassifier.NormalizePostgresDomainProbeCastType(typeText);
-
-        private static bool TryNormalizePostgresParameterizedProbeCastType(string normalized, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryNormalizePostgresParameterizedProbeCastType(normalized, out castType);
-
-        private static bool TryParsePostgresTypeArguments(string normalized, string typeName, out string[] args)
-            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresTypeArguments(normalized, typeName, out args);
-
-        private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out castType);
-
-        private static bool TryMapPostgresArrayCastType(string castType, out Type arrayType)
-            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(castType.Trim().ToLowerInvariant(), out arrayType);
-
-        private static IReadOnlyList<string> GetPostgresColumnNames(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntitySchemaMetadataReader.GetPostgresColumnNames(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> QueryComputedColumnMap(DbConnection connection, string sql, string? schemaName, string tableName)
-            => DynamicEntityComputedColumnReader.QueryComputedColumnMap(connection, sql, schemaName, tableName);
-
-        private static string? GetSqliteCreateTableSql(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityComputedColumnReader.GetSqliteCreateTableSql(connection, schemaName, tableName);
-
-        private static IReadOnlyDictionary<string, ScaffoldComputedColumn> ExtractSqliteGeneratedColumns(string? createTableSql)
-            => DynamicEntityComputedColumnReader.ExtractSqliteGeneratedColumns(createTableSql);
-
-        private static (string Sql, bool Stored) NormalizeComputedColumnSql(string raw)
-            => DynamicEntityComputedColumnReader.NormalizeComputedColumnSql(raw);
-
-        private static bool TryTrimTrailingComputedStorageToken(string sql, string token, out string trimmedSql)
-            => ScaffoldSqlMetadataParser.TryTrimTrailingComputedStorageToken(sql, token, out trimmedSql);
-
-        private static bool HasBalancedOuterParentheses(string value)
-            => ScaffoldSqlMetadataParser.HasBalancedOuterParentheses(value);
-
-        private static int FindMatchingParenthesis(string sql, int openIndex)
-            => ScaffoldSqliteDdlParser.FindMatchingParenthesis(sql, openIndex);
-
-        private static int FindSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
-            => ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, keyword, startIndex);
-
-        private static IReadOnlyList<string> SplitTopLevelCommaSeparated(string text)
-            => ScaffoldSqliteDdlParser.SplitTopLevelCommaSeparated(text);
-
-        private static (string? schema, string table) SplitSchema(string identifier)
-            => DynamicEntitySchemaResolver.SplitSchema(identifier);
-
-        private static (string? schema, string table, List<ColumnInfo> columns, bool isReadOnlyEntity) ResolveTableSchema(DbConnection connection, string tableName)
-            => DynamicEntitySchemaResolver.ResolveTableSchema(
-                connection,
-                tableName,
-                static (cn, schema, table) => GetTableSchema(cn, schema, table).ToList(),
-                static () => new List<ColumnInfo>(),
-                IsReadOnlyDynamicObject);
-
-        private static bool IsReadOnlyDynamicObject(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.IsReadOnlyDynamicObject(connection, schemaName, tableName);
-
-        private static bool IsDynamicQueryObject(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.IsDynamicQueryObject(connection, schemaName, tableName);
-
-        private static bool IsProviderOwnedSynonym(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.IsProviderOwnedSynonym(connection, schemaName, tableName);
-
-        private static bool IsProviderNativeTemporalTable(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.IsProviderNativeTemporalTable(connection, schemaName, tableName);
-
-        private static bool HasProviderOwnedTriggers(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.HasProviderOwnedTriggers(connection, schemaName, tableName);
-
-        private static bool HasUnmodeledDefaults(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.HasUnmodeledDefaults(connection, schemaName, tableName);
-
-        private static bool HasUnmodeledDefaultSql(string? raw)
-            => !string.IsNullOrWhiteSpace(raw)
-               && !TryNormalizeDynamicDefaultSql(raw, out _);
-
-        private static bool TryNormalizeDynamicDefaultSql(string? raw, out string defaultValueSql)
-            => DynamicEntityReadOnlyClassifier.TryNormalizeDynamicDefaultSql(raw, out defaultValueSql);
-
-        private static bool HasWriteBlockingProviderSpecificColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.HasWriteBlockingProviderSpecificColumns(connection, schemaName, tableName);
-
-        private static bool HasWriteBlockingMySqlSetColumns(DbConnection connection, string? schemaName, string tableName)
-            => DynamicEntityReadOnlyClassifier.HasWriteBlockingMySqlSetColumns(connection, schemaName, tableName);
-
-        private static bool TryParseBoundedMySqlSetValues(string? detail, out string[] values)
-            => ScaffoldProviderSpecificTypeClassifier.TryParseBoundedMySqlSetValues(detail, out values);
-
-        private static bool TryParseMySqlQuotedTypeValues(string? detail, string typeName, out string[] values)
-            => ScaffoldProviderSpecificTypeClassifier.TryParseMySqlQuotedTypeValues(detail, typeName, out values);
-
-        private static bool IsWriteBlockingSqliteDeclaredType(string? declaredType)
-            => DynamicEntityReadOnlyClassifier.IsWriteBlockingSqliteDeclaredType(declaredType);
-
-        private static bool IsUnsafeSqliteProviderSpecificDeclaredType(string normalizedDeclaredType)
-            => DynamicEntityReadOnlyClassifier.IsUnsafeSqliteProviderSpecificDeclaredType(normalizedDeclaredType);
-
-        private static bool ContainsSqliteDeclaredTypeToken(string normalizedDeclaredType, string token)
-            => DynamicEntityReadOnlyClassifier.ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, token);
-
-        private static string? ResolveUniqueUnqualifiedSchema(DbConnection connection, string tableName)
-            => DynamicEntitySchemaResolver.ResolveUniqueUnqualifiedSchema(connection, tableName);
-
-        private static IReadOnlyList<string> GetMatchingObjectSchemas(DbConnection connection, string tableName)
-            => DynamicEntitySchemaResolver.GetMatchingObjectSchemas(connection, tableName);
-
-        private static IReadOnlyList<string> GetSqliteMatchingObjectSchemas(DbConnection connection, string tableName)
-            => DynamicEntitySchemaResolver.GetSqliteMatchingObjectSchemas(connection, tableName);
-
-        private static IReadOnlyList<string> QuerySchemaNameList(DbConnection connection, string sql, string tableName)
-            => DynamicEntitySchemaResolver.QuerySchemaNameList(connection, sql, tableName);
-
-        private static bool TryGetTableSchema(DbConnection connection, string? schemaName, string tableName, out List<ColumnInfo> columns)
-        {
-            var found = DynamicEntitySchemaResolver.TryGetTableSchema(
-                connection,
-                schemaName,
-                tableName,
-                static (cn, schema, table) => GetTableSchema(cn, schema, table).ToList(),
-                static () => new List<ColumnInfo>(),
-                out var resolvedColumns);
-            columns = resolvedColumns;
-            return found;
-        }
-
-        private static string EscapeQualified(DbConnection connection, string? schema, string table)
-            => DynamicEntitySchemaResolver.EscapeQualified(connection, schema, table);
-
-        private static bool ReaderHasColumn(DbDataReader reader, string name)
-            => DynamicEntitySchemaResolver.ReaderHasColumn(reader, name);
-
-        /// <summary>
-        /// Wraps a raw SQL identifier in the appropriate quoting characters for the provider.
-        /// Escapes embedded quoting characters so legitimate identifiers are preserved
-        /// without allowing crafted table or schema names to break out of the quote.
-        /// </summary>
-        private static string EscapeIdentifier(DbConnection connection, string identifier)
-            => DynamicEntitySchemaResolver.EscapeIdentifier(connection, identifier);
-
-        /// <summary>
-        /// Maps a CLR type and its nullability to the property type for the generated entity.
-        /// Value types that allow null are wrapped in <see cref="Nullable{T}"/>; reference types
-        /// are returned as-is since nullability is implicit.
-        /// </summary>
-        private static Type GetPropertyType(Type type, bool allowNull)
-            => DynamicEntityTableSchemaReader.GetPropertyType(type, allowNull);
-
-        private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
-            => DynamicEntityTableSchemaReader.NormalizeScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType);
-
-        private static bool IsSqliteConnection(string connectionName)
-            => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsPostgresConnection(string connectionName)
-            => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsMySqlConnection(string connectionName)
-            => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsSqlServerConnection(string connectionName)
-            => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
-               && !IsPostgresConnection(connectionName)
-               && !IsMySqlConnection(connectionName)
-               && !IsSqliteConnection(connectionName);
-
-        private static bool IsSqliteUuidDeclaredType(string? declaredType)
-            => DynamicEntityTableSchemaReader.IsSqliteUuidDeclaredType(declaredType);
-
-        private static string ToPascalCase(string name)
-            => ScaffoldNameHelper.ToPascalCase(name);
-
-        private static string EscapeCSharpIdentifier(string identifier)
-            => ScaffoldNameHelper.EscapeCSharpIdentifier(identifier);
     }
 }
