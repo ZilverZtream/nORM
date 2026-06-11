@@ -113,6 +113,14 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.ExpressionIndexes.cs"));
 
+    private static string ReadSqliteUnsupportedFeatureSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteUnsupportedFeatureDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteUnsupportedFeatureDiscovery.Columns.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteUnsupportedFeatureDiscovery.Triggers.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteUnsupportedFeatureDiscovery.Indexes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteUnsupportedFeatureDiscovery.Helpers.cs"));
+
     private static string ReadIndexDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
@@ -745,6 +753,7 @@ public partial class ScaffoldingContractDocTests
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
+        var sqliteUnsupportedSource = ReadSqliteUnsupportedFeatureSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
 
         Assert.Contains("filtered/partial", doc, StringComparison.Ordinal);
@@ -770,6 +779,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("FindCreateIndexKeyListOpen", source, StringComparison.Ordinal);
         Assert.Contains("FindSqlKeywordOutsideQuotes", source, StringComparison.Ordinal);
         Assert.Contains("GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name)", indexDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("index_xinfo", sqliteUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("\"PartialIndex\"", sqliteUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("\"ExpressionIndex\"", sqliteUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("\"DescendingIndex\"", sqliteUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("i.type IN (1, 2)", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("am.amname = 'btree'", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("ix.indoption[key.ord - 1] & 1", indexDiscoverySource, StringComparison.Ordinal);
