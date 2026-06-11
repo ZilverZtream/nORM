@@ -101,6 +101,11 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ModelConfiguration.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Relationships.cs"));
 
+    private static string ReadLiveProviderScaffoldCliParitySource()
+        => string.Concat(
+            ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliManyToManyTests.cs"));
+
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -1318,7 +1323,7 @@ public class ScaffoldingContractDocTests
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var defaultValidator = ReadRepoFile("src", "nORM", "Migration", "DefaultValueValidator.cs");
         var liveScaffoldTests = ReadRepoFile("tests", "LiveProviderScaffoldingParityTests.cs");
-        var liveScaffoldCliTests = ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs");
+        var liveScaffoldCliTests = ReadLiveProviderScaffoldCliParitySource();
 
         Assert.Contains("Repeated scaffolds of the same schema", cliReadme, StringComparison.Ordinal);
         Assert.Contains("ordered deterministically", cliReadme, StringComparison.Ordinal);
