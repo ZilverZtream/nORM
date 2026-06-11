@@ -97,6 +97,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificColumnFeatureDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificIndexFeatureDiscovery.cs"));
 
+    private static string ReadSqlServerUnsupportedFeatureSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.CheckConstraints.cs"));
+
     private static string ReadIndexDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
@@ -388,7 +394,7 @@ public partial class ScaffoldingContractDocTests
         var source = ReadStaticEntityScaffoldSource();
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
-        var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
+        var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var skippedMetadataSource = string.Concat(
@@ -886,7 +892,7 @@ public partial class ScaffoldingContractDocTests
         var foreignKeyDiscoverySource = ReadForeignKeyDiscoverySource();
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var keyDiscoverySource = ReadKeyDiscoverySource();
-        var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
+        var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
         var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var configurationSource = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var snapshotSource = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
