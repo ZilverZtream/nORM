@@ -17,6 +17,10 @@ public partial class ScaffoldingContractDocTests
         var cliSource = string.Concat(
             ReadRepoFile("src", "dotnet-norm", "Program.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.EfToolConfig.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Project.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Configuration.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.FiltersAndResults.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Shared.cs"));
         var scaffolderSource = string.Concat(
             ReadDatabaseScaffolderSource(),
