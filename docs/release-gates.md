@@ -199,6 +199,13 @@ Current RC3 local evidence with SQL Server, PostgreSQL, and MySQL configured:
 `eng\live-provider-gate.cmd live` passed 1425/1425, and
 `dotnet run --project samples/nORM.Sample.Store -c Release --no-build --
 verify-providers` passed SQLite, SQL Server, PostgreSQL, and MySQL.
+Current full non-benchmark v1 correctness evidence:
+`eng\v1-release-gate.ps1 -Mode full -MinLiveProviders 3 -SkipBenchmark`
+passed on commit `223f0195cea695c85a841e6bf4852c2c1d484545`: AOT baseline
+302/302 clean, public API snapshot 2/2, package consumer 6/6, CLI smoke 78/78,
+live provider gate 1951/1951, full suite 11557/11557, and package validation
+green. Because `-SkipBenchmark` was used, this is correctness/provider-parity
+evidence only, not performance evidence.
 The sample certification report records error/warning totals and recommended
 fix rows in addition to per-provider checks. Provider FAIL results, and SKIP
 results under strict certification, contribute error-level report evidence.
