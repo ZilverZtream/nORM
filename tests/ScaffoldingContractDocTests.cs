@@ -116,6 +116,8 @@ public partial class ScaffoldingContractDocTests
     private static string ReadDiagnosticsWriterSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Classification.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Markdown.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.cs"));
 
     private static string ReadContextWriterSource()

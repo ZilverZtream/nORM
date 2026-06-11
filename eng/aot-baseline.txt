@@ -300,7 +300,7 @@ src/nORM/Scaffolding/DynamicEntityTableSchemaReader.cs:194:IL3050
 src/nORM/Scaffolding/DynamicEntityTypeBuilder.cs:147:IL2026
 src/nORM/Scaffolding/DynamicEntityTypeBuilder.cs:36:IL3050
 src/nORM/Scaffolding/ScaffoldContextWriter.Shell.cs:109:IL2026
-src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:55:IL2026
-src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:55:IL3050
+src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:54:IL2026
+src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:54:IL3050
 src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:105:IL3050
 src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:142:IL3050
