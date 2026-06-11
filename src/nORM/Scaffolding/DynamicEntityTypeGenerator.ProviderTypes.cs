@@ -64,19 +64,5 @@ namespace nORM.Scaffolding
         private static bool IsSqliteUuidDeclaredType(string? declaredType)
             => DynamicEntityTableSchemaReader.IsSqliteUuidDeclaredType(declaredType);
 
-        private static bool IsSqliteConnection(string connectionName)
-            => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsPostgresConnection(string connectionName)
-            => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsMySqlConnection(string connectionName)
-            => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsSqlServerConnection(string connectionName)
-            => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
-               && !IsPostgresConnection(connectionName)
-               && !IsMySqlConnection(connectionName)
-               && !IsSqliteConnection(connectionName);
     }
 }

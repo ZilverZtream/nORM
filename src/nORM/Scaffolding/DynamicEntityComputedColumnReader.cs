@@ -12,9 +12,7 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyDictionary<string, DynamicEntityTypeGenerator.ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var result = new Dictionary<string, DynamicEntityTypeGenerator.ScaffoldComputedColumn>(StringComparer.OrdinalIgnoreCase);
                 foreach (var (columnName, computed) in ExtractSqliteGeneratedColumns(GetSqliteCreateTableSql(connection, schemaName, tableName)))
@@ -23,8 +21,8 @@ namespace nORM.Scaffolding
                 using var cmd = connection.CreateCommand();
                 var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                     ? string.Empty
-                    : EscapeIdentifier(connection, schemaName!) + ".";
-                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                    : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -46,7 +44,7 @@ namespace nORM.Scaffolding
                 return result;
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryComputedColumnMap(connection, """
                     SELECT c.name AS ColumnName,
@@ -61,7 +59,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryComputedColumnMap(connection, """
                     SELECT column_name AS ColumnName,
@@ -74,7 +72,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryComputedColumnMap(connection, """
                     SELECT column_name AS ColumnName,
@@ -128,7 +126,7 @@ namespace nORM.Scaffolding
             using var command = connection.CreateCommand();
             var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                 ? string.Empty
-                : EscapeIdentifier(connection, schemaName!) + ".";
+                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
             command.CommandText = $"SELECT sql FROM {schemaPrefix}sqlite_master WHERE type = 'table' AND name = @tableName";
             AddStringParameter(command, "@tableName", tableName);
             return Convert.ToString(command.ExecuteScalar());

@@ -20,13 +20,13 @@ namespace nORM.Scaffolding
 
         public static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
         {
-            if (DynamicEntitySchemaResolver.IsSqliteConnection(connection.GetType().Name)
+            if (DynamicEntityConnectionKind.IsSqlite(connection)
                 && IsSqliteUuidDeclaredType(declaredType))
             {
                 return typeof(Guid);
             }
 
-            if (DynamicEntitySchemaResolver.IsSqliteConnection(connection.GetType().Name)
+            if (DynamicEntityConnectionKind.IsSqlite(connection)
                 && isKey
                 && isAuto
                 && !allowNull
@@ -48,8 +48,7 @@ namespace nORM.Scaffolding
             string? sqlServerAliasBaseType,
             IReadOnlyDictionary<string, string> mySqlUnsignedColumnTypes)
         {
-            var connectionName = connection.GetType().Name;
-            if (DynamicEntitySchemaResolver.IsPostgresConnection(connectionName)
+            if (DynamicEntityConnectionKind.IsPostgres(connection)
                 && normalizedClrType == typeof(Array)
                 && postgresDomainColumnCastTypes.TryGetValue(columnName, out var domainCastType)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(domainCastType.Trim().ToLowerInvariant(), out var arrayClrType))
@@ -57,13 +56,13 @@ namespace nORM.Scaffolding
                 return arrayClrType;
             }
 
-            if (DynamicEntitySchemaResolver.IsSqlServerConnection(connectionName)
+            if (DynamicEntityConnectionKind.IsSqlServer(connection)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(sqlServerAliasBaseType, out var aliasClrType))
             {
                 return aliasClrType;
             }
 
-            if (DynamicEntitySchemaResolver.IsMySqlConnection(connectionName)
+            if (DynamicEntityConnectionKind.IsMySql(connection)
                 && mySqlUnsignedColumnTypes.TryGetValue(columnName, out var unsignedColumnType)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(unsignedColumnType, out var unsignedClrType))
             {

@@ -327,6 +327,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.Keys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityProviderTypeMetadataReader.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataQuery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityConnectionKind.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"));
 
@@ -913,6 +914,27 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("IsUnboundedScaffoldMaxLength", source, StringComparison.Ordinal);
         Assert.Contains("'timestamp', 'rowversion'", source, StringComparison.Ordinal);
         Assert.Contains("RV", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dynamic_scaffolding_provider_dispatch_is_centralized()
+    {
+        var source = ReadDynamicEntitySource();
+        var helperSource = ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityConnectionKind.cs");
+        var dispatchSource = source.Replace(helperSource, string.Empty, StringComparison.Ordinal);
+
+        Assert.Contains("internal static class DynamicEntityConnectionKind", source, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.IsSqlite(connection)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.IsSqlServer(connection)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.IsPostgres(connection)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.IsMySql(connection)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.EscapeIdentifier(connection", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("DynamicEntityConnectionKind.EscapeQualified(connection", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("connection.GetType().Name", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsSqliteConnection", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsSqlServerConnection", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsPostgresConnection", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsMySqlConnection", dispatchSource, StringComparison.Ordinal);
     }
 
     [Fact]

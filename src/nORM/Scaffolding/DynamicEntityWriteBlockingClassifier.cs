@@ -8,17 +8,16 @@ namespace nORM.Scaffolding
     {
         public static bool HasWriteBlockingProviderSpecificColumns(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
                 return HasWriteBlockingSqliteColumns(connection, schemaName, tableName);
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
                 return HasWriteBlockingSqlServerColumns(connection, schemaName, tableName);
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
                 return HasWriteBlockingPostgresColumns(connection, schemaName, tableName);
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
                 return HasWriteBlockingMySqlColumns(connection, schemaName, tableName);
 
             return false;

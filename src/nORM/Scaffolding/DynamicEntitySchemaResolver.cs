@@ -86,8 +86,7 @@ namespace nORM.Scaffolding
 
             if (schemas.Count == 1)
             {
-                var connectionName = connection.GetType().Name;
-                if (IsSqlServerConnection(connectionName) || IsPostgresConnection(connectionName))
+                if (DynamicEntityConnectionKind.IsSqlServer(connection) || DynamicEntityConnectionKind.IsPostgres(connection))
                     return schemas[0];
             }
 
@@ -96,11 +95,10 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyList<string> GetMatchingObjectSchemas(DbConnection connection, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
                 return GetSqliteMatchingObjectSchemas(connection, tableName);
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QuerySchemaNameList(connection, """
                     SELECT s.name AS SchemaName
@@ -113,7 +111,7 @@ namespace nORM.Scaffolding
                     """, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QuerySchemaNameList(connection, """
                     SELECT table_schema AS SchemaName
@@ -149,7 +147,7 @@ namespace nORM.Scaffolding
             foreach (var schema in schemas.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 using var command = connection.CreateCommand();
-                command.CommandText = $"SELECT name FROM {EscapeIdentifier(connection, schema)}.sqlite_master WHERE type IN ('table', 'view') AND name = @tableName LIMIT 1";
+                command.CommandText = $"SELECT name FROM {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.sqlite_master WHERE type IN ('table', 'view') AND name = @tableName LIMIT 1";
                 AddStringParameter(command, "@tableName", tableName);
                 if (command.ExecuteScalar() is not null)
                     matches.Add(schema);
@@ -178,26 +176,8 @@ namespace nORM.Scaffolding
                 .ToArray();
         }
 
-        public static string EscapeQualified(DbConnection connection, string? schema, string table)
-            => string.IsNullOrEmpty(schema)
-                ? EscapeIdentifier(connection, table)
-                : $"{EscapeIdentifier(connection, schema!)}.{EscapeIdentifier(connection, table)}";
-
         public static bool ReaderHasColumn(DbDataReader reader, string name)
             => ScaffoldDataReaderHelper.HasColumn(reader, name);
-
-        public static string EscapeIdentifier(DbConnection connection, string identifier)
-        {
-            var name = connection.GetType().Name.ToLowerInvariant();
-            return name switch
-            {
-                var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "\"\"")}\"",
-                var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "\"\"")}\"",
-                var n when n.Contains("mysql") => $"`{identifier.Replace("`", "``")}`",
-                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "]]")}]",
-                _ => $"\"{identifier.Replace("\"", "\"\"")}\""
-            };
-        }
 
         private static void AddStringParameter(DbCommand command, string name, string? value)
         {
@@ -207,20 +187,5 @@ namespace nORM.Scaffolding
             parameter.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
             command.Parameters.Add(parameter);
         }
-
-        public static bool IsSqliteConnection(string connectionName)
-            => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
-
-        public static bool IsPostgresConnection(string connectionName)
-            => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
-
-        public static bool IsMySqlConnection(string connectionName)
-            => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
-
-        public static bool IsSqlServerConnection(string connectionName)
-            => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
-               && !IsPostgresConnection(connectionName)
-               && !IsMySqlConnection(connectionName)
-               && !IsSqliteConnection(connectionName);
     }
 }

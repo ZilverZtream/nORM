@@ -11,12 +11,11 @@ namespace nORM.Scaffolding
     {
         public static bool HasUnmodeledDefaults(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"PRAGMA {EscapeIdentifier(connection, schema)}.table_xinfo({EscapeIdentifier(connection, tableName)})";
+                cmd.CommandText = $"PRAGMA {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -30,7 +29,7 @@ namespace nORM.Scaffolding
                 return false;
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryHasUnmodeledDefault(connection, """
                     SELECT CONVERT(nvarchar(max), dc.definition) AS DefaultSql
@@ -44,7 +43,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryHasUnmodeledDefault(connection, """
                     SELECT column_default AS DefaultSql
@@ -58,7 +57,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryHasUnmodeledDefault(connection, """
                     SELECT CASE

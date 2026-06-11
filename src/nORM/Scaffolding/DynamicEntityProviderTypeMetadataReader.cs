@@ -11,7 +11,7 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyDictionary<string, string> GetPostgresDomainColumnCastTypes(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsPostgresConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsPostgres(connection))
                 return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -96,7 +96,7 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, string> GetMySqlUnsignedColumnTypes(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsMySqlConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsMySql(connection))
                 return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -125,7 +125,7 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, string> GetSqlServerAliasColumnBaseTypes(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsSqlServerConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsSqlServer(connection))
                 return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

@@ -11,7 +11,7 @@ namespace nORM.Scaffolding
         {
             var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"PRAGMA {EscapeIdentifier(connection, schema)}.table_xinfo({EscapeIdentifier(connection, tableName)})";
+            cmd.CommandText = $"PRAGMA {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {

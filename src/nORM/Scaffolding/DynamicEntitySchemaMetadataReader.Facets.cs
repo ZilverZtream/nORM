@@ -11,8 +11,7 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyDictionary<string, ScaffoldColumnFacet> GetStringBinaryFacets(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryColumnFacetMap(connection, """
                     SELECT c.name AS ColumnName,
@@ -45,7 +44,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryColumnFacetMap(connection, """
                     SELECT column_name AS ColumnName,
@@ -60,7 +59,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryColumnFacetMap(connection, """
                     SELECT column_name AS ColumnName,
@@ -79,8 +78,7 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo> GetDecimalPrecisions(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryDecimalPrecisionMap(connection, """
                     SELECT c.name AS ColumnName,
@@ -100,7 +98,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryDecimalPrecisionMap(connection, """
                     SELECT column_name AS ColumnName,
@@ -114,7 +112,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryDecimalPrecisionMap(connection, """
                     SELECT column_name AS ColumnName,

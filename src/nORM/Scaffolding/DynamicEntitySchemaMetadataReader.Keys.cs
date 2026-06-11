@@ -13,16 +13,14 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
                 using var cmd = connection.CreateCommand();
                 var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                     ? string.Empty
-                    : EscapeIdentifier(connection, schemaName!) + ".";
-                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                    : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -44,7 +42,7 @@ namespace nORM.Scaffolding
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT c.name AS ColumnName
@@ -57,7 +55,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -71,7 +69,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryColumnNameSet(connection, """
                     SELECT column_name AS ColumnName
@@ -87,16 +85,14 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, int> GetPrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 using var cmd = connection.CreateCommand();
                 var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                     ? string.Empty
-                    : EscapeIdentifier(connection, schemaName!) + ".";
-                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                    : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
+                cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -112,7 +108,7 @@ namespace nORM.Scaffolding
                 return result;
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT c.name AS ColumnName, ic.key_ordinal AS Ordinal
@@ -126,7 +122,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT att.attname AS ColumnName, keys.ordinality AS Ordinal
@@ -141,7 +137,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryColumnOrdinalMap(connection, """
                     SELECT column_name AS ColumnName, ordinal_position AS Ordinal
@@ -157,8 +153,7 @@ namespace nORM.Scaffolding
 
         public static IReadOnlySet<string> GetRowVersionColumns(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (!IsSqlServerConnection(connectionName))
+            if (!DynamicEntityConnectionKind.IsSqlServer(connection))
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             return QueryColumnNameSet(connection, """

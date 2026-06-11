@@ -10,14 +10,13 @@ namespace nORM.Scaffolding
     {
         public static bool IsDynamicQueryObject(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = $"""
                     SELECT type, sql
-                    FROM {EscapeIdentifier(connection, schema)}.sqlite_master
+                    FROM {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.sqlite_master
                     WHERE name = @tableName
                       AND type IN ('table', 'view')
                     LIMIT 1
@@ -35,7 +34,7 @@ namespace nORM.Scaffolding
                 return sql?.TrimStart().StartsWith("CREATE VIRTUAL TABLE", StringComparison.OrdinalIgnoreCase) == true;
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1
@@ -47,7 +46,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1
@@ -64,7 +63,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1
@@ -79,7 +78,7 @@ namespace nORM.Scaffolding
 
         public static bool IsProviderOwnedSynonym(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsSqlServerConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsSqlServer(connection))
                 return false;
 
             return QueryExists(connection, """
@@ -93,7 +92,7 @@ namespace nORM.Scaffolding
 
         public static bool IsProviderNativeTemporalTable(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsSqlServerConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsSqlServer(connection))
                 return false;
 
             return QueryExists(connection, """
@@ -109,14 +108,13 @@ namespace nORM.Scaffolding
 
         public static bool HasProviderOwnedTriggers(DbConnection connection, string? schemaName, string tableName)
         {
-            var connectionName = connection.GetType().Name;
-            if (IsSqliteConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
             {
                 var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = $"""
                     SELECT 1
-                    FROM {EscapeIdentifier(connection, schema)}.sqlite_master
+                    FROM {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.sqlite_master
                     WHERE type = 'trigger'
                       AND tbl_name = @tableName
                     LIMIT 1
@@ -125,7 +123,7 @@ namespace nORM.Scaffolding
                 return cmd.ExecuteScalar() is not null;
             }
 
-            if (IsSqlServerConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsSqlServer(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1
@@ -138,7 +136,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsPostgresConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsPostgres(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1
@@ -149,7 +147,7 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
-            if (IsMySqlConnection(connectionName))
+            if (DynamicEntityConnectionKind.IsMySql(connection))
             {
                 return QueryExists(connection, """
                     SELECT 1

@@ -10,15 +10,15 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
         {
-            if (!IsSqliteConnection(connection.GetType().Name))
+            if (!DynamicEntityConnectionKind.IsSqlite(connection))
                 return new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase);
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             using var cmd = connection.CreateCommand();
             var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
                 ? string.Empty
-                : EscapeIdentifier(connection, schemaName!) + ".";
-            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({EscapeIdentifier(connection, tableName)})";
+                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
+            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {

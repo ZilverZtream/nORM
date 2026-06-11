@@ -12,7 +12,7 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
-            var qualified = DynamicEntitySchemaResolver.EscapeQualified(connection, schemaName, tableName);
+            var qualified = DynamicEntityConnectionKind.EscapeQualified(connection, schemaName, tableName);
             var postgresDomainColumnCastTypes = GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
             DataTable? schema;
             using (var cmd = connection.CreateCommand())

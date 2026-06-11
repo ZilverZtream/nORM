@@ -14,7 +14,7 @@ namespace nORM.Scaffolding
             string qualified,
             IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
         {
-            if (!DynamicEntitySchemaResolver.IsPostgresConnection(connection.GetType().Name) || postgresDomainColumnCastTypes.Count == 0)
+            if (!DynamicEntityConnectionKind.IsPostgres(connection) || postgresDomainColumnCastTypes.Count == 0)
                 return $"SELECT * FROM {qualified} WHERE 1=0";
 
             var columnNames = DynamicEntitySchemaMetadataReader.GetPostgresColumnNames(connection, schemaName, tableName);
@@ -23,7 +23,7 @@ namespace nORM.Scaffolding
 
             var projection = columnNames.Select(column =>
             {
-                var escaped = DynamicEntitySchemaResolver.EscapeIdentifier(connection, column);
+                var escaped = DynamicEntityConnectionKind.EscapeIdentifier(connection, column);
                 return postgresDomainColumnCastTypes.TryGetValue(column, out var castType)
                     ? $"{escaped}::{castType} AS {escaped}"
                     : escaped;
