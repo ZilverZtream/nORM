@@ -94,6 +94,13 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.cs"));
 
+    private static string ReadContextWriterSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Shell.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ModelConfiguration.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Relationships.cs"));
+
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -187,7 +194,7 @@ public class ScaffoldingContractDocTests
         var entityTypeBuilder = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var entityTypeConfiguration = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var scaffolder = ReadDatabaseScaffolderSource();
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var sqlServerMigration = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
         var postgresMigration = ReadRepoFile("src", "nORM", "Migration", "PostgresMigrationSqlGenerator.cs");
         var mysqlMigration = ReadRepoFile("src", "nORM", "Migration", "MySqlMigrationSqlGenerator.cs");
@@ -374,7 +381,7 @@ public class ScaffoldingContractDocTests
     {
         var source = ReadStaticEntityScaffoldSource();
         var entityWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.cs");
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var entityStart = source.IndexOf("public static async Task<string> BuildAsync", StringComparison.Ordinal);
         var entityEnd = source.IndexOf("public static string BuildSchemaProbeSql", entityStart, StringComparison.Ordinal);
@@ -1169,7 +1176,7 @@ public class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         var source = ReadDatabaseScaffolderSource();
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var manyToManyDiscoverySource = ReadManyToManyDiscoverySource();
         var sqlServerMigration = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
         var postgresMigration = ReadRepoFile("src", "nORM", "Migration", "PostgresMigrationSqlGenerator.cs");
@@ -1205,7 +1212,7 @@ public class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         var source = ReadDatabaseScaffolderSource();
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var checkFeatureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCheckFeatureConfigurationBuilder.cs");
         var foreignKeyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.cs");
@@ -1257,7 +1264,7 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
 
         Assert.Contains("Generated entity classes and generated contexts are `partial`", doc, StringComparison.Ordinal);
         Assert.Contains("OnModelCreatingPartial(ModelBuilder)", doc, StringComparison.Ordinal);
@@ -1300,7 +1307,7 @@ public class ScaffoldingContractDocTests
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var featureMapBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs");
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
         var manyToManyDiscoverySource = ReadManyToManyDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
@@ -1855,7 +1862,7 @@ public class ScaffoldingContractDocTests
             ReadDatabaseScaffolderSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
         var tableFilterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs");
-        var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
+        var contextWriterSource = ReadContextWriterSource();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
 
