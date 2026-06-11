@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.Linq;
+using static nORM.Scaffolding.DynamicEntitySchemaResolver;
 
 namespace nORM.Scaffolding
 {
@@ -617,43 +618,5 @@ namespace nORM.Scaffolding
             command.Parameters.Add(parameter);
         }
 
-        private static bool ReaderHasColumn(DbDataReader reader, string name)
-        {
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static string EscapeIdentifier(DbConnection connection, string identifier)
-        {
-            var name = connection.GetType().Name.ToLowerInvariant();
-            return name switch
-            {
-                var n when n.Contains("sqlite") => $"\"{identifier.Replace("\"", "\"\"")}\"",
-                var n when n.Contains("npgsql") => $"\"{identifier.Replace("\"", "\"\"")}\"",
-                var n when n.Contains("mysql") => $"`{identifier.Replace("`", "``")}`",
-                var n when n.Contains("sqlconnection") => $"[{identifier.Replace("]", "]]")}]",
-                _ => $"\"{identifier.Replace("\"", "\"\"")}\""
-            };
-        }
-
-        private static bool IsSqliteConnection(string connectionName)
-            => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsPostgresConnection(string connectionName)
-            => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsMySqlConnection(string connectionName)
-            => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsSqlServerConnection(string connectionName)
-            => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
-               && !IsPostgresConnection(connectionName)
-               && !IsMySqlConnection(connectionName)
-               && !IsSqliteConnection(connectionName);
     }
 }

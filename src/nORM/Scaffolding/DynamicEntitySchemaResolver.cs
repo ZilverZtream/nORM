@@ -216,16 +216,16 @@ namespace nORM.Scaffolding
             command.Parameters.Add(parameter);
         }
 
-        private static bool IsSqliteConnection(string connectionName)
+        public static bool IsSqliteConnection(string connectionName)
             => connectionName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsPostgresConnection(string connectionName)
+        public static bool IsPostgresConnection(string connectionName)
             => connectionName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsMySqlConnection(string connectionName)
+        public static bool IsMySqlConnection(string connectionName)
             => connectionName.Contains("MySql", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsSqlServerConnection(string connectionName)
+        public static bool IsSqlServerConnection(string connectionName)
             => connectionName.Contains("SqlConnection", StringComparison.OrdinalIgnoreCase)
                && !IsPostgresConnection(connectionName)
                && !IsMySqlConnection(connectionName)
