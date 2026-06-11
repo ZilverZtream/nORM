@@ -74,6 +74,13 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Expressions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Types.cs"));
 
+    private static string ReadColumnDiscoverySource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"));
+
     private static string ReadPostgresUnsupportedFeatureSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs"),
@@ -312,7 +319,7 @@ public partial class ScaffoldingContractDocTests
         var skippedMetadataSource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.cs"));
-        var columnDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.cs");
+        var columnDiscoverySource = ReadColumnDiscoverySource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
         var parserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.cs");
         var sqlMetadataParserSource = ReadSqlMetadataParserSource();
