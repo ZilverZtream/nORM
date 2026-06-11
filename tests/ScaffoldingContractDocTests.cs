@@ -95,6 +95,15 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
 
+    private static string ReadKeyDiscoverySource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Fallback.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Queries.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Helpers.cs"));
+
     private static string ReadSkippedObjectDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs"),
@@ -196,6 +205,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
+            ReadKeyDiscoverySource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelCompositionBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldObjectSelectionBuilder.cs"),
@@ -858,7 +868,7 @@ public partial class ScaffoldingContractDocTests
         var checkFeatureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCheckFeatureConfigurationBuilder.cs");
         var foreignKeyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.cs");
         var indexDiscoverySource = ReadIndexDiscoverySource();
-        var keyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.cs");
+        var keyDiscoverySource = ReadKeyDiscoverySource();
         var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
         var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var configurationSource = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
