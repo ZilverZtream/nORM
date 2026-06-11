@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading.Tasks;
@@ -11,7 +10,7 @@ namespace nORM.Scaffolding
             DbConnection connection,
             List<ScaffoldUnsupportedFeatureInfo> features,
             HashSet<string> tableKeys)
-            => AddFeaturesAsync(connection, features, tableKeys, """
+            => ScaffoldUnsupportedFeatureDiscoveryReader.AddFeaturesAsync(connection, features, tableKeys, """
                 SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'ProviderSpecificColumnType' AS Kind,
                     (CASE
                         WHEN domain_name IS NOT NULL AND domain_name <> ''
@@ -92,34 +91,5 @@ namespace nORM.Scaffolding
                       OR udt_name IN ('json', 'jsonb', 'inet', 'cidr', 'macaddr', 'macaddr8', 'tsvector', 'tsquery')
                   )
                 """);
-
-        private static async Task AddFeaturesAsync(
-            DbConnection connection,
-            List<ScaffoldUnsupportedFeatureInfo> features,
-            HashSet<string> tableKeys,
-            string sql)
-        {
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var tableKey = TableKey(NullIfWhiteSpace(Convert.ToString(reader["TableSchema"])), Convert.ToString(reader["TableName"]) ?? string.Empty);
-                if (!tableKeys.Contains(tableKey))
-                    continue;
-
-                features.Add(new ScaffoldUnsupportedFeatureInfo(
-                    tableKey,
-                    Convert.ToString(reader["Kind"]) ?? string.Empty,
-                    Convert.ToString(reader["ObjectName"]) ?? string.Empty,
-                    Convert.ToString(reader["Detail"]) ?? string.Empty));
-            }
-        }
-
-        private static string TableKey(string? schema, string table)
-            => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;
-
-        private static string? NullIfWhiteSpace(string? value)
-            => string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }
