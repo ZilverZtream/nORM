@@ -14,7 +14,10 @@ public partial class ScaffoldingContractDocTests
     public void Doc_and_cli_pin_repeatable_table_filter_for_literal_commas()
     {
         var doc = ReadDoc();
-        var cliSource = ReadRepoFile("src", "dotnet-norm", "Program.cs");
+        var cliSource = string.Concat(
+            ReadRepoFile("src", "dotnet-norm", "Program.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Shared.cs"));
         var scaffolderSource = string.Concat(
             ReadDatabaseScaffolderSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
