@@ -7,8 +7,6 @@ namespace nORM.Scaffolding
 {
     internal static class ScaffoldManyToManyJoinDiscovery
     {
-        private static readonly IReadOnlySet<string> EmptyStringSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         public static IReadOnlyList<ScaffoldManyToManyJoinInfo> BuildManyToManyJoins(
             IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys,
             IReadOnlyList<ScaffoldTableInfo> tables,
@@ -117,10 +115,10 @@ namespace nORM.Scaffolding
                 rightGroup.Select(static fk => fk.DependentColumn).ToArray(),
                 leftPrincipal.PrincipalKeyProperties,
                 rightPrincipal.PrincipalKeyProperties,
-                NormalizeReferentialAction(leftGroup[0].OnDelete),
-                NormalizeReferentialAction(leftGroup[0].OnUpdate),
-                NormalizeReferentialAction(rightGroup[0].OnDelete),
-                NormalizeReferentialAction(rightGroup[0].OnUpdate),
+                ScaffoldForeignKeyShape.NormalizeReferentialAction(leftGroup[0].OnDelete),
+                ScaffoldForeignKeyShape.NormalizeReferentialAction(leftGroup[0].OnUpdate),
+                ScaffoldForeignKeyShape.NormalizeReferentialAction(rightGroup[0].OnDelete),
+                ScaffoldForeignKeyShape.NormalizeReferentialAction(rightGroup[0].OnUpdate),
                 leftPrincipal.UsesPrimaryKey && rightPrincipal.UsesPrimaryKey,
                 leftCollectionName,
                 rightCollectionName);
@@ -144,8 +142,8 @@ namespace nORM.Scaffolding
 
             return fkGroups.Length == 2
                    && fkGroups.All(rows => rows.Length > 0 && rows.All(row => row.ColumnCount == rows.Length))
-                   && !AllForeignKeyGroupsAreUniqueDependentKeys(joinTableKey, fkGroups, primaryKeyColumnsByTable, indexes)
-                   && fkGroups.All(HasOnlyScaffoldableReferentialActions);
+                   && !ScaffoldForeignKeyShape.AllForeignKeyGroupsAreUniqueDependentKeys(joinTableKey, fkGroups, primaryKeyColumnsByTable, indexes)
+                   && fkGroups.All(ScaffoldForeignKeyShape.HasOnlyScaffoldableReferentialActions);
         }
 
         private static bool HasScaffoldableManyToManyBridgeShape(
@@ -167,11 +165,8 @@ namespace nORM.Scaffolding
             var fkColumnNames = fkGroups
                 .SelectMany(static rows => rows.Select(static fk => fk.DependentColumn))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var hasExactBridgePrimaryKey = joinPrimaryKeyColumns.Count == fkColumnNames.Count
-                && joinPrimaryKeyColumns.All(column => fkColumnNames.Contains(column));
-            var databaseGeneratedColumns = databaseGeneratedColumnsByTable.TryGetValue(joinTableKey, out var generatedColumns)
-                ? generatedColumns
-                : EmptyStringSet;
+            var hasExactBridgePrimaryKey = ScaffoldJoinTableShape.HasExactBridgePrimaryKey(joinPrimaryKeyColumns, fkColumnNames);
+            var databaseGeneratedColumns = ScaffoldJoinTableShape.GetColumnSet(databaseGeneratedColumnsByTable, joinTableKey);
             var payloadColumns = joinColumns.Keys
                 .Where(column => !fkColumnNames.Contains(column) && !databaseGeneratedColumns.Contains(column))
                 .ToArray();
@@ -180,7 +175,7 @@ namespace nORM.Scaffolding
                 && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
                 && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
                 && identityColumns.Contains(payloadColumns[0])
-                && HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
+                && ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
 
             if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
                 return false;
@@ -210,8 +205,8 @@ namespace nORM.Scaffolding
                 return false;
 
             var principalColumns = foreignKeyGroup.Select(static fk => fk.PrincipalColumn).ToArray();
-            var usesPrimaryKey = HasPrimaryKeyColumns(primaryKeyColumnsByTable, tableKey, principalColumns);
-            if (!usesPrimaryKey && !ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes))
+            var usesPrimaryKey = ScaffoldForeignKeyShape.HasPrimaryKeyColumns(primaryKeyColumnsByTable, tableKey, principalColumns);
+            if (!usesPrimaryKey && !ScaffoldForeignKeyShape.ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes))
                 return false;
 
             var principalKeyProperties = principalColumns
@@ -234,20 +229,16 @@ namespace nORM.Scaffolding
             ScaffoldManyToManyPrincipalInfo rightPrincipal,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
-        {
-            var leftCollectionBase = ScaffoldNameHelper.Pluralize(ScaffoldNameHelper.ToNavigationName(rightPrincipal.EntityName));
-            var rightCollectionBase = ScaffoldNameHelper.Pluralize(ScaffoldNameHelper.ToNavigationName(leftPrincipal.EntityName));
-            var isSelfJoin = string.Equals(leftPrincipal.TableKey, rightPrincipal.TableKey, StringComparison.OrdinalIgnoreCase);
-            if (isSelfJoin)
-            {
-                leftCollectionBase += "By" + ScaffoldNameHelper.ToNavigationName(GetColumnPropertyName(columnPropertiesByTable, joinTableKey, left.DependentColumn));
-                rightCollectionBase += "By" + ScaffoldNameHelper.ToNavigationName(GetColumnPropertyName(columnPropertiesByTable, joinTableKey, right.DependentColumn));
-            }
-
-            var leftCollectionName = ScaffoldNameHelper.MakeUnique(leftCollectionBase, GetOrCreateMemberNames(memberNamesByTable, leftPrincipal.TableKey));
-            var rightCollectionName = ScaffoldNameHelper.MakeUnique(rightCollectionBase, GetOrCreateMemberNames(memberNamesByTable, rightPrincipal.TableKey));
-            return (leftCollectionName, rightCollectionName);
-        }
+            => ScaffoldManyToManyNavigationNameBuilder.BuildCollectionNames(
+                joinTableKey,
+                left,
+                right,
+                leftPrincipal.TableKey,
+                leftPrincipal.EntityName,
+                rightPrincipal.TableKey,
+                rightPrincipal.EntityName,
+                columnPropertiesByTable,
+                memberNamesByTable);
 
         private static ScaffoldForeignKeyInfo[][] OrderManyToManyForeignKeyGroups(string joinTableName, ScaffoldForeignKeyInfo[][] foreignKeyGroups)
             => foreignKeyGroups
@@ -261,97 +252,6 @@ namespace nORM.Scaffolding
             var position = joinTableName.IndexOf(principalTable, StringComparison.OrdinalIgnoreCase);
             return position < 0 ? int.MaxValue : position;
         }
-
-        private static bool HasPrimaryKeyColumns(
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            string tableKey,
-            IReadOnlyList<string> columnNames)
-            => primaryKeyColumnsByTable.TryGetValue(tableKey, out var keyColumns)
-               && keyColumns.Count == columnNames.Count
-               && keyColumns.SequenceEqual(columnNames, StringComparer.OrdinalIgnoreCase);
-
-        private static bool HasOnlyScaffoldableReferentialActions(IEnumerable<ScaffoldForeignKeyInfo> foreignKeys)
-            => foreignKeys.All(static fk =>
-                IsScaffoldableReferentialAction(fk.OnDelete)
-                && IsScaffoldableReferentialAction(fk.OnUpdate));
-
-        private static bool HasExactUniqueIndex(
-            IReadOnlyList<ScaffoldIndexInfo> indexes,
-            string tableKey,
-            IReadOnlySet<string> columnNames)
-            => indexes
-                .Where(index => IsUnfilteredUniqueKeyIndex(index)
-                                && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
-                .Any(group =>
-                {
-                    var columns = group
-                        .Where(index => !index.IsIncluded)
-                        .Select(index => index.ColumnName)
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                    return columns.Count == columnNames.Count
-                           && columnNames.All(columns.Contains)
-                           && group.All(col => col.ColumnCount == columnNames.Count);
-                });
-
-        private static bool AllForeignKeyGroupsAreUniqueDependentKeys(
-            string dependentTableKey,
-            IEnumerable<IReadOnlyList<ScaffoldForeignKeyInfo>> foreignKeyGroups,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndexInfo> indexes)
-        {
-            var groups = foreignKeyGroups
-                .Select(group => group.ToArray())
-                .Where(group => group.Length > 0)
-                .ToArray();
-
-            return groups.Length >= 2
-                   && groups.All(group =>
-            {
-                var dependentColumns = group
-                    .Select(static fk => fk.DependentColumn)
-                    .ToArray();
-                return HasPrimaryKeyColumns(primaryKeyColumnsByTable, dependentTableKey, dependentColumns)
-                       || HasExactUniqueIndex(indexes, dependentTableKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
-            });
-        }
-
-        private static bool ReferencesUniqueIndex(
-            IReadOnlyList<ScaffoldForeignKeyInfo> rows,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndexInfo> indexes)
-        {
-            if (rows.Count == 0)
-                return false;
-
-            var principalKey = TableKey(rows[0].PrincipalSchema, rows[0].PrincipalTable);
-            if (!primaryKeyColumnsByTable.TryGetValue(principalKey, out var primaryKeyColumns)
-                || primaryKeyColumns.Count == 0)
-            {
-                return false;
-            }
-
-            var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-            return indexes
-                .Where(index => IsUnfilteredUniqueKeyIndex(index) && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(index => index.IndexName, StringComparer.OrdinalIgnoreCase)
-                .Any(group =>
-                {
-                    var keyColumns = group
-                        .Where(index => !index.IsIncluded)
-                        .OrderBy(index => index.Ordinal)
-                        .Select(index => index.ColumnName)
-                        .ToArray();
-                    return keyColumns.Length == rows.Count
-                           && group.All(col => col.ColumnCount == rows.Count)
-                           && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
-                });
-        }
-
-        private static bool IsUnfilteredUniqueKeyIndex(ScaffoldIndexInfo index)
-            => index.IsUnique
-               && !index.IsIncluded
-               && string.IsNullOrWhiteSpace(index.FilterSql);
 
         private static string GetColumnPropertyName(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
@@ -367,32 +267,8 @@ namespace nORM.Scaffolding
             return ScaffoldNameHelper.EscapeCSharpIdentifier(ScaffoldNameHelper.ToPascalCase(columnName));
         }
 
-        private static HashSet<string> GetOrCreateMemberNames(
-            Dictionary<string, HashSet<string>> memberNamesByTable,
-            string tableKey)
-        {
-            if (!memberNamesByTable.TryGetValue(tableKey, out var names))
-            {
-                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                memberNamesByTable[tableKey] = names;
-            }
-
-            return names;
-        }
-
-        private static bool IsScaffoldableReferentialAction(string? action)
-            => NormalizeReferentialAction(action) is "CASCADE" or "SET NULL" or "SET DEFAULT" or "RESTRICT" or "NO ACTION";
-
-        private static string NormalizeReferentialAction(string? action)
-        {
-            if (string.IsNullOrWhiteSpace(action))
-                return "NO ACTION";
-
-            return action.Replace('_', ' ').Trim().ToUpperInvariant();
-        }
-
         private static string TableKey(string? schema, string table)
-            => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;
+            => ScaffoldForeignKeyShape.TableKey(schema, table);
 
         private static string TrimIdSuffix(string name)
         {
