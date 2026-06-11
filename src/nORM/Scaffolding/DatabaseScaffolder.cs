@@ -2281,9 +2281,7 @@ namespace nORM.Scaffolding
         /// Escapes schema and table identifiers using the given provider's rules.
         /// </summary>
         private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
-            => string.IsNullOrEmpty(schema)
-                ? IdentifierEscaping.EscapeSingle(provider, table)
-                : $"{provider.Escape(schema!)}.{IdentifierEscaping.EscapeSingle(provider, table)}";
+            => IdentifierEscaping.EscapeTable(provider, table, schema);
 
         /// <summary>
         /// Escapes an identifier so it is valid in generated C# code. Reserved keywords are

@@ -98,7 +98,7 @@ namespace nORM.Scaffolding
             foreach (var table in tables)
             {
                 await using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM {EscapeQualified(provider, table.Schema, table.Name)} WHERE 1=0";
+                cmd.CommandText = $"SELECT * FROM {IdentifierEscaping.EscapeTable(provider, table.Name, table.Schema)} WHERE 1=0";
                 await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo).ConfigureAwait(false);
                 var schema = reader.GetSchemaTable()!;
                 var keyColumns = new List<string>();
@@ -240,11 +240,6 @@ namespace nORM.Scaffolding
                 : provider.Escape(schema!) + ".";
             return $"PRAGMA {prefix}{pragmaName}({IdentifierEscaping.EscapeSingle(provider, argument)})";
         }
-
-        private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
-            => string.IsNullOrEmpty(schema)
-                ? IdentifierEscaping.EscapeSingle(provider, table)
-                : $"{provider.Escape(schema!)}.{IdentifierEscaping.EscapeSingle(provider, table)}";
 
         private static string TableKey(string? schema, string table)
             => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;

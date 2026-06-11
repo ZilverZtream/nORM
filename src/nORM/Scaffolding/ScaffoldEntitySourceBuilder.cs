@@ -108,7 +108,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
             IReadOnlySet<string>? postgresTextCastColumns = null)
         {
-            var qualified = EscapeQualified(provider, schemaName, tableName);
+            var qualified = IdentifierEscaping.EscapeTable(provider, tableName, schemaName);
             if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
                 || ((providerSpecificColumnTypes is null
                      || providerSpecificColumnTypes.Count == 0
@@ -254,9 +254,5 @@ namespace nORM.Scaffolding
             command.Parameters.Add(parameter);
         }
 
-        private static string EscapeQualified(DatabaseProvider provider, string? schema, string table)
-            => string.IsNullOrWhiteSpace(schema)
-                ? IdentifierEscaping.EscapeSingle(provider, table)
-                : $"{provider.Escape(schema!)}.{IdentifierEscaping.EscapeSingle(provider, table)}";
     }
 }
