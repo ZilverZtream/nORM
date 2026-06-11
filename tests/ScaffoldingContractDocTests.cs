@@ -64,6 +64,7 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelCompositionBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldObjectSelectionBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnPropertyDiscovery.cs"),
@@ -1795,7 +1796,9 @@ public class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         var cliSource = ReadRepoFile("src", "dotnet-norm", "Program.cs");
-        var scaffolderSource = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        var scaffolderSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
         var tableFilterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs");
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");

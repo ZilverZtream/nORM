@@ -88,73 +88,26 @@ namespace nORM.Scaffolding
                     Directory.CreateDirectory(contextOutputDirectory);
                 }
                 var discovery = await ScaffoldModelDiscovery.BuildAsync(connection, provider, options).ConfigureAwait(false);
-                var tables = discovery.Tables;
-                var skippedObjects = discovery.SkippedObjects;
-                var queryArtifactTableKeys = discovery.QueryArtifactTableKeys;
-                var entityByTable = discovery.EntityByTable;
-                var columnPropertiesByTable = discovery.ColumnPropertiesByTable;
-                var primaryKeyColumnsByTable = discovery.PrimaryKeyColumnsByTable;
-                var nonNullableColumnsByTable = discovery.NonNullableColumnsByTable;
-                var sqliteDeclaredTypesByTable = discovery.SqliteDeclaredTypesByTable;
-                var stringBinaryFacetsByTable = discovery.StringBinaryFacetsByTable;
-                var commentsByTable = discovery.CommentsByTable;
-                var identityColumnsByTable = discovery.IdentityColumnsByTable;
-                var indexes = discovery.Indexes;
-                var foreignKeys = discovery.ForeignKeys;
-                var unsupportedFeatures = discovery.UnsupportedFeatures;
-                var featureConfigurations = discovery.FeatureConfigurations;
-                safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
-                var computedColumnsByTable = featureConfigurations.ComputedColumnsByTable;
+                safeContextName = MakeUniqueContextName(safeContextName, discovery.EntityByTable.Values);
                 var composition = ScaffoldModelCompositionBuilder.Build(discovery);
-                var manyToManyJoins = composition.ManyToManyJoins;
-                var manyToManyJoinTableKeys = composition.ManyToManyJoinTableKeys;
-                var relationships = composition.Relationships;
-                var compositePrimaryKeys = composition.CompositePrimaryKeys;
-                var defaultValueConfigurations = composition.DefaultValueConfigurations;
-                var checkConstraints = composition.CheckConstraints;
-                var computedColumnConfigurations = composition.ComputedColumnConfigurations;
-                var expressionIndexConfigurations = composition.ExpressionIndexConfigurations;
-                var collationConfigurations = composition.CollationConfigurations;
-                var identityOptionConfigurations = composition.IdentityOptionConfigurations;
-                var precisionConfigurations = composition.PrecisionConfigurations;
-                var columnFacetConfigurations = composition.ColumnFacetConfigurations;
-                var entityFiles = await BuildScaffoldEntityFilesAsync(
+                var outputPlan = await ScaffoldOutputPlanBuilder.BuildAsync(
                     connection,
                     provider,
                     outputDirectory,
+                    contextOutputDirectory,
                     namespaceName,
-                    tables,
-                    entityByTable,
-                    columnPropertiesByTable,
-                    primaryKeyColumnsByTable,
-                    nonNullableColumnsByTable,
-                    sqliteDeclaredTypesByTable,
-                    stringBinaryFacetsByTable,
-                    commentsByTable,
-                    identityColumnsByTable,
-                    indexes,
-                    relationships,
-                    manyToManyJoins,
-                    manyToManyJoinTableKeys,
-                    queryArtifactTableKeys,
-                    featureConfigurations,
+                    contextNamespace,
+                    safeContextName,
+                    discovery,
+                    composition,
+                    options,
+                    _stringBuilderPool).ConfigureAwait(false);
+                await EmitScaffoldOutputAsync(
+                    outputDirectory,
+                    outputPlan.GeneratedFiles,
+                    outputPlan.Diagnostics,
+                    outputPlan.DiagnosticsJson,
                     options).ConfigureAwait(false);
-                var generatedFiles = entityFiles.GeneratedFiles.ToList();
-                var entityNames = entityFiles.EntityNames;
-
-                var routineStubs = options.EmitRoutineStubs
-                    ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
-                    : Array.Empty<ScaffoldSkippedObject>();
-                var sequenceStubs = options.EmitSequenceStubs
-                    ? skippedObjects.Where(obj => string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase)).ToArray()
-                    : Array.Empty<ScaffoldSkippedObject>();
-                var ctxCode = ScaffoldContextWithRelationships(contextNamespace, safeContextName, entityNames, relationships, manyToManyJoins, routineStubs, compositePrimaryKeys, defaultValueConfigurations, checkConstraints, computedColumnConfigurations, expressionIndexConfigurations, collationConfigurations, sequenceStubs, identityOptionConfigurations, precisionConfigurations, columnFacetConfigurations, options.PluralizeQueryProperties, options.UseNullableReferenceTypes, namespaceName, options.UseDatabaseNames);
-                generatedFiles.Add((Path.Combine(contextOutputDirectory, safeContextName + ".cs"), ctxCode));
-                var diagnostics = ScaffoldDiagnostics(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, manyToManyJoinTableKeys);
-                var diagnosticsJson = string.IsNullOrWhiteSpace(diagnostics)
-                    ? null
-                    : ScaffoldDiagnosticsJson(foreignKeys, unsupportedFeatures, skippedObjects, primaryKeyColumnsByTable, indexes, columnPropertiesByTable, nonNullableColumnsByTable, computedColumnsByTable, identityColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, manyToManyJoinTableKeys);
-                await EmitScaffoldOutputAsync(outputDirectory, generatedFiles, diagnostics, diagnosticsJson, options).ConfigureAwait(false);
             }
             finally
             {
