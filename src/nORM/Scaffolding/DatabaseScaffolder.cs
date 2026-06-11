@@ -87,49 +87,25 @@ namespace nORM.Scaffolding
                     Directory.CreateDirectory(outputDirectory);
                     Directory.CreateDirectory(contextOutputDirectory);
                 }
-                var filterCatalog = GetScaffoldFilterCatalog(connection, provider);
-                var discoveredTables = await GetTablesAsync(connection, provider).ConfigureAwait(false);
-                var discoveredSkippedObjects = await GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
-                var (tables, skippedObjects, queryArtifactTableKeys) = BuildScaffoldObjectSelection(
-                    discoveredTables,
-                    discoveredSkippedObjects,
-                    options,
-                    provider,
-                    filterCatalog);
-                var entityByTable = BuildEntityNameMap(tables, options.UseDatabaseNames);
+                var discovery = await ScaffoldModelDiscovery.BuildAsync(connection, provider, options).ConfigureAwait(false);
+                var tables = discovery.Tables;
+                var skippedObjects = discovery.SkippedObjects;
+                var queryArtifactTableKeys = discovery.QueryArtifactTableKeys;
+                var entityByTable = discovery.EntityByTable;
+                var columnPropertiesByTable = discovery.ColumnPropertiesByTable;
+                var memberNamesByTable = discovery.MemberNamesByTable;
+                var primaryKeyColumnsByTable = discovery.PrimaryKeyColumnsByTable;
+                var primaryKeyConstraintNamesByTable = discovery.PrimaryKeyConstraintNamesByTable;
+                var nonNullableColumnsByTable = discovery.NonNullableColumnsByTable;
+                var sqliteDeclaredTypesByTable = discovery.SqliteDeclaredTypesByTable;
+                var stringBinaryFacetsByTable = discovery.StringBinaryFacetsByTable;
+                var commentsByTable = discovery.CommentsByTable;
+                var identityColumnsByTable = discovery.IdentityColumnsByTable;
+                var indexes = discovery.Indexes;
+                var foreignKeys = discovery.ForeignKeys;
+                var unsupportedFeatures = discovery.UnsupportedFeatures;
+                var featureConfigurations = discovery.FeatureConfigurations;
                 safeContextName = MakeUniqueContextName(safeContextName, entityByTable.Values);
-                var columnPropertiesByTable = await GetColumnPropertyNamesAsync(connection, provider, tables, entityByTable, options.UseDatabaseNames).ConfigureAwait(false);
-                var memberNamesByTable = BuildMemberNameMap(columnPropertiesByTable, entityByTable);
-                var primaryKeyColumnsByTable = await GetPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var primaryKeyConstraintNamesByTable = await GetPrimaryKeyConstraintNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var nonNullableColumnsByTable = await GetNonNullableColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var sqliteDeclaredTypesByTable = provider is SqliteProvider
-                    ? await GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false)
-                    : new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-                var stringBinaryFacetsByTable = await GetStringBinaryFacetsAsync(connection, provider, tables).ConfigureAwait(false);
-                var commentsByTable = await GetScaffoldCommentsAsync(connection, provider, tables).ConfigureAwait(false);
-                var identityColumnsByTable = await GetIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
-                var scaffoldedTableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var indexes = FilterIndexesToScaffoldedTables(
-                    await GetIndexesAsync(connection, provider, tables).ConfigureAwait(false),
-                    scaffoldedTableKeys);
-                var foreignKeys = FilterForeignKeysToScaffoldedTables(
-                    await GetForeignKeysAsync(connection, provider, tables).ConfigureAwait(false),
-                    scaffoldedTableKeys);
-                var unsupportedFeatures = (await GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
-                unsupportedFeatures.AddRange(await GetPostgresEnumColumnFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
-                RemoveSupportedDescendingIndexDiagnostics(unsupportedFeatures, indexes);
-                RemoveSupportedIncludedColumnIndexDiagnostics(unsupportedFeatures, indexes);
-                RemoveSupportedPartialIndexDiagnostics(unsupportedFeatures, indexes);
-                AddMissingPrimaryKeyDiagnostics(unsupportedFeatures, tables, primaryKeyColumnsByTable, columnPropertiesByTable);
-                AddReferentialActionDiagnostics(unsupportedFeatures, foreignKeys);
-                AddRelationshipPrincipalKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable, indexes);
-                AddRelationshipDependentKeyDiagnostics(unsupportedFeatures, foreignKeys, primaryKeyColumnsByTable);
-                var featureConfigurations = BuildFeatureConfigurations(
-                    unsupportedFeatures,
-                    entityByTable,
-                    columnPropertiesByTable,
-                    stringBinaryFacetsByTable);
                 var computedColumnsByTable = featureConfigurations.ComputedColumnsByTable;
                 var rowVersionColumnsByTable = featureConfigurations.RowVersionColumnsByTable;
                 var manyToManyJoins = BuildManyToManyJoins(foreignKeys, tables, entityByTable, columnPropertiesByTable, primaryKeyColumnsByTable, identityColumnsByTable, computedColumnsByTable, indexes, nonNullableColumnsByTable, featureConfigurations.ProviderOwnedWriteBlockedTableKeys, memberNamesByTable);
@@ -405,38 +381,13 @@ namespace nORM.Scaffolding
         private static string SqliteSchemaResult(string schema)
             => ScaffoldSkippedObjectDiscovery.SqliteSchemaResult(schema);
         private static string SqlitePragma(DatabaseProvider provider, string? schema, string pragmaName, string argument)
-        {
-            var prefix = string.IsNullOrWhiteSpace(schema)
-                ? string.Empty
-                : provider.Escape(schema!) + ".";
-            return $"PRAGMA {prefix}{pragmaName}({IdentifierEscaping.EscapeSingle(provider, argument)})";
-        }
+            => ScaffoldModelDiscovery.SqlitePragma(provider, schema, pragmaName, argument);
 
         private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetSqliteDeclaredColumnTypesAsync(
             DbConnection connection,
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTable> tables)
-        {
-            var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var table in tables)
-            {
-                var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
-                await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    var name = Convert.ToString(reader["name"]);
-                    var type = Convert.ToString(reader["type"]);
-                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type))
-                        columns[name!] = type!;
-                }
-
-                result[TableKey(table.Schema, table.Name)] = columns;
-            }
-
-            return result;
-        }
+            => await ScaffoldModelDiscovery.GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false);
 
         private static Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>>> GetStringBinaryFacetsAsync(
             DbConnection connection,
