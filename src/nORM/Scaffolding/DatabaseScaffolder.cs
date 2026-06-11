@@ -1846,161 +1846,27 @@ namespace nORM.Scaffolding
             bool useNullableReferenceTypes = true,
             string? entityNamespaceName = null,
             bool useDatabaseNames = false)
-        {
-            compositePrimaryKeys ??= Array.Empty<ScaffoldPrimaryKey>();
-            defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
-            checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
-            computedColumnConfigurations ??= Array.Empty<ScaffoldComputedColumnConfiguration>();
-            expressionIndexConfigurations ??= Array.Empty<ScaffoldExpressionIndexConfiguration>();
-            collationConfigurations ??= Array.Empty<ScaffoldCollationConfiguration>();
-            sequenceStubs ??= Array.Empty<ScaffoldSkippedObject>();
-            identityOptionConfigurations ??= Array.Empty<ScaffoldIdentityOptionConfiguration>();
-            precisionConfigurations ??= Array.Empty<ScaffoldPrecisionConfiguration>();
-            columnFacetConfigurations ??= Array.Empty<ScaffoldColumnFacetConfiguration>();
-            routineStubs ??= Array.Empty<ScaffoldSkippedObject>();
-            return ScaffoldContextWriter.Write(new ScaffoldContextInfo(
+            => ScaffoldContextAdapter.Write(
                 namespaceName,
                 contextName,
-                entities.ToArray(),
-                ConvertContextRelationshipInfos(relationships),
-                ConvertManyToManyJoinInfos(manyToManyJoins),
-                ConvertRoutineStubInfos(routineStubs),
-                ConvertContextPrimaryKeyInfos(compositePrimaryKeys),
-                ConvertContextDefaultValueInfos(defaultValueConfigurations),
-                ConvertContextCheckConstraintInfos(checkConstraintConfigurations),
-                ConvertContextComputedColumnInfos(computedColumnConfigurations),
-                ConvertContextExpressionIndexInfos(expressionIndexConfigurations),
-                ConvertContextCollationInfos(collationConfigurations),
-                ConvertContextSequenceInfos(sequenceStubs),
-                ConvertContextIdentityOptionInfos(identityOptionConfigurations),
-                ConvertContextPrecisionInfos(precisionConfigurations),
-                ConvertContextColumnFacetInfos(columnFacetConfigurations),
+                entities,
+                relationships,
+                manyToManyJoins,
+                routineStubs,
+                compositePrimaryKeys,
+                defaultValueConfigurations,
+                checkConstraintConfigurations,
+                computedColumnConfigurations,
+                expressionIndexConfigurations,
+                collationConfigurations,
+                sequenceStubs,
+                identityOptionConfigurations,
+                precisionConfigurations,
+                columnFacetConfigurations,
                 pluralizeQueryProperties,
                 useNullableReferenceTypes,
                 entityNamespaceName,
-                useDatabaseNames));
-        }
-
-        private static ScaffoldContextRelationshipInfo[] ConvertContextRelationshipInfos(IReadOnlyList<ScaffoldRelationship> relationships)
-        {
-            var converted = new ScaffoldContextRelationshipInfo[relationships.Count];
-            for (var i = 0; i < relationships.Count; i++)
-            {
-                var relationship = relationships[i];
-                converted[i] = new ScaffoldContextRelationshipInfo(
-                    relationship.DependentEntityName,
-                    relationship.PrincipalEntityName,
-                    relationship.ReferenceNavigationName,
-                    relationship.CollectionNavigationName,
-                    relationship.IsUniqueDependentKey,
-                    relationship.CascadeDelete,
-                    relationship.OnDelete,
-                    relationship.OnUpdate,
-                    relationship.ConstraintName,
-                    relationship.ForeignKeyPropertyNames,
-                    relationship.PrincipalKeyPropertyNames);
-            }
-
-            return converted;
-        }
-
-        private static ScaffoldManyToManyJoinInfo[] ConvertManyToManyJoinInfos(IReadOnlyList<ScaffoldManyToManyJoin> joins)
-        {
-            var converted = new ScaffoldManyToManyJoinInfo[joins.Count];
-            for (var i = 0; i < joins.Count; i++)
-            {
-                var join = joins[i];
-                converted[i] = new ScaffoldManyToManyJoinInfo(
-                    join.JoinTableKey,
-                    join.LeftTableKey,
-                    join.RightTableKey,
-                    join.JoinTableName,
-                    join.JoinTableSchema,
-                    join.LeftEntityName,
-                    join.RightEntityName,
-                    join.LeftForeignKeyColumns,
-                    join.RightForeignKeyColumns,
-                    join.LeftPrincipalKeyProperties,
-                    join.RightPrincipalKeyProperties,
-                    join.LeftOnDelete,
-                    join.LeftOnUpdate,
-                    join.RightOnDelete,
-                    join.RightOnUpdate,
-                    join.UsesPrimaryKeys,
-                    join.LeftCollectionNavigationName,
-                    join.RightCollectionNavigationName);
-            }
-
-            return converted;
-        }
-
-        private static ScaffoldRoutineStubInfo[] ConvertRoutineStubInfos(IReadOnlyList<ScaffoldSkippedObject> routineStubs)
-        {
-            var converted = new ScaffoldRoutineStubInfo[routineStubs.Count];
-            for (var i = 0; i < routineStubs.Count; i++)
-            {
-                var routine = routineStubs[i];
-                converted[i] = new ScaffoldRoutineStubInfo(
-                    routine.Schema,
-                    routine.Name,
-                    routine.Kind,
-                    routine.Detail,
-                    routine.Comment,
-                    BuildSkippedObjectMetadata(routine));
-            }
-
-            return converted;
-        }
-
-        private static ScaffoldContextPrimaryKeyInfo[] ConvertContextPrimaryKeyInfos(IReadOnlyList<ScaffoldPrimaryKey> primaryKeys)
-            => primaryKeys
-                .Select(key => new ScaffoldContextPrimaryKeyInfo(key.EntityName, key.PropertyNames, key.ConstraintName))
-                .ToArray();
-
-        private static ScaffoldContextDefaultValueInfo[] ConvertContextDefaultValueInfos(IReadOnlyList<ScaffoldDefaultValueConfiguration> defaultValues)
-            => defaultValues
-                .Select(defaultValue => new ScaffoldContextDefaultValueInfo(defaultValue.EntityName, defaultValue.PropertyName, defaultValue.DefaultValueSql))
-                .ToArray();
-
-        private static ScaffoldContextCheckConstraintInfo[] ConvertContextCheckConstraintInfos(IReadOnlyList<ScaffoldCheckConstraintConfiguration> checks)
-            => checks
-                .Select(check => new ScaffoldContextCheckConstraintInfo(check.EntityName, check.Name, check.Sql))
-                .ToArray();
-
-        private static ScaffoldContextComputedColumnInfo[] ConvertContextComputedColumnInfos(IReadOnlyList<ScaffoldComputedColumnConfiguration> computedColumns)
-            => computedColumns
-                .Select(computed => new ScaffoldContextComputedColumnInfo(computed.EntityName, computed.PropertyName, computed.Sql, computed.Stored))
-                .ToArray();
-
-        private static ScaffoldContextExpressionIndexInfo[] ConvertContextExpressionIndexInfos(IReadOnlyList<ScaffoldExpressionIndexConfiguration> expressionIndexes)
-            => expressionIndexes
-                .Select(index => new ScaffoldContextExpressionIndexInfo(index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
-                .ToArray();
-
-        private static ScaffoldContextCollationInfo[] ConvertContextCollationInfos(IReadOnlyList<ScaffoldCollationConfiguration> collations)
-            => collations
-                .Select(collation => new ScaffoldContextCollationInfo(collation.EntityName, collation.PropertyName, collation.Collation))
-                .ToArray();
-
-        private static ScaffoldContextSequenceInfo[] ConvertContextSequenceInfos(IReadOnlyList<ScaffoldSkippedObject> sequenceStubs)
-            => sequenceStubs
-                .Select(sequence => new ScaffoldContextSequenceInfo(sequence.Schema, sequence.Name, sequence.Detail, sequence.Comment))
-                .ToArray();
-
-        private static ScaffoldContextIdentityOptionInfo[] ConvertContextIdentityOptionInfos(IReadOnlyList<ScaffoldIdentityOptionConfiguration> identityOptions)
-            => identityOptions
-                .Select(identity => new ScaffoldContextIdentityOptionInfo(identity.EntityName, identity.PropertyName, identity.Seed, identity.Increment))
-                .ToArray();
-
-        private static ScaffoldContextPrecisionInfo[] ConvertContextPrecisionInfos(IReadOnlyList<ScaffoldPrecisionConfiguration> precisionConfigurations)
-            => precisionConfigurations
-                .Select(precision => new ScaffoldContextPrecisionInfo(precision.EntityName, precision.PropertyName, precision.Precision, precision.Scale))
-                .ToArray();
-
-        private static ScaffoldContextColumnFacetInfo[] ConvertContextColumnFacetInfos(IReadOnlyList<ScaffoldColumnFacetConfiguration> columnFacetConfigurations)
-            => columnFacetConfigurations
-                .Select(facet => new ScaffoldContextColumnFacetInfo(facet.EntityName, facet.PropertyName, facet.MaxLength, facet.IsUnicode, facet.IsFixedLength))
-                .ToArray();
+                useDatabaseNames);
 
         private static (byte? Precision, byte? Scale) GetRoutineParameterPrecisionScale(string? dataType)
             => ScaffoldRoutineTypeMapper.GetRoutineParameterPrecisionScale(dataType);
@@ -2193,14 +2059,14 @@ namespace nORM.Scaffolding
 
         private readonly record struct ScaffoldTable(string Name, string? Schema);
 
-        private readonly record struct ScaffoldSkippedObject(
+        internal readonly record struct ScaffoldSkippedObject(
             string? Schema,
             string Name,
             string Kind,
             string Detail,
             string? Comment);
 
-        private readonly record struct ScaffoldPrimaryKey(
+        internal readonly record struct ScaffoldPrimaryKey(
             string EntityName,
             string[] PropertyNames,
             string? ConstraintName);
@@ -2293,7 +2159,7 @@ namespace nORM.Scaffolding
             string? FilterSql,
             bool IsSyntheticName = false);
 
-        private readonly record struct ScaffoldRelationship(
+        internal readonly record struct ScaffoldRelationship(
             string DependentTableKey,
             string PrincipalTableKey,
             string DependentEntityName,
@@ -2317,7 +2183,7 @@ namespace nORM.Scaffolding
             public bool IsComposite => ForeignKeyPropertyNames.Count > 1 || PrincipalKeyPropertyNames.Count > 1;
         }
 
-        private readonly record struct ScaffoldManyToManyJoin(
+        internal readonly record struct ScaffoldManyToManyJoin(
             string JoinTableKey,
             string LeftTableKey,
             string RightTableKey,

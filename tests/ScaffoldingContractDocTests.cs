@@ -68,6 +68,7 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPrimaryKeyConfigurationBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticReportBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationAdapter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextAdapter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiagnosticBuilder.cs"));
