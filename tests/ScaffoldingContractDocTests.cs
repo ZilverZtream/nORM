@@ -100,6 +100,10 @@ public partial class ScaffoldingContractDocTests
     private static string ReadIndexDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Queries.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
 
@@ -215,6 +219,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
             ReadKeyDiscoverySource(),
             ReadForeignKeyDiscoverySource(),
+            ReadIndexDiscoverySource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelCompositionBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldObjectSelectionBuilder.cs"),
