@@ -93,7 +93,8 @@ public class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.TypeMapping.cs"));
 
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
