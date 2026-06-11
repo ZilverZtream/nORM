@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldDiagnosticsWriter
+    internal static partial class ScaffoldDiagnosticsWriter
     {
         public static void AppendMarkdown(
             StringBuilder sb,
@@ -33,88 +33,24 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldUnsupportedFeatureInfo> unsupportedFeatures,
             IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects)
         {
-            var compositeForeignKeyItems = compositeForeignKeys
-                .Select(foreignKey => new
-                {
-                    code = CodeForCompositeForeignKey(),
-                    severity = Severity(),
-                    category = CategoryForCompositeForeignKey(),
-                    constraint = foreignKey.ConstraintName,
-                    dependentTable = foreignKey.DependentTable,
-                    dependentColumns = foreignKey.DependentColumns,
-                    principalTable = foreignKey.PrincipalTable,
-                    principalColumns = foreignKey.PrincipalColumns,
-                    metadata = foreignKey.Metadata,
-                    suggestedAction = SuggestedActionForCompositeForeignKey()
-                })
-                .ToArray();
-
-            var possibleJoinTableItems = possibleJoinTables
-                .Select(table => new
-                {
-                    code = CodeForPossibleJoinTable(),
-                    severity = Severity(),
-                    category = CategoryForPossibleJoinTable(),
-                    table = table.TableKey,
-                    principalTables = table.PrincipalTables,
-                    constraints = table.ConstraintNames,
-                    reasons = table.Reasons,
-                    metadata = table.Metadata,
-                    suggestedAction = SuggestedActionForPossibleJoinTable()
-                })
-                .ToArray();
-
-            var providerOwnedSchemaFeatures = unsupportedFeatures
-                .OrderBy(f => f.TableKey, StringComparer.Ordinal)
-                .ThenBy(f => f.Kind, StringComparer.Ordinal)
-                .ThenBy(f => f.Name, StringComparer.Ordinal)
-                .Select(feature => new
-                {
-                    code = CodeForUnsupportedFeature(feature.Kind),
-                    severity = Severity(),
-                    category = CategoryForUnsupportedFeature(feature.Kind),
-                    kind = feature.Kind,
-                    table = feature.TableKey,
-                    name = feature.Name,
-                    detail = feature.Detail,
-                    metadata = feature.Metadata ?? new Dictionary<string, object?>(0, StringComparer.Ordinal),
-                    suggestedAction = SuggestedActionForUnsupportedFeature(feature.Kind)
-                })
-                .ToArray();
-
-            var skippedDatabaseObjects = skippedObjects
-                .OrderBy(o => TableKey(o.Schema, o.Name), StringComparer.Ordinal)
-                .ThenBy(o => o.Kind, StringComparer.Ordinal)
-                .Select(obj => new
-                {
-                    code = CodeForSkippedObject(obj.Kind),
-                    severity = Severity(),
-                    category = CategoryForSkippedObject(obj.Kind),
-                    kind = obj.Kind,
-                    name = TableKey(obj.Schema, obj.Name),
-                    detail = obj.Detail,
-                    metadata = obj.Metadata ?? new Dictionary<string, object?>(0, StringComparer.Ordinal),
-                    suggestedAction = SuggestedActionForSkippedObject(obj.Kind)
-                })
-                .ToArray();
+            var compositeForeignKeyItems = BuildCompositeForeignKeyJsonItems(compositeForeignKeys);
+            var possibleJoinTableItems = BuildPossibleJoinTableJsonItems(possibleJoinTables);
+            var providerOwnedSchemaFeatures = BuildProviderOwnedSchemaFeatureJsonItems(unsupportedFeatures);
+            var skippedDatabaseObjects = BuildSkippedDatabaseObjectJsonItems(skippedObjects);
 
             var diagnosticCodes = compositeForeignKeyItems
                 .Select(item => item.code)
                 .Concat(possibleJoinTableItems.Select(item => item.code))
                 .Concat(providerOwnedSchemaFeatures.Select(item => item.code))
                 .Concat(skippedDatabaseObjects.Select(item => item.code))
-                .GroupBy(code => code, StringComparer.Ordinal)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+                .CountByOrdinalValue();
 
             var diagnosticCategories = compositeForeignKeyItems
                 .Select(item => item.category)
                 .Concat(possibleJoinTableItems.Select(item => item.category))
                 .Concat(providerOwnedSchemaFeatures.Select(item => item.category))
                 .Concat(skippedDatabaseObjects.Select(item => item.category))
-                .GroupBy(category => category, StringComparer.Ordinal)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+                .CountByOrdinalValue();
 
             return JsonSerializer.Serialize(
                 new
