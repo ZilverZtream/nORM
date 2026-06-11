@@ -354,7 +354,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("set('a','b','c','d','e','f','g','h')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false)]
     [InlineData("set('read,write','admin')", false)]
+    [InlineData("ARRAY (_int4)", true)]
+    [InlineData("integer[]", true)]
+    [InlineData("int4[]", true)]
+    [InlineData("uuid[]", true)]
+    [InlineData("varchar[]", true)]
+    [InlineData("inet[]", false)]
     [InlineData("DOMAIN (public.email_address -> character varying)", false)]
+    [InlineData("DOMAIN (public.score_values -> ARRAY (_int4))", false)]
     [InlineData("DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))", false)]
     [InlineData("user-defined type (dbo.EmailAddress -> nvarchar)", false)]
     [InlineData("int unsigned", false)]
@@ -379,6 +386,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_address -> character varying)" } })!);
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" } })!);
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (_int4))" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "integer[]" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "int4[]" } })!);
+        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Ids"] = "uuid[]" } })!);
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" } })!);
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar)" } })!);
         Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" } })!);
@@ -390,6 +400,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Path"] = "hierarchyid" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "sql_variant" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Address"] = "inet" } })!);
+        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Addresses"] = "inet[]" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "cidr" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Mac"] = "macaddr" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Search"] = "tsvector" } })!);
@@ -505,6 +516,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("ARRAY (_text)", "text[]")]
     [InlineData("ARRAY (_bytea)", "bytea[]")]
     [InlineData("ARRAY (_timestamptz)", "timestamp with time zone[]")]
+    [InlineData("integer[]", "integer[]")]
+    [InlineData("int4[]", "integer[]")]
+    [InlineData("varchar[]", "character varying[]")]
+    [InlineData("bpchar[]", "character[]")]
+    [InlineData("uuid[]", "uuid[]")]
     public void NormalizePostgresDomainProbeCastType_StaticAndDynamic_NormalizesSafeFacetsAndTextCastsMalformedTypes(string typeText, string expected)
     {
         var staticMethod = GetMethod("NormalizePostgresDomainProbeCastType", new[] { typeof(string) });

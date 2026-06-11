@@ -209,6 +209,9 @@ namespace nORM.Scaffolding
         public static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
         {
             castType = string.Empty;
+            if (normalized.EndsWith("[]", StringComparison.Ordinal))
+                return TryNormalizePostgresArrayElementCastType(normalized[..^2].Trim(), out castType);
+
             if (!normalized.StartsWith("array", StringComparison.Ordinal))
                 return false;
 
@@ -223,7 +226,12 @@ namespace nORM.Scaffolding
                 .Trim()
                 .TrimStart('_');
 
-            castType = element switch
+            return TryNormalizePostgresArrayElementCastType(element, out castType);
+        }
+
+        private static bool TryNormalizePostgresArrayElementCastType(string element, out string castType)
+        {
+            castType = element.Trim().TrimStart('_') switch
             {
                 "int2" or "smallint" => "smallint[]",
                 "int4" or "integer" => "integer[]",
@@ -246,7 +254,6 @@ namespace nORM.Scaffolding
                 "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
                 _ => string.Empty
             };
-
             return castType.Length > 0;
         }
 
@@ -344,6 +351,9 @@ namespace nORM.Scaffolding
         public static bool TryMapPostgresArrayCastType(string normalized, out Type arrayType)
         {
             arrayType = typeof(object[]);
+            if (TryMapPostgresArrayProbeCastType(normalized, out var canonicalCastType))
+                normalized = canonicalCastType;
+
             if (!normalized.EndsWith("[]", StringComparison.Ordinal))
                 return false;
 

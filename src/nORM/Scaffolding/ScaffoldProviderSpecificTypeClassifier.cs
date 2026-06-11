@@ -45,7 +45,8 @@ namespace nORM.Scaffolding
                    || normalized == "jsonb"
                    || normalized == "uuid"
                    || ScaffoldPostgresTypeClassifier.IsSafePostgresUserDefinedScalarColumnType(normalized)
-                   || (normalized.StartsWith("array", StringComparison.Ordinal) && ScaffoldPostgresTypeClassifier.TryMapPostgresArrayType(detail, out _))
+                   || (!normalized.StartsWith("domain", StringComparison.Ordinal)
+                       && ScaffoldPostgresTypeClassifier.TryMapPostgresArrayType(detail, out _))
                    || ScaffoldMySqlTypeClassifier.TryParseMySqlEnumValues(detail, out _)
                    || ScaffoldMySqlTypeClassifier.TryParseBoundedMySqlSetValues(detail, out _)
                    || ScaffoldPostgresTypeClassifier.TryParsePostgresEnumValues(detail, out _)
