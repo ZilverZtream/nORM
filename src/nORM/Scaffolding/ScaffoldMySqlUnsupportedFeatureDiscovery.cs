@@ -253,15 +253,7 @@ namespace nORM.Scaffolding
         }
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
-        {
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
+            => ScaffoldDataReaderHelper.HasColumn(reader, name);
 
         private static string TableKey(string? schema, string table)
             => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;

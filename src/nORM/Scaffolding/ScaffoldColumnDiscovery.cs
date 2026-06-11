@@ -334,15 +334,7 @@ namespace nORM.Scaffolding
                 StringComparer.OrdinalIgnoreCase);
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
-        {
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
+            => ScaffoldDataReaderHelper.HasColumn(reader, name);
 
         private static string SqlitePragma(DatabaseProvider provider, string? schema, string pragmaName, string argument)
         {

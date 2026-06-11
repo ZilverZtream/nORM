@@ -67,6 +67,7 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnPropertyDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPrimaryKeyConfigurationBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticReportBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiagnosticBuilder.cs"));
 
@@ -75,7 +76,8 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityReadOnlyClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"));
 
     [Fact]
     public void Doc_describes_bounded_v1_contract()

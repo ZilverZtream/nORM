@@ -1331,15 +1331,7 @@ namespace nORM.Scaffolding
                 providerOwnedWriteBlockedTableKeys);
 
         private static bool ReaderHasColumn(DbDataReader reader, string name)
-        {
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
+            => ScaffoldDataReaderHelper.HasColumn(reader, name);
 
         private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(ScaffoldSkippedObject obj)
             => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(

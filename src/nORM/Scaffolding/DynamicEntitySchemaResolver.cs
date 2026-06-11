@@ -184,15 +184,7 @@ namespace nORM.Scaffolding
                 : $"{EscapeIdentifier(connection, schema!)}.{EscapeIdentifier(connection, table)}";
 
         public static bool ReaderHasColumn(DbDataReader reader, string name)
-        {
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                if (string.Equals(reader.GetName(i), name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
-        }
+            => ScaffoldDataReaderHelper.HasColumn(reader, name);
 
         public static string EscapeIdentifier(DbConnection connection, string identifier)
         {
