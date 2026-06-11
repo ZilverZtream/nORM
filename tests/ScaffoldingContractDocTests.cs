@@ -120,6 +120,11 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Markdown.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.cs"));
 
+    private static string ReadRoutineStubWriterSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.GeneratedMembers.cs"));
+
     private static string ReadContextWriterSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs"),
@@ -543,7 +548,7 @@ public partial class ScaffoldingContractDocTests
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
-        var routineWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs");
+        var routineWriterSource = ReadRoutineStubWriterSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         Assert.Contains("code =", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("severity =", diagnosticsWriterSource, StringComparison.Ordinal);
