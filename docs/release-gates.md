@@ -251,6 +251,11 @@ Every `dotnet test` step is also time-bounded. The default is 45 minutes per
 test step; override it with `-TestStepTimeoutMinutes` or
 `NORM_TEST_STEP_TIMEOUT_MINUTES`. Timed-out test steps terminate the process tree
 and report stdout/stderr log paths plus recent log tails.
+Test steps also enable VSTest hang detection. The default inactivity timeout is
+5 minutes per active test; override it with `-TestStepHangTimeoutMinutes` or
+`NORM_TEST_STEP_HANG_TIMEOUT_MINUTES`. Hang failures report the active test and
+write VSTest blame artifacts so a stuck smoke test does not wait for the outer
+step timeout.
 `full` mode records its fast benchmark as smoke evidence; public performance
 claims still require the `rc` provider matrix.
 
