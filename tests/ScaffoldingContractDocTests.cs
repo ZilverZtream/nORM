@@ -62,6 +62,12 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresUnsupportedFeatureDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresProviderSpecificIndexFeatureDiscovery.cs"));
 
+    private static string ReadIndexDiscoverySource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
+
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -1005,7 +1011,7 @@ public class ScaffoldingContractDocTests
         var diagnosticsWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs");
         var featureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs");
         var expressionIndexConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs");
-        var indexDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs");
+        var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
         var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
@@ -1163,7 +1169,7 @@ public class ScaffoldingContractDocTests
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var checkFeatureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCheckFeatureConfigurationBuilder.cs");
         var foreignKeyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.cs");
-        var indexDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs");
+        var indexDiscoverySource = ReadIndexDiscoverySource();
         var keyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.cs");
         var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
         var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
