@@ -19,8 +19,7 @@ namespace nORM.Scaffolding
             if (tableKeys.Count == 0)
                 return new Dictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>>(StringComparer.OrdinalIgnoreCase);
 
-            var providerName = provider.GetType().Name;
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
             {
                 return await QueryColumnFacetMapAsync(connection, tableKeys, """
                     SELECT SCHEMA_NAME(t.schema_id) AS TableSchema,
@@ -52,7 +51,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 return await QueryColumnFacetMapAsync(connection, tableKeys, """
                     SELECT table_schema AS TableSchema,
@@ -67,7 +66,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
             {
                 return await QueryColumnFacetMapAsync(connection, tableKeys, """
                     SELECT NULL AS TableSchema,

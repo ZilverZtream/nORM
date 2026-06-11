@@ -16,10 +16,9 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var providerName = provider.GetType().Name;
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
             {
                 var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
                 foreach (var table in tables)
@@ -53,7 +52,7 @@ namespace nORM.Scaffolding
                 return ToReadOnlySetDictionary(result);
             }
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
             {
                 return await QueryColumnNameMapAsync(connection, tableKeys, """
                     SELECT SCHEMA_NAME(t.schema_id) AS TableSchema, t.name AS TableName, c.name AS ColumnName
@@ -64,7 +63,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 return await QueryColumnNameMapAsync(connection, tableKeys, """
                     SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
@@ -77,7 +76,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
             {
                 return await QueryColumnNameMapAsync(connection, tableKeys, """
                     SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ColumnName

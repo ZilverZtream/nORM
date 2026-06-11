@@ -18,7 +18,7 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
             {
                 var sqliteResult = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
                 foreach (var table in tables)
@@ -61,7 +61,7 @@ namespace nORM.Scaffolding
                 return sqliteResult;
             }
 
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 return await QueryColumnNameMapAsync(connection, tableKeys, """

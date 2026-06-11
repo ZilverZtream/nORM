@@ -16,11 +16,10 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
             var tableKeys = tables.Select(table => TableKey(table.Schema, table.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (tableKeys.Count == 0 || provider is SqliteProvider)
+            if (tableKeys.Count == 0 || ScaffoldProviderKind.IsSqlite(provider))
                 return new Dictionary<string, ScaffoldComments>(StringComparer.OrdinalIgnoreCase);
 
-            var providerName = provider.GetType().Name;
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
             {
                 return await QueryScaffoldCommentsAsync(connection, tableKeys, """
                     SELECT SCHEMA_NAME(o.schema_id) AS TableSchema,
@@ -63,7 +62,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 return await QueryScaffoldCommentsAsync(connection, tableKeys, """
                     SELECT n.nspname AS TableSchema,
@@ -81,7 +80,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
             {
                 return await QueryScaffoldCommentsAsync(connection, tableKeys, """
                     SELECT NULL AS TableSchema,

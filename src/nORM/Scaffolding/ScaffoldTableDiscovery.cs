@@ -15,8 +15,7 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
             {
                 var tables = new List<ScaffoldTableInfo>();
                 foreach (var schema in await ScaffoldSkippedObjectDiscovery.GetSqliteSchemasAsync(connection).ConfigureAwait(false))
@@ -55,21 +54,21 @@ namespace nORM.Scaffolding
                 return tables;
             }
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
             {
                 return await QueryTablesAsync(
                     connection,
                     "SELECT s.name AS TABLE_SCHEMA, t.name AS TABLE_NAME FROM sys.tables t INNER JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.is_ms_shipped = 0 ORDER BY s.name, t.name").ConfigureAwait(false);
             }
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 return await QueryTablesAsync(
                     connection,
                     "SELECT table_schema AS TABLE_SCHEMA, table_name AS TABLE_NAME FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name").ConfigureAwait(false);
             }
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
             {
                 return await QueryTablesAsync(
                     connection,

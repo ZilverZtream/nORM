@@ -14,17 +14,16 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
                 return await ScaffoldSqliteIndexDiscovery.GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await QueryIndexesAsync(connection, SqlServerIndexSql).ConfigureAwait(false);
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
                 return await QueryIndexesAsync(connection, PostgresIndexSql).ConfigureAwait(false);
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
                 return await GetMySqlIndexesAsync(connection, provider, tables).ConfigureAwait(false);
 
             return Array.Empty<ScaffoldIndexInfo>();

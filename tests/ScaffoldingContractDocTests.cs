@@ -148,6 +148,26 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlSkippedObjectDiscovery.cs"));
 
+    private static string ReadScaffoldProviderDispatchSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Selection.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnPropertyDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCommentDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Probes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.ProviderTypes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSchemaDiscoveryAdapter.UnsupportedFeatures.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"));
+
     private static string ReadUnsupportedFeatureMetadataSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs"),
@@ -743,6 +763,27 @@ public partial class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Source_pins_scaffold_provider_dispatch_helper()
+    {
+        var helper = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldProviderKind.cs");
+        var dispatchSource = ReadScaffoldProviderDispatchSource();
+
+        Assert.Contains("internal static class ScaffoldProviderKind", helper, StringComparison.Ordinal);
+        Assert.Contains("IsSqlite(DatabaseProvider provider)", helper, StringComparison.Ordinal);
+        Assert.Contains("IsSqlServer(DatabaseProvider provider)", helper, StringComparison.Ordinal);
+        Assert.Contains("IsPostgres(DatabaseProvider provider)", helper, StringComparison.Ordinal);
+        Assert.Contains("IsMySql(DatabaseProvider provider)", helper, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldProviderKind.IsSqlite(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldProviderKind.IsSqlServer(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldProviderKind.IsPostgres(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldProviderKind.IsMySql(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("provider.GetType().Name", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("providerName", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("provider is SqliteProvider", dispatchSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsMySqlProvider", dispatchSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_and_source_pin_provider_specific_index_diagnostics()
     {
         var doc = ReadDoc();
@@ -996,7 +1037,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PRAGMA", source, StringComparison.Ordinal);
         Assert.Contains("table_xinfo", source, StringComparison.Ordinal);
         Assert.Contains("typeof(long)", source, StringComparison.Ordinal);
-        Assert.Contains("provider is SqliteProvider", source, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldProviderKind.IsSqlite(provider)", source, StringComparison.Ordinal);
     }
 
     [Fact]

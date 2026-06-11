@@ -60,8 +60,7 @@ namespace nORM.Scaffolding
             DbConnection connection,
             DatabaseProvider provider)
         {
-            var providerName = provider.GetType().Name;
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
             {
                 return await QuerySkippedObjectCommentsAsync(connection, """
                     SELECT SCHEMA_NAME(o.schema_id) AS ObjectSchema,
@@ -88,7 +87,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 return await QuerySkippedObjectCommentsAsync(connection, """
                     SELECT n.nspname AS ObjectSchema,
@@ -117,7 +116,7 @@ namespace nORM.Scaffolding
                     """).ConfigureAwait(false);
             }
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
             {
                 return await QuerySkippedObjectCommentsAsync(connection, """
                     SELECT NULL AS ObjectSchema,

@@ -14,17 +14,16 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var providerName = provider.GetType().Name;
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
                 return await GetSqliteForeignKeysAsync(connection, provider, tables).ConfigureAwait(false);
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await QueryForeignKeysAsync(connection, SqlServerForeignKeySql).ConfigureAwait(false);
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
                 return await QueryForeignKeysAsync(connection, PostgresForeignKeySql).ConfigureAwait(false);
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
                 return await QueryForeignKeysAsync(connection, MySqlForeignKeySql).ConfigureAwait(false);
 
             return Array.Empty<ScaffoldForeignKeyInfo>();

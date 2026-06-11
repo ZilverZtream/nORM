@@ -26,28 +26,28 @@ namespace nORM.Scaffolding
 
         public static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null, string? providerSpecificColumnType = null)
         {
-            if (provider is SqliteProvider && IsSqliteUuidDeclaredType(declaredType))
+            if (ScaffoldProviderKind.IsSqlite(provider) && IsSqliteUuidDeclaredType(declaredType))
                 return typeof(Guid);
 
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
+            if (ScaffoldProviderKind.IsPostgres(provider)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayType(providerSpecificColumnType, out var arrayType))
             {
                 return arrayType;
             }
 
-            if (provider.GetType().Name.Contains("SqlServer", StringComparison.OrdinalIgnoreCase)
+            if (ScaffoldProviderKind.IsSqlServer(provider)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrType(providerSpecificColumnType, out var aliasBaseType))
             {
                 return aliasBaseType;
             }
 
-            if (provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+            if (ScaffoldProviderKind.IsMySql(provider)
                 && ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(providerSpecificColumnType, out var unsignedType))
             {
                 return unsignedType;
             }
 
-            if (provider is SqliteProvider
+            if (ScaffoldProviderKind.IsSqlite(provider)
                 && isKey
                 && isAuto
                 && !allowNull

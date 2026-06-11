@@ -15,19 +15,18 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var providerName = provider.GetType().Name;
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
                 return await GetSqlitePrimaryKeyColumnNameMapAsync(connection, provider, tables).ConfigureAwait(false);
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await QueryOrderedColumnNameMapAsync(connection, tableKeys, SqlServerPrimaryKeyColumnSql).ConfigureAwait(false);
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
                 return await QueryOrderedColumnNameMapAsync(connection, tableKeys, PostgresPrimaryKeyColumnSql).ConfigureAwait(false);
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
                 return await QueryOrderedColumnNameMapAsync(connection, tableKeys, MySqlPrimaryKeyColumnSql).ConfigureAwait(false);
 
             return await GetProviderSchemaPrimaryKeyColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
@@ -38,13 +37,12 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var providerName = provider.GetType().Name;
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await QueryPrimaryKeyConstraintNameMapAsync(connection, tableKeys, SqlServerPrimaryKeyConstraintNameSql).ConfigureAwait(false);
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
                 return await QueryPrimaryKeyConstraintNameMapAsync(connection, tableKeys, PostgresPrimaryKeyConstraintNameSql).ConfigureAwait(false);
 
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

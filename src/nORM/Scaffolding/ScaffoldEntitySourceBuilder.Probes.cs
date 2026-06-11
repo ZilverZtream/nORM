@@ -23,7 +23,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? postgresTextCastColumns = null)
         {
             var qualified = IdentifierEscaping.EscapeTable(provider, tableName, schemaName);
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
+            if (!ScaffoldProviderKind.IsPostgres(provider)
                 || ((providerSpecificColumnTypes is null
                      || providerSpecificColumnTypes.Count == 0
                      || !providerSpecificColumnTypes.Values.Any(ScaffoldProviderSpecificTypeClassifier.RequiresPostgresSchemaProbeCast))
@@ -55,7 +55,7 @@ namespace nORM.Scaffolding
             string? schemaName,
             string tableName)
         {
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (!ScaffoldProviderKind.IsPostgres(provider))
                 return EmptyStringSet;
 
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

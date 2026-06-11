@@ -16,18 +16,17 @@ namespace nORM.Scaffolding
             IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var providerName = provider.GetType().Name;
 
-            if (provider is SqliteProvider)
+            if (ScaffoldProviderKind.IsSqlite(provider))
                 return await GetSqliteUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
 
-            if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await GetSqlServerUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
 
-            if (providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
                 return await GetPostgresUnsupportedSchemaFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
 
-            if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsMySql(provider))
                 return await GetMySqlUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
 
             return Array.Empty<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
@@ -58,7 +57,7 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
         {
-            if (!provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (!ScaffoldProviderKind.IsPostgres(provider))
                 return Array.Empty<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
 
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);

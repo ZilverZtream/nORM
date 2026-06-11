@@ -35,8 +35,8 @@ namespace nORM.Scaffolding
         public static bool MatchesSchemaFilter(DatabaseProvider provider, string? schemaName, string requested, string? filterCatalog)
             => !string.IsNullOrWhiteSpace(schemaName)
                    ? string.Equals(schemaName, requested, StringComparison.OrdinalIgnoreCase)
-                   : provider is SqliteProvider && string.Equals(requested, "main", StringComparison.OrdinalIgnoreCase)
-                     || IsMySqlProvider(provider) && !string.IsNullOrWhiteSpace(filterCatalog) && string.Equals(filterCatalog, requested, StringComparison.OrdinalIgnoreCase);
+                   : ScaffoldProviderKind.IsSqlite(provider) && string.Equals(requested, "main", StringComparison.OrdinalIgnoreCase)
+                     || ScaffoldProviderKind.IsMySql(provider) && !string.IsNullOrWhiteSpace(filterCatalog) && string.Equals(filterCatalog, requested, StringComparison.OrdinalIgnoreCase);
 
         public static bool MatchesSkippedObjectFilter(DatabaseProvider provider, ScaffoldSkippedObjectInfo obj, string requested)
             => MatchesSkippedObjectFilter(obj, requested)
@@ -80,7 +80,7 @@ namespace nORM.Scaffolding
                || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
 
         private static bool IsDefaultSqliteSchemaQualifiedFilter(DatabaseProvider provider, string? schemaName, string objectName, string requested)
-            => provider is SqliteProvider
+            => ScaffoldProviderKind.IsSqlite(provider)
                && string.IsNullOrWhiteSpace(schemaName)
                && string.Equals(GetSchemaNameOrNull(requested), "main", StringComparison.OrdinalIgnoreCase)
                && string.Equals(GetUnqualifiedName(requested), objectName, StringComparison.OrdinalIgnoreCase);
@@ -89,9 +89,6 @@ namespace nORM.Scaffolding
             => string.IsNullOrWhiteSpace(table.Schema)
                 ? "<default>." + table.Name
                 : TableKey(table.Schema, table.Name);
-
-        private static bool IsMySqlProvider(DatabaseProvider provider)
-            => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
 
         private static string TableKey(string? schema, string table)
             => string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";

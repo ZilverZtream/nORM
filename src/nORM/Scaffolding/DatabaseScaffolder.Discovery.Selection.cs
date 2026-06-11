@@ -10,10 +10,7 @@ namespace nORM.Scaffolding
     public static partial class DatabaseScaffolder
     {
         private static string? GetScaffoldFilterCatalog(DbConnection connection, DatabaseProvider provider)
-            => IsMySqlProvider(provider) ? NullIfWhiteSpace(connection.Database) : null;
-
-        private static bool IsMySqlProvider(DatabaseProvider provider)
-            => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
+            => ScaffoldProviderKind.IsMySql(provider) ? NullIfWhiteSpace(connection.Database) : null;
 
         private static (IReadOnlyList<ScaffoldTable> Tables, IReadOnlyList<ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys) BuildScaffoldObjectSelection(
             IReadOnlyList<ScaffoldTable> discoveredTables,

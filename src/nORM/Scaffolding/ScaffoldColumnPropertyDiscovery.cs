@@ -19,7 +19,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             bool useDatabaseNames)
         {
-            if (provider.GetType().Name.Contains("Postgres", StringComparison.OrdinalIgnoreCase))
+            if (ScaffoldProviderKind.IsPostgres(provider))
             {
                 var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var orderedColumns = await QueryOrderedColumnNameMapAsync(connection, tableKeys, """

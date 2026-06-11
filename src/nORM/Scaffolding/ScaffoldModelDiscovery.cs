@@ -39,7 +39,7 @@ namespace nORM.Scaffolding
             var primaryKeyColumnsByTable = await ScaffoldKeyDiscovery.GetPrimaryKeyColumnNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var primaryKeyConstraintNamesByTable = await ScaffoldKeyDiscovery.GetPrimaryKeyConstraintNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var nonNullableColumnsByTable = await ScaffoldColumnDiscovery.GetNonNullableColumnNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
-            var sqliteDeclaredTypesByTable = provider is SqliteProvider
+            var sqliteDeclaredTypesByTable = ScaffoldProviderKind.IsSqlite(provider)
                 ? await GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false)
                 : new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             var stringBinaryFacetsByTable = await ScaffoldColumnDiscovery.GetStringBinaryFacetsAsync(connection, provider, tableInfos).ConfigureAwait(false);
@@ -177,10 +177,7 @@ namespace nORM.Scaffolding
                     primaryKeyColumnsByTable)));
 
         private static string? GetScaffoldFilterCatalog(DbConnection connection, DatabaseProvider provider)
-            => IsMySqlProvider(provider) ? NullIfWhiteSpace(connection.Database) : null;
-
-        private static bool IsMySqlProvider(DatabaseProvider provider)
-            => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
+            => ScaffoldProviderKind.IsMySql(provider) ? NullIfWhiteSpace(connection.Database) : null;
 
         private static string TableKey(string? schema, string table)
             => ScaffoldForeignKeyShape.TableKey(schema, table);
