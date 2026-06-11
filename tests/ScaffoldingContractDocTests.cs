@@ -772,7 +772,13 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("supported FK referential actions are emitted", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("unrecognized/provider-specific FK referential action tokens", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("Ordinary SQL Server/PostgreSQL included-column indexes are emitted with IndexAttribute.IsIncluded", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.Contains("Ordinary SQL Server/PostgreSQL/SQLite filtered and partial column indexes are emitted with IndexAttribute.FilterSql", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.Contains("supported expression-index predicates are emitted with HasExpressionIndex filter metadata", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.Contains("SQLite, ordinary PostgreSQL B-tree, and MySQL expression indexes are emitted with HasExpressionIndex", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.Contains("including supported filters, included columns, PostgreSQL null ordering, and NULLS NOT DISTINCT uniqueness", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.DoesNotContain("v1 scaffolding emits only key-column index metadata", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("v1 scaffolding emits only provider-neutral column indexes", diagnosticsWriterSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("v1 scaffolding emits portable B-tree/rowstore column-index metadata only", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.DoesNotContain("non-default FK referential actions", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("ExtractCreateIndexWhereClause(feature.Detail)", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("IsCreateIndexUnique(feature.Detail)", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
