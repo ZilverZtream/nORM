@@ -1,11 +1,10 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldUnsupportedFeatureMetadataBuilder
+    internal static partial class ScaffoldUnsupportedFeatureMetadataBuilder
     {
         public static IReadOnlyDictionary<string, object?> BuildMetadata(ScaffoldUnsupportedFeatureInfo feature)
         {
@@ -161,135 +160,5 @@ namespace nORM.Scaffolding
 
         private static bool IsWriteBlockingProviderSpecificColumnType(string? detail)
             => ScaffoldProviderSpecificTypeClassifier.IsWriteBlockingProviderSpecificColumnType(detail);
-
-        private static void AddTriggerFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeatureInfo feature)
-        {
-            var values = ScaffoldSemicolonParser.Parse(feature.Detail, out var header);
-            var provider = ParseSkippedObjectProvider(header);
-            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
-            metadata["providerObjectKind"] = "Trigger";
-            if (!metadata.ContainsKey("table"))
-                metadata["table"] = feature.TableKey;
-            if (!metadata.ContainsKey("triggerName"))
-                metadata["triggerName"] = feature.Name;
-            metadata["providerOwnedDdl"] = true;
-            metadata["generatedModelConfigurationSupported"] = false;
-            metadata["readOnlyEntity"] = true;
-            metadata["generatedWritesSupported"] = false;
-            metadata["reason"] = "provider-owned-trigger";
-            AddMetadataValue(metadata, values, "timing");
-            AddMetadataValue(metadata, values, "event");
-            AddMetadataValue(metadata, values, "orientation");
-            AddMetadataValue(metadata, values, "triggerSql");
-            AddMetadataBooleanValue(metadata, values, "isDisabled");
-            AddMetadataBooleanValue(metadata, values, "isInsteadOf");
-            if (!metadata.ContainsKey("definitionAvailable"))
-                metadata["definitionAvailable"] = metadata.ContainsKey("triggerSql");
-        }
-
-        private static void AddTemporalTableFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeatureInfo feature)
-        {
-            var values = ScaffoldSemicolonParser.Parse(feature.Detail, out var header);
-            var provider = ParseSkippedObjectProvider(header);
-            metadata["provider"] = IsKnownProviderName(provider) ? provider : ParseSkippedObjectProvider(feature.Detail);
-            metadata["providerObjectKind"] = "TemporalTable";
-            if (!metadata.ContainsKey("table"))
-                metadata["table"] = feature.TableKey;
-            metadata["providerNativeTemporal"] = true;
-            metadata["generatedTemporalConfigurationSupported"] = false;
-            AddMetadataValue(metadata, values, "temporalType");
-            AddMetadataValue(metadata, values, "historyTable");
-            if (!metadata.ContainsKey("temporalType"))
-            {
-                metadata["temporalType"] = feature.Detail.Contains("history table", StringComparison.OrdinalIgnoreCase)
-                    ? "history"
-                    : "system-versioned";
-            }
-        }
-
-        private static void AddMetadataBooleanValue(
-            IDictionary<string, object?> metadata,
-            IReadOnlyDictionary<string, string> values,
-            string key)
-        {
-            if (!values.TryGetValue(key, out var value)
-                || !TryParseMetadataBoolean(value, out var parsed))
-            {
-                return;
-            }
-
-            metadata[key] = parsed;
-        }
-
-        private static bool IsKnownProviderName(string value)
-            => value.Equals("SQL Server", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
-               || value.Equals("SQLite", StringComparison.OrdinalIgnoreCase);
-
-        private static bool TryParseRelationshipPrincipalKeyDetail(
-            string detail,
-            out string principalTable,
-            out string[] principalColumns)
-        {
-            principalTable = string.Empty;
-            principalColumns = Array.Empty<string>();
-            const string prefix = "FK references ";
-            if (!detail.StartsWith(prefix, StringComparison.Ordinal))
-                return false;
-
-            var columnsStart = detail.IndexOf(".(", prefix.Length, StringComparison.Ordinal);
-            if (columnsStart < 0)
-                return false;
-
-            var columnsEnd = detail.IndexOf(')', columnsStart + 2);
-            if (columnsEnd <= columnsStart + 2)
-                return false;
-
-            principalTable = detail.Substring(prefix.Length, columnsStart - prefix.Length);
-            principalColumns = detail
-                .Substring(columnsStart + 2, columnsEnd - columnsStart - 2)
-                .Split(',')
-                .Select(static column => column.Trim())
-                .Where(static column => column.Length > 0)
-                .ToArray();
-            return !string.IsNullOrWhiteSpace(principalTable) && principalColumns.Length > 0;
-        }
-
-        private static bool TryParseReferentialActionDetail(
-            string detail,
-            out string onDelete,
-            out string onUpdate)
-        {
-            onDelete = string.Empty;
-            onUpdate = string.Empty;
-            const string deletePrefix = "ON DELETE ";
-            const string updateMarker = "; ON UPDATE ";
-            if (!detail.StartsWith(deletePrefix, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            var updateIndex = detail.IndexOf(updateMarker, deletePrefix.Length, StringComparison.OrdinalIgnoreCase);
-            if (updateIndex < 0)
-                return false;
-
-            onDelete = detail.Substring(deletePrefix.Length, updateIndex - deletePrefix.Length).Trim();
-            onUpdate = detail[(updateIndex + updateMarker.Length)..].Trim();
-            return onDelete.Length > 0 && onUpdate.Length > 0;
-        }
-
-        private static void AddMetadataValue(
-            IDictionary<string, object?> metadata,
-            IReadOnlyDictionary<string, string> values,
-            string key)
-        {
-            if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
-                metadata[key] = value;
-        }
-
-        private static string ParseSkippedObjectProvider(string detail)
-            => ScaffoldSkippedObjectMetadataBuilder.ParseSkippedObjectProvider(detail);
-
-        private static string? NullIfWhiteSpace(string? value)
-            => string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

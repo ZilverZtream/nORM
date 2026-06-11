@@ -104,6 +104,8 @@ public partial class ScaffoldingContractDocTests
     private static string ReadUnsupportedFeatureMetadataSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.ProviderObjects.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.Relationships.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexFeatureMetadataBuilder.cs"));
 
     private static string ReadDiagnosticsWriterSource()
