@@ -68,6 +68,14 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
 
+    private static string ReadSkippedObjectDiscoverySource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteSkippedObjectDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerSkippedObjectDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlSkippedObjectDiscovery.cs"));
+
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
@@ -211,7 +219,7 @@ public class ScaffoldingContractDocTests
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var sqlServerUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerUnsupportedFeatureDiscovery.cs");
         var mySqlUnsupportedSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlUnsupportedFeatureDiscovery.cs");
-        var skippedDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs");
+        var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var skippedMetadataSource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.cs"));
@@ -335,7 +343,7 @@ public class ScaffoldingContractDocTests
         var source = ReadStaticEntityScaffoldSource();
         var entityWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.cs");
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
-        var skippedDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs");
+        var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var entityStart = source.IndexOf("public static async Task<string> BuildAsync", StringComparison.Ordinal);
         var entityEnd = source.IndexOf("public static string BuildSchemaProbeSql", entityStart, StringComparison.Ordinal);
 
@@ -423,7 +431,7 @@ public class ScaffoldingContractDocTests
         Assert.Contains("stale `nORM.ScaffoldWarnings.*` files", doc, StringComparison.Ordinal);
         var source = ReadStaticEntityScaffoldSource();
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
-        var skippedDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs");
+        var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var diagnosticsWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs");
         var routineWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs");
         var unsupportedMetadataSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.cs");
