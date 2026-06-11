@@ -642,37 +642,10 @@ namespace nORM.Scaffolding
                 .ToArray();
 
         private static string NormalizeReferentialAction(string? action)
-        {
-            if (string.IsNullOrWhiteSpace(action))
-                return "NO ACTION";
-
-            return action.Replace('_', ' ').Trim().ToUpperInvariant();
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.NormalizeReferentialAction(action);
 
         private static bool TryParseReferentialAction(string? action, out ReferentialAction referentialAction)
-        {
-            switch (NormalizeReferentialAction(action))
-            {
-                case "CASCADE":
-                    referentialAction = ReferentialAction.Cascade;
-                    return true;
-                case "SET NULL":
-                    referentialAction = ReferentialAction.SetNull;
-                    return true;
-                case "RESTRICT":
-                    referentialAction = ReferentialAction.Restrict;
-                    return true;
-                case "SET DEFAULT":
-                    referentialAction = ReferentialAction.SetDefault;
-                    return true;
-                case "NO ACTION":
-                    referentialAction = ReferentialAction.NoAction;
-                    return true;
-                default:
-                    referentialAction = ReferentialAction.NoAction;
-                    return false;
-            }
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.TryParseReferentialAction(action, out referentialAction);
 
         private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
@@ -697,115 +670,31 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
-        {
-            foreach (var table in tables)
-            {
-                var tableKey = TableKey(table.Schema, table.Name);
-                if (primaryKeyColumnsByTable.TryGetValue(tableKey, out var keys) && keys.Count > 0)
-                    continue;
-
-                columnPropertiesByTable.TryGetValue(tableKey, out var properties);
-                var columnNames = properties?.Keys.ToArray() ?? Array.Empty<string>();
-                var propertyNames = properties?.Values.ToArray() ?? Array.Empty<string>();
-                features.Add(new ScaffoldUnsupportedFeature(
-                    tableKey,
-                    "MissingPrimaryKey",
-                    table.Name,
-                    "Table has no primary key; generated entity is a query/bootstrap artifact until a key is configured.")
-                {
-                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["table"] = tableKey,
-                        ["columns"] = columnNames,
-                        ["properties"] = propertyNames,
-                        ["columnCount"] = columnNames.Length,
-                        ["reason"] = "missing-primary-key"
-                    }
-                });
-            }
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.AddMissingPrimaryKeyDiagnostics(
+                features,
+                tables,
+                primaryKeyColumnsByTable,
+                columnPropertiesByTable);
 
         private static void AddReferentialActionDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys)
-        {
-            foreach (var group in foreignKeys.GroupBy(
-                fk => $"{fk.DependentSchema}\u001f{fk.DependentTable}\u001f{fk.ConstraintName}",
-                StringComparer.OrdinalIgnoreCase))
-            {
-                var fk = group.First();
-                var onDelete = NormalizeReferentialAction(fk.OnDelete);
-                var onUpdate = NormalizeReferentialAction(fk.OnUpdate);
-                if (TryParseReferentialAction(onDelete, out _)
-                    && TryParseReferentialAction(onUpdate, out _))
-                    continue;
-
-                var rows = group.ToArray();
-                var dependentKey = TableKey(fk.DependentSchema, fk.DependentTable);
-                var principalKey = TableKey(fk.PrincipalSchema, fk.PrincipalTable);
-                var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
-                var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-                features.Add(new ScaffoldUnsupportedFeature(
-                    dependentKey,
-                    "ReferentialAction",
-                    fk.ConstraintName,
-                    $"ON DELETE {onDelete}; ON UPDATE {onUpdate}")
-                {
-                    Metadata = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["dependentTable"] = dependentKey,
-                        ["dependentColumns"] = dependentColumns,
-                        ["principalTable"] = principalKey,
-                        ["principalColumns"] = principalColumns,
-                        ["columnCount"] = rows.Length,
-                        ["onDelete"] = onDelete,
-                        ["onUpdate"] = onUpdate
-                    }
-                });
-            }
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.AddReferentialActionDiagnostics(features, foreignKeys);
 
         private static void RemoveSupportedDescendingIndexDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var supportedDescending = indexes
-                .Where(static index => index.IsDescending)
-                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            features.RemoveAll(feature =>
-                string.Equals(feature.Kind, "DescendingIndex", StringComparison.OrdinalIgnoreCase)
-                && supportedDescending.Contains(feature.TableKey + "\u001f" + feature.Name));
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.RemoveSupportedDescendingIndexDiagnostics(features, indexes);
 
         private static void RemoveSupportedIncludedColumnIndexDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var supportedIncluded = indexes
-                .Where(static index => index.IsIncluded)
-                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            features.RemoveAll(feature =>
-                string.Equals(feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
-                && supportedIncluded.Contains(feature.TableKey + "\u001f" + feature.Name));
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.RemoveSupportedIncludedColumnIndexDiagnostics(features, indexes);
 
         private static void RemoveSupportedPartialIndexDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldIndex> indexes)
-        {
-            var supportedPartial = indexes
-                .Where(static index => !string.IsNullOrWhiteSpace(index.FilterSql))
-                .Select(static index => index.TableKey + "\u001f" + index.IndexName)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            features.RemoveAll(feature =>
-                string.Equals(feature.Kind, "PartialIndex", StringComparison.OrdinalIgnoreCase)
-                && supportedPartial.Contains(feature.TableKey + "\u001f" + feature.Name));
-        }
+            => ScaffoldUnsupportedDiagnosticAdapter.RemoveSupportedPartialIndexDiagnostics(features, indexes);
 
         private static void AddRelationshipPrincipalKeyDiagnostics(
             List<ScaffoldUnsupportedFeature> features,
